@@ -31,7 +31,23 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Check formatting and conflict markers
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2.23.0
+        with:
+          flutter-version: 3.47.1
+          channel: stable
+          cache: true
+
+      - name: Validate Flutter project
+        shell: bash
+        run: |
+          flutter pub get
+          dart format --output=none --set-exit-if-changed lib test
+          flutter analyze --fatal-infos
+          flutter test
+          flutter build apk --debug
+
+      - name: Check repository hygiene
         shell: bash
         run: |
           git diff --check "$(git hash-object -t tree /dev/null)" HEAD
@@ -41,9 +57,6 @@ jobs:
             exit 1
           fi
 
-      - name: Block sensitive files
-        shell: bash
-        run: |
           failed=0
           while IFS= read -r -d '' file; do
             case "$file" in
@@ -55,14 +68,8 @@ jobs:
                 ;;
             esac
           done < <(git ls-files -z)
-          exit "$failed"
 
-      - name: Block files larger than 10 MiB
-        shell: bash
-        run: |
           max_bytes=$((10 * 1024 * 1024))
-          failed=0
-
           while IFS= read -r -d '' file; do
             [[ -f "$file" ]] || continue
             size=$(wc -c < "$file")
