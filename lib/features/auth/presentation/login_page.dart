@@ -364,33 +364,19 @@ class _PomiMark extends StatelessWidget {
               ),
             ],
           ),
-          child: const SizedBox.square(
-            dimension: 94,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Text(
-                  'P',
-                  style: TextStyle(
-                    color: Color(0xFF8A68B6),
-                    fontSize: 58,
-                    height: 1,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -8,
-                  ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(28),
+            child: SizedBox.square(
+              dimension: 108,
+              child: Transform.scale(
+                scale: 1.34,
+                child: Image.asset(
+                  'assets/images/pomi_logo.png',
+                  fit: BoxFit.cover,
+                  filterQuality: FilterQuality.high,
+                  semanticLabel: 'POMI 品牌标志',
                 ),
-                Positioned(
-                  top: 27,
-                  right: 31,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: Color(0xFFF8F5F8),
-                      shape: BoxShape.circle,
-                    ),
-                    child: SizedBox.square(dimension: 7),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),
