@@ -17,6 +17,24 @@ flutter pub get
 flutter run
 ```
 
+## UI demo scope
+
+The current Flutter UI uses local demo data and includes:
+
+- fixed new/existing demo-account routes;
+- three-step patient onboarding;
+- dashboard and medication three-state interactions;
+- medication management and reminder screens;
+- menstrual-cycle calendar and weight trends;
+- visit records and source traceability;
+- upload, OCR review, draft confirmation, and medication reconciliation;
+- report generation and three-layer report navigation;
+- doctor KYC, signature, and test-chain certification states;
+- patient profile and authorization entry points.
+
+Backend APIs, real OCR, identity providers, blockchain nodes, PDF export, and
+production persistence are intentionally not connected yet.
+
 ## Quality checks
 
 Run the same core checks used by GitHub Actions:
@@ -26,3 +44,5 @@ dart format --output=none --set-exit-if-changed lib test
 flutter analyze --fatal-infos
 flutter test
 ```
+
+See `THIRD_PARTY_NOTICES.md` for UI dependency licenses.

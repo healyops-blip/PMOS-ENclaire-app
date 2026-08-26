@@ -7,8 +7,10 @@ environment:
   sdk: ^3.13.1
 
 dependencies:
+  fl_chart: 1.2.0
   flutter:
     sdk: flutter
+  table_calendar: 3.2.1
 
 dev_dependencies:
   flutter_test:
