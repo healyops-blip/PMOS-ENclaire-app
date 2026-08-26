@@ -6,6 +6,15 @@ The Flutter client and Supabase backend assets live in this repository. See
 [`docs/architecture.md`](docs/architecture.md) for directory boundaries and
 security rules.
 
+## Repository layout
+
+- `lib/`: Flutter application code
+- `test/`: Flutter unit and widget tests
+- `android/` and `ios/`: native host projects
+- `supabase/`: database migrations and server-side Edge Functions
+- `docs/`: architecture, API, privacy, and technical decisions
+- `.github/workflows/`: required CI and security checks
+
 ## Requirements
 
 - Flutter 3.47.1 (stable)
