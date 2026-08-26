@@ -2,6 +2,10 @@
 
 PMOS ENclaire mobile application built with Flutter for iOS and Android.
 
+The Flutter client and Supabase backend assets live in this repository. See
+[`docs/architecture.md`](docs/architecture.md) for directory boundaries and
+security rules.
+
 ## Requirements
 
 - Flutter 3.47.1 (stable)
