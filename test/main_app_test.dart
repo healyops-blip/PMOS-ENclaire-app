@@ -19,7 +19,9 @@ void main() {
   ) async {
     await tester.pumpWidget(const MainApp());
 
-    await tester.tap(find.byKey(const Key('demo-login-button')));
+    final loginButton = find.byKey(const Key('demo-login-button'));
+    await tester.ensureVisible(loginButton);
+    await tester.tap(loginButton);
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('dashboard-page')), findsOneWidget);
@@ -42,6 +44,40 @@ void main() {
       find.descendant(of: secondMedicationStatus, matching: find.text('已服用')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('switches between password code login and phone registration', (
+    tester,
+  ) async {
+    _setPhoneViewport(tester);
+    await tester.pumpWidget(const MainApp());
+
+    expect(find.byKey(const Key('auth-identifier-field')), findsOneWidget);
+    expect(find.byKey(const Key('auth-password-field')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('auth-code-mode')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('auth-code-field')), findsOneWidget);
+    expect(find.byKey(const Key('auth-password-field')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('auth-register-tab')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('auth-phone-field')), findsOneWidget);
+    expect(find.byKey(const Key('auth-register-code-field')), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const Key('auth-phone-field')),
+      '13800005678',
+    );
+    await tester.enterText(
+      find.byKey(const Key('auth-register-code-field')),
+      '2026',
+    );
+    final registerButton = find.byKey(const Key('demo-login-button'));
+    await tester.ensureVisible(registerButton);
+    await tester.tap(registerButton);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('onboarding-page')), findsOneWidget);
   });
 
   testWidgets('new demo user completes onboarding before the dashboard', (
