@@ -21,14 +21,14 @@ class DemoAccount {
   }
 
   static const newUser = DemoAccount(
-    uid: 'demo-new-user',
+    uid: 'preset-new-user',
     label: '新用户演示',
     displayName: '新朋友',
     onboardingRequired: true,
   );
 
   static const existingUser = DemoAccount(
-    uid: 'demo-existing-user',
+    uid: 'preset-existing-user',
     label: '老用户演示',
     displayName: '林晓晴',
     onboardingRequired: false,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:pmos_enclaire/core/theme/pomi_theme.dart';
 import 'package:pmos_enclaire/features/auth/domain/demo_account.dart';
 import 'package:pmos_enclaire/features/auth/presentation/login_page.dart';
@@ -11,57 +12,67 @@ abstract final class PomiRoutes {
   static const dashboard = '/dashboard';
 }
 
-class PomiApp extends StatelessWidget {
+class PomiApp extends StatefulWidget {
   const PomiApp({super.key});
 
   @override
+  State<PomiApp> createState() => _PomiAppState();
+}
+
+class _PomiAppState extends State<PomiApp> {
+  late final GoRouter _router = GoRouter(
+    initialLocation: PomiRoutes.login,
+    routes: [
+      GoRoute(
+        path: PomiRoutes.login,
+        builder: (context, state) => LoginPage(
+          onLogin: (account) {
+            final route = account.onboardingRequired
+                ? PomiRoutes.onboarding
+                : PomiRoutes.dashboard;
+            context.go(route, extra: account);
+          },
+        ),
+      ),
+      GoRoute(
+        path: PomiRoutes.onboarding,
+        builder: (context, state) {
+          final account = state.extra as DemoAccount? ?? DemoAccount.newUser;
+          return OnboardingPage(
+            account: account,
+            onCompleted: (profileName) {
+              context.go(
+                PomiRoutes.dashboard,
+                extra: account.copyWith(displayName: profileName),
+              );
+            },
+          );
+        },
+      ),
+      GoRoute(
+        path: PomiRoutes.dashboard,
+        builder: (context, state) {
+          final account =
+              state.extra as DemoAccount? ?? DemoAccount.existingUser;
+          return DashboardPage(account: account);
+        },
+      ),
+    ],
+  );
+
+  @override
+  void dispose() {
+    _router.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'Pomi',
       debugShowCheckedModeBanner: false,
       theme: PomiTheme.light,
-      initialRoute: PomiRoutes.login,
-      onGenerateRoute: (settings) {
-        switch (settings.name) {
-          case PomiRoutes.login:
-            return MaterialPageRoute<void>(
-              settings: settings,
-              builder: (context) => LoginPage(
-                onLogin: (account) {
-                  final route = account.onboardingRequired
-                      ? PomiRoutes.onboarding
-                      : PomiRoutes.dashboard;
-                  Navigator.of(context)
-                      .pushReplacementNamed(route, arguments: account);
-                },
-              ),
-            );
-          case PomiRoutes.onboarding:
-            final account =
-                settings.arguments as DemoAccount? ?? DemoAccount.newUser;
-            return MaterialPageRoute<void>(
-              settings: settings,
-              builder: (context) => OnboardingPage(
-                account: account,
-                onCompleted: (profileName) {
-                  Navigator.of(context).pushReplacementNamed(
-                    PomiRoutes.dashboard,
-                    arguments: account.copyWith(displayName: profileName),
-                  );
-                },
-              ),
-            );
-          case PomiRoutes.dashboard:
-            final account =
-                settings.arguments as DemoAccount? ?? DemoAccount.existingUser;
-            return MaterialPageRoute<void>(
-              settings: settings,
-              builder: (_) => DashboardPage(account: account),
-            );
-          default:
-            return null;
-        }
-      },
+      routerConfig: _router,
     );
   }
 }

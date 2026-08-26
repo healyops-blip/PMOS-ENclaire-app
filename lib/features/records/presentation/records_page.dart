@@ -266,8 +266,8 @@ class _VisitDetailPage extends StatelessWidget {
               children: [
                 _TraceRow('上传时间', '2026-08-26 10:24'),
                 _TraceRow('用户确认', '2026-08-26 10:28'),
-                _TraceRow('签字医生', '陈医生 · KYC 已通过'),
-                _TraceRow('测试链状态', '已确认 · 12 confirmations', last: true),
+                _TraceRow('文件版本', 'V2 · V1 已保留'),
+                _TraceRow('演示认证', '当前版本已完成', last: true),
               ],
             ),
           ),

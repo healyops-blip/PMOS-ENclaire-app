@@ -1,9 +1,19 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 import 'package:pmos_enclaire/core/theme/pomi_theme.dart';
 import 'package:pmos_enclaire/core/widgets/demo_badge.dart';
 import 'package:pmos_enclaire/core/widgets/pomi_line_chart.dart';
 import 'package:pmos_enclaire/core/widgets/pomi_surfaces.dart';
+import 'package:pmos_enclaire/features/certification/application/certification_providers.dart';
+import 'package:pmos_enclaire/features/certification/domain/certification_record.dart';
 import 'package:pmos_enclaire/features/certification/presentation/certification_page.dart';
+import 'package:printing/printing.dart';
+
+enum _PdfAction { save, share, print }
 
 class ReportGeneratorPage extends StatefulWidget {
   const ReportGeneratorPage({super.key});
@@ -182,6 +192,126 @@ class _ReportPageState extends State<ReportPage> {
     ),
   };
 
+  Future<Uint8List> _buildPdf() async {
+    final logoData = await rootBundle.load('assets/images/pomi_logo.png');
+    final logo = pw.MemoryImage(logoData.buffer.asUint8List());
+    final document = pw.Document(
+      title: 'POMI PCOS Visit Preparation Report',
+      author: 'POMI',
+    );
+    document.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(36),
+        build: (context) => [
+          pw.Row(
+            children: [
+              pw.Image(logo, width: 56, height: 56, fit: pw.BoxFit.cover),
+              pw.SizedBox(width: 14),
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    'POMI PCOS VISIT REPORT',
+                    style: pw.TextStyle(
+                      fontSize: 20,
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColor.fromHex('#6A4C93'),
+                    ),
+                  ),
+                  pw.Text('Demo patient / Generated 2026-08-27'),
+                ],
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 24),
+          pw.Container(
+            padding: const pw.EdgeInsets.all(12),
+            color: PdfColor.fromHex('#F5F0F9'),
+            child: pw.Text(
+              'Patient statement (verbatim): Irregular menstrual cycles during the past two months. Occasional missed metformin doses due to stomach discomfort.',
+            ),
+          ),
+          pw.SizedBox(height: 18),
+          pw.Text(
+            'Latest confirmed indicators',
+            style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 8),
+          pw.TableHelper.fromTextArray(
+            headers: const ['Indicator', 'Value', 'Reference / status'],
+            data: const [
+              ['Fasting glucose', '5.6 mmol/L', '3.9 - 6.1'],
+              ['HbA1c', '5.5 %', '4.0 - 6.0'],
+              ['Total testosterone', '0.9 ng/mL', 'Above 0.8'],
+              ['Triglycerides', '1.4 mmol/L', '0.45 - 1.70'],
+            ],
+            headerDecoration: pw.BoxDecoration(
+              color: PdfColor.fromHex('#EDE5F3'),
+            ),
+          ),
+          pw.SizedBox(height: 18),
+          pw.Text(
+            'Current medications',
+            style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.Bullet(text: 'Metformin XR 850 mg / once daily'),
+          pw.Bullet(text: 'Folic acid 0.4 mg / once daily'),
+          pw.Bullet(text: 'Vitamin D3 1000 IU / once daily'),
+          pw.SizedBox(height: 22),
+          pw.Divider(),
+          pw.Text(
+            'Demo data only. Patient-reported information is for visit preparation and does not constitute diagnosis, treatment advice, or an official medical record.',
+            style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+          ),
+        ],
+      ),
+    );
+    return document.save();
+  }
+
+  Future<void> _handlePdf(_PdfAction action) async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(const SnackBar(content: Text('正在生成 PDF…')));
+    try {
+      final bytes = await _buildPdf();
+      switch (action) {
+        case _PdfAction.save:
+          await FilePicker.platform.saveFile(
+            fileName: 'pomi-visit-report-20260827.pdf',
+            bytes: bytes,
+            type: FileType.custom,
+            allowedExtensions: const ['pdf'],
+          );
+        case _PdfAction.share:
+          await Printing.sharePdf(
+            bytes: bytes,
+            filename: 'pomi-visit-report-20260827.pdf',
+            subject: 'POMI 复诊准备报告',
+          );
+        case _PdfAction.print:
+          await Printing.layoutPdf(onLayout: (_) async => bytes);
+      }
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(switch (action) {
+              _PdfAction.save => 'PDF 已生成',
+              _PdfAction.share => '已打开系统分享面板',
+              _PdfAction.print => '已打开系统打印面板',
+            }),
+          ),
+        );
+      }
+    } on Exception {
+      if (mounted) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('PDF 操作失败，但 App 内报告不受影响')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -189,10 +319,34 @@ class _ReportPageState extends State<ReportPage> {
       appBar: AppBar(
         title: const Text('复诊报告'),
         actions: [
-          IconButton(
-            onPressed: () => ScaffoldMessenger.of(context)
-                .showSnackBar(const SnackBar(content: Text('PDF 导出将在后端接入后启用'))),
-            icon: const Icon(Icons.ios_share_outlined),
+          PopupMenuButton<_PdfAction>(
+            key: const Key('report-pdf-menu'),
+            tooltip: 'PDF 操作',
+            onSelected: _handlePdf,
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: _PdfAction.save,
+                child: ListTile(
+                  leading: Icon(Icons.download_outlined),
+                  title: Text('保存 PDF'),
+                ),
+              ),
+              PopupMenuItem(
+                value: _PdfAction.share,
+                child: ListTile(
+                  leading: Icon(Icons.ios_share_outlined),
+                  title: Text('分享 PDF'),
+                ),
+              ),
+              PopupMenuItem(
+                value: _PdfAction.print,
+                child: ListTile(
+                  leading: Icon(Icons.print_outlined),
+                  title: Text('打印 PDF'),
+                ),
+              ),
+            ],
+            icon: const Icon(Icons.picture_as_pdf_outlined),
           ),
         ],
       ),
@@ -283,7 +437,7 @@ class _SummaryLayer extends StatelessWidget {
         const PomiSectionCard(
           color: PomiColors.primaryPale,
           child: Text(
-            '近 6 个月体重缓慢下降，血糖与 HbA1c 保持稳定；总睾酮本次轻度超出参考上限。当前用药完成率 85%，建议复诊时重点讨论二甲双胍胃部不适与剂量。',
+            '最新体重记录为 69.6 kg。空腹血糖和 HbA1c 本次位于材料所列参考范围内；总睾酮本次数值高于该报告参考上限。以下内容仅整理已确认数据，不作病因解释或治疗建议。',
             style: TextStyle(fontSize: 12, height: 1.7),
           ),
         ),
@@ -328,7 +482,7 @@ class _SummaryLayer extends StatelessWidget {
                     style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
                   ),
                   Spacer(),
-                  PomiPill(label: '完成率 85%', color: PomiColors.success),
+                  PomiPill(label: '用药三状态', color: PomiColors.primary),
                 ],
               ),
               SizedBox(height: 8),
@@ -339,6 +493,16 @@ class _SummaryLayer extends StatelessWidget {
                 minY: 68,
                 maxY: 73,
                 height: 150,
+              ),
+              SizedBox(height: 10),
+              Wrap(
+                spacing: 7,
+                runSpacing: 7,
+                children: [
+                  PomiPill(label: '已服用 23', color: PomiColors.success),
+                  PomiPill(label: '主动漏服 2', color: PomiColors.warning),
+                  PomiPill(label: '未记录 4', color: PomiColors.textMuted),
+                ],
               ),
             ],
           ),
@@ -489,43 +653,9 @@ class _SourceLayer extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 18),
-        const PomiSectionTitle(title: '签字与测试链'),
+        const PomiSectionTitle(title: '材料认证演示'),
         const SizedBox(height: 8),
-        PomiSectionCard(
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const CertificationPage()),
-          ),
-          child: const Row(
-            children: [
-              Icon(
-                Icons.verified_user_outlined,
-                color: PomiColors.success,
-                size: 32,
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '陈医生签字 · KYC 已通过',
-                      style: TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                    SizedBox(height: 3),
-                    Text(
-                      '测试链确认中 · 查看完整流转记录',
-                      style: TextStyle(
-                        color: PomiColors.textMuted,
-                        fontSize: 10,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right_rounded),
-            ],
-          ),
-        ),
+        const _CertificationEntry(),
         const SizedBox(height: 14),
         const Text(
           '原始材料与结构化数据仅供复诊沟通，不构成诊断或治疗建议。',
@@ -533,6 +663,76 @@ class _SourceLayer extends StatelessWidget {
           style: TextStyle(color: PomiColors.textMuted, fontSize: 10),
         ),
       ],
+    );
+  }
+}
+
+class _CertificationEntry extends ConsumerStatefulWidget {
+  const _CertificationEntry();
+
+  @override
+  ConsumerState<_CertificationEntry> createState() =>
+      _CertificationEntryState();
+}
+
+class _CertificationEntryState extends ConsumerState<_CertificationEntry> {
+  CertificationStatus _status = CertificationStatus.notStarted;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final record = await ref
+        .read(certificationRepositoryProvider)
+        .read('document-lab-006', 'revision-v2');
+    if (mounted) setState(() => _status = record.status);
+  }
+
+  Future<void> _open() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const CertificationPage()));
+    await _load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final succeeded = _status == CertificationStatus.succeeded;
+    return PomiSectionCard(
+      onTap: _open,
+      child: Row(
+        children: [
+          Icon(
+            succeeded ? Icons.verified_rounded : Icons.verified_user_outlined,
+            color: succeeded ? PomiColors.success : PomiColors.primary,
+            size: 32,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  succeeded ? '演示认证已完成' : '当前材料版本可进行本地认证演示',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  succeeded ? '水印只绑定检测单 V2，替换版本后需重新认证' : '不包含真实医院签发、医生身份或链上交易',
+                  style: const TextStyle(
+                    color: PomiColors.textMuted,
+                    fontSize: 10,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded),
+        ],
+      ),
     );
   }
 }

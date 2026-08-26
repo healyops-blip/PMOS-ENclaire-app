@@ -27,8 +27,10 @@ class _OnboardingPageState extends State<OnboardingPage> {
   final _nextVisitController = TextEditingController(text: '2026-09-10');
 
   int _step = 0;
+  String _gender = '女性';
   String _cycleLength = '35-45 天';
   String _periodLength = '4-5 天';
+  String _managementGoal = '准备复诊材料';
   final Set<String> _medications = {'二甲双胍', '维生素 D3'};
 
   @override
@@ -44,7 +46,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   void _next() {
     if (_step == 0 && !_basicFormKey.currentState!.validate()) return;
-    if (_step < 2) {
+    if (_step < 3) {
       setState(() => _step += 1);
       return;
     }
@@ -53,8 +55,13 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   @override
   Widget build(BuildContext context) {
-    final titles = ['基本信息', '经期信息', '当前用药'];
-    final subtitles = ['帮助医生了解你的基本情况', '后续可以随时修改', '确认目前正在使用的药品'];
+    final titles = ['基本信息', '经期信息', '当前用药', '管理目标'];
+    final subtitles = [
+      '帮助医生了解你的基本情况',
+      '后续可以随时修改',
+      '确认目前正在使用的药品',
+      '选择你最希望 Pomi 帮助的方向',
+    ];
 
     return Scaffold(
       key: const Key('onboarding-page'),
@@ -69,7 +76,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   const DemoBadge(label: '首次使用'),
                   const Spacer(),
                   Text(
-                    '${_step + 1} / 3',
+                    '${_step + 1} / 4',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
@@ -78,12 +85,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
-                children: List.generate(3, (index) {
+                children: List.generate(4, (index) {
                   return Expanded(
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 220),
                       height: 5,
-                      margin: EdgeInsets.only(right: index == 2 ? 0 : 7),
+                      margin: EdgeInsets.only(right: index == 3 ? 0 : 7),
                       decoration: BoxDecoration(
                         color: index <= _step
                             ? PomiColors.primary
@@ -125,6 +132,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
                             birthController: _birthController,
                             diagnosisController: _diagnosisController,
                             heightController: _heightController,
+                            gender: _gender,
+                            onGenderChanged: (value) =>
+                                setState(() => _gender = value),
                           ),
                           1 => _CycleInfoStep(
                             key: const ValueKey('cycle-info'),
@@ -137,7 +147,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                             onPeriodChanged: (value) =>
                                 setState(() => _periodLength = value),
                           ),
-                          _ => _MedicationStep(
+                          2 => _MedicationStep(
                             key: const ValueKey('medication-info'),
                             selected: _medications,
                             onChanged: (name, selected) {
@@ -150,6 +160,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
                               });
                             },
                           ),
+                          _ => _GoalStep(
+                            key: const ValueKey('management-goal'),
+                            selected: _managementGoal,
+                            onChanged: (value) =>
+                                setState(() => _managementGoal = value),
+                          ),
                         },
                       ),
                       const SizedBox(height: 12),
@@ -158,7 +174,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       FilledButton(
                         key: const Key('onboarding-next'),
                         onPressed: _next,
-                        child: Text(_step == 2 ? '完成，进入首页' : '下一步'),
+                        child: Text(_step == 3 ? '完成，进入首页' : '下一步'),
                       ),
                       if (_step > 0)
                         TextButton(
@@ -184,6 +200,8 @@ class _BasicInfoStep extends StatelessWidget {
     required this.birthController,
     required this.diagnosisController,
     required this.heightController,
+    required this.gender,
+    required this.onGenderChanged,
     super.key,
   });
 
@@ -192,6 +210,8 @@ class _BasicInfoStep extends StatelessWidget {
   final TextEditingController birthController;
   final TextEditingController diagnosisController;
   final TextEditingController heightController;
+  final String gender;
+  final ValueChanged<String> onGenderChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -228,7 +248,12 @@ class _BasicInfoStep extends StatelessWidget {
                     ? '请输入有效身高'
                     : null;
               },
-              last: true,
+            ),
+            const _FieldLabel('性别'),
+            _ChoiceWrap(
+              values: const ['女性', '男性', '其他', '暂不填写'],
+              selected: gender,
+              onChanged: onGenderChanged,
             ),
           ],
         ),
@@ -341,6 +366,76 @@ class _MedicationStep extends StatelessWidget {
             '用药按多囊用药、日常补剂和其他药分组，医生需关注全局用药。',
             style: Theme.of(context).textTheme.bodySmall,
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GoalStep extends StatelessWidget {
+  const _GoalStep({required this.selected, required this.onChanged, super.key});
+
+  final String selected;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    const goals = [
+      ('准备复诊材料', '把化验、用药、周期和体重整理成医生易读的报告'),
+      ('坚持日常记录', '通过轻量提醒维护用药、经期和体重数据'),
+      ('看懂身体趋势', '在不提供诊断的前提下查看可追溯的变化'),
+    ];
+    return _FormCard(
+      child: Column(
+        children: [
+          for (final goal in goals)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Material(
+                color: selected == goal.$1
+                    ? PomiColors.primary.withValues(alpha: 0.09)
+                    : PomiColors.surfaceMuted,
+                borderRadius: BorderRadius.circular(14),
+                child: InkWell(
+                  onTap: () => onChanged(goal.$1),
+                  borderRadius: BorderRadius.circular(14),
+                  child: Padding(
+                    padding: const EdgeInsets.all(13),
+                    child: Row(
+                      children: [
+                        Icon(
+                          selected == goal.$1
+                              ? Icons.radio_button_checked_rounded
+                              : Icons.radio_button_unchecked_rounded,
+                          color: selected == goal.$1
+                              ? PomiColors.primary
+                              : PomiColors.textMuted,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                goal.$1,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                goal.$2,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -471,7 +566,7 @@ class _PrivacyNote extends StatelessWidget {
           SizedBox(width: 8),
           Expanded(
             child: Text(
-              '仅收集最小字段；演示阶段不收集真实姓名、身份证号、手机号和地址。',
+              '仅收集最小字段；画像不收集真实姓名、身份证号和地址，选填手机号仅作为账号资料。',
               style: TextStyle(color: PomiColors.textMuted, fontSize: 10),
             ),
           ),

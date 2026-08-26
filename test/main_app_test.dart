@@ -46,7 +46,7 @@ void main() {
     );
   });
 
-  testWidgets('switches between password code login and phone registration', (
+  testWidgets('uses account password login and registration without SMS', (
     tester,
   ) async {
     _setPhoneViewport(tester);
@@ -54,24 +54,35 @@ void main() {
 
     expect(find.byKey(const Key('auth-identifier-field')), findsOneWidget);
     expect(find.byKey(const Key('auth-password-field')), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('auth-code-mode')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('auth-code-field')), findsOneWidget);
-    expect(find.byKey(const Key('auth-password-field')), findsNothing);
+    expect(find.textContaining('不发送短信验证码'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('auth-register-tab')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('auth-phone-field')), findsOneWidget);
-    expect(find.byKey(const Key('auth-register-code-field')), findsOneWidget);
+    expect(
+      find.byKey(const Key('auth-register-account-field')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('auth-register-password-field')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('auth-register-confirm-field')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('auth-register-phone-field')), findsOneWidget);
 
     await tester.enterText(
-      find.byKey(const Key('auth-phone-field')),
-      '13800005678',
+      find.byKey(const Key('auth-register-account-field')),
+      'pomi_created',
     );
     await tester.enterText(
-      find.byKey(const Key('auth-register-code-field')),
-      '2026',
+      find.byKey(const Key('auth-register-password-field')),
+      'Pomi2026!',
+    );
+    await tester.enterText(
+      find.byKey(const Key('auth-register-confirm-field')),
+      'Pomi2026!',
     );
     final registerButton = find.byKey(const Key('demo-login-button'));
     await tester.ensureVisible(registerButton);
@@ -89,14 +100,14 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(const MainApp());
-    await tester.tap(find.byKey(const Key('account-demo-new-user')));
+    await tester.tap(find.byKey(const Key('account-preset-new-user')));
     await tester.tap(find.byKey(const Key('demo-login-button')));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('onboarding-page')), findsOneWidget);
     expect(find.text('基本信息'), findsOneWidget);
 
-    for (var step = 0; step < 3; step++) {
+    for (var step = 0; step < 4; step++) {
       final next = find.byKey(const Key('onboarding-next'));
       await tester.ensureVisible(next);
       await tester.tap(next);
@@ -128,6 +139,17 @@ void main() {
     await tester.tap(find.byKey(const Key('certification-entry')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('certification-page')), findsOneWidget);
+    expect(find.text('医院认证演示'), findsWidgets);
+    expect(find.textContaining('KYC'), findsNothing);
+    expect(find.textContaining('交易哈希'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('advance-certification-button')));
+    await tester.pump();
+    expect(find.text('认证处理中…'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 1500));
+    await tester.pumpAndSettle();
+    expect(find.text('演示认证成功'), findsOneWidget);
+    expect(find.text('演示认证'), findsOneWidget);
   });
 
   testWidgets('upload flow reaches OCR confirmation and reconciliation', (
@@ -138,15 +160,30 @@ void main() {
 
     await tester.tap(find.byKey(const Key('upload-button')));
     await tester.pumpAndSettle();
-    expect(find.text('上传就诊记录'), findsOneWidget);
+    expect(find.text('选择材料类型'), findsOneWidget);
+    expect(find.text('化验／检测'), findsOneWidget);
+    expect(find.text('医嘱／处方'), findsOneWidget);
+    expect(find.text('影像文字报告'), findsOneWidget);
+    expect(find.text('门诊病历／就诊记录'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('upload-camera-option')));
+    await tester.tap(find.byKey(const Key('material-type-prescription')));
     await tester.pumpAndSettle();
+    expect(find.text('上传医嘱'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('upload-demo-option')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('confirm-external-ocr')));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 900));
     expect(find.text('识别完成'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('ocr-review-button')));
     await tester.pumpAndSettle();
-    expect(find.text('待确认草稿 · 化验单'), findsOneWidget);
+    expect(find.text('待确认草稿 · 医嘱'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('confirm-draft-盐酸二甲双胍缓释片')));
+    await tester.tap(find.byKey(const Key('confirm-draft-肌醇')));
+    await tester.pump();
 
     final confirmOcr = find.byKey(const Key('confirm-ocr-button'));
     await tester.ensureVisible(confirmOcr);
@@ -181,6 +218,14 @@ void main() {
     expect(find.text('1 · 摘要'), findsOneWidget);
     expect(find.text('2 · 趋势'), findsOneWidget);
     expect(find.text('3 · 来源'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('report-pdf-menu')));
+    await tester.pumpAndSettle();
+    expect(find.text('保存 PDF'), findsOneWidget);
+    expect(find.text('分享 PDF'), findsOneWidget);
+    expect(find.text('打印 PDF'), findsOneWidget);
+    await tester.tapAt(const Offset(12, 180));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('2 · 趋势'));
     await tester.pumpAndSettle();

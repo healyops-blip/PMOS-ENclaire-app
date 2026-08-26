@@ -1,12 +1,10 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:pmos_enclaire/core/theme/pomi_theme.dart';
-import 'package:pmos_enclaire/core/widgets/frosted_panel.dart';
 import 'package:pmos_enclaire/features/auth/domain/demo_account.dart';
 
 enum _AuthView { login, register }
-
-enum _LoginMethod { password, code }
 
 class LoginPage extends StatefulWidget {
   const LoginPage({required this.onLogin, super.key});
@@ -18,74 +16,67 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final _identifierController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _phoneController = TextEditingController();
-  final _codeController = TextEditingController();
+  final _accountController = TextEditingController(text: 'pomi_existing');
+  final _passwordController = TextEditingController(text: 'Pomi2026!');
+  final _registerAccountController = TextEditingController();
+  final _registerPasswordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  final _optionalPhoneController = TextEditingController();
 
-  DemoAccount _selected = DemoAccount.existingUser;
   _AuthView _view = _AuthView.login;
-  _LoginMethod _loginMethod = _LoginMethod.password;
-  bool _obscurePassword = true;
-  bool _codeRequested = false;
+  DemoAccount _selectedAccount = DemoAccount.existingUser;
 
   @override
   void dispose() {
-    _identifierController.dispose();
+    _accountController.dispose();
     _passwordController.dispose();
-    _phoneController.dispose();
-    _codeController.dispose();
+    _registerAccountController.dispose();
+    _registerPasswordController.dispose();
+    _confirmPasswordController.dispose();
+    _optionalPhoneController.dispose();
     super.dispose();
   }
 
   void _switchView(_AuthView view) {
-    if (_view == view) return;
-    FocusScope.of(context).unfocus();
+    if (_view != view) setState(() => _view = view);
+  }
+
+  void _selectDemo(DemoAccount account) {
     setState(() {
-      _view = view;
-      _codeRequested = false;
+      _selectedAccount = account;
+      _view = _AuthView.login;
+      _accountController.text = account == DemoAccount.newUser
+          ? 'pomi_new'
+          : 'pomi_existing';
+      _passwordController.text = 'Pomi2026!';
     });
   }
 
-  void _requestCode() {
-    final value = _view == _AuthView.register
-        ? _phoneController.text
-        : _identifierController.text;
-    if (value.trim().isEmpty) {
-      _showMessage(_view == _AuthView.register ? '请先输入手机号' : '请先输入用户名或手机号');
-      return;
-    }
-    setState(() => _codeRequested = true);
-    _showMessage('演示验证码已发送：2026');
-  }
-
   void _submit() {
-    FocusScope.of(context).unfocus();
     if (_view == _AuthView.register) {
-      final phone = _phoneController.text.replaceAll(' ', '');
-      if (phone.length != 11) {
-        _showMessage('请输入 11 位手机号');
-        return;
+      final accountName = _registerAccountController.text.trim();
+      final password = _registerPasswordController.text;
+      if (accountName.length < 3) return _message('账号名至少需要 3 个字符');
+      if (password.length < 8) return _message('密码至少需要 8 个字符');
+      if (password != _confirmPasswordController.text) {
+        return _message('两次输入的密码不一致');
       }
-      if (_codeController.text.trim().isEmpty) {
-        _showMessage('请输入短信验证码');
-        return;
-      }
-      widget.onLogin(DemoAccount.newUser);
+      widget.onLogin(DemoAccount.newUser.copyWith(displayName: accountName));
       return;
     }
-    widget.onLogin(_selected);
+
+    if (_accountController.text.trim().isEmpty ||
+        _passwordController.text.isEmpty) {
+      return _message('请输入账号名和密码');
+    }
+    widget.onLogin(_selectedAccount);
   }
 
-  void _showMessage(String message) {
+  void _message(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-          width: 300,
-        ),
+        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
       );
   }
 
@@ -93,253 +84,136 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: const Key('login-page'),
-      backgroundColor: const Color(0xFFF4F0F6),
+      backgroundColor: const Color(0xFFF3EEF5),
       body: LayoutBuilder(
         builder: (context, constraints) {
           final framed = constraints.maxWidth >= 560;
-          final verticalInset = framed ? 22.0 : 0.0;
-          final minHeight = constraints.maxHeight - verticalInset * 2;
-
-          return SingleChildScrollView(
-            padding: EdgeInsets.symmetric(
-              horizontal: framed ? 24 : 0,
-              vertical: verticalInset,
-            ),
-            child: Center(
+          return Center(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(
+                horizontal: framed ? 32 : 0,
+                vertical: framed ? 28 : 0,
+              ),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 480),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(framed ? 46 : 0),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(minHeight: minHeight),
-                    child: Stack(
-                      children: [
-                        const Positioned.fill(
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  Color(0xFF65438F),
-                                  Color(0xFF8264A8),
-                                  Color(0xFFA98EC2),
-                                  Color(0xFFD2C1DC),
-                                ],
-                                stops: [0, 0.38, 0.72, 1],
-                              ),
-                            ),
-                          ),
-                        ),
-                        const Positioned(
-                          top: -70,
-                          right: -70,
-                          child: GlowOrb(
-                            color: Color(0x55E3C9FF),
-                            size: 230,
-                            blur: 65,
-                          ),
-                        ),
-                        const Positioned(
-                          bottom: 40,
-                          left: -100,
-                          child: GlowOrb(
-                            color: Color(0x55F2DCEB),
-                            size: 260,
-                            blur: 75,
-                          ),
-                        ),
-                        SafeArea(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(24, 24, 24, 22),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                _ModeHeader(
-                                  view: _view,
-                                  onChanged: _switchView,
-                                ),
-                                const SizedBox(height: 34),
-                                const _PomiMark(),
-                                const SizedBox(height: 28),
-                                FrostedPanel(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    20,
-                                    20,
-                                    20,
-                                    18,
-                                  ),
-                                  borderRadius: BorderRadius.circular(30),
-                                  tintOpacity: 0.16,
-                                  borderOpacity: 0.3,
-                                  blur: 30,
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      AnimatedSwitcher(
-                                        duration: const Duration(
-                                          milliseconds: 220,
-                                        ),
-                                        child: _view == _AuthView.login
-                                            ? _LoginFields(
-                                                key: const ValueKey('login'),
-                                                identifierController:
-                                                    _identifierController,
-                                                passwordController:
-                                                    _passwordController,
-                                                codeController: _codeController,
-                                                method: _loginMethod,
-                                                obscurePassword:
-                                                    _obscurePassword,
-                                                codeRequested: _codeRequested,
-                                                onMethodChanged: (value) {
-                                                  setState(() {
-                                                    _loginMethod = value;
-                                                    _codeRequested = false;
-                                                  });
-                                                },
-                                                onTogglePassword: () =>
-                                                    setState(
-                                                      () => _obscurePassword =
-                                                          !_obscurePassword,
-                                                    ),
-                                                onRequestCode: _requestCode,
-                                                onForgotPassword: () =>
-                                                    _showMessage(
-                                                      '密码找回功能将在账号服务接入后开放',
-                                                    ),
-                                              )
-                                            : _RegisterFields(
-                                                key: const ValueKey('register'),
-                                                phoneController:
-                                                    _phoneController,
-                                                codeController: _codeController,
-                                                codeRequested: _codeRequested,
-                                                onRequestCode: _requestCode,
-                                              ),
-                                      ),
-                                      const SizedBox(height: 18),
-                                      _PrimaryAction(
-                                        key: const Key('demo-login-button'),
-                                        label: _view == _AuthView.login
-                                            ? '登录'
-                                            : '注册并继续',
-                                        onPressed: _submit,
-                                      ),
-                                      const SizedBox(height: 14),
-                                      _InlineSwitch(
-                                        view: _view,
-                                        onChanged: _switchView,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                _DemoAccess(
-                                  selected: _selected,
-                                  onSelected: (account) =>
-                                      setState(() => _selected = account),
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  '公开演示账户 · 不发送真实短信 · 不建设真实账号体系\n'
-                                  '模拟医疗数据，不构成诊断或治疗建议',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.72),
-                                    fontSize: 10,
-                                    height: 1.55,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                child: Container(
+                  constraints: BoxConstraints(
+                    minHeight: framed ? 820 : constraints.maxHeight,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(framed ? 42 : 0),
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFF65438F),
+                        Color(0xFF8264A8),
+                        Color(0xFFA98EC2),
+                        Color(0xFFD2C1DC),
                       ],
                     ),
+                    boxShadow: framed
+                        ? const [
+                            BoxShadow(
+                              color: Color(0x332D183D),
+                              blurRadius: 48,
+                              offset: Offset(0, 20),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Stack(
+                    children: [
+                      const Positioned(
+                        right: -55,
+                        top: 110,
+                        child: _Orb(color: Color(0x66F0CFF2), size: 190),
+                      ),
+                      const Positioned(
+                        left: -75,
+                        bottom: 110,
+                        child: _Orb(color: Color(0x44FFFFFF), size: 230),
+                      ),
+                      SafeArea(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(24, 24, 24, 28),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const _PomiMark(),
+                              const SizedBox(height: 26),
+                              _GlassCard(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _AuthTabs(
+                                      view: _view,
+                                      onChanged: _switchView,
+                                    ),
+                                    const SizedBox(height: 22),
+                                    AnimatedSwitcher(
+                                      duration: const Duration(
+                                        milliseconds: 240,
+                                      ),
+                                      child: _view == _AuthView.login
+                                          ? _LoginFields(
+                                              key: const ValueKey('login'),
+                                              accountController:
+                                                  _accountController,
+                                              passwordController:
+                                                  _passwordController,
+                                              onForgot: () =>
+                                                  _message('演示阶段请联系管理员重置密码'),
+                                            )
+                                          : _RegisterFields(
+                                              key: const ValueKey('register'),
+                                              accountController:
+                                                  _registerAccountController,
+                                              passwordController:
+                                                  _registerPasswordController,
+                                              confirmController:
+                                                  _confirmPasswordController,
+                                              phoneController:
+                                                  _optionalPhoneController,
+                                            ),
+                                    ),
+                                    const SizedBox(height: 20),
+                                    _PrimaryAction(
+                                      label: _view == _AuthView.login
+                                          ? '登录'
+                                          : '创建账号',
+                                      onPressed: _submit,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              _DemoAccess(
+                                selected: _selectedAccount,
+                                onSelected: _selectDemo,
+                              ),
+                              const SizedBox(height: 12),
+                              const Text(
+                                '公开演示账户 · 不发送短信验证码\n模拟医疗数据，不构成诊断或治疗建议',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Color(0xCFFFFFFF),
+                                  fontSize: 10,
+                                  height: 1.55,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
           );
         },
-      ),
-    );
-  }
-}
-
-class _ModeHeader extends StatelessWidget {
-  const _ModeHeader({required this.view, required this.onChanged});
-
-  final _AuthView view;
-  final ValueChanged<_AuthView> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const Text(
-          'Pomi',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.4,
-          ),
-        ),
-        const Spacer(),
-        _HeaderAction(
-          key: const Key('auth-login-tab'),
-          label: '登录',
-          selected: view == _AuthView.login,
-          onTap: () => onChanged(_AuthView.login),
-        ),
-        const SizedBox(width: 8),
-        _HeaderAction(
-          key: const Key('auth-register-tab'),
-          label: '注册',
-          selected: view == _AuthView.register,
-          onTap: () => onChanged(_AuthView.register),
-        ),
-      ],
-    );
-  }
-}
-
-class _HeaderAction extends StatelessWidget {
-  const _HeaderAction({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-    super.key,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: selected
-          ? Colors.white.withValues(alpha: 0.2)
-          : Colors.transparent,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: selected ? 1 : 0.72),
-              fontSize: 13,
-              fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -380,14 +254,13 @@ class _PomiMark extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 17),
         const Text(
           '戳戳 Pomi，翻译你的身体',
           style: TextStyle(
             color: Colors.white,
             fontSize: 17,
             fontWeight: FontWeight.w500,
-            letterSpacing: 0.2,
           ),
         ),
       ],
@@ -395,241 +268,61 @@ class _PomiMark extends StatelessWidget {
   }
 }
 
-class _LoginFields extends StatelessWidget {
-  const _LoginFields({
-    required this.identifierController,
-    required this.passwordController,
-    required this.codeController,
-    required this.method,
-    required this.obscurePassword,
-    required this.codeRequested,
-    required this.onMethodChanged,
-    required this.onTogglePassword,
-    required this.onRequestCode,
-    required this.onForgotPassword,
-    super.key,
-  });
+class _GlassCard extends StatelessWidget {
+  const _GlassCard({required this.child});
 
-  final TextEditingController identifierController;
-  final TextEditingController passwordController;
-  final TextEditingController codeController;
-  final _LoginMethod method;
-  final bool obscurePassword;
-  final bool codeRequested;
-  final ValueChanged<_LoginMethod> onMethodChanged;
-  final VoidCallback onTogglePassword;
-  final VoidCallback onRequestCode;
-  final VoidCallback onForgotPassword;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Text(
-          '欢迎回来',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 26,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.7,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(26),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+        child: Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.16),
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
           ),
-        ),
-        const SizedBox(height: 5),
-        Text(
-          '登录后继续查看你的健康记录',
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.7),
-            fontSize: 12,
-          ),
-        ),
-        const SizedBox(height: 16),
-        _LoginMethodSwitch(method: method, onChanged: onMethodChanged),
-        const SizedBox(height: 15),
-        _GlassTextField(
-          key: const Key('auth-identifier-field'),
-          controller: identifierController,
-          label: '用户名 / 手机号',
-          hintText: '输入用户名或 11 位手机号',
-          icon: Icons.person_outline_rounded,
-          keyboardType: TextInputType.text,
-          textInputAction: TextInputAction.next,
-        ),
-        const SizedBox(height: 12),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 180),
-          child: method == _LoginMethod.password
-              ? _GlassTextField(
-                  key: const Key('auth-password-field'),
-                  controller: passwordController,
-                  label: '密码',
-                  hintText: '输入登录密码',
-                  icon: Icons.key_rounded,
-                  obscureText: obscurePassword,
-                  suffix: IconButton(
-                    tooltip: obscurePassword ? '显示密码' : '隐藏密码',
-                    onPressed: onTogglePassword,
-                    icon: Icon(
-                      obscurePassword
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined,
-                      color: Colors.white.withValues(alpha: 0.72),
-                      size: 20,
-                    ),
-                  ),
-                )
-              : _GlassTextField(
-                  key: const Key('auth-code-field'),
-                  controller: codeController,
-                  label: '验证码',
-                  hintText: '输入短信验证码',
-                  icon: Icons.shield_outlined,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  suffix: _CodeButton(
-                    requested: codeRequested,
-                    onPressed: onRequestCode,
-                  ),
-                ),
-        ),
-        if (method == _LoginMethod.password) ...[
-          const SizedBox(height: 4),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: onForgotPassword,
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.white.withValues(alpha: 0.82),
-                visualDensity: VisualDensity.compact,
-              ),
-              child: const Text('忘记密码？'),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _RegisterFields extends StatelessWidget {
-  const _RegisterFields({
-    required this.phoneController,
-    required this.codeController,
-    required this.codeRequested,
-    required this.onRequestCode,
-    super.key,
-  });
-
-  final TextEditingController phoneController;
-  final TextEditingController codeController;
-  final bool codeRequested;
-  final VoidCallback onRequestCode;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Text(
-          '创建账号',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 26,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.7,
-          ),
-        ),
-        const SizedBox(height: 5),
-        Text(
-          '使用手机号注册，验证码仅用于身份确认',
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.7),
-            fontSize: 12,
-          ),
-        ),
-        const SizedBox(height: 18),
-        _GlassTextField(
-          key: const Key('auth-phone-field'),
-          controller: phoneController,
-          label: '手机号',
-          hintText: '输入 11 位手机号',
-          icon: Icons.phone_iphone_rounded,
-          keyboardType: TextInputType.phone,
-          textInputAction: TextInputAction.next,
-          maxLength: 11,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        ),
-        const SizedBox(height: 12),
-        _GlassTextField(
-          key: const Key('auth-register-code-field'),
-          controller: codeController,
-          label: '验证码',
-          hintText: '输入短信验证码',
-          icon: Icons.shield_outlined,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          suffix: _CodeButton(
-            requested: codeRequested,
-            onPressed: onRequestCode,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          '注册即代表你已阅读并同意《用户协议》和《隐私政策》',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.68),
-            fontSize: 10,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _LoginMethodSwitch extends StatelessWidget {
-  const _LoginMethodSwitch({required this.method, required this.onChanged});
-
-  final _LoginMethod method;
-  final ValueChanged<_LoginMethod> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(4),
-        child: Row(
-          children: [
-            Expanded(
-              child: _MethodOption(
-                key: const Key('auth-password-mode'),
-                label: '密码登录',
-                selected: method == _LoginMethod.password,
-                onTap: () => onChanged(_LoginMethod.password),
-              ),
-            ),
-            Expanded(
-              child: _MethodOption(
-                key: const Key('auth-code-mode'),
-                label: '验证码登录',
-                selected: method == _LoginMethod.code,
-                onTap: () => onChanged(_LoginMethod.code),
-              ),
-            ),
-          ],
+          child: child,
         ),
       ),
     );
   }
 }
 
-class _MethodOption extends StatelessWidget {
-  const _MethodOption({
+class _AuthTabs extends StatelessWidget {
+  const _AuthTabs({required this.view, required this.onChanged});
+
+  final _AuthView view;
+  final ValueChanged<_AuthView> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _AuthTab(
+          key: const Key('auth-login-tab'),
+          label: '登录',
+          selected: view == _AuthView.login,
+          onTap: () => onChanged(_AuthView.login),
+        ),
+        const SizedBox(width: 20),
+        _AuthTab(
+          key: const Key('auth-register-tab'),
+          label: '注册',
+          selected: view == _AuthView.register,
+          onTap: () => onChanged(_AuthView.register),
+        ),
+      ],
+    );
+  }
+}
+
+class _AuthTab extends StatelessWidget {
+  const _AuthTab({
     required this.label,
     required this.selected,
     required this.onTap,
@@ -644,31 +337,14 @@ class _MethodOption extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(vertical: 9),
-        decoration: BoxDecoration(
-          color: selected ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: selected
-              ? const [
-                  BoxShadow(
-                    color: Color(0x1A2C173E),
-                    blurRadius: 14,
-                    offset: Offset(0, 5),
-                  ),
-                ]
-              : null,
-        ),
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
         child: Text(
           label,
-          textAlign: TextAlign.center,
           style: TextStyle(
-            color: selected
-                ? PomiColors.primary
-                : Colors.white.withValues(alpha: 0.72),
-            fontSize: 12,
+            color: selected ? Colors.white : const Color(0xBFFFFFFF),
+            fontSize: selected ? 22 : 15,
             fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
           ),
         ),
@@ -677,118 +353,165 @@ class _MethodOption extends StatelessWidget {
   }
 }
 
-class _GlassTextField extends StatelessWidget {
-  const _GlassTextField({
-    required this.controller,
-    required this.label,
-    required this.hintText,
-    required this.icon,
-    this.keyboardType,
-    this.textInputAction,
-    this.obscureText = false,
-    this.maxLength,
-    this.inputFormatters,
-    this.suffix,
+class _LoginFields extends StatelessWidget {
+  const _LoginFields({
+    required this.accountController,
+    required this.passwordController,
+    required this.onForgot,
     super.key,
   });
 
-  final TextEditingController controller;
-  final String label;
-  final String hintText;
-  final IconData icon;
-  final TextInputType? keyboardType;
-  final TextInputAction? textInputAction;
-  final bool obscureText;
-  final int? maxLength;
-  final List<TextInputFormatter>? inputFormatters;
-  final Widget? suffix;
+  final TextEditingController accountController;
+  final TextEditingController passwordController;
+  final VoidCallback onForgot;
 
   @override
   Widget build(BuildContext context) {
-    final border = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(19),
-      borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.28)),
-    );
-
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      textInputAction: textInputAction,
-      obscureText: obscureText,
-      maxLength: maxLength,
-      inputFormatters: inputFormatters,
-      cursorColor: Colors.white,
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 15,
-        fontWeight: FontWeight.w600,
-      ),
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hintText,
-        counterText: '',
-        labelStyle: TextStyle(
-          color: Colors.white.withValues(alpha: 0.82),
-          fontSize: 12,
+    return Column(
+      children: [
+        _GlassTextField(
+          key: const Key('auth-identifier-field'),
+          label: '账号名',
+          hintText: '输入唯一账号名',
+          controller: accountController,
+          icon: Icons.alternate_email_rounded,
         ),
-        hintStyle: TextStyle(
-          color: Colors.white.withValues(alpha: 0.48),
-          fontSize: 13,
-          fontWeight: FontWeight.w400,
+        const SizedBox(height: 14),
+        _GlassTextField(
+          key: const Key('auth-password-field'),
+          label: '密码',
+          hintText: '输入密码',
+          controller: passwordController,
+          icon: Icons.key_rounded,
+          obscureText: true,
+          trailing: TextButton(onPressed: onForgot, child: const Text('忘记密码')),
         ),
-        prefixIcon: Icon(
-          icon,
-          color: Colors.white.withValues(alpha: 0.82),
-          size: 20,
-        ),
-        suffixIcon: suffix,
-        suffixIconConstraints: const BoxConstraints(minWidth: 46),
-        filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.1),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 17,
-        ),
-        border: border,
-        enabledBorder: border,
-        focusedBorder: border.copyWith(
-          borderSide: const BorderSide(color: Colors.white, width: 1.4),
-        ),
-      ),
+      ],
     );
   }
 }
 
-class _CodeButton extends StatelessWidget {
-  const _CodeButton({required this.requested, required this.onPressed});
+class _RegisterFields extends StatelessWidget {
+  const _RegisterFields({
+    required this.accountController,
+    required this.passwordController,
+    required this.confirmController,
+    required this.phoneController,
+    super.key,
+  });
 
-  final bool requested;
-  final VoidCallback onPressed;
+  final TextEditingController accountController;
+  final TextEditingController passwordController;
+  final TextEditingController confirmController;
+  final TextEditingController phoneController;
 
   @override
   Widget build(BuildContext context) {
-    return TextButton(
-      key: const Key('request-code-button'),
-      onPressed: onPressed,
-      style: TextButton.styleFrom(
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        visualDensity: VisualDensity.compact,
-      ),
-      child: Text(
-        requested ? '重新发送' : '获取验证码',
-        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-      ),
+    return Column(
+      children: [
+        _GlassTextField(
+          key: const Key('auth-register-account-field'),
+          label: '账号名',
+          hintText: '至少 3 个字符，注册后不可重复',
+          controller: accountController,
+          icon: Icons.person_outline_rounded,
+        ),
+        const SizedBox(height: 12),
+        _GlassTextField(
+          key: const Key('auth-register-password-field'),
+          label: '密码',
+          hintText: '至少 8 个字符',
+          controller: passwordController,
+          icon: Icons.key_rounded,
+          obscureText: true,
+        ),
+        const SizedBox(height: 12),
+        _GlassTextField(
+          key: const Key('auth-register-confirm-field'),
+          label: '确认密码',
+          hintText: '再次输入密码',
+          controller: confirmController,
+          icon: Icons.verified_user_outlined,
+          obscureText: true,
+        ),
+        const SizedBox(height: 12),
+        _GlassTextField(
+          key: const Key('auth-register-phone-field'),
+          label: '手机号（选填，不验证）',
+          hintText: '仅作为账号资料，当前不能用于登录',
+          controller: phoneController,
+          icon: Icons.phone_iphone_rounded,
+          keyboardType: TextInputType.phone,
+        ),
+      ],
+    );
+  }
+}
+
+class _GlassTextField extends StatelessWidget {
+  const _GlassTextField({
+    required this.label,
+    required this.hintText,
+    required this.controller,
+    required this.icon,
+    this.obscureText = false,
+    this.trailing,
+    this.keyboardType,
+    super.key,
+  });
+
+  final String label;
+  final String hintText;
+  final TextEditingController controller;
+  final IconData icon;
+  final bool obscureText;
+  final Widget? trailing;
+  final TextInputType? keyboardType;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 3, bottom: 7),
+          child: Text(
+            label,
+            style: const TextStyle(color: Color(0xE6FFFFFF), fontSize: 12),
+          ),
+        ),
+        TextField(
+          controller: controller,
+          obscureText: obscureText,
+          keyboardType: keyboardType,
+          style: const TextStyle(color: Colors.white, fontSize: 14),
+          decoration: InputDecoration(
+            hintText: hintText,
+            hintStyle: const TextStyle(color: Color(0x99FFFFFF), fontSize: 12),
+            prefixIcon: Icon(icon, color: Colors.white, size: 20),
+            suffixIcon: trailing,
+            filled: true,
+            fillColor: Colors.white.withValues(alpha: 0.12),
+            contentPadding: const EdgeInsets.symmetric(vertical: 14),
+            border: _border(const Color(0x66FFFFFF)),
+            enabledBorder: _border(const Color(0x55FFFFFF)),
+            focusedBorder: _border(Colors.white, width: 1.4),
+          ),
+        ),
+      ],
+    );
+  }
+
+  OutlineInputBorder _border(Color color, {double width = 1}) {
+    return OutlineInputBorder(
+      borderRadius: BorderRadius.circular(16),
+      borderSide: BorderSide(color: color, width: width),
     );
   }
 }
 
 class _PrimaryAction extends StatelessWidget {
-  const _PrimaryAction({
-    required this.label,
-    required this.onPressed,
-    super.key,
-  });
+  const _PrimaryAction({required this.label, required this.onPressed});
 
   final String label;
   final VoidCallback onPressed;
@@ -796,85 +519,23 @@ class _PrimaryAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 58,
+      width: double.infinity,
+      height: 54,
       child: FilledButton(
+        key: const Key('demo-login-button'),
         onPressed: onPressed,
         style: FilledButton.styleFrom(
           backgroundColor: const Color(0xFFFDFBFD),
           foregroundColor: PomiColors.primary,
-          elevation: 0,
-          padding: const EdgeInsets.fromLTRB(24, 4, 7, 4),
           shape: const StadiumBorder(),
+          elevation: 8,
+          shadowColor: const Color(0x552C173E),
         ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-            const DecoratedBox(
-              decoration: BoxDecoration(
-                color: PomiColors.primary,
-                shape: BoxShape.circle,
-              ),
-              child: SizedBox.square(
-                dimension: 44,
-                child: Icon(
-                  Icons.arrow_forward_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-            ),
-          ],
+        child: Text(
+          label,
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
         ),
       ),
-    );
-  }
-}
-
-class _InlineSwitch extends StatelessWidget {
-  const _InlineSwitch({required this.view, required this.onChanged});
-
-  final _AuthView view;
-  final ValueChanged<_AuthView> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final isLogin = view == _AuthView.login;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          isLogin ? '还没有账号？' : '已经有账号？',
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.68),
-            fontSize: 12,
-          ),
-        ),
-        TextButton(
-          onPressed: () =>
-              onChanged(isLogin ? _AuthView.register : _AuthView.login),
-          style: TextButton.styleFrom(
-            foregroundColor: Colors.white,
-            visualDensity: VisualDensity.compact,
-          ),
-          child: Text(
-            isLogin ? '手机号注册' : '返回登录',
-            style: const TextStyle(
-              decoration: TextDecoration.underline,
-              decorationColor: Colors.white,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -887,31 +548,18 @@ class _DemoAccess extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 8,
+      runSpacing: 8,
       children: [
-        Text(
-          '快捷体验',
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.72),
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
+        for (final account in DemoAccount.values)
+          _DemoChip(
+            key: Key('account-${account.uid}'),
+            account: account,
+            selected: account.uid == selected.uid,
+            onTap: () => onSelected(account),
           ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            for (var index = 0; index < DemoAccount.values.length; index++) ...[
-              if (index > 0) const SizedBox(width: 10),
-              Expanded(
-                child: _DemoChip(
-                  account: DemoAccount.values[index],
-                  selected: selected.uid == DemoAccount.values[index].uid,
-                  onTap: () => onSelected(DemoAccount.values[index]),
-                ),
-              ),
-            ],
-          ],
-        ),
       ],
     );
   }
@@ -922,6 +570,7 @@ class _DemoChip extends StatelessWidget {
     required this.account,
     required this.selected,
     required this.onTap,
+    super.key,
   });
 
   final DemoAccount account;
@@ -931,41 +580,54 @@ class _DemoChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      key: Key('account-${account.uid}'),
       color: selected
-          ? Colors.white.withValues(alpha: 0.22)
-          : Colors.white.withValues(alpha: 0.08),
-      borderRadius: BorderRadius.circular(16),
+          ? Colors.white.withValues(alpha: 0.26)
+          : Colors.white.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(999),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(999),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                account.onboardingRequired
-                    ? Icons.auto_awesome_rounded
-                    : Icons.favorite_outline_rounded,
+                selected ? Icons.check_circle : Icons.account_circle_outlined,
                 color: Colors.white,
-                size: 15,
+                size: 16,
               ),
               const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  account.label,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
+              Text(
+                account.label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _Orb extends StatelessWidget {
+  const _Orb({required this.color, required this.size});
+
+  final Color color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return ImageFiltered(
+      imageFilter: ImageFilter.blur(sigmaX: 32, sigmaY: 32),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       ),
     );
   }

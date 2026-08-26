@@ -157,7 +157,7 @@ class _DashboardBody extends StatelessWidget {
               const SizedBox(height: 20),
               const _SectionHeader(
                 title: '本月用药统计',
-                trailing: DemoBadge(label: '三状态 · 非依从率'),
+                trailing: DemoBadge(label: '三状态统计'),
               ),
               const SizedBox(height: 8),
               _PomiCard(child: _MedicationSummary(medications: medications)),
@@ -296,38 +296,15 @@ class _Hero extends StatelessWidget {
                           ],
                         ),
                       ),
-                      SizedBox(
-                        width: 64,
-                        height: 64,
-                        child: Stack(
-                          alignment: Alignment.center,
+                      const SizedBox(
+                        width: 88,
+                        child: Column(
                           children: [
-                            CircularProgressIndicator(
-                              value: 0.85,
-                              strokeWidth: 4,
-                              color: Colors.white,
-                              backgroundColor: Color(0x44FFFFFF),
-                            ),
-                            Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  '85%',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                Text(
-                                  '完成率',
-                                  style: TextStyle(
-                                    color: Color(0xBBFFFFFF),
-                                    fontSize: 8,
-                                  ),
-                                ),
-                              ],
-                            ),
+                            _HeroState(label: '已服用', value: '23'),
+                            SizedBox(height: 5),
+                            _HeroState(label: '主动漏服', value: '2'),
+                            SizedBox(height: 5),
+                            _HeroState(label: '未记录', value: '4'),
                           ],
                         ),
                       ),
@@ -339,6 +316,44 @@ class _Hero extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _HeroState extends StatelessWidget {
+  const _HeroState({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(color: Color(0xCFFFFFFF), fontSize: 9),
+          ),
+        ),
+        Container(
+          width: 25,
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.18),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            value,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

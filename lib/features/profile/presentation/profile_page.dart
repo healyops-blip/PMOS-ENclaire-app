@@ -125,7 +125,7 @@ class ProfilePage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 20),
-                const PomiSectionTitle(title: '认证与授权'),
+                const PomiSectionTitle(title: '认证演示与隐私'),
                 const SizedBox(height: 8),
                 PomiSectionCard(
                   padding: EdgeInsets.zero,
@@ -134,9 +134,9 @@ class ProfilePage extends StatelessWidget {
                       _ProfileAction(
                         key: const Key('certification-entry'),
                         icon: Icons.verified_user_outlined,
-                        title: '电子病历认证',
-                        subtitle: '医生 KYC · 电子签字 · 测试链',
-                        badge: '1 项进行中',
+                        title: '医院认证演示',
+                        subtitle: '本地四状态 · 绑定当前材料版本',
+                        badge: '仅前端',
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute<void>(
                             builder: (_) => const CertificationPage(),
@@ -145,8 +145,8 @@ class ProfilePage extends StatelessWidget {
                       ),
                       _ProfileAction(
                         icon: Icons.share_outlined,
-                        title: '跨院授权记录',
-                        subtitle: '查看材料访问和撤回记录',
+                        title: '跨院授权记录（P1）',
+                        subtitle: '后续独立开发，当前不连接跨院服务',
                         onTap: () => _showNotReady(context),
                       ),
                       _ProfileAction(
