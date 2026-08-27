@@ -39,6 +39,13 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Set up Android NDK 30
+        shell: bash
+        run: |
+          sdkmanager="${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$sdkmanager" --licenses >/dev/null || true
+          "$sdkmanager" "ndk;30.0.16138531"
+
       - name: Validate Flutter project
         shell: bash
         run: |
