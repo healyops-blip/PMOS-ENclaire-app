@@ -569,11 +569,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         '选择当前正在使用的药品或补剂',
         style: TextStyle(fontWeight: FontWeight.w700),
       ),
-      const SizedBox(height: _onboardingLabelGap),
-      const Text(
-        '未列出的项目可点击 + 手动添加。',
-        style: TextStyle(color: pomiMuted, fontSize: 12),
-      ),
       const SizedBox(height: _onboardingSectionGap),
       Wrap(
         spacing: _onboardingLabelGap,
