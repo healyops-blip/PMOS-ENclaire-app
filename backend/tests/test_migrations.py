@@ -4,10 +4,12 @@ from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
+from pytest import MonkeyPatch
 from sqlalchemy import create_engine, inspect, text
 
 
-def test_initial_migration_is_repeatable_and_safe(tmp_path: Path) -> None:
+def test_initial_migration_is_repeatable_and_safe(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.delenv("POMI_DATABASE_URL", raising=False)
     database_path = tmp_path / "migrated.db"
     database_url = f"sqlite:///{database_path}"
     backend_root = Path(__file__).resolve().parents[1]
