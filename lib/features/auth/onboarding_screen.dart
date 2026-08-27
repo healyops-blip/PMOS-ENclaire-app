@@ -527,7 +527,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           readOnly: true,
           onTap: () => _chooseDate(_lastPeriod),
           decoration: const InputDecoration(
-            labelText: '开始日期（选填）',
             suffixIcon: Icon(Icons.calendar_today_outlined),
             helperText: '\u00A0',
             helperStyle: TextStyle(fontSize: 12, height: 1),
