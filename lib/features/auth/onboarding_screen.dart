@@ -262,7 +262,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               constraints: const BoxConstraints(maxWidth: 520),
               child: Column(
                 children: [
-                  _OnboardingHeader(step: _step),
+                  _OnboardingHeader(
+                    step: _step,
+                    onBack:
+                        _step == 0 || _saving
+                            ? null
+                            : () => setState(() => _step -= 1),
+                  ),
                   Expanded(
                     child: Form(
                       key: _formKey,
@@ -286,34 +292,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        FilledButton(
-                          onPressed:
-                              _saving ? null : (_step == 2 ? _save : _next),
-                          child:
-                              _saving
-                                  ? const SizedBox.square(
-                                    dimension: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                  : Text(_step == 2 ? '完成，进入首页' : '下一步'),
-                        ),
-                        if (_step > 0)
-                          TextButton(
-                            onPressed:
-                                _saving
-                                    ? null
-                                    : () => setState(() => _step -= 1),
-                            child: const Text(
-                              '返回上一步',
-                              style: TextStyle(color: pomiMuted),
-                            ),
-                          ),
-                      ],
+                    child: FilledButton(
+                      onPressed: _saving ? null : (_step == 2 ? _save : _next),
+                      child:
+                          _saving
+                              ? const SizedBox.square(
+                                dimension: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                              : Text(_step == 2 ? '完成，进入首页' : '下一步'),
                     ),
                   ),
                 ],
@@ -777,33 +766,51 @@ class _DatePickerCardState extends State<_DatePickerCard> {
 }
 
 class _OnboardingHeader extends StatelessWidget {
-  const _OnboardingHeader({required this.step});
+  const _OnboardingHeader({required this.step, this.onBack});
   final int step;
+  final VoidCallback? onBack;
+
   @override
   Widget build(BuildContext context) {
     const titles = ['基本信息', '经期情况', '当前用药'];
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 4),
-      child: Column(
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(
-              3,
-              (index) => AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
-                width: index == step ? 26 : 8,
-                height: 8,
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                decoration: BoxDecoration(
-                  color: index <= step ? pomiPurple : const Color(0xFFD8D1DC),
-                  borderRadius: BorderRadius.circular(999),
+          Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  3,
+                  (index) => AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
+                    width: index == step ? 26 : 8,
+                    height: 8,
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    decoration: BoxDecoration(
+                      color:
+                          index <= step ? pomiPurple : const Color(0xFFD8D1DC),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(height: 16),
+              Text(titles[step], style: Theme.of(context).textTheme.titleLarge),
+            ],
           ),
-          const SizedBox(height: 16),
-          Text(titles[step], style: Theme.of(context).textTheme.titleLarge),
+          if (step > 0)
+            Positioned(
+              left: -12,
+              top: -12,
+              child: IconButton(
+                onPressed: onBack,
+                tooltip: '返回上一步',
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+              ),
+            ),
         ],
       ),
     );
