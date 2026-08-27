@@ -373,7 +373,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 keyboardType: TextInputType.number,
                 textAlign: TextAlign.center,
                 decoration: const InputDecoration(
-                  labelText: '身高',
+                  labelText: '身高（选填）',
                   suffixText: 'cm',
                   helperText: '\u00A0',
                   helperStyle: TextStyle(fontSize: 12, height: 1),
@@ -381,7 +381,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   floatingLabelAlignment: FloatingLabelAlignment.start,
                 ),
                 validator: (value) {
-                  final height = double.tryParse(value ?? '');
+                  final normalized = value?.trim() ?? '';
+                  if (normalized.isEmpty) return null;
+                  final height = double.tryParse(normalized);
                   return height == null || height < 100 || height > 230
                       ? '请输入 100–230 cm'
                       : null;
@@ -399,7 +401,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 ),
                 textAlign: TextAlign.center,
                 decoration: const InputDecoration(
-                  labelText: '体重',
+                  labelText: '体重（选填）',
                   suffixText: 'kg',
                   helperText: '\u00A0',
                   helperStyle: TextStyle(fontSize: 12, height: 1),
