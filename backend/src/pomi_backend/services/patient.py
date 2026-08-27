@@ -65,7 +65,7 @@ class PatientProfileService:
             )
             if field in payload.model_fields_set
         }
-        if payload.complete_onboarding:
+        if payload.complete_onboarding and not profile.onboarding_completed:
             changes["onboarding_completed"] = True
             changes["onboarding_completed_at"] = utc_now()
             self.account.onboarding_completed = True

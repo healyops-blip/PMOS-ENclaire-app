@@ -67,6 +67,19 @@ void main() {
       expect(copy.originalText, original.confirmedText);
     },
   );
+
+  test('demo confirmation is idempotent and preserves provenance', () async {
+    final repository = DemoPatientNoteRepository();
+    final original = await repository.latest();
+    final copy = await repository.copy(original!.id, visitContext: '下次复诊');
+    final first = await repository.confirm(copy.id);
+    final repeated = await repository.confirm(copy.id);
+
+    expect(repeated.confirmedAt, first.confirmedAt);
+    expect(repeated.confirmedText, copy.originalText);
+    expect(repeated.visitContext, '下次复诊');
+    expect(repeated.sourceNoteId, original.id);
+  });
 }
 
 const _note = <String, dynamic>{

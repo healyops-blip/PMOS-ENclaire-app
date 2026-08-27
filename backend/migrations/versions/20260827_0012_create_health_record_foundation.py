@@ -71,12 +71,13 @@ def upgrade() -> None:
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
-            ["replaces_medication_id"],
-            ["medication.id"],
-            name=op.f("fk_medication_replaces_medication_id_medication"),
-            ondelete="SET NULL",
+            ["patient_id", "replaces_medication_id"],
+            ["medication.patient_id", "medication.id"],
+            name="fk_medication_replacement_same_patient",
+            ondelete="RESTRICT",
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_medication")),
+        sa.UniqueConstraint("patient_id", "id", name="uq_medication_patient_id"),
     )
     with op.batch_alter_table("medication", schema=None) as batch_op:
         batch_op.create_index(
@@ -149,9 +150,9 @@ def upgrade() -> None:
             name=op.f("ck_medication_daily_medication_daily_status"),
         ),
         sa.ForeignKeyConstraint(
-            ["medication_id"],
-            ["medication.id"],
-            name=op.f("fk_medication_daily_medication_id_medication"),
+            ["patient_id", "medication_id"],
+            ["medication.patient_id", "medication.id"],
+            name="fk_medication_daily_medication_same_patient",
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
@@ -199,9 +200,9 @@ def upgrade() -> None:
             ondelete="RESTRICT",
         ),
         sa.ForeignKeyConstraint(
-            ["medication_id"],
-            ["medication.id"],
-            name=op.f("fk_medication_event_medication_id_medication"),
+            ["patient_id", "medication_id"],
+            ["medication.patient_id", "medication.id"],
+            name="fk_medication_event_medication_same_patient",
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(

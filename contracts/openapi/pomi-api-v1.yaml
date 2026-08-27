@@ -263,7 +263,7 @@ paths:
     put:
       tags: [Medications]
       operationId: updateMedication
-      summary: Adjust, continue, or stop a medication
+      summary: Adjust, pause, resume, or stop a medication
       parameters:
         - $ref: '#/components/parameters/MedicationId'
       requestBody:
@@ -456,6 +456,22 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
         '409':
           $ref: '#/components/responses/ErrorResponse'
+    delete:
+      tags: [Cycles]
+      operationId: deleteCycle
+      summary: Soft-delete a menstrual cycle
+      parameters:
+        - name: cycle_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Cycle deleted
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
 
   /api/weights:
     get:
@@ -554,15 +570,6 @@ paths:
           in: query
           schema:
             $ref: '#/components/schemas/DocumentType'
-        - name: encounter_id
-          in: query
-          schema:
-            type: string
-            format: uuid
-        - name: upload_status
-          in: query
-          schema:
-            $ref: '#/components/schemas/UploadStatus'
         - $ref: '#/components/parameters/Cursor'
         - $ref: '#/components/parameters/Limit'
       responses:
@@ -596,9 +603,6 @@ paths:
                   format: binary
                 document_type:
                   $ref: '#/components/schemas/DocumentType'
-                encounter_id:
-                  type: [string, 'null']
-                  format: uuid
                 external_processing_consent_version:
                   type: [string, 'null']
                   maxLength: 40
@@ -693,7 +697,7 @@ paths:
           multipart/form-data:
             schema:
               type: object
-              required: [file, replacement_reason]
+              required: [file, replacement_reason, expected_current_revision_id]
               properties:
                 file:
                   type: string
@@ -967,7 +971,7 @@ paths:
     post:
       tags: [Reports]
       operationId: createPatientNote
-      summary: Create and optionally confirm a patient note
+      summary: Create a patient-note draft for the current visit
       requestBody:
         required: true
         content:
@@ -1011,7 +1015,7 @@ paths:
     put:
       tags: [Reports]
       operationId: updatePatientNote
-      summary: Update or confirm a patient note without changing old reports
+      summary: Update an unconsumed patient-note draft
       parameters:
         - name: note_id
           in: path
@@ -1037,12 +1041,16 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/PatientNote'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
 
   /api/patient-notes/{note_id}/confirm:
     post:
       tags: [Reports]
       operationId: confirmPatientNote
-      summary: Idempotently confirm the exact patient statement text
+      summary: Idempotently confirm a patient note
       parameters:
         - $ref: '#/components/parameters/PatientNoteId'
       responses:
@@ -1057,12 +1065,16 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/PatientNote'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
 
   /api/patient-notes/{note_id}/skip:
     post:
       tags: [Reports]
       operationId: skipPatientNote
-      summary: Idempotently record an explicit empty-statement decision
+      summary: Idempotently skip a patient note
       parameters:
         - $ref: '#/components/parameters/PatientNoteId'
       responses:
@@ -1077,12 +1089,16 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/PatientNote'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
 
   /api/patient-notes/{note_id}/copy:
     post:
       tags: [Reports]
       operationId: copyPatientNote
-      summary: Copy confirmed history into a new editable draft
+      summary: Copy a prior patient note into a new editable draft
       parameters:
         - $ref: '#/components/parameters/PatientNoteId'
       requestBody:
@@ -1093,7 +1109,7 @@ paths:
               $ref: '#/components/schemas/PatientNoteCopy'
       responses:
         '201':
-          description: Independent draft created
+          description: New patient-note draft created
           content:
             application/json:
               schema:
@@ -1103,6 +1119,8 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/PatientNote'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
 
   /api/reports:
     get:
@@ -1354,15 +1372,15 @@ components:
       schema:
         type: string
         format: uuid
-    DocumentId:
-      name: document_id
+    PatientNoteId:
+      name: note_id
       in: path
       required: true
       schema:
         type: string
         format: uuid
-    PatientNoteId:
-      name: note_id
+    DocumentId:
+      name: document_id
       in: path
       required: true
       schema:
@@ -1695,11 +1713,19 @@ components:
 
     MedicationStatus:
       type: string
-      enum: [active, stopped, unknown]
+      enum: [active, paused, stopped]
 
     MedicationEventType:
       type: string
-      enum: [started, adjusted, continued, stopped]
+      enum: [created, adjusted, paused, resumed, stopped]
+
+    MedicationUpdateEventType:
+      type: string
+      enum: [adjusted, paused, resumed, stopped]
+
+    MedicationSourceCategory:
+      type: string
+      enum: [prescribed, supplement, other_long_term]
 
     MedicationSourceType:
       type: string
@@ -1719,9 +1745,6 @@ components:
         specification:
           type: [string, 'null']
           maxLength: 200
-        dosage_text:
-          type: [string, 'null']
-          maxLength: 300
         dosage_value:
           type: [number, 'null']
           minimum: 0
@@ -1739,8 +1762,10 @@ components:
       allOf:
         - $ref: '#/components/schemas/MedicationInstruction'
         - type: object
-          required: [drug_name, start_date, source_type, event_date]
+          required: [drug_name, source_category, start_date, event_date]
           properties:
+            source_category:
+              $ref: '#/components/schemas/MedicationSourceCategory'
             start_date:
               type: string
               format: date
@@ -1763,15 +1788,10 @@ components:
           required: [event_type, event_date, updated_at]
           properties:
             event_type:
-              $ref: '#/components/schemas/MedicationEventType'
+              $ref: '#/components/schemas/MedicationUpdateEventType'
             event_date:
               type: string
               format: date
-            end_date:
-              type: [string, 'null']
-              format: date
-            current_status:
-              $ref: '#/components/schemas/MedicationStatus'
             stop_source:
               oneOf:
                 - $ref: '#/components/schemas/StopSource'
@@ -1785,12 +1805,17 @@ components:
             updated_at:
               type: string
               format: date-time
+      description: |
+        `adjusted` creates a new medication version rather than overwriting the
+        existing instruction. The old version is ended and the returned new
+        version links back through `replaces_medication_id`. `paused`, `resumed`,
+        and `stopped` append immutable events to the medication timeline.
 
     Medication:
       allOf:
         - $ref: '#/components/schemas/MedicationInstruction'
         - type: object
-          required: [id, patient_id, drug_name, current_status, source_type, created_at, updated_at]
+          required: [id, patient_id, drug_name, status, source_category, created_at, updated_at]
           properties:
             id:
               type: string
@@ -1806,13 +1831,14 @@ components:
             end_date:
               type: [string, 'null']
               format: date
-            current_status:
+            status:
               $ref: '#/components/schemas/MedicationStatus'
-            source_type:
-              $ref: '#/components/schemas/MedicationSourceType'
-            source_document_id:
+            source_category:
+              $ref: '#/components/schemas/MedicationSourceCategory'
+            replaces_medication_id:
               type: [string, 'null']
               format: uuid
+              description: Previous medication version replaced by this record.
             created_at:
               type: string
               format: date-time
@@ -1822,7 +1848,7 @@ components:
 
     MedicationEvent:
       type: object
-      required: [id, medication_id, event_type, event_date, confirmed_at]
+      required: [id, medication_id, event_type, event_date, created_at]
       properties:
         id:
           type: string
@@ -1850,7 +1876,7 @@ components:
             - type: 'null'
         note:
           type: [string, 'null']
-        confirmed_at:
+        created_at:
           type: string
           format: date-time
 
@@ -1860,6 +1886,11 @@ components:
       properties:
         medication:
           $ref: '#/components/schemas/Medication'
+        replaced_medication:
+          oneOf:
+            - $ref: '#/components/schemas/Medication'
+            - type: 'null'
+          description: Ended prior version when an adjustment creates a replacement.
         event:
           $ref: '#/components/schemas/MedicationEvent'
 
@@ -1876,46 +1907,58 @@ components:
       allOf:
         - $ref: '#/components/schemas/PageMeta'
         - type: object
-          required: [items]
+          required: [server_date, items, groups]
           properties:
+            server_date:
+              type: string
+              format: date
+              description: Server business date used for all medication writes.
             items:
               type: array
               items:
                 $ref: '#/components/schemas/Medication'
+            groups:
+              type: object
+              required: [prescribed, supplement, other_long_term]
+              properties:
+                prescribed:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Medication'
+                supplement:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Medication'
+                other_long_term:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Medication'
 
     MedicationDailyUpsert:
       type: object
       required: [record_date, intake_status]
+      additionalProperties: false
       properties:
         record_date:
           type: string
           format: date
         intake_status:
           $ref: '#/components/schemas/IntakeStatus'
-        actual_dosage:
-          type: [number, 'null']
-          minimum: 0
-        actual_dosage_unit:
-          type: [string, 'null']
-          maxLength: 50
-        note:
-          type: [string, 'null']
-          maxLength: 500
 
     MedicationDaily:
       allOf:
         - $ref: '#/components/schemas/MedicationDailyUpsert'
         - type: object
-          required: [id, medication_id, recorded_at]
+          required: [medication_id]
           properties:
             id:
-              type: string
+              type: [string, 'null']
               format: uuid
             medication_id:
               type: string
               format: uuid
             recorded_at:
-              type: string
+              type: [string, 'null']
               format: date-time
 
     ThreeStateStats:
@@ -2000,28 +2043,23 @@ components:
 
     WeightInput:
       type: object
-      required: [measured_at, weight_kg]
+      additionalProperties: false
+      required: [record_date, weight_kg]
       properties:
-        measured_at:
+        record_date:
           type: string
-          format: date-time
+          format: date
         weight_kg:
           type: number
           minimum: 20
-          maximum: 350
-        source_type:
-          type: string
-          enum: [manual, imported]
-          default: manual
-        note:
-          type: [string, 'null']
-          maxLength: 500
+          maximum: 300
+          multipleOf: 0.1
 
     WeightRecord:
       allOf:
         - $ref: '#/components/schemas/WeightInput'
         - type: object
-          required: [id, created_at]
+          required: [id, created_at, updated_at]
           properties:
             id:
               type: string
@@ -2029,10 +2067,134 @@ components:
             created_at:
               type: string
               format: date-time
+            updated_at:
+              type: string
+              format: date-time
+
+    DashboardSectionStatus:
+      type: string
+      enum: [ok, empty, error]
+
+    DashboardMedication:
+      type: object
+      required: [medication_id, drug_name, intake_status]
+      properties:
+        medication_id:
+          type: string
+          format: uuid
+        drug_name:
+          type: string
+        specification:
+          type: [string, 'null']
+        dosage_text:
+          type: [string, 'null']
+        frequency:
+          type: [string, 'null']
+        intake_status:
+          $ref: '#/components/schemas/IntakeStatus'
+        recorded_at:
+          type: [string, 'null']
+          format: date-time
+
+    DashboardFollowUpData:
+      type: object
+      required: [date, timing, days]
+      properties:
+        date:
+          type: string
+          format: date
+        timing:
+          type: string
+          enum: [upcoming, due, overdue]
+        days:
+          type: integer
+          minimum: 0
+          description: Days remaining for upcoming visits or days overdue otherwise.
+
+    DashboardMonthlyMedicationData:
+      allOf:
+        - $ref: '#/components/schemas/ThreeStateStats'
+        - type: object
+          required: [month, by_medication]
+          properties:
+            month:
+              type: string
+              pattern: '^\d{4}-\d{2}$'
+            by_medication:
+              type: array
+              items:
+                allOf:
+                  - $ref: '#/components/schemas/ThreeStateStats'
+                  - type: object
+                    required: [medication_id, drug_name]
+                    properties:
+                      medication_id:
+                        type: string
+                        format: uuid
+                      drug_name:
+                        type: string
+
+    DashboardFollowUpSection:
+      type: object
+      required: [status, data, error_code]
+      properties:
+        status:
+          $ref: '#/components/schemas/DashboardSectionStatus'
+        data:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardFollowUpData'
+            - type: 'null'
+        error_code:
+          type: [string, 'null']
+
+    DashboardTodayMedicationsSection:
+      type: object
+      required: [status, data, error_code]
+      properties:
+        status:
+          $ref: '#/components/schemas/DashboardSectionStatus'
+        data:
+          type: [array, 'null']
+          items:
+            $ref: '#/components/schemas/DashboardMedication'
+        error_code:
+          type: [string, 'null']
+
+    DashboardMonthlyMedicationSection:
+      type: object
+      required: [status, data, error_code]
+      properties:
+        status:
+          $ref: '#/components/schemas/DashboardSectionStatus'
+        data:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardMonthlyMedicationData'
+            - type: 'null'
+        error_code:
+          type: [string, 'null']
+
+    DashboardLatestReportSection:
+      type: object
+      required: [status, data, error_code]
+      properties:
+        status:
+          $ref: '#/components/schemas/DashboardSectionStatus'
+        data:
+          oneOf:
+            - $ref: '#/components/schemas/ReportListItem'
+            - type: 'null'
+        error_code:
+          type: [string, 'null']
 
     Dashboard:
       type: object
-      required: [server_date, data_as_of, profile_summary, today_medications, month_medication_stats]
+      required:
+        - server_date
+        - data_as_of
+        - follow_up
+        - today_medications
+        - monthly_medication_summary
+        - latest_report
       properties:
         server_date:
           type: string
@@ -2040,73 +2202,14 @@ components:
         data_as_of:
           type: string
           format: date-time
-        profile_summary:
-          type: object
-          required: [patient_id]
-          properties:
-            patient_id:
-              type: string
-              format: uuid
-            nickname:
-              type: [string, 'null']
-            primary_condition:
-              type: [string, 'null']
-        next_visit:
-          type: [object, 'null']
-          properties:
-            date:
-              type: string
-              format: date
-            days_remaining:
-              type: integer
+        follow_up:
+          $ref: '#/components/schemas/DashboardFollowUpSection'
         today_medications:
-          type: array
-          items:
-            type: object
-            required: [medication_id, drug_name, intake_status]
-            properties:
-              medication_id:
-                type: string
-                format: uuid
-              drug_name:
-                type: string
-              specification:
-                type: [string, 'null']
-              dosage_text:
-                type: [string, 'null']
-              frequency:
-                type: [string, 'null']
-              intake_status:
-                $ref: '#/components/schemas/IntakeStatus'
-              recorded_at:
-                type: [string, 'null']
-                format: date-time
-        month_medication_stats:
-          allOf:
-            - $ref: '#/components/schemas/ThreeStateStats'
-            - type: object
-              required: [month, by_medication]
-              properties:
-                month:
-                  type: string
-                  pattern: '^\d{4}-\d{2}$'
-                by_medication:
-                  type: array
-                  items:
-                    allOf:
-                      - $ref: '#/components/schemas/ThreeStateStats'
-                      - type: object
-                        required: [medication_id, drug_name]
-                        properties:
-                          medication_id:
-                            type: string
-                            format: uuid
-                          drug_name:
-                            type: string
+          $ref: '#/components/schemas/DashboardTodayMedicationsSection'
+        monthly_medication_summary:
+          $ref: '#/components/schemas/DashboardMonthlyMedicationSection'
         latest_report:
-          oneOf:
-            - $ref: '#/components/schemas/ReportListItem'
-            - type: 'null'
+          $ref: '#/components/schemas/DashboardLatestReportSection'
 
     DocumentType:
       type: string
@@ -2114,7 +2217,7 @@ components:
 
     UploadStatus:
       type: string
-      enum: [uploaded, processing, ready, failed, deleted]
+      enum: [uploaded, ready, failed, deleted]
 
     Document:
       type: object
@@ -2125,9 +2228,6 @@ components:
           format: uuid
         patient_id:
           type: string
-          format: uuid
-        encounter_id:
-          type: [string, 'null']
           format: uuid
         document_type:
           $ref: '#/components/schemas/DocumentType'
@@ -2182,6 +2282,15 @@ components:
           pattern: '^[a-f0-9]{64}$'
         file_size_bytes:
           type: integer
+        mime_type:
+          type: string
+          enum: [image/jpeg, image/png, application/pdf]
+        pixel_count:
+          type: [integer, 'null']
+          maximum: 25000000
+        page_count:
+          type: integer
+          const: 1
         replaced_revision_id:
           type: [string, 'null']
           format: uuid
@@ -2687,13 +2796,14 @@ components:
           items:
             $ref: '#/components/schemas/ReconciliationItemDecision'
 
-    ConfirmationStatus:
+    PatientNoteStatus:
       type: string
-      enum: [draft, confirmed, cancelled]
+      enum: [draft, confirmed, skipped, consumed]
 
     PatientNoteInput:
       type: object
       required: [original_text]
+      additionalProperties: false
       properties:
         original_text:
           type: string
@@ -2708,10 +2818,6 @@ components:
         visit_context:
           type: [string, 'null']
           maxLength: 200
-
-    PatientNoteStatus:
-      type: string
-      enum: [draft, confirmed, skipped, consumed]
 
     PatientNote:
       type: object
@@ -2732,6 +2838,7 @@ components:
         status:
           $ref: '#/components/schemas/PatientNoteStatus'
         source_note_id:
+        confirmed_by_uid:
           type: [string, 'null']
           format: uuid
         confirmed_at:

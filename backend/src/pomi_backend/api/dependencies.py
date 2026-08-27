@@ -12,6 +12,8 @@ from sqlalchemy.orm import Session
 from pomi_backend.db.models import UserAccount
 from pomi_backend.services import AuthService
 from pomi_backend.services.auth import AuthError
+from pomi_backend.services.documents import DocumentService
+from pomi_backend.services.medications import MedicationService
 from pomi_backend.services.patient import PatientProfileService
 from pomi_backend.services.patient_notes import PatientNoteService
 
@@ -56,6 +58,21 @@ def get_current_account(service: AuthServiceDependency, session_id: SessionId) -
 CurrentAccount = Annotated[UserAccount, Depends(get_current_account)]
 
 
+def get_medication_service(
+    request: Request,
+    session: DatabaseSession,
+    account: CurrentAccount,
+) -> MedicationService:
+    return MedicationService(
+        session,
+        account,
+        request.app.state.business_date_provider(),
+    )
+
+
+MedicationServiceDependency = Annotated[MedicationService, Depends(get_medication_service)]
+
+
 def get_patient_profile_service(
     session: DatabaseSession, account: CurrentAccount
 ) -> PatientProfileService:
@@ -74,3 +91,12 @@ def get_patient_note_service(
 
 
 PatientNoteServiceDependency = Annotated[PatientNoteService, Depends(get_patient_note_service)]
+
+
+def get_document_service(
+    request: Request, session: DatabaseSession, account: CurrentAccount
+) -> DocumentService:
+    return DocumentService(session, account, request.app.state.settings.storage_root)
+
+
+DocumentServiceDependency = Annotated[DocumentService, Depends(get_document_service)]

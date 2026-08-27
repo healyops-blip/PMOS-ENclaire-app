@@ -73,6 +73,7 @@ terminal echo unless the corresponding one-shot environment variable is set.
 ```bash
 pomi-admin seed-accounts
 pomi-admin seed-health
+pomi-admin purge-documents
 pomi-admin reset-password ACCOUNT_NAME
 ```
 
@@ -80,8 +81,24 @@ pomi-admin reset-password ACCOUNT_NAME
 `seed-health` keeps the first-time user's health records empty and idempotently
 adds synthetic medications, events, daily statuses, cycles, and weights for the
 returning user. Run it only after `seed-accounts`.
+`purge-documents` removes expired physical files for soft-deleted documents after
+the seven-day retention period; immutable report references must be registered by
+the report module before enabling its scheduled timer.
 `reset-password` changes the hash and revokes every active Session for the
 account. Neither operation is exposed as an HTTP endpoint.
+
+## Medication API
+
+- `GET/POST /api/medications` reads grouped current medications or creates one.
+- `PUT /api/medications/{id}` adjusts, pauses, resumes, or stops a medication.
+- Dose/frequency adjustments create a new row linked by `replaces_medication_id`.
+- `GET /api/medications/{id}/events` returns the immutable cross-version timeline.
+- `PUT /api/medications/{id}/daily-status` only accepts the server business date.
+- `GET /api/medication-daily` dynamically returns `unrecorded` without storing it.
+
+The server business date uses `POMI_BUSINESS_TIMEZONE` (`Asia/Singapore` by
+default). Daily totals exclude future dates and derive expected days from every
+start, pause, resume, adjustment, and stop boundary.
 
 ## Remaining P0 backend rules
 

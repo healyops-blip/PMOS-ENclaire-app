@@ -53,6 +53,12 @@ class ReportSnapshot(Base):
             "report_status IN ('pending', 'succeeded', 'failed')",
             name="report_snapshot_status",
         ),
+        CheckConstraint(
+            "report_status != 'succeeded' OR "
+            "(snapshot_json IS NOT NULL AND snapshot_hash IS NOT NULL "
+            "AND report_generated_at IS NOT NULL)",
+            name="successful_report_complete",
+        ),
         UniqueConstraint("patient_id", "source_digest", name="uq_report_patient_source_digest"),
         Index("ix_report_snapshot_patient_generated", "patient_id", "report_generated_at"),
     )
@@ -96,6 +102,18 @@ class ReportSource(Base):
             "'rule_execution')",
             name="report_source_origin_kind",
         ),
+        CheckConstraint(
+            "(origin_kind = 'medical_document' AND document_id IS NOT NULL "
+            "AND document_revision_id IS NOT NULL) OR "
+            "(origin_kind != 'medical_document' AND document_id IS NULL "
+            "AND document_revision_id IS NULL)",
+            name="report_source_document_identity",
+        ),
+        CheckConstraint(
+            "(origin_kind = 'rule_execution' AND rule_execution_id IS NOT NULL) OR "
+            "(origin_kind != 'rule_execution' AND rule_execution_id IS NULL)",
+            name="report_source_rule_identity",
+        ),
         UniqueConstraint(
             "report_id", "source_type", "source_record_id", name="uq_report_source_record"
         ),
@@ -109,7 +127,11 @@ class ReportSource(Base):
     source_type: Mapped[str] = mapped_column(String(32), nullable=False)
     source_record_id: Mapped[str] = mapped_column(String(36), nullable=False)
     origin_kind: Mapped[str] = mapped_column(String(24), nullable=False)
-    document_id: Mapped[str | None] = mapped_column(String(36))
-    document_revision_id: Mapped[str | None] = mapped_column(String(36))
+    document_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("document.id", ondelete="RESTRICT")
+    )
+    document_revision_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("document_revision.id", ondelete="RESTRICT")
+    )
     rule_execution_id: Mapped[str | None] = mapped_column(String(36))
     included_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, default=utc_now)
