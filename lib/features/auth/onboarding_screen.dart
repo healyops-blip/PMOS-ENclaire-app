@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -16,7 +17,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nickname = TextEditingController();
   final _birthYear = TextEditingController(text: '1997');
-  final _height = TextEditingController(text: '162');
+  final _height = TextEditingController();
   final _weight = TextEditingController();
   final _diagnosisYear = TextEditingController(text: '2023');
   final _lastPeriod = TextEditingController();
@@ -64,6 +65,75 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     if (picked != null) {
       controller.text = picked.toIso8601String().substring(0, 10);
     }
+  }
+
+  Future<void> _chooseYear(
+    TextEditingController controller, {
+    required int fallbackYear,
+  }) async {
+    final currentYear = DateTime.now().year;
+    const firstYear = 1940;
+    final initialYear =
+        (int.tryParse(controller.text) ?? fallbackYear)
+            .clamp(firstYear, currentYear)
+            .toInt();
+    var selectedYear = initialYear;
+    final scrollController = FixedExtentScrollController(
+      initialItem: initialYear - firstYear,
+    );
+
+    final picked = await showModalBottomSheet<int>(
+      context: context,
+      showDragHandle: true,
+      builder:
+          (context) => SafeArea(
+            top: false,
+            child: SizedBox(
+              height: 330,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('取消'),
+                        ),
+                        const Text(
+                          '选择年份',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, selectedYear),
+                          child: const Text('确定'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: CupertinoPicker(
+                      scrollController: scrollController,
+                      itemExtent: 44,
+                      useMagnifier: true,
+                      magnification: 1.08,
+                      onSelectedItemChanged:
+                          (index) => selectedYear = firstYear + index,
+                      children: [
+                        for (var year = firstYear; year <= currentYear; year++)
+                          Center(child: Text('$year 年')),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+    );
+    scrollController.dispose();
+    if (picked != null) setState(() => controller.text = '$picked');
   }
 
   void _next() {
@@ -222,7 +292,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         textAlign: TextAlign.center,
         decoration: const InputDecoration(
           labelText: '昵称',
-          floatingLabelAlignment: FloatingLabelAlignment.center,
+          floatingLabelAlignment: FloatingLabelAlignment.start,
         ),
         validator:
             (value) => value == null || value.trim().isEmpty ? '请输入昵称' : null,
@@ -233,11 +303,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           Expanded(
             child: TextFormField(
               controller: _birthYear,
-              keyboardType: TextInputType.number,
+              readOnly: true,
+              onTap: () => _chooseYear(_birthYear, fallbackYear: 1997),
               textAlign: TextAlign.center,
               decoration: const InputDecoration(
                 labelText: '出生年份',
-                floatingLabelAlignment: FloatingLabelAlignment.center,
+                floatingLabelAlignment: FloatingLabelAlignment.start,
               ),
               validator: _yearValidator,
             ),
@@ -246,11 +317,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           Expanded(
             child: TextFormField(
               controller: _diagnosisYear,
-              keyboardType: TextInputType.number,
+              readOnly: true,
+              onTap: () => _chooseYear(_diagnosisYear, fallbackYear: 2023),
               textAlign: TextAlign.center,
               decoration: const InputDecoration(
                 labelText: '确诊年份',
-                floatingLabelAlignment: FloatingLabelAlignment.center,
+                floatingLabelAlignment: FloatingLabelAlignment.start,
               ),
               validator: _yearValidator,
             ),
@@ -268,7 +340,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               decoration: const InputDecoration(
                 labelText: '身高',
                 suffixText: 'cm',
-                floatingLabelAlignment: FloatingLabelAlignment.center,
+                floatingLabelAlignment: FloatingLabelAlignment.start,
               ),
               validator: (value) {
                 final height = double.tryParse(value ?? '');
@@ -289,7 +361,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               decoration: const InputDecoration(
                 labelText: '体重',
                 suffixText: 'kg',
-                floatingLabelAlignment: FloatingLabelAlignment.center,
+                floatingLabelAlignment: FloatingLabelAlignment.start,
               ),
               validator: _weightValidator,
             ),
