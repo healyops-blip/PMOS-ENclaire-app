@@ -143,17 +143,34 @@ class MedicationDailyRepository(PatientScopedRepository):
 class MenstrualCycleRepository(PatientScopedRepository):
     model = MenstrualCycle
 
-    def list(self) -> list[MenstrualCycle]:
+    def list(
+        self,
+        *,
+        from_date: date | None = None,
+        to_date: date | None = None,
+    ) -> list[MenstrualCycle]:
+        statement = select(MenstrualCycle).where(
+            MenstrualCycle.patient_id == self.patient_id,
+            MenstrualCycle.deleted_at.is_(None),
+        )
+        if from_date is not None:
+            statement = statement.where(MenstrualCycle.start_date >= from_date)
+        if to_date is not None:
+            statement = statement.where(MenstrualCycle.start_date <= to_date)
         return list(
             self.session.scalars(
-                select(MenstrualCycle)
-                .where(
-                    MenstrualCycle.patient_id == self.patient_id,
-                    MenstrualCycle.deleted_at.is_(None),
+                statement.order_by(
+                    MenstrualCycle.start_date.desc(),
+                    MenstrualCycle.created_at.desc(),
                 )
-                .order_by(MenstrualCycle.start_date.desc())
             )
         )
+
+    def active(self, cycle_id: str) -> MenstrualCycle | None:
+        cycle = self.get(cycle_id)
+        if cycle is None or cycle.deleted_at is not None:
+            return None
+        return cycle
 
     def update(self, cycle: MenstrualCycle, **changes: Any) -> MenstrualCycle:
         if self.get(cycle.id) is None:
@@ -175,12 +192,20 @@ class MenstrualCycleRepository(PatientScopedRepository):
 class WeightRepository(PatientScopedRepository):
     model = WeightRecord
 
-    def list(self) -> list[WeightRecord]:
+    def list(
+        self,
+        *,
+        from_date: date | None = None,
+        to_date: date | None = None,
+    ) -> list[WeightRecord]:
+        statement = select(WeightRecord).where(WeightRecord.patient_id == self.patient_id)
+        if from_date is not None:
+            statement = statement.where(WeightRecord.record_date >= from_date)
+        if to_date is not None:
+            statement = statement.where(WeightRecord.record_date <= to_date)
         return list(
             self.session.scalars(
-                select(WeightRecord)
-                .where(WeightRecord.patient_id == self.patient_id)
-                .order_by(WeightRecord.record_date)
+                statement.order_by(WeightRecord.record_date, WeightRecord.created_at)
             )
         )
 

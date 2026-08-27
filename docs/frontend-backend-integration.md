@@ -146,7 +146,7 @@ Authorization: Bearer <session_id>
 | 用药历史 | `GET /api/medications/{medication_id}/events` | 时间线 | 不可覆盖的事件链 |
 | 每日状态 | `PUT /api/medications/{medication_id}/daily-status` | 首页、用药月历 | taken/missed/unrecorded |
 | 每日状态范围 | `GET /api/medication-daily` | 月统计 | 日期范围内三状态记录 |
-| 经期 | `GET/POST /api/cycles`、`PUT /api/cycles/{cycle_id}` | 经期页 | 周期和趋势 |
+| 经期 | `GET/POST /api/cycles`、`PUT/DELETE /api/cycles/{cycle_id}` | 经期页 | 周期、趋势和逻辑删除 |
 | 体重 | `GET/POST /api/weights`、`PUT /api/weights/{weight_id}` | 经期/体重页 | 体重趋势 |
 | 材料 | `GET/POST /api/documents` | 记录页、上传页 | 材料及当前修订 |
 | 材料详情 | `GET/DELETE /api/documents/{document_id}` | 材料详情 | 详情或软删除结果 |
@@ -246,7 +246,8 @@ PUT 允许分步部分更新。请求中的 `complete_onboarding=true` 只有在
 - `current_status`：`active/stopped/unknown`。
 - 新增/编辑请求还包含 `change_reason`、`event_date`、`note`。
 - 停药必须附带 `stop_source`：`written_order/verbal_doctor/patient_self/other`。
-- 后端每次修改生成 `medication_event`，事件类型：`started/adjusted/continued/stopped`。
+- 后端每次修改生成不可变 `medication_event`，事件类型：`created/adjusted/paused/resumed/stopped`。
+- 剂量或频率调整不得覆盖原记录：旧版本结束生效，新增版本通过 `replaces_medication_id` 关联。
 
 每日状态请求：
 
@@ -258,7 +259,7 @@ PUT 允许分步部分更新。请求中的 `complete_onboarding=true` 只有在
 | `actual_dosage_unit` | string/null | 否 | 实际剂量单位 |
 | `note` | string/null | 否 | 最长 500 字 |
 
-唯一键为 `patient_id + medication_id + record_date`，重复 PUT 覆盖当日状态但不创建重复行。
+唯一键为 `patient_id + medication_id + record_date`，重复 PUT 覆盖当日状态但不创建重复行。仅业务当天允许写入；`unrecorded` 删除明确状态行，并按药物生效、暂停、恢复、调整和停用区间动态计算。
 
 ### 5.5 经期与体重
 
@@ -269,10 +270,11 @@ PUT 允许分步部分更新。请求中的 `complete_onboarding=true` 只有在
 - `cycle_length_days` 和 `duration_days` 由后端计算。
 - 周期重叠返回 `CYCLE_DATE_OVERLAP`。
 
-体重字段：`id`、`measured_at`、`weight_kg`、`source_type`、`note`、`created_at`。
+体重字段：`id`、`record_date`、`weight_kg`、`created_at`、`updated_at`。
 
-- 只保存 kg，合理范围 20–350 kg。
+- 只保存 kg，合理范围 20.0–300.0 kg，最多一位小数。
 - 同一患者同一自然日 POST 视为更新并返回现有 ID。
+- GET 按 `record_date` 升序返回；可使用 `from`、`to` 做日期过滤。
 
 ### 5.6 材料与修订
 
