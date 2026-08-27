@@ -15,6 +15,7 @@ from pomi_backend.api.errors import (
 )
 from pomi_backend.api.health import router as health_router
 from pomi_backend.api.middleware import SecurityHeadersMiddleware
+from pomi_backend.api.weights import router as weights_router
 from pomi_backend.config import Settings
 from pomi_backend.db import build_engine, build_session_factory
 from pomi_backend.services.auth import AuthError
@@ -55,6 +56,7 @@ def create_app(*, settings: Settings | None = None, engine: Engine | None = None
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.include_router(auth_router)
     app.include_router(health_router)
+    app.include_router(weights_router)
     return app
 
 

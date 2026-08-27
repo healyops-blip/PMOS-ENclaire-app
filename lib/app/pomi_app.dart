@@ -5,6 +5,7 @@ import 'package:pmos_enclaire/features/auth/domain/demo_account.dart';
 import 'package:pmos_enclaire/features/auth/presentation/login_page.dart';
 import 'package:pmos_enclaire/features/dashboard/presentation/dashboard_page.dart';
 import 'package:pmos_enclaire/features/onboarding/presentation/onboarding_page.dart';
+import 'package:pmos_enclaire/features/weight/data/weight_repository.dart';
 
 abstract final class PomiRoutes {
   static const login = '/login';
@@ -13,7 +14,9 @@ abstract final class PomiRoutes {
 }
 
 class PomiApp extends StatefulWidget {
-  const PomiApp({super.key});
+  const PomiApp({this.weightRepository, super.key});
+
+  final WeightRepository? weightRepository;
 
   @override
   State<PomiApp> createState() => _PomiAppState();
@@ -54,7 +57,10 @@ class _PomiAppState extends State<PomiApp> {
         builder: (context, state) {
           final account =
               state.extra as DemoAccount? ?? DemoAccount.existingUser;
-          return DashboardPage(account: account);
+          return DashboardPage(
+            account: account,
+            weightRepository: widget.weightRepository,
+          );
         },
       ),
     ],

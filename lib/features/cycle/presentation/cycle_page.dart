@@ -3,29 +3,61 @@ import 'package:pmos_enclaire/core/theme/pomi_theme.dart';
 import 'package:pmos_enclaire/core/widgets/demo_badge.dart';
 import 'package:pmos_enclaire/core/widgets/pomi_line_chart.dart';
 import 'package:pmos_enclaire/core/widgets/pomi_surfaces.dart';
+import 'package:pmos_enclaire/features/weight/application/weight_controller.dart';
+import 'package:pmos_enclaire/features/weight/domain/weight_input_validator.dart';
+import 'package:pmos_enclaire/features/weight/domain/weight_record.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 class CyclePage extends StatefulWidget {
-  const CyclePage({super.key});
+  const CyclePage({required this.weightController, super.key});
+
+  final WeightController weightController;
 
   @override
   State<CyclePage> createState() => _CyclePageState();
 }
 
 class _CyclePageState extends State<CyclePage> {
-  DateTime _focusedDay = DateTime(2026, 8, 26);
-  DateTime _selectedDay = DateTime(2026, 8, 26);
+  DateTime _focusedDay = DateTime(2026, 8, 27);
+  DateTime _selectedDay = DateTime(2026, 8, 27);
   final Set<DateTime> _periodDays = {
     for (var day = 6; day <= 10; day++) DateTime(2026, 8, day),
   };
-  final Map<DateTime, double> _weights = {
-    DateTime(2026, 8, 3): 70.8,
-    DateTime(2026, 8, 10): 70.2,
-    DateTime(2026, 8, 17): 69.9,
-    DateTime(2026, 8, 24): 69.6,
-  };
+
+  @override
+  void initState() {
+    super.initState();
+    widget.weightController.addListener(_refresh);
+  }
+
+  @override
+  void didUpdateWidget(covariant CyclePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.weightController != widget.weightController) {
+      oldWidget.weightController.removeListener(_refresh);
+      widget.weightController.addListener(_refresh);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.weightController.removeListener(_refresh);
+    super.dispose();
+  }
+
+  void _refresh() {
+    if (mounted) setState(() {});
+  }
 
   DateTime _dateOnly(DateTime day) => DateTime(day.year, day.month, day.day);
+
+  WeightRecord? _recordFor(DateTime day) {
+    final target = _dateOnly(day);
+    for (final record in widget.weightController.records) {
+      if (_dateOnly(record.recordDate) == target) return record;
+    }
+    return null;
+  }
 
   void _togglePeriod() {
     final day = _dateOnly(_selectedDay);
@@ -39,45 +71,35 @@ class _CyclePageState extends State<CyclePage> {
   }
 
   Future<void> _recordWeight() async {
-    final controller = TextEditingController(
-      text: _weights[_dateOnly(_selectedDay)]?.toString() ?? '',
-    );
+    final existing = _recordFor(_selectedDay);
     final result = await showDialog<double>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('记录体重'),
-        content: TextField(
-          key: const Key('weight-input'),
-          controller: controller,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
-            suffixText: 'kg',
-            hintText: '例如 69.5',
-          ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () =>
-                Navigator.pop(context, double.tryParse(controller.text.trim())),
-            child: const Text('保存'),
-          ),
-        ],
+      builder: (_) => _WeightEntryDialog(
+        recordDate: _selectedDay,
+        initialWeight: existing?.weightKg,
       ),
     );
-    controller.dispose();
-    if (result == null || result < 30 || result > 250) return;
-    setState(() => _weights[_dateOnly(_selectedDay)] = result);
+    if (result == null || !mounted) return;
+
+    final saved = await widget.weightController.save(
+      recordDate: _selectedDay,
+      weightKg: result,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          saved
+              ? '体重已保存'
+              : widget.weightController.errorMessage ?? '保存失败，请稍后重试',
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final sortedWeights = _weights.entries.toList()
-      ..sort((a, b) => a.key.compareTo(b.key));
+    final records = widget.weightController.records;
     return ColoredBox(
       key: const Key('cycle-page'),
       color: PomiColors.primaryPale,
@@ -87,7 +109,7 @@ class _CyclePageState extends State<CyclePage> {
             child: PomiPageHeader(
               title: '经期与体重',
               subtitle: '把身体变化放在同一条时间线上',
-              trailing: DemoBadge(label: '模拟数据'),
+              trailing: DemoBadge(label: '经期为模拟数据'),
             ),
           ),
           SliverPadding(
@@ -100,11 +122,9 @@ class _CyclePageState extends State<CyclePage> {
                     firstDay: DateTime(2025),
                     lastDay: DateTime(2027, 12, 31),
                     focusedDay: _focusedDay,
-                    selectedDayPredicate: (day) =>
-                        _periodDays.contains(_dateOnly(day)),
-                    eventLoader: (day) => _weights.containsKey(_dateOnly(day))
-                        ? const ['weight']
-                        : const [],
+                    selectedDayPredicate: (day) => isSameDay(day, _selectedDay),
+                    eventLoader: (day) =>
+                        _recordFor(day) == null ? const [] : const ['weight'],
                     onDaySelected: (selected, focused) {
                       setState(() {
                         _selectedDay = _dateOnly(selected);
@@ -184,9 +204,13 @@ class _CyclePageState extends State<CyclePage> {
                     Expanded(
                       child: FilledButton.icon(
                         key: const Key('record-weight-button'),
-                        onPressed: _recordWeight,
+                        onPressed: widget.weightController.isLoading
+                            ? null
+                            : _recordWeight,
                         icon: const Icon(Icons.monitor_weight_outlined),
-                        label: const Text('记录体重'),
+                        label: Text(
+                          _recordFor(_selectedDay) == null ? '记录体重' : '修改体重',
+                        ),
                       ),
                     ),
                   ],
@@ -234,37 +258,191 @@ class _CyclePageState extends State<CyclePage> {
                 const SizedBox(height: 22),
                 const PomiSectionTitle(title: '体重趋势'),
                 const SizedBox(height: 8),
-                PomiSectionCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${sortedWeights.last.value.toStringAsFixed(1)} kg',
-                        style: Theme.of(context).textTheme.headlineMedium,
-                      ),
-                      const Text(
-                        '较月初下降 1.2 kg',
-                        style: TextStyle(
-                          color: PomiColors.success,
-                          fontSize: 11,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      PomiLineChart(
-                        values: [for (final item in sortedWeights) item.value],
-                        labels: [
-                          for (final item in sortedWeights)
-                            '${item.key.month}/${item.key.day}',
-                        ],
-                        color: PomiColors.glowPink,
-                        minY: 68.5,
-                        maxY: 71.5,
-                      ),
-                    ],
-                  ),
+                _WeightTrendCard(
+                  records: records,
+                  loading: widget.weightController.isLoading,
+                  errorMessage: widget.weightController.errorMessage,
+                  onRetry: widget.weightController.load,
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WeightEntryDialog extends StatefulWidget {
+  const _WeightEntryDialog({required this.recordDate, this.initialWeight});
+
+  final DateTime recordDate;
+  final double? initialWeight;
+
+  @override
+  State<_WeightEntryDialog> createState() => _WeightEntryDialogState();
+}
+
+class _WeightEntryDialogState extends State<_WeightEntryDialog> {
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.initialWeight?.toStringAsFixed(1) ?? '',
+  );
+  String? _validationMessage;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final message = validateWeightInput(_controller.text);
+    if (message != null) {
+      setState(() => _validationMessage = message);
+      return;
+    }
+    Navigator.pop(context, double.parse(_controller.text.trim()));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.initialWeight == null ? '记录体重' : '修改体重'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${widget.recordDate.year} 年 ${widget.recordDate.month} 月 ${widget.recordDate.day} 日',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            key: const Key('weight-input'),
+            controller: _controller,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              suffixText: 'kg',
+              hintText: '20.0–300.0',
+              errorText: _validationMessage,
+            ),
+            autofocus: true,
+            onChanged: (_) {
+              if (_validationMessage != null) {
+                setState(() => _validationMessage = null);
+              }
+            },
+            onSubmitted: (_) => _submit(),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          key: const Key('save-weight-button'),
+          onPressed: _submit,
+          child: const Text('保存'),
+        ),
+      ],
+    );
+  }
+}
+
+class _WeightTrendCard extends StatelessWidget {
+  const _WeightTrendCard({
+    required this.records,
+    required this.loading,
+    required this.errorMessage,
+    required this.onRetry,
+  });
+
+  final List<WeightRecord> records;
+  final bool loading;
+  final String? errorMessage;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading && records.isEmpty) {
+      return const PomiSectionCard(
+        child: Center(
+          child: CircularProgressIndicator(key: Key('weight-loading')),
+        ),
+      );
+    }
+    if (records.isEmpty) {
+      return PomiSectionCard(
+        child: Center(
+          child: Padding(
+            key: const Key('weight-empty-state'),
+            padding: const EdgeInsets.symmetric(vertical: 22),
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.monitor_weight_outlined,
+                  color: PomiColors.primary,
+                  size: 34,
+                ),
+                const SizedBox(height: 8),
+                Text(errorMessage ?? '还没有体重记录'),
+                const SizedBox(height: 4),
+                Text(
+                  errorMessage == null ? '选择上方日期，记录第一条体重' : '检查网络后重新加载',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                if (errorMessage != null)
+                  TextButton(onPressed: onRetry, child: const Text('重试')),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final latest = records.last;
+    final change = latest.weightKg - records.first.weightKg;
+    final changeLabel = records.length == 1
+        ? '第一条体重记录'
+        : '较首条${change > 0 ? '上升' : '下降'} ${change.abs().toStringAsFixed(1)} kg';
+    return PomiSectionCard(
+      key: const Key('weight-trend-card'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${latest.weightKg.toStringAsFixed(1)} kg',
+                key: const Key('weight-latest-value'),
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              const Spacer(),
+              Text(
+                '${latest.recordDate.year}-${latest.recordDate.month.toString().padLeft(2, '0')}-${latest.recordDate.day.toString().padLeft(2, '0')}',
+                key: const Key('weight-latest-date'),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+          Text(
+            changeLabel,
+            style: TextStyle(
+              color: change <= 0 ? PomiColors.success : PomiColors.warning,
+              fontSize: 11,
+            ),
+          ),
+          const SizedBox(height: 12),
+          PomiLineChart(
+            values: [for (final record in records) record.weightKg],
+            labels: [
+              for (final record in records)
+                '${record.recordDate.month}/${record.recordDate.day}',
+            ],
+            color: PomiColors.glowPink,
           ),
         ],
       ),
