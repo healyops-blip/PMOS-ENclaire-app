@@ -86,13 +86,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       context: context,
       builder:
           (context) => Dialog(
-            insetPadding: const EdgeInsets.symmetric(horizontal: 36),
+            backgroundColor: Colors.white,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 50),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
             ),
             clipBehavior: Clip.antiAlias,
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 320),
+              constraints: const BoxConstraints(maxWidth: 276),
               child: SizedBox(
                 height: 330,
                 child: Column(
