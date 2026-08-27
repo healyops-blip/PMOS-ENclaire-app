@@ -522,7 +522,6 @@ class _OnboardingHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const titles = ['基本信息', '经期情况', '当前用药'];
-    const subtitles = ['', '帮助整理周期和就诊倒计时', '帮助定制日常用药管理'];
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 4),
       child: Column(
@@ -545,13 +544,6 @@ class _OnboardingHeader extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(titles[step], style: Theme.of(context).textTheme.titleLarge),
-          if (subtitles[step].isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              subtitles[step],
-              style: const TextStyle(color: pomiMuted, fontSize: 12),
-            ),
-          ],
         ],
       ),
     );
