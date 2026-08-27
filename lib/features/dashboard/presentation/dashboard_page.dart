@@ -7,6 +7,7 @@ import 'package:pmos_enclaire/features/cycle/presentation/cycle_page.dart';
 import 'package:pmos_enclaire/features/dashboard/domain/medication.dart';
 import 'package:pmos_enclaire/features/medications/presentation/medication_page.dart';
 import 'package:pmos_enclaire/features/profile/presentation/profile_page.dart';
+import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
 import 'package:pmos_enclaire/features/records/presentation/records_page.dart';
 import 'package:pmos_enclaire/features/records/presentation/upload_flow.dart';
 import 'package:pmos_enclaire/features/reports/presentation/report_page.dart';
@@ -16,12 +17,16 @@ import 'package:pmos_enclaire/features/weight/data/weight_repository.dart';
 class DashboardPage extends StatefulWidget {
   const DashboardPage({
     required this.account,
-    this.weightRepository,
+    required this.profileRepository,
+    required this.weightRepository,
+    this.now,
     super.key,
   });
 
   final DemoAccount account;
-  final WeightRepository? weightRepository;
+  final PatientProfileRepository profileRepository;
+  final WeightRepository weightRepository;
+  final DateTime Function()? now;
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -60,9 +65,8 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void initState() {
     super.initState();
-    _weightController = WeightController(
-      widget.weightRepository ?? MemoryWeightRepository.seeded(),
-    )..addListener(_onWeightChanged);
+    _weightController = WeightController(widget.weightRepository)
+      ..addListener(_onWeightChanged);
     _weightController.load();
   }
 
@@ -118,9 +122,12 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               ),
             ),
-            CyclePage(weightController: _weightController),
+            CyclePage(weightController: _weightController, now: widget.now),
             const RecordsPage(),
-            ProfilePage(account: widget.account),
+            ProfilePage(
+              account: widget.account,
+              repository: widget.profileRepository,
+            ),
           ],
         ),
       ),
@@ -671,47 +678,64 @@ class _DashboardWeightSummary extends StatelessWidget {
       child: Padding(
         key: const Key('dashboard-weight-summary'),
         padding: const EdgeInsets.symmetric(vertical: 13),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: PomiColors.glowPink.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(13),
-              ),
-              child: const Icon(
-                Icons.monitor_weight_outlined,
-                color: PomiColors.primary,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            if (controller.errorMessage != null) ...[
+              Row(
+                key: const Key('dashboard-weight-stale-warning'),
                 children: [
-                  Text(
-                    '${latest.weightKg.toStringAsFixed(1)} kg',
-                    key: const Key('dashboard-weight-value'),
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  Text(
-                    '${latest.recordDate.year}-$month-$day 记录',
-                    key: const Key('dashboard-weight-date'),
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
+                  const Icon(Icons.sync_problem_rounded, size: 18),
+                  const SizedBox(width: 8),
+                  const Expanded(child: Text('同步失败，当前为上次数据')),
+                  TextButton(onPressed: controller.load, child: const Text('重试')),
                 ],
               ),
+              const SizedBox(height: 6),
+            ],
+            Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: PomiColors.glowPink.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: const Icon(
+                    Icons.monitor_weight_outlined,
+                    color: PomiColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${latest.weightKg.toStringAsFixed(1)} kg',
+                        key: const Key('dashboard-weight-value'),
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        '${latest.recordDate.year}-$month-$day 记录',
+                        key: const Key('dashboard-weight-date'),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                if (controller.isLoading)
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+              ],
             ),
-            if (controller.isLoading)
-              const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
           ],
         ),
       ),
