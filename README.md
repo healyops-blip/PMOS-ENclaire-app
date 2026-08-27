@@ -31,11 +31,11 @@ flutter pub get
 flutter run
 ```
 
-## UI demo scope
+## Current product scope
 
-The current Flutter UI uses local demo data and includes:
+The Flutter UI currently includes:
 
-- fixed new/existing demo-account routes;
+- real account registration, login, secure Session storage, and cold-start recovery;
 - three-step patient onboarding;
 - dashboard and medication three-state interactions;
 - medication management and reminder screens;
@@ -46,10 +46,12 @@ The current Flutter UI uses local demo data and includes:
 - doctor KYC, signature, and test-chain certification states;
 - patient profile and authorization entry points.
 
-The Flutter screens still use local demo data. The FastAPI account-name/password
-authentication API and SQLite persistence are implemented, but the Flutter auth
-screens are not connected to them yet. Patient data APIs, real OCR, identity
-providers, blockchain nodes, and PDF export remain unimplemented.
+The non-authentication Flutter feature screens still use local demo data and are
+the next frontend integration work. FastAPI now implements the contracted P0
+patient, tracking, document, OCR, reconciliation, report snapshot, and PDF APIs.
+OCR defaults to an explicitly labelled local mock adapter; production Qwen use
+requires server-only credentials. Identity-provider and blockchain behavior is
+outside the P0 backend boundary.
 
 ## Quality checks
 
@@ -59,6 +61,7 @@ Run the same core checks used by GitHub Actions:
 dart format --output=none --set-exit-if-changed lib test
 flutter analyze --fatal-infos
 flutter test
+flutter build apk --debug
 ```
 
 ## Frontend/backend integration

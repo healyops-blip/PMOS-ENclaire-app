@@ -8,16 +8,15 @@ Use environment variables for production configuration and external API keys.
 
 ## API contracts
 
-- 已经实现并通过测试的认证接口：
+- 认证接口与 Session 约定：
   [`../docs/backend-api.md`](../docs/backend-api.md)
 - 全部 P0 前后端分工与字段说明：
   [`../docs/frontend-backend-integration.md`](../docs/frontend-backend-integration.md)
 - 全部 P0 机器可读契约：
   [`../contracts/openapi/pomi-api-v1.yaml`](../contracts/openapi/pomi-api-v1.yaml)
 
-已实现接口以运行代码、测试和 `docs/backend-api.md` 为准；扩展总契约时不得
-改变现有认证字段。尚未实现的模块根据总 OpenAPI 开发，并在同一 PR 更新
-Pydantic Schema、Flutter DTO 和契约测试。
+业务接口使用 `success/data/request_id/error` 信封；现有认证接口继续保持直接
+响应兼容。接口路径、方法和参数以总 OpenAPI、运行代码及测试共同约束。
 
 ## Local setup
 
@@ -33,6 +32,17 @@ pytest
 ruff check .
 uvicorn pomi_backend.main:app --reload
 ```
+
+在另一个终端启动可恢复的 OCR/PDF 队列：
+
+```bash
+cd backend
+pomi-worker
+```
+
+本地默认 `POMI_OCR_MODE=mock`。接入 Qwen 时，仅在后端服务器配置
+`POMI_OCR_MODE=qwen`、`POMI_QWEN_API_URL`、`POMI_QWEN_API_KEY` 和
+`POMI_QWEN_MODEL`。原件与 PDF 保存在 `POMI_STORAGE_ROOT` 下，不作为静态目录公开。
 
 The default database path is `backend/runtime/pomi.db`. Set
 `POMI_DATABASE_URL` to use another SQLite path or a PostgreSQL connection later.
@@ -79,9 +89,12 @@ pomi-admin reset-password ACCOUNT_NAME
 `reset-password` changes the hash and revokes every active Session for the
 account. Neither operation is exposed as an HTTP endpoint.
 
-## Remaining P0 backend rules
+## Implemented P0 modules
 
-Implement Router, Pydantic Schema, Service, and Repository separately. SQLite is
-the P0 formal data source; uploaded originals and generated PDFs stay in a private
-server directory. OCR and PDF work must be claimed by the single-process worker,
-not FastAPI `BackgroundTasks`.
+- 患者引导/画像、Dashboard、不可覆盖的用药事件、每日三状态、经期和体重；
+- 私有医疗材料、不可变修订和鉴权文件流；
+- 可恢复 OCR 任务、Draft 2020-12 Schema 校验、字段确认与正式记录入库；
+- 用药对账、确定性规则审计接口、患者自述、不可变报告快照、来源追溯与 PDF。
+
+SQLite 是 P0 正式数据源。OCR 与 PDF 必须由单进程 `pomi-worker` 领取，不能使用
+FastAPI `BackgroundTasks`。

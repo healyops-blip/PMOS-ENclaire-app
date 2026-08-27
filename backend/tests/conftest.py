@@ -36,7 +36,7 @@ def api_engine(tmp_path: Path) -> Iterator[Engine]:
 
 
 @pytest.fixture
-def api_settings() -> Settings:
+def api_settings(tmp_path: Path) -> Settings:
     return Settings(
         database_url="sqlite://",
         session_ttl_seconds=7 * 24 * 60 * 60,
@@ -46,6 +46,8 @@ def api_settings() -> Settings:
         argon2_parallelism=1,
         auth_rate_limit_attempts=100,
         auth_rate_limit_window_seconds=60,
+        storage_root=tmp_path / "storage",
+        ocr_mode="mock",
     )
 
 

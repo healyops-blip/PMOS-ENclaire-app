@@ -19,9 +19,9 @@ PMOS-ENclaire-app/
 │   │   ├── db/           # SQLAlchemy engine and persistence models
 │   │   ├── repositories/ # Data-access boundaries
 │   │   ├── schemas/      # Explicit request and response models
-│   │   └── services/     # Authentication and application use cases
+│   │   ├── services/     # Authentication and application use cases
+│   │   └── workers/      # Recoverable OCR and PDF queue processors
 │   ├── migrations/       # Versioned SQLite schema changes
-│   ├── worker/           # Single-process OCR worker
 │   └── tests/            # Backend tests
 ├── contracts/
 │   ├── openapi/          # Versioned API contract

@@ -368,15 +368,15 @@ PDF 对象字段：`report_id`、`file_id`、`generation_status`、`file_name`�
 | Rules | `deterministic_rule`、`rule_execution` | 禁止在数据库保存可执行 Python 表达式 |
 | Reports | `patient_note`、`report_snapshot`、`report_source`、`report_file` | 快照创建后不可覆盖 |
 
-首个数据库迁移需要把接口契约补充字段落盘：
+数据库迁移已把接口契约补充字段落盘：
 
 - `patient_profile.usual_cycle_length_days INTEGER NULL`
 - `patient_profile.external_ocr_notice_version TEXT NULL`
 - `medication_event.stop_source TEXT NULL`
-- 幂等记录表：`idempotency_record(id, account_uid, endpoint_key, idempotency_key, resource_type, resource_id, response_digest, expires_at, created_at)`，并对 `account_uid + endpoint_key + idempotency_key` 建唯一索引。
+- 幂等键按资源域落在 `medication`、`document`、`document_revision`、`ocr_task`、`medication_reconciliation` 和 `report_snapshot`，并建立对应用户/患者与幂等键唯一约束。
 - `weight_record` 增加患者本地日期列或等价唯一索引，保证同一患者同一天幂等更新。
 
-`onboarding_step` 是根据画像字段计算的响应字段，不要求单独存库；`last_menstrual_start_date` 完成引导时写入首条 `menstrual_cycle`，避免在画像与周期表重复维护两份正式数据。
+`onboarding_step` 会按画像字段重新计算并持久化，便于异常退出后恢复；`last_menstrual_start_date` 完成引导时写入首条 `menstrual_cycle`，避免在画像与周期表重复维护两份正式数据。
 
 ## 6. 错误码与前端动作
 
@@ -410,30 +410,30 @@ PDF 对象字段：`report_id`、`file_id`、`generation_status`、`file_name`�
 |---|---|---|---|---|---|
 | BE-00 | 已完成 | 后端 | 账号注册、登录、`/auth/me`、退出、SQLite Session、限流 | 无 | `backend/tests` 已覆盖；不得破坏现有响应 |
 | FE-00 | 已完成 | 前端 | Dio Bearer Header、系统安全存储 | BE-00 | Header 为 `Authorization: Bearer`，清 Session 后不再发送 |
-| FE-01 | 待开发 | 前端 | `AccountDto`、`LoginResponseDto`、`AuthRepository`，登录/注册页接真接口，冷启动恢复 | BE-00 | 注册后自动登录；401 清 Session；按 `onboarding_completed` 路由 |
-| BE-01 | 待开发 | 后端 | 患者画像 GET/PUT 和引导完成事务 | BE-00 | 分步保存、字段校验、完成状态和 409 测试 |
+| FE-01 | 已完成 | 前端 | `AccountDto`、`AuthRepository`，登录/注册页接真接口，冷启动恢复 | BE-00 | 注册后自动登录；Bearer Session 安全存储；按 `onboarding_completed` 路由 |
+| BE-01 | 已完成 | 后端 | 患者画像 GET/PUT 和引导完成事务 | BE-00 | 分步保存、字段校验、完成状态和并发检查已有测试 |
 | FE-02 | 待开发 | 前端 | 四步引导接画像接口，移除账号路由中的 `DemoAccount` 依赖 | FE-01、BE-01 | 杀进程重开不丢步骤；完成后进入 Dashboard |
-| BE-02 | 待开发 | 后端 | 用药、事件、每日三状态、经期、体重、Dashboard 聚合 | BE-01 | `unrecorded` 不等于 `missed`；事件不可覆盖；同日体重幂等 |
+| BE-02 | 已完成 | 后端 | 用药、事件、每日三状态、经期、体重、Dashboard 聚合 | BE-01 | `unrecorded` 不等于 `missed`；事件不可覆盖；同日体重幂等 |
 | FE-03 | 待开发 | 前端 | Dashboard/用药/经期/体重 Repository 与页面状态 | BE-02 | 成功、空数据、加载、401、409、500 均有页面状态 |
-| BE-03 | 待开发 | 后端 | 材料、修订、私有文件流、OCR 任务/草稿/确认/重试 | BE-01 | 文件限制、租约、字段级来源、确认事务和失败测试 |
+| BE-03 | 已完成 | 后端 | 材料、修订、私有文件流、OCR 任务/草稿/确认/重试 | BE-01 | 文件限制、租约、字段级来源、确认事务和失败测试 |
 | FE-04 | 待开发 | 前端 | 上传进度、2 秒 OCR 轮询、四类确认页和错误恢复 | BE-03 | 页面退出停止轮询；未确认草稿不进入正式数据 |
-| BE-04 | 待开发 | 后端 | 医嘱对账、规则执行、患者自述、报告快照、PDF | BE-02、BE-03 | 旧药不自动停；快照不可变；PDF 和 App 同源 |
+| BE-04 | 已完成 | 后端 | 医嘱对账、规则执行、患者自述、报告快照、PDF | BE-02、BE-03 | 旧药不自动停；快照不可变；PDF 和 App 同源 |
 | FE-05 | 待开发 | 前端 | 对账、报告三层、PDF 下载/分享/打印 | BE-04 | 所有来源可追溯；生成中/失败/完成状态明确 |
-| QA-01 | 待开发 | 联调/测试 | OpenAPI 契约测试、后端 fixture、Flutter Repository 测试、端到端验收 | 对应 BE/FE | 同一字段在 OpenAPI、Pydantic、DTO 和 fixture 中一致 |
+| QA-01 | 进行中 | 联调/测试 | OpenAPI 契约检查、后端 fixture、Flutter Repository 测试、端到端验收 | 对应 BE/FE | 后端与 Auth Repository 已覆盖；业务页面联调后补端到端验收 |
 
 ### 7.2 工作包说明
 
 #### 工作包 A：基础与账号（后端先行）
 
-后端：认证、异常中间件、SQLite 迁移、密码哈希、会话、注册/登录/恢复/退出已经实现；下一步实现画像，并保持现有认证响应兼容。
+后端：认证、异常中间件、SQLite 迁移、密码哈希、会话、注册/登录/恢复/退出和患者画像已经实现，并保持现有认证响应兼容。
 
-前端：AuthRepository、SessionStore、真实登录/注册、启动路由、画像 DTO 与分步保存。注册流程必须执行“注册成功 → 登录 → 安全保存 Session”；冷启动通过 `/api/auth/me` 恢复。
+前端：AuthRepository、SessionStore、真实登录/注册和启动路由已经实现；画像 DTO 与分步保存仍待接入。注册流程执行“注册成功 → 登录 → 安全保存 Session”，冷启动通过 `/api/auth/me` 恢复。
 
 完成定义：新账号真实入库；重启可恢复会话；新用户进引导，老用户进 Dashboard。
 
 #### 工作包 B：日常记录（可与 A 后半段并行）
 
-后端：用药/事件/每日状态、经期、体重、Dashboard 聚合。
+后端：用药/事件/每日状态、经期、体重、Dashboard 聚合已经实现。
 
 前端：替换 Dashboard、用药、经期和体重页面的硬编码数据。
 
@@ -441,7 +441,7 @@ PDF 对象字段：`report_id`、`file_id`、`generation_status`、`file_name`�
 
 #### 工作包 C：文件与 OCR
 
-后端：私有文件、修订、OCR 任务/租约 Worker、Qwen 适配器、四类 Schema、字段级结果。
+后端：私有文件、修订、OCR 任务/租约 Worker、Qwen 适配器、四类 Schema、字段级结果已经实现。
 
 前端：DocumentRepository、上传进度、2 秒轮询、四类确认 DTO、权限和错误恢复。
 
@@ -449,7 +449,7 @@ PDF 对象字段：`report_id`、`file_id`、`generation_status`、`file_name`�
 
 #### 工作包 D：对账与报告
 
-后端：确定性规则、用药对账事务、患者自述、不可变报告、来源关系、PDF Worker。
+后端：确定性规则、用药对账事务、患者自述、不可变报告、来源关系、PDF Worker 已经实现。
 
 前端：对账逐项决策、报告生成状态、三层页面、文件下载/分享/打印。
 

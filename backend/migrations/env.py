@@ -9,7 +9,34 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from pomi_backend.db.base import Base
-from pomi_backend.db.models import UserAccount, UserSession  # noqa: F401
+from pomi_backend.db.models import (  # noqa: F401
+    DeterministicRule,
+    Document,
+    DocumentRevision,
+    Encounter,
+    ImagingReport,
+    LabObservation,
+    MedicalOrder,
+    Medication,
+    MedicationDaily,
+    MedicationEvent,
+    MedicationReconciliation,
+    MedicationReconciliationItem,
+    MenstrualCycle,
+    OcrFieldResult,
+    OcrResult,
+    OcrTask,
+    OutpatientRecord,
+    PatientNote,
+    PatientProfile,
+    ReportFile,
+    ReportSnapshot,
+    ReportSource,
+    RuleExecution,
+    UserAccount,
+    UserSession,
+    WeightRecord,
+)
 
 config = context.config
 

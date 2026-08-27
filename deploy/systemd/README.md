@@ -3,6 +3,8 @@
 - `pomi-api.service` starts one Uvicorn worker on `127.0.0.1:8010` and restarts it after
   failures. One worker is intentional while authentication rate limits are kept
   in process memory.
+- `pomi-worker.service` processes the recoverable OCR and PDF queues outside the
+  API request process.
 - `pomi-backup.service` creates a consistent SQLite backup.
 - `pomi-backup.timer` runs the backup daily and catches missed runs after boot.
 - `pomi.env.example` documents non-secret production settings.
@@ -12,10 +14,11 @@ Install units after creating the directories and environment file described in
 
 ```bash
 sudo cp /opt/pomi/current/deploy/systemd/pomi-api.service /etc/systemd/system/
+sudo cp /opt/pomi/current/deploy/systemd/pomi-worker.service /etc/systemd/system/
 sudo cp /opt/pomi/current/deploy/systemd/pomi-backup.service /etc/systemd/system/
 sudo cp /opt/pomi/current/deploy/systemd/pomi-backup.timer /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now pomi-api.service pomi-backup.timer
+sudo systemctl enable --now pomi-api.service pomi-worker.service pomi-backup.timer
 ```
 
 The real `/etc/pomi/pomi.env` must be owned by root with mode `0600`. Never add

@@ -4,12 +4,31 @@ import 'package:flutter/material.dart';
 import 'package:pmos_enclaire/core/theme/pomi_theme.dart';
 import 'package:pmos_enclaire/features/auth/domain/demo_account.dart';
 
+class AuthSubmission {
+  const AuthSubmission.login({
+    required this.accountName,
+    required this.password,
+  }) : phoneNumber = null,
+       registering = false;
+
+  const AuthSubmission.register({
+    required this.accountName,
+    required this.password,
+    this.phoneNumber,
+  }) : registering = true;
+
+  final String accountName;
+  final String password;
+  final String? phoneNumber;
+  final bool registering;
+}
+
 enum _AuthView { login, register }
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({required this.onLogin, super.key});
+  const LoginPage({required this.onSubmit, super.key});
 
-  final ValueChanged<DemoAccount> onLogin;
+  final Future<void> Function(AuthSubmission submission) onSubmit;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -25,6 +44,7 @@ class _LoginPageState extends State<LoginPage> {
 
   _AuthView _view = _AuthView.login;
   DemoAccount _selectedAccount = DemoAccount.existingUser;
+  bool _submitting = false;
 
   @override
   void dispose() {
@@ -52,7 +72,9 @@ class _LoginPageState extends State<LoginPage> {
     });
   }
 
-  void _submit() {
+  Future<void> _submit() async {
+    if (_submitting) return;
+    late final AuthSubmission submission;
     if (_view == _AuthView.register) {
       final accountName = _registerAccountController.text.trim();
       final password = _registerPasswordController.text;
@@ -61,15 +83,31 @@ class _LoginPageState extends State<LoginPage> {
       if (password != _confirmPasswordController.text) {
         return _message('两次输入的密码不一致');
       }
-      widget.onLogin(DemoAccount.newUser.copyWith(displayName: accountName));
-      return;
+      submission = AuthSubmission.register(
+        accountName: accountName,
+        password: password,
+        phoneNumber: _optionalPhoneController.text.trim().isEmpty
+            ? null
+            : _optionalPhoneController.text.trim(),
+      );
+    } else {
+      if (_accountController.text.trim().isEmpty ||
+          _passwordController.text.isEmpty) {
+        return _message('请输入账号名和密码');
+      }
+      submission = AuthSubmission.login(
+        accountName: _accountController.text.trim(),
+        password: _passwordController.text,
+      );
     }
-
-    if (_accountController.text.trim().isEmpty ||
-        _passwordController.text.isEmpty) {
-      return _message('请输入账号名和密码');
+    setState(() => _submitting = true);
+    try {
+      await widget.onSubmit(submission);
+    } catch (error) {
+      if (mounted) _message(error.toString());
+    } finally {
+      if (mounted) setState(() => _submitting = false);
     }
-    widget.onLogin(_selectedAccount);
   }
 
   void _message(String message) {
@@ -180,10 +218,12 @@ class _LoginPageState extends State<LoginPage> {
                                     ),
                                     const SizedBox(height: 20),
                                     _PrimaryAction(
-                                      label: _view == _AuthView.login
+                                      label: _submitting
+                                          ? '请稍候…'
+                                          : _view == _AuthView.login
                                           ? '登录'
                                           : '创建账号',
-                                      onPressed: _submit,
+                                      onPressed: _submitting ? null : _submit,
                                     ),
                                   ],
                                 ),
@@ -514,7 +554,7 @@ class _PrimaryAction extends StatelessWidget {
   const _PrimaryAction({required this.label, required this.onPressed});
 
   final String label;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {

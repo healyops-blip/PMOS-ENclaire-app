@@ -1,0 +1,40 @@
+[Unit]
+Description=Pomi OCR and PDF worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pomi
+Group=pomi
+WorkingDirectory=/opt/pomi/current/backend
+EnvironmentFile=/etc/pomi/pomi.env
+ExecStart=/opt/pomi/current/backend/.venv/bin/pomi-worker
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+KillSignal=SIGTERM
+UMask=0077
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadWritePaths=/var/lib/pomi /var/log/pomi
+MemoryMax=1G
+TasksMax=128
+
+StandardOutput=append:/var/log/pomi/worker.log
+StandardError=append:/var/log/pomi/worker-error.log
+
+[Install]
+WantedBy=multi-user.target

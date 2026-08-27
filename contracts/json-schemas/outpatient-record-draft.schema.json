@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pomi.local/schemas/outpatient-record-draft.schema.json",
+  "title": "OutpatientRecordDraft",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["visit_date", "diagnosis_summary", "treatment_plan"],
+  "properties": {
+    "hospital_name": {"type": ["string", "null"]},
+    "department_name": {"type": ["string", "null"]},
+    "doctor_name": {"type": ["string", "null"]},
+    "visit_date": {"type": "string", "format": "date"},
+    "chief_complaint": {"type": ["string", "null"]},
+    "diagnosis_summary": {"type": "string", "minLength": 1},
+    "treatment_plan": {"type": "string", "minLength": 1},
+    "medical_advice": {"type": ["string", "null"]}
+  }
+}

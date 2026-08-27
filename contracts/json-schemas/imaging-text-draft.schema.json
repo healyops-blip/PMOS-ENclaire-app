@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pomi.local/schemas/imaging-text-draft.schema.json",
+  "title": "ImagingTextDraft",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["findings_text", "conclusion_text"],
+  "properties": {
+    "examination_name": {"type": ["string", "null"]},
+    "body_part": {"type": ["string", "null"]},
+    "examination_method": {"type": ["string", "null"]},
+    "findings_text": {"type": "string", "minLength": 1},
+    "conclusion_text": {"type": "string", "minLength": 1},
+    "examined_at": {"type": ["string", "null"], "format": "date"},
+    "reported_at": {"type": ["string", "null"], "format": "date"}
+  }
+}

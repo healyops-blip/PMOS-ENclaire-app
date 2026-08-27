@@ -1,6 +1,6 @@
 # Pomi 后端接口文档
 
-本文档描述当前已经实现并可供 Flutter 客户端联调的 FastAPI 接口。接口以实际代码、Schema 和自动化测试为准；尚未实现的患者画像、OCR、报告和区块链接口不在本文档中。
+本文档专门说明已实现的账号与 Session 接口。患者画像、日常记录、材料、OCR、对账和报告接口见 [`frontend-backend-integration.md`](frontend-backend-integration.md)，机器可读定义以 [`../contracts/openapi/pomi-api-v1.yaml`](../contracts/openapi/pomi-api-v1.yaml) 为准。区块链不属于 P0 后端范围。
 
 ## 1. 公共约定
 

@@ -4,6 +4,7 @@ from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from pytest import MonkeyPatch
 from sqlalchemy import create_engine, inspect, text
 
@@ -25,6 +26,12 @@ def test_initial_migration_is_repeatable_and_safe(tmp_path: Path, monkeypatch: M
         "alembic_version",
         "user_account",
         "user_session",
+        "patient_profile",
+        "medication",
+        "medication_event",
+        "medication_daily",
+        "menstrual_cycle",
+        "weight_record",
     }
 
     account_columns = {column["name"] for column in inspector.get_columns("user_account")}
@@ -48,6 +55,6 @@ def test_initial_migration_is_repeatable_and_safe(tmp_path: Path, monkeypatch: M
 
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-            "20260826_0001"
+            ScriptDirectory.from_config(config).get_current_head()
         )
     engine.dispose()
