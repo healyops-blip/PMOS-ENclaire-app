@@ -435,6 +435,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   Widget _cycleStep() => _StepCard(
+    showFrame: false,
+    padding: const EdgeInsets.all(16),
     children: [
       TextFormField(
         controller: _lastPeriod,
@@ -476,6 +478,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   );
 
   Widget _medicationStep() => _StepCard(
+    showFrame: false,
+    padding: const EdgeInsets.all(16),
     children: [
       const Text(
         '选择当前正在使用的药品或补剂',
@@ -520,7 +524,7 @@ class _OnboardingHeader extends StatelessWidget {
     const titles = ['基本信息', '经期情况', '当前用药'];
     const subtitles = ['', '帮助整理周期和就诊倒计时', '帮助定制日常用药管理'];
     return Padding(
-      padding: EdgeInsets.fromLTRB(24, 24, 24, step == 0 ? 4 : 18),
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 4),
       child: Column(
         children: [
           Row(
