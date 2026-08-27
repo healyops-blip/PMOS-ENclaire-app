@@ -76,13 +76,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           (context) => Dialog(
             backgroundColor: Colors.white,
             surfaceTintColor: Colors.transparent,
-            insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+            insetPadding: const EdgeInsets.symmetric(horizontal: 40),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
             ),
             clipBehavior: Clip.antiAlias,
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 340),
+              constraints: const BoxConstraints(maxWidth: 300),
               child: SizedBox(
                 height: 350,
                 child: Column(
@@ -109,6 +109,22 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       ),
                     ),
                     const Divider(height: 1),
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(18, 12, 18, 0),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text('年', textAlign: TextAlign.center),
+                          ),
+                          Expanded(
+                            child: Text('月', textAlign: TextAlign.center),
+                          ),
+                          Expanded(
+                            child: Text('日', textAlign: TextAlign.center),
+                          ),
+                        ],
+                      ),
+                    ),
                     Expanded(
                       child: CupertinoDatePicker(
                         mode: CupertinoDatePickerMode.date,
