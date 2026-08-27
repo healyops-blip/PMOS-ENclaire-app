@@ -14,11 +14,15 @@ import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.d
 import 'package:pmos_enclaire/features/records/presentation/records_page.dart';
 import 'package:pmos_enclaire/features/records/presentation/upload_flow.dart';
 import 'package:pmos_enclaire/features/reports/presentation/report_page.dart';
+import 'package:pmos_enclaire/features/weight/application/weight_controller.dart';
+import 'package:pmos_enclaire/features/weight/data/weight_repository.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({
     required this.account,
     required this.profileRepository,
+    required this.weightRepository,
+    this.now,
     this.cycleRepository,
     this.medicationRepository,
     super.key,
@@ -26,6 +30,8 @@ class DashboardPage extends StatefulWidget {
 
   final DemoAccount account;
   final PatientProfileRepository profileRepository;
+  final WeightRepository weightRepository;
+  final DateTime Function()? now;
   final CycleRepository? cycleRepository;
   final MedicationRepository? medicationRepository;
 
@@ -35,6 +41,7 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   int _selectedTab = 0;
+  late final WeightController _weightController;
   late List<Medication> _medications = widget.medicationRepository == null
       ? const [
           Medication(
@@ -72,6 +79,9 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void initState() {
     super.initState();
+    _weightController = WeightController(widget.weightRepository)
+      ..addListener(_onWeightChanged);
+    _weightController.load();
     _medicationRepository =
         widget.medicationRepository ?? DemoMedicationRepository(_medications);
     _medicationStatusController = MedicationStatusController(
@@ -79,6 +89,10 @@ class _DashboardPageState extends State<DashboardPage> {
       medications: _medications,
     )..addListener(_syncMedicationStatus);
     _refreshMedications();
+  }
+
+  void _onWeightChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _refreshMedications() async {
@@ -151,6 +165,9 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   void dispose() {
+    _weightController
+      ..removeListener(_onWeightChanged)
+      ..dispose();
     _medicationStatusController
       ..removeListener(_syncMedicationStatus)
       ..dispose();
@@ -170,6 +187,7 @@ class _DashboardPageState extends State<DashboardPage> {
             _DashboardBody(
               account: widget.account,
               medications: _medications,
+              weightController: _weightController,
               onStatusTap: _toggleTaken,
               onStatusLongPress: _showStatusActions,
               onMedicationManage: () => Navigator.of(context).push(
@@ -186,7 +204,11 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               ),
             ),
-            CyclePage(repository: widget.cycleRepository),
+            CyclePage(
+              repository: widget.cycleRepository,
+              weightController: _weightController,
+              now: widget.now,
+            ),
             const RecordsPage(),
             ProfilePage(
               account: widget.account,
@@ -216,6 +238,7 @@ class _DashboardBody extends StatelessWidget {
   const _DashboardBody({
     required this.account,
     required this.medications,
+    required this.weightController,
     required this.onStatusTap,
     required this.onStatusLongPress,
     required this.onMedicationManage,
@@ -224,6 +247,7 @@ class _DashboardBody extends StatelessWidget {
 
   final DemoAccount account;
   final List<Medication> medications;
+  final WeightController weightController;
   final ValueChanged<int> onStatusTap;
   final ValueChanged<int> onStatusLongPress;
   final VoidCallback onMedicationManage;
@@ -267,6 +291,10 @@ class _DashboardBody extends StatelessWidget {
               _PomiCard(child: _MedicationSummary(medications: medications)),
               const SizedBox(height: 16),
               _ReportCallToAction(onTap: onReport),
+              const SizedBox(height: 20),
+              const _SectionHeader(title: '最新体重'),
+              const SizedBox(height: 8),
+              _DashboardWeightSummary(controller: weightController),
               const SizedBox(height: 12),
               const Text(
                 '患者自述 · 仅供参考 · 不构成诊断 · 不进入正式病历 · 模拟数据',
@@ -696,6 +724,122 @@ class _MedicationSummary extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _DashboardWeightSummary extends StatelessWidget {
+  const _DashboardWeightSummary({required this.controller});
+
+  final WeightController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final latest = controller.latest;
+    if (controller.isLoading && latest == null) {
+      return const _PomiCard(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 18),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+    if (latest == null) {
+      return _PomiCard(
+        child: Padding(
+          key: const Key('dashboard-weight-empty'),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.monitor_weight_outlined,
+                color: PomiColors.primary,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  controller.errorMessage ?? '还没有体重记录，前往“经期”页添加',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+              if (controller.errorMessage != null)
+                TextButton(onPressed: controller.load, child: const Text('重试')),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final month = latest.recordDate.month.toString().padLeft(2, '0');
+    final day = latest.recordDate.day.toString().padLeft(2, '0');
+    return _PomiCard(
+      child: Padding(
+        key: const Key('dashboard-weight-summary'),
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (controller.errorMessage != null) ...[
+              Row(
+                key: const Key('dashboard-weight-stale-warning'),
+                children: [
+                  const Icon(Icons.sync_problem_rounded, size: 18),
+                  const SizedBox(width: 8),
+                  const Expanded(child: Text('同步失败，当前为上次数据')),
+                  TextButton(
+                    onPressed: controller.load,
+                    child: const Text('重试'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+            ],
+            Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: PomiColors.glowPink.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: const Icon(
+                    Icons.monitor_weight_outlined,
+                    color: PomiColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${latest.weightKg.toStringAsFixed(1)} kg',
+                        key: const Key('dashboard-weight-value'),
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        '${latest.recordDate.year}-$month-$day 记录',
+                        key: const Key('dashboard-weight-date'),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                if (controller.isLoading)
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

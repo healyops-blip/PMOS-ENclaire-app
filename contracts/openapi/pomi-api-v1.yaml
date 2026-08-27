@@ -2049,34 +2049,31 @@ components:
 
     WeightInput:
       type: object
-      required: [measured_at, weight_kg]
+      additionalProperties: false
+      required: [record_date, weight_kg]
       properties:
-        measured_at:
+        record_date:
           type: string
-          format: date-time
+          format: date
         weight_kg:
           type: number
           minimum: 20
           maximum: 300
           multipleOf: 0.1
-        source_type:
-          type: string
-          enum: [manual, imported]
-          default: manual
-        note:
-          type: [string, 'null']
-          maxLength: 500
 
     WeightRecord:
       allOf:
         - $ref: '#/components/schemas/WeightInput'
         - type: object
-          required: [id, created_at]
+          required: [id, created_at, updated_at]
           properties:
             id:
               type: string
               format: uuid
             created_at:
+              type: string
+              format: date-time
+            updated_at:
               type: string
               format: date-time
 

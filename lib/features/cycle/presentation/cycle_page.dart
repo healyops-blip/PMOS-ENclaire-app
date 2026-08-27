@@ -5,12 +5,21 @@ import 'package:pmos_enclaire/core/widgets/pomi_line_chart.dart';
 import 'package:pmos_enclaire/core/widgets/pomi_surfaces.dart';
 import 'package:pmos_enclaire/features/cycle/data/cycle_repository.dart';
 import 'package:pmos_enclaire/features/cycle/domain/menstrual_cycle.dart';
+import 'package:pmos_enclaire/features/weight/application/weight_controller.dart';
+import 'package:pmos_enclaire/features/weight/presentation/weight_section.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 class CyclePage extends StatefulWidget {
-  const CyclePage({this.repository, super.key});
+  const CyclePage({
+    this.repository,
+    this.weightController,
+    this.now,
+    super.key,
+  });
 
   final CycleRepository? repository;
+  final WeightController? weightController;
+  final DateTime Function()? now;
 
   @override
   State<CyclePage> createState() => _CyclePageState();
@@ -153,31 +162,36 @@ class _CyclePageState extends State<CyclePage> {
 
   Widget _content() {
     if (_loadError != null) {
-      return PomiSectionCard(
-        key: const Key('cycle-error-state'),
-        child: Column(
-          children: [
-            const Icon(
-              Icons.cloud_off_rounded,
-              color: PomiColors.primary,
-              size: 42,
+      return Column(
+        children: [
+          PomiSectionCard(
+            key: const Key('cycle-error-state'),
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.cloud_off_rounded,
+                  color: PomiColors.primary,
+                  size: 42,
+                ),
+                const SizedBox(height: 10),
+                const Text('经期记录加载失败'),
+                const SizedBox(height: 4),
+                Text(
+                  _loadError.toString(),
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton(
+                  key: const Key('retry-cycle-button'),
+                  onPressed: _load,
+                  child: const Text('重新加载'),
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
-            const Text('经期记录加载失败'),
-            const SizedBox(height: 4),
-            Text(
-              _loadError.toString(),
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton(
-              key: const Key('retry-cycle-button'),
-              onPressed: _load,
-              child: const Text('重新加载'),
-            ),
-          ],
-        ),
+          ),
+          _weightSection(),
+        ],
       );
     }
     final cycles = _cycles;
@@ -189,23 +203,28 @@ class _CyclePageState extends State<CyclePage> {
       );
     }
     if (cycles.isEmpty) {
-      return PomiSectionCard(
-        key: const Key('cycle-empty-state'),
-        child: Column(
-          children: [
-            const PomiEmptyState(
-              icon: Icons.calendar_month_outlined,
-              title: '还没有经期记录',
-              description: '从最近一次经期开始日期记起，结束日期可以稍后补录。',
+      return Column(
+        children: [
+          PomiSectionCard(
+            key: const Key('cycle-empty-state'),
+            child: Column(
+              children: [
+                const PomiEmptyState(
+                  icon: Icons.calendar_month_outlined,
+                  title: '还没有经期记录',
+                  description: '从最近一次经期开始日期记起，结束日期可以稍后补录。',
+                ),
+                FilledButton.icon(
+                  key: const Key('empty-add-cycle-button'),
+                  onPressed: () => _openEditor(),
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('添加第一条记录'),
+                ),
+              ],
             ),
-            FilledButton.icon(
-              key: const Key('empty-add-cycle-button'),
-              onPressed: () => _openEditor(),
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('添加第一条记录'),
-            ),
-          ],
-        ),
+          ),
+          _weightSection(),
+        ],
       );
     }
     final lengths = cycles
@@ -280,8 +299,15 @@ class _CyclePageState extends State<CyclePage> {
           _historyCard(cycle),
           const SizedBox(height: 10),
         ],
+        _weightSection(),
       ],
     );
+  }
+
+  Widget _weightSection() {
+    final controller = widget.weightController;
+    if (controller == null) return const SizedBox.shrink();
+    return WeightSection(controller: controller, now: widget.now);
   }
 
   Widget _calendar(List<MenstrualCycle> cycles) {

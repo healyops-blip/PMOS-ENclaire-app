@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pmos_enclaire/app/pomi_app.dart';
+import 'package:pmos_enclaire/core/network/pomi_api_client.dart';
 import 'package:pmos_enclaire/features/auth/data/auth_repository.dart';
 import 'package:pmos_enclaire/features/cycle/data/cycle_repository.dart';
 import 'package:pmos_enclaire/features/medications/data/medication_repository.dart';
 import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
+import 'package:pmos_enclaire/features/weight/data/weight_repository.dart';
 
 void main() {
   runApp(const MainApp());
@@ -14,6 +16,9 @@ class MainApp extends StatelessWidget {
   const MainApp({
     this.authRepository,
     this.profileRepository,
+    this.weightRepository,
+    this.apiClient,
+    this.now,
     this.cycleRepository,
     this.medicationRepository,
     super.key,
@@ -21,6 +26,9 @@ class MainApp extends StatelessWidget {
 
   final AuthRepository? authRepository;
   final PatientProfileRepository? profileRepository;
+  final WeightRepository? weightRepository;
+  final PomiApiClient? apiClient;
+  final DateTime Function()? now;
   final CycleRepository? cycleRepository;
   final MedicationRepository? medicationRepository;
 
@@ -30,6 +38,9 @@ class MainApp extends StatelessWidget {
       child: PomiApp(
         authRepository: authRepository,
         profileRepository: profileRepository,
+        weightRepository: weightRepository,
+        apiClient: apiClient,
+        now: now,
         cycleRepository: cycleRepository,
         medicationRepository: medicationRepository,
       ),

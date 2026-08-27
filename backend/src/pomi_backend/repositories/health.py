@@ -269,12 +269,20 @@ class WeightRepository(PatientScopedRepository):
     model = WeightRecord
     update_fields = frozenset({"record_date", "weight_kg"})
 
-    def list(self) -> list[WeightRecord]:
+    def list(
+        self,
+        *,
+        from_date: date | None = None,
+        to_date: date | None = None,
+    ) -> list[WeightRecord]:
+        statement = select(WeightRecord).where(WeightRecord.patient_id == self.patient_id)
+        if from_date is not None:
+            statement = statement.where(WeightRecord.record_date >= from_date)
+        if to_date is not None:
+            statement = statement.where(WeightRecord.record_date <= to_date)
         return list(
             self.session.scalars(
-                select(WeightRecord)
-                .where(WeightRecord.patient_id == self.patient_id)
-                .order_by(WeightRecord.record_date)
+                statement.order_by(WeightRecord.record_date, WeightRecord.created_at)
             )
         )
 

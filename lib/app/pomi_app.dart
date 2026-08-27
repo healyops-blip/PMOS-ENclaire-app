@@ -11,6 +11,7 @@ import 'package:pmos_enclaire/features/dashboard/presentation/dashboard_page.dar
 import 'package:pmos_enclaire/features/medications/data/medication_repository.dart';
 import 'package:pmos_enclaire/features/onboarding/presentation/onboarding_page.dart';
 import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
+import 'package:pmos_enclaire/features/weight/data/weight_repository.dart';
 
 abstract final class PomiRoutes {
   static const login = '/login';
@@ -22,6 +23,9 @@ class PomiApp extends StatefulWidget {
   const PomiApp({
     this.authRepository,
     this.profileRepository,
+    this.weightRepository,
+    this.apiClient,
+    this.now,
     this.cycleRepository,
     this.medicationRepository,
     super.key,
@@ -29,6 +33,9 @@ class PomiApp extends StatefulWidget {
 
   final AuthRepository? authRepository;
   final PatientProfileRepository? profileRepository;
+  final WeightRepository? weightRepository;
+  final PomiApiClient? apiClient;
+  final DateTime Function()? now;
   final CycleRepository? cycleRepository;
   final MedicationRepository? medicationRepository;
 
@@ -37,7 +44,7 @@ class PomiApp extends StatefulWidget {
 }
 
 class _PomiAppState extends State<PomiApp> {
-  late final PomiApiClient _apiClient = PomiApiClient();
+  late final PomiApiClient _apiClient = widget.apiClient ?? PomiApiClient();
   late final AuthRepository _authRepository =
       widget.authRepository ??
       FastApiAuthRepository(_apiClient, SecureSessionStore());
@@ -46,6 +53,11 @@ class _PomiAppState extends State<PomiApp> {
       (widget.authRepository is DemoAuthRepository
           ? DemoPatientProfileRepository()
           : FastApiPatientProfileRepository(_apiClient));
+  late final WeightRepository _weightRepository =
+      widget.weightRepository ??
+      (widget.authRepository is DemoAuthRepository
+          ? MemoryWeightRepository.seeded()
+          : ApiWeightRepository(_apiClient));
   late final CycleRepository? _cycleRepository =
       widget.cycleRepository ??
       (widget.authRepository is DemoAuthRepository
@@ -110,6 +122,8 @@ class _PomiAppState extends State<PomiApp> {
           return DashboardPage(
             account: account,
             profileRepository: _profileRepository,
+            weightRepository: _weightRepository,
+            now: widget.now,
             cycleRepository: _cycleRepository,
             medicationRepository: _medicationRepository,
           );
