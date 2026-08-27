@@ -51,6 +51,7 @@ class PatientRepository:
 
 class PatientScopedRepository:
     model: type[Any]
+    update_fields: frozenset[str] = frozenset()
 
     def __init__(self, session: Session, patient_id: str) -> None:
         self.session = session
@@ -67,13 +68,41 @@ class PatientScopedRepository:
     def add(self, record: Record) -> Record:
         if record.patient_id != self.patient_id:
             raise ValueError("record patient does not match repository scope")
+        self._validate_associations(record)
         self.session.add(record)
+        self.session.flush()
+        return record
+
+    def _validate_associations(self, record: Record) -> None:
+        """Validate patient-owned references before relying on database constraints."""
+
+    def _apply_changes(self, record: Record, changes: dict[str, Any]) -> Record:
+        unsupported = changes.keys() - self.update_fields
+        if unsupported:
+            fields = ", ".join(sorted(unsupported))
+            raise ValueError(f"fields are not updateable: {fields}")
+        for field, value in changes.items():
+            setattr(record, field, value)
         self.session.flush()
         return record
 
 
 class MedicationRepository(PatientScopedRepository):
     model = Medication
+    update_fields = frozenset(
+        {
+            "drug_name",
+            "source_category",
+            "specification",
+            "dosage_value",
+            "dosage_unit",
+            "frequency",
+            "route",
+            "status",
+            "start_date",
+            "end_date",
+        }
+    )
 
     def list(self, *, status: str | None = None) -> list[Medication]:
         statement = select(Medication).where(Medication.patient_id == self.patient_id)
@@ -82,16 +111,27 @@ class MedicationRepository(PatientScopedRepository):
         return list(self.session.scalars(statement.order_by(Medication.created_at.desc())))
 
     def update(self, medication: Medication, **changes: Any) -> Medication:
-        if self.get(medication.id) is None:
+        owned_medication = self.get(medication.id)
+        if owned_medication is None:
             raise ValueError("medication is outside repository scope")
-        for field, value in changes.items():
-            setattr(medication, field, value)
-        self.session.flush()
-        return medication
+        return self._apply_changes(owned_medication, changes)
+
+    def _validate_associations(self, record: Record) -> None:
+        if isinstance(record, Medication) and record.replaces_medication_id is not None:
+            if self.get(record.replaces_medication_id) is None:
+                raise ValueError("replacement medication is outside repository scope")
 
 
 class MedicationEventRepository(PatientScopedRepository):
     model = MedicationEvent
+
+    def _validate_associations(self, record: Record) -> None:
+        if isinstance(record, MedicationEvent):
+            medication = MedicationRepository(self.session, self.patient_id).get(
+                record.medication_id
+            )
+            if medication is None:
+                raise ValueError("event medication is outside repository scope")
 
     def list_for_medication(self, medication_id: str) -> list[MedicationEvent]:
         return list(
@@ -108,6 +148,14 @@ class MedicationEventRepository(PatientScopedRepository):
 
 class MedicationDailyRepository(PatientScopedRepository):
     model = MedicationDaily
+
+    def _validate_associations(self, record: Record) -> None:
+        if isinstance(record, MedicationDaily):
+            medication = MedicationRepository(self.session, self.patient_id).get(
+                record.medication_id
+            )
+            if medication is None:
+                raise ValueError("daily medication is outside repository scope")
 
     def find(self, medication_id: str, record_date: date) -> MedicationDaily | None:
         return self.session.scalar(
@@ -142,6 +190,16 @@ class MedicationDailyRepository(PatientScopedRepository):
 
 class MenstrualCycleRepository(PatientScopedRepository):
     model = MenstrualCycle
+    update_fields = frozenset({"start_date", "end_date", "note"})
+
+    def get(self, record_id: str) -> MenstrualCycle | None:
+        return self.session.scalar(
+            select(MenstrualCycle).where(
+                MenstrualCycle.id == record_id,
+                MenstrualCycle.patient_id == self.patient_id,
+                MenstrualCycle.deleted_at.is_(None),
+            )
+        )
 
     def list(self) -> list[MenstrualCycle]:
         return list(
@@ -156,12 +214,10 @@ class MenstrualCycleRepository(PatientScopedRepository):
         )
 
     def update(self, cycle: MenstrualCycle, **changes: Any) -> MenstrualCycle:
-        if self.get(cycle.id) is None:
+        active_cycle = self.get(cycle.id)
+        if active_cycle is None:
             raise ValueError("cycle is outside repository scope")
-        for field, value in changes.items():
-            setattr(cycle, field, value)
-        self.session.flush()
-        return cycle
+        return self._apply_changes(active_cycle, changes)
 
     def soft_delete(self, cycle_id: str, deleted_at: Any) -> bool:
         cycle = self.get(cycle_id)
@@ -174,6 +230,7 @@ class MenstrualCycleRepository(PatientScopedRepository):
 
 class WeightRepository(PatientScopedRepository):
     model = WeightRecord
+    update_fields = frozenset({"record_date", "weight_kg"})
 
     def list(self) -> list[WeightRecord]:
         return list(
@@ -193,9 +250,7 @@ class WeightRepository(PatientScopedRepository):
         )
 
     def update(self, record: WeightRecord, **changes: Any) -> WeightRecord:
-        if self.get(record.id) is None:
+        owned_record = self.get(record.id)
+        if owned_record is None:
             raise ValueError("weight record is outside repository scope")
-        for field, value in changes.items():
-            setattr(record, field, value)
-        self.session.flush()
-        return record
+        return self._apply_changes(owned_record, changes)
