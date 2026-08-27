@@ -760,14 +760,6 @@ paths:
               schema:
                 type: string
                 format: binary
-            image/png:
-              schema:
-                type: string
-                format: binary
-            application/pdf:
-              schema:
-                type: string
-                format: binary
         '403':
           $ref: '#/components/responses/ErrorResponse'
         '404':
@@ -999,6 +991,26 @@ paths:
                       data:
                         $ref: '#/components/schemas/PatientNote'
 
+  /api/patient-notes/latest:
+    get:
+      tags: [Reports]
+      operationId: getLatestPatientNote
+      summary: Get the latest patient note draft, confirmation, skip or consumed record
+      responses:
+        '200':
+          description: Latest note or null
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        oneOf:
+                          - $ref: '#/components/schemas/PatientNote'
+                          - type: 'null'
+
   /api/patient-notes/{note_id}:
     put:
       tags: [Reports]
@@ -1033,26 +1045,6 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
         '409':
           $ref: '#/components/responses/ErrorResponse'
-
-  /api/patient-notes/latest:
-    get:
-      tags: [Reports]
-      operationId: getLatestPatientNote
-      summary: Get the latest patient note for the current patient
-      responses:
-        '200':
-          description: Latest note or null
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiSuccess'
-                  - type: object
-                    properties:
-                      data:
-                        oneOf:
-                          - $ref: '#/components/schemas/PatientNote'
-                          - type: 'null'
 
   /api/patient-notes/{note_id}/confirm:
     post:
@@ -1109,6 +1101,12 @@ paths:
       summary: Copy a prior patient note into a new editable draft
       parameters:
         - $ref: '#/components/parameters/PatientNoteId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientNoteCopy'
       responses:
         '201':
           description: New patient-note draft created
@@ -2810,19 +2808,20 @@ components:
         original_text:
           type: string
           maxLength: 5000
-        encounter_id:
+        visit_context:
           type: [string, 'null']
-          format: uuid
+          maxLength: 200
+
+    PatientNoteCopy:
+      type: object
+      properties:
+        visit_context:
+          type: [string, 'null']
+          maxLength: 200
 
     PatientNote:
       type: object
-      required:
-        - id
-        - patient_id
-        - original_text
-        - status
-        - created_at
-        - updated_at
+      required: [id, patient_id, original_text, status, created_at, updated_at]
       properties:
         id:
           type: string
@@ -2830,27 +2829,24 @@ components:
         patient_id:
           type: string
           format: uuid
-        encounter_id:
+        visit_context:
           type: [string, 'null']
-          format: uuid
         original_text:
           type: string
-          maxLength: 5000
         confirmed_text:
           type: [string, 'null']
-          maxLength: 5000
         status:
           $ref: '#/components/schemas/PatientNoteStatus'
+        source_note_id:
         confirmed_by_uid:
           type: [string, 'null']
           format: uuid
         confirmed_at:
           type: [string, 'null']
           format: date-time
-        source_patient_note_id:
+        consumed_at:
           type: [string, 'null']
-          format: uuid
-          description: Prior note copied to create this independently editable draft.
+          format: date-time
         created_at:
           type: string
           format: date-time
@@ -2860,7 +2856,7 @@ components:
 
     ReportStatus:
       type: string
-      enum: [generating, succeeded, failed]
+      enum: [pending, succeeded, failed]
 
     ReportCreate:
       type: object

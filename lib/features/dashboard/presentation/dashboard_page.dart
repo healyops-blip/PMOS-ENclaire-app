@@ -15,6 +15,7 @@ import 'package:pmos_enclaire/features/records/presentation/records_page.dart';
 import 'package:pmos_enclaire/features/records/presentation/upload_flow.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/reports/presentation/report_page.dart';
+import 'package:pmos_enclaire/features/reports/data/patient_note_repository.dart';
 import 'package:pmos_enclaire/features/weight/application/weight_controller.dart';
 import 'package:pmos_enclaire/features/weight/data/weight_repository.dart';
 
@@ -22,6 +23,7 @@ class DashboardPage extends StatefulWidget {
   const DashboardPage({
     required this.account,
     required this.profileRepository,
+    required this.patientNoteRepository,
     required this.documentRepository,
     required this.weightRepository,
     this.now,
@@ -32,6 +34,7 @@ class DashboardPage extends StatefulWidget {
 
   final DemoAccount account;
   final PatientProfileRepository profileRepository;
+  final PatientNoteRepository patientNoteRepository;
   final DocumentRepository documentRepository;
   final WeightRepository weightRepository;
   final DateTime Function()? now;
@@ -204,7 +207,9 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
               onReport: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) => const ReportGeneratorPage(),
+                  builder: (_) => ReportGeneratorPage(
+                    repository: widget.patientNoteRepository,
+                  ),
                 ),
               ),
             ),
