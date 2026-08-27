@@ -100,6 +100,52 @@ void main() {
     expect(repository.deletedIds, ['remove-me']);
     expect(find.byKey(const Key('cycle-empty-state')), findsOneWidget);
   });
+
+  testWidgets('keeps the editor draft open when saving fails', (tester) async {
+    final repository = _FakeCycleRepository(mutationFailuresRemaining: 1);
+    await _pumpPage(tester, repository);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('add-cycle-button')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('cycle-note-field')), '保留输入');
+    await tester.tap(find.byKey(const Key('save-cycle-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('cycle-editor-dialog')), findsOneWidget);
+    expect(find.byKey(const Key('cycle-editor-error')), findsOneWidget);
+    expect(find.text('保留输入'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('save-cycle-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('cycle-editor-dialog')), findsNothing);
+    expect(repository.createdDraft?.note, '保留输入');
+    expect(find.byKey(const Key('ongoing-cycle-card')), findsOneWidget);
+  });
+
+  test(
+    'demo repository recalculates adjacent cycle lengths after editing',
+    () async {
+      final repository = DemoCycleRepository();
+
+      final updated = await repository.update(
+        'demo-2',
+        CycleDraft(startDate: DateTime(2026, 7), endDate: DateTime(2026, 7, 5)),
+      );
+      final cycles = await repository.list();
+
+      expect(updated.cycleLengthDays, 23);
+      expect(
+        cycles.singleWhere((cycle) => cycle.id == 'demo-3').cycleLengthDays,
+        36,
+      );
+      expect(
+        cycles.singleWhere((cycle) => cycle.id == 'demo-1').cycleLengthDays,
+        isNull,
+      );
+    },
+  );
 }
 
 Future<void> _pumpPage(WidgetTester tester, CycleRepository repository) async {
@@ -136,11 +182,13 @@ class _FakeCycleRepository implements CycleRepository {
     List<MenstrualCycle>? records,
     this.listGate,
     this.failuresRemaining = 0,
+    this.mutationFailuresRemaining = 0,
   }) : records = [...?records];
 
   final List<MenstrualCycle> records;
   final Completer<List<MenstrualCycle>>? listGate;
   int failuresRemaining;
+  int mutationFailuresRemaining;
   int listCalls = 0;
   CycleDraft? createdDraft;
   final List<String> deletedIds = [];
@@ -158,6 +206,10 @@ class _FakeCycleRepository implements CycleRepository {
 
   @override
   Future<MenstrualCycle> create(CycleDraft draft) async {
+    if (mutationFailuresRemaining > 0) {
+      mutationFailuresRemaining -= 1;
+      throw const CycleRepositoryException('保存失败，请重试');
+    }
     createdDraft = draft;
     final value = _cycle('created', draft.startDate, draft.endDate);
     records.insert(0, value);
@@ -166,6 +218,10 @@ class _FakeCycleRepository implements CycleRepository {
 
   @override
   Future<MenstrualCycle> update(String id, CycleDraft draft) async {
+    if (mutationFailuresRemaining > 0) {
+      mutationFailuresRemaining -= 1;
+      throw const CycleRepositoryException('保存失败，请重试');
+    }
     final value = _cycle(id, draft.startDate, draft.endDate);
     records[records.indexWhere((item) => item.id == id)] = value;
     return value;

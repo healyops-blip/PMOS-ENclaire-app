@@ -57,30 +57,30 @@ class _CyclePageState extends State<CyclePage> {
   }
 
   Future<void> _openEditor([MenstrualCycle? cycle]) async {
-    final draft = await showDialog<CycleDraft>(
+    final saved = await showDialog<bool>(
       context: context,
-      builder: (_) => _CycleEditorDialog(initial: cycle),
+      builder: (_) => _CycleEditorDialog(
+        initial: cycle,
+        onSave: (draft) async {
+          setState(() => _saving = true);
+          try {
+            if (cycle == null) {
+              await _repository.create(draft);
+            } else {
+              await _repository.update(cycle.id, draft);
+            }
+          } finally {
+            if (mounted) setState(() => _saving = false);
+          }
+        },
+      ),
     );
-    if (draft == null || !mounted) return;
-    setState(() => _saving = true);
-    try {
-      if (cycle == null) {
-        await _repository.create(draft);
-      } else {
-        await _repository.update(cycle.id, draft);
-      }
-      await _load();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(cycle == null ? '经期记录已添加' : '经期记录已更新')),
-      );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(error.toString())));
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
+    if (saved != true || !mounted) return;
+    await _load();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(cycle == null ? '经期记录已添加' : '经期记录已更新')),
+    );
   }
 
   Future<void> _delete(MenstrualCycle cycle) async {
@@ -406,9 +406,10 @@ class _CyclePageState extends State<CyclePage> {
 }
 
 class _CycleEditorDialog extends StatefulWidget {
-  const _CycleEditorDialog({this.initial});
+  const _CycleEditorDialog({required this.onSave, this.initial});
 
   final MenstrualCycle? initial;
+  final Future<void> Function(CycleDraft draft) onSave;
 
   @override
   State<_CycleEditorDialog> createState() => _CycleEditorDialogState();
@@ -422,6 +423,7 @@ class _CycleEditorDialogState extends State<_CycleEditorDialog> {
     text: widget.initial?.note,
   );
   String? _error;
+  bool _saving = false;
 
   @override
   void dispose() {
@@ -455,21 +457,32 @@ class _CycleEditorDialogState extends State<_CycleEditorDialog> {
     if (value != null) setState(() => _endDate = value);
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (_endDate != null && _endDate!.isBefore(_startDate)) {
       setState(() => _error = '开始日期不能晚于结束日期');
       return;
     }
-    Navigator.pop(
-      context,
-      CycleDraft(
-        startDate: _startDate,
-        endDate: _endDate,
-        flowLevel: _flowLevel,
-        note: _note.text.trim().isEmpty ? null : _note.text.trim(),
-        updatedAt: widget.initial?.updatedAt,
-      ),
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    final draft = CycleDraft(
+      startDate: _startDate,
+      endDate: _endDate,
+      flowLevel: _flowLevel,
+      note: _note.text.trim().isEmpty ? null : _note.text.trim(),
+      updatedAt: widget.initial?.updatedAt,
     );
+    try {
+      await widget.onSave(draft);
+      if (mounted) Navigator.pop(context, true);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = error.toString();
+      });
+    }
   }
 
   @override
@@ -538,13 +551,13 @@ class _CycleEditorDialogState extends State<_CycleEditorDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: _saving ? null : () => Navigator.pop(context),
           child: const Text('取消'),
         ),
         FilledButton(
           key: const Key('save-cycle-button'),
-          onPressed: _save,
-          child: const Text('保存'),
+          onPressed: _saving ? null : _save,
+          child: Text(_saving ? '保存中…' : '保存'),
         ),
       ],
     );

@@ -210,7 +210,7 @@ class MedicationDailyRepository(PatientScopedRepository):
 
 class MenstrualCycleRepository(PatientScopedRepository):
     model = MenstrualCycle
-    update_fields = frozenset({"start_date", "end_date", "note"})
+    update_fields = frozenset({"start_date", "end_date", "flow_level", "note", "source_type"})
 
     def get(self, record_id: str) -> MenstrualCycle | None:
         return self.session.scalar(
