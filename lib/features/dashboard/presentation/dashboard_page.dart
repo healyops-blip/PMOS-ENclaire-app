@@ -11,6 +11,7 @@ import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.d
 import 'package:pmos_enclaire/features/records/presentation/records_page.dart';
 import 'package:pmos_enclaire/features/records/presentation/upload_flow.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
+import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:pmos_enclaire/features/reports/presentation/report_page.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -18,12 +19,14 @@ class DashboardPage extends StatefulWidget {
     required this.account,
     required this.profileRepository,
     required this.documentRepository,
+    required this.ocrRepository,
     super.key,
   });
 
   final DemoAccount account;
   final PatientProfileRepository profileRepository;
   final DocumentRepository documentRepository;
+  final OcrRepository ocrRepository;
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -102,6 +105,7 @@ class _DashboardPageState extends State<DashboardPage> {
             RecordsPage(
               key: ValueKey(_recordsVersion),
               repository: widget.documentRepository,
+              ocrRepository: widget.ocrRepository,
             ),
             ProfilePage(
               account: widget.account,
@@ -115,6 +119,7 @@ class _DashboardPageState extends State<DashboardPage> {
         onPressed: () => showUploadFlow(
           context,
           repository: widget.documentRepository,
+          ocrRepository: widget.ocrRepository,
           onUploaded: () => setState(() => _recordsVersion++),
         ),
         backgroundColor: PomiColors.primary,

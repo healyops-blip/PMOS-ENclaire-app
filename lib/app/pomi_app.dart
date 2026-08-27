@@ -10,6 +10,7 @@ import 'package:pmos_enclaire/features/dashboard/presentation/dashboard_page.dar
 import 'package:pmos_enclaire/features/onboarding/presentation/onboarding_page.dart';
 import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
+import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 
 abstract final class PomiRoutes {
   static const login = '/login';
@@ -22,12 +23,14 @@ class PomiApp extends StatefulWidget {
     this.authRepository,
     this.profileRepository,
     this.documentRepository,
+    this.ocrRepository,
     super.key,
   });
 
   final AuthRepository? authRepository;
   final PatientProfileRepository? profileRepository;
   final DocumentRepository? documentRepository;
+  final OcrRepository? ocrRepository;
 
   @override
   State<PomiApp> createState() => _PomiAppState();
@@ -48,6 +51,11 @@ class _PomiAppState extends State<PomiApp> {
       (widget.authRepository is DemoAuthRepository
           ? DemoDocumentRepository()
           : FastApiDocumentRepository(_apiClient));
+  late final OcrRepository _ocrRepository =
+      widget.ocrRepository ??
+      (widget.authRepository is DemoAuthRepository
+          ? DemoOcrRepository()
+          : FastApiOcrRepository(_apiClient));
 
   late final GoRouter _router = GoRouter(
     initialLocation: PomiRoutes.login,
@@ -103,6 +111,7 @@ class _PomiAppState extends State<PomiApp> {
             account: account,
             profileRepository: _profileRepository,
             documentRepository: _documentRepository,
+            ocrRepository: _ocrRepository,
           );
         },
       ),

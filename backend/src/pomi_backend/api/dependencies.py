@@ -13,6 +13,7 @@ from pomi_backend.db.models import UserAccount
 from pomi_backend.services import AuthService
 from pomi_backend.services.auth import AuthError
 from pomi_backend.services.documents import DocumentService
+from pomi_backend.services.ocr import OCRTaskService
 from pomi_backend.services.patient import PatientProfileService
 
 bearer_scheme = HTTPBearer(auto_error=False, scheme_name="SessionBearer")
@@ -74,3 +75,12 @@ def get_document_service(
 
 
 DocumentServiceDependency = Annotated[DocumentService, Depends(get_document_service)]
+
+
+def get_ocr_task_service(
+    request: Request, session: DatabaseSession, account: CurrentAccount
+) -> OCRTaskService:
+    return OCRTaskService(session, account, model_name=request.app.state.settings.ocr_model)
+
+
+OCRTaskServiceDependency = Annotated[OCRTaskService, Depends(get_ocr_task_service)]

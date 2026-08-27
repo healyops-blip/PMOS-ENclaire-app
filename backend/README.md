@@ -8,6 +8,9 @@ Use environment variables for production configuration and external API keys.
 
 ## API contracts
 
+- OCR task, Worker, retry, and Flutter polling contract:
+  [`../docs/ocr-pipeline.md`](../docs/ocr-pipeline.md)
+
 - 已经实现并通过测试的认证接口：
   [`../docs/backend-api.md`](../docs/backend-api.md)
 - 全部 P0 前后端分工与字段说明：
@@ -32,10 +35,23 @@ python -m alembic upgrade head
 pytest
 ruff check .
 uvicorn pomi_backend.main:app --reload
+pomi-ocr-worker --once
 ```
 
 The default database path is `backend/runtime/pomi.db`. Set
 `POMI_DATABASE_URL` to use another SQLite path or a PostgreSQL connection later.
+
+## OCR worker
+
+FastAPI creates and reads OCR tasks but never executes model calls inside a request.
+Run `pomi-ocr-worker` as a separate single-process service. It claims work through
+expiring SQLite leases and can resume a task whose worker stopped before the provider
+call. If a worker stops while a provider request is in flight, the task becomes
+`timed_out` instead of silently resending protected medical data.
+
+Qwen3-VL configuration is server-only: `POMI_OCR_API_KEY`, `POMI_OCR_API_BASE_URL`,
+`POMI_OCR_MODEL`, `POMI_OCR_TIMEOUT_SECONDS`, and `POMI_OCR_LEASE_SECONDS`. Never put
+the key in Flutter, a database row, logs, or source control.
 
 ## Current authentication persistence
 

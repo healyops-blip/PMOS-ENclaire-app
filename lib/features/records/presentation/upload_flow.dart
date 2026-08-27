@@ -7,6 +7,8 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:pmos_enclaire/core/theme/pomi_theme.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
+import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
+import 'package:pmos_enclaire/features/records/presentation/ocr_task_page.dart';
 
 enum MedicalMaterialType { laboratory, prescription, imagingText, outpatient }
 
@@ -42,6 +44,7 @@ enum _UploadSource { camera, gallery, file, demo }
 Future<void> showUploadFlow(
   BuildContext context, {
   required DocumentRepository repository,
+  required OcrRepository ocrRepository,
   VoidCallback? onUploaded,
 }) async {
   final type = await showModalBottomSheet<MedicalMaterialType>(
@@ -113,7 +116,20 @@ Future<void> showUploadFlow(
   );
   if (uploaded == null || !context.mounted) return;
   onUploaded?.call();
-  _showMessage(context, '${type.shortLabel}已安全保存，可在材料列表查看');
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text('${type.shortLabel}已安全保存，可在材料列表查看'),
+      action: SnackBarAction(
+        label: '开始识别',
+        onPressed: () => Navigator.of(context).push<void>(
+          MaterialPageRoute(
+            builder: (_) =>
+                OcrTaskPage(repository: ocrRepository, document: uploaded),
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 Future<SelectedDocumentFile?> _pickMaterial(_UploadSource source) async {

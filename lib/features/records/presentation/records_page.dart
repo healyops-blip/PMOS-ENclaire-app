@@ -6,13 +6,20 @@ import 'package:intl/intl.dart';
 import 'package:pmos_enclaire/core/theme/pomi_theme.dart';
 import 'package:pmos_enclaire/core/widgets/pomi_surfaces.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
+import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:pmos_enclaire/features/records/presentation/upload_flow.dart';
+import 'package:pmos_enclaire/features/records/presentation/ocr_task_page.dart';
 import 'package:printing/printing.dart';
 
 class RecordsPage extends StatefulWidget {
-  const RecordsPage({required this.repository, super.key});
+  const RecordsPage({
+    required this.repository,
+    required this.ocrRepository,
+    super.key,
+  });
 
   final DocumentRepository repository;
+  final OcrRepository ocrRepository;
 
   @override
   State<RecordsPage> createState() => _RecordsPageState();
@@ -100,6 +107,7 @@ class _RecordsPageState extends State<RecordsPage> {
                     onPressed: () => showUploadFlow(
                       context,
                       repository: widget.repository,
+                      ocrRepository: widget.ocrRepository,
                       onUploaded: _reload,
                     ),
                   ),
@@ -117,6 +125,7 @@ class _RecordsPageState extends State<RecordsPage> {
                         MaterialPageRoute(
                           builder: (_) => DocumentDetailPage(
                             repository: widget.repository,
+                            ocrRepository: widget.ocrRepository,
                             documentId: items[index].id,
                           ),
                         ),
@@ -187,10 +196,12 @@ class _DocumentCard extends StatelessWidget {
 class DocumentDetailPage extends StatefulWidget {
   const DocumentDetailPage({
     required this.repository,
+    required this.ocrRepository,
     required this.documentId,
     super.key,
   });
   final DocumentRepository repository;
+  final OcrRepository ocrRepository;
   final String documentId;
 
   @override
@@ -350,6 +361,19 @@ class _DocumentDetailPageState extends State<DocumentDetailPage> {
                 subtitle: Text(revision.replacementReason ?? '首次上传'),
               ),
             const SizedBox(height: 8),
+            FilledButton.icon(
+              key: const Key('start-document-ocr-button'),
+              onPressed: () => Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => OcrTaskPage(
+                    repository: widget.ocrRepository,
+                    document: document,
+                  ),
+                ),
+              ),
+              icon: const Icon(Icons.document_scanner_outlined),
+              label: const Text('开始或查看文字识别'),
+            ),
             FilledButton.icon(
               key: const Key('replace-document-button'),
               onPressed: () => _replace(document),

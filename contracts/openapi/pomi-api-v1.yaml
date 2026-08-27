@@ -236,8 +236,6 @@ paths:
       tags: [Medications]
       operationId: createMedication
       summary: Add a medication and its first event
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -762,8 +760,6 @@ paths:
       tags: [OCR]
       operationId: createOcrTask
       summary: Queue OCR for a specific document revision
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -771,7 +767,7 @@ paths:
             schema:
               $ref: '#/components/schemas/OcrTaskCreate'
       responses:
-        '202':
+        '201':
           description: OCR task queued or existing idempotent task returned
           content:
             application/json:
@@ -865,7 +861,6 @@ paths:
       summary: Create a new user-requested OCR attempt
       parameters:
         - $ref: '#/components/parameters/TaskId'
-        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: false
         content:
@@ -873,7 +868,7 @@ paths:
             schema:
               $ref: '#/components/schemas/OcrRetryRequest'
       responses:
-        '202':
+        '201':
           description: New OCR attempt queued
           content:
             application/json:
@@ -2165,11 +2160,11 @@ components:
 
     OcrTaskStatus:
       type: string
-      enum: [pending, processing, succeeded, failed, timeout, fallback, confirmed]
+      enum: [queued, processing, pending_confirmation, confirmed, failed, timed_out]
 
     OcrResultSource:
       type: string
-      enum: [qwen_api, fallback]
+      enum: [qwen3-vl]
 
     OcrTaskCreate:
       type: object
@@ -2181,13 +2176,10 @@ components:
         document_revision_id:
           type: string
           format: uuid
-        force_new_attempt:
-          type: boolean
-          default: false
 
     OcrTask:
       type: object
-      required: [id, document_id, document_revision_id, document_type, task_status, attempt_count, max_attempts, queued_at, progress]
+      required: [id, document_id, document_revision_id, material_type, status, model, prompt_version, schema_version, attempt_number, provider_attempts, attempt_history, created_at, updated_at]
       properties:
         id:
           type: string
@@ -2198,39 +2190,47 @@ components:
         document_revision_id:
           type: string
           format: uuid
-        document_type:
+        material_type:
           $ref: '#/components/schemas/DocumentType'
-        task_status:
+        status:
           $ref: '#/components/schemas/OcrTaskStatus'
-        attempt_count:
-          type: integer
-          minimum: 0
-        max_attempts:
+        model:
+          type: string
+        prompt_version:
+          type: string
+        schema_version:
+          type: string
+        attempt_number:
           type: integer
           minimum: 1
-        queued_at:
-          type: string
-          format: date-time
-        started_at:
+        provider_attempts:
+          type: integer
+          minimum: 0
+        parent_task_id:
           type: [string, 'null']
-          format: date-time
-        finished_at:
-          type: [string, 'null']
-          format: date-time
-        processing_ms:
+          format: uuid
+        attempt_history:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        duration_ms:
           type: [integer, 'null']
-        error_code:
-          type: [string, 'null']
-        error_message:
-          type: [string, 'null']
+        error:
+          type: [object, 'null']
+          additionalProperties: true
         result_source:
           oneOf:
             - $ref: '#/components/schemas/OcrResultSource'
             - type: 'null'
-        progress:
-          type: integer
-          minimum: 0
-          maximum: 100
+        reused:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
 
     ValidationStatus:
       type: string
@@ -2238,15 +2238,18 @@ components:
 
     FieldConfirmationStatus:
       type: string
-      enum: [pending, confirmed, edited, rejected]
+      enum: [pending, accepted, corrected, rejected]
 
     OcrFieldResult:
       type: object
-      required: [field_path, raw_text, parsed_value, confidence, confirmation_status]
+      required: [id, path, source_text, parsed_value, confidence, confirmation_status]
       properties:
-        field_path:
+        id:
           type: string
-        raw_text:
+          format: uuid
+        path:
+          type: string
+        source_text:
           type: [string, 'null']
         parsed_value: {}
         confidence:
@@ -2392,36 +2395,33 @@ components:
 
     OcrDraftResult:
       type: object
-      required: [result_id, task_id, document_type, validation_status, critical_error, result_source, fields, draft]
+      required: [id, task_id, raw_response, validated_draft, fields, created_at]
       properties:
-        result_id:
+        id:
           type: string
           format: uuid
         task_id:
           type: string
           format: uuid
-        document_type:
-          $ref: '#/components/schemas/DocumentType'
-        validation_status:
-          $ref: '#/components/schemas/ValidationStatus'
-        critical_error:
-          type: boolean
-        result_source:
-          $ref: '#/components/schemas/OcrResultSource'
-        validation_errors:
-          type: array
-          items:
-            type: string
+        raw_response:
+          type: object
+          additionalProperties: true
+        validated_draft:
+          type: object
+          additionalProperties: true
+        user_modified_data:
+          type: [object, 'null']
+          additionalProperties: true
+        confirmed_data:
+          type: [object, 'null']
+          additionalProperties: true
         fields:
           type: array
           items:
             $ref: '#/components/schemas/OcrFieldResult'
-        draft:
-          oneOf:
-            - $ref: '#/components/schemas/LabDraft'
-            - $ref: '#/components/schemas/MedicalOrderDraft'
-            - $ref: '#/components/schemas/ImagingTextDraft'
-            - $ref: '#/components/schemas/OutpatientRecordDraft'
+        created_at:
+          type: string
+          format: date-time
 
     FieldConfirmation:
       type: object
