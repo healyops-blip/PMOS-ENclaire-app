@@ -1,0 +1,50 @@
+"""FastAPI application factory and ASGI entrypoint."""
+
+from __future__ import annotations
+
+from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
+from sqlalchemy import Engine
+
+from pomi_backend.api.auth import router as auth_router
+from pomi_backend.api.errors import (
+    auth_error_handler,
+    rate_limit_error_handler,
+    validation_error_handler,
+)
+from pomi_backend.config import Settings
+from pomi_backend.db import build_engine, build_session_factory
+from pomi_backend.services.auth import AuthError
+from pomi_backend.services.rate_limit import RateLimitExceeded, SlidingWindowRateLimiter
+from pomi_backend.services.security import PasswordManager
+
+
+def create_app(*, settings: Settings | None = None, engine: Engine | None = None) -> FastAPI:
+    active_settings = settings or Settings.from_env()
+    docs_enabled = active_settings.environment != "production"
+    app = FastAPI(
+        title="Pomi API",
+        debug=False,
+        docs_url="/docs" if docs_enabled else None,
+        redoc_url="/redoc" if docs_enabled else None,
+        openapi_url="/openapi.json" if docs_enabled else None,
+    )
+
+    active_engine = engine or build_engine(active_settings.database_url)
+    app.state.settings = active_settings
+    app.state.engine = active_engine
+    app.state.session_factory = build_session_factory(active_engine)
+    app.state.password_manager = PasswordManager(active_settings)
+    app.state.auth_rate_limiter = SlidingWindowRateLimiter(
+        attempts=active_settings.auth_rate_limit_attempts,
+        window_seconds=active_settings.auth_rate_limit_window_seconds,
+    )
+
+    app.add_exception_handler(AuthError, auth_error_handler)
+    app.add_exception_handler(RateLimitExceeded, rate_limit_error_handler)
+    app.add_exception_handler(RequestValidationError, validation_error_handler)
+    app.include_router(auth_router)
+    return app
+
+
+app = create_app()

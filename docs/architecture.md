@@ -15,8 +15,11 @@ PMOS-ENclaire-app/
 ├── ios/                  # iOS host project
 ├── backend/
 │   ├── src/pomi_backend/
+│   │   ├── api/          # FastAPI routes, auth dependencies, and error handling
 │   │   ├── db/           # SQLAlchemy engine and persistence models
-│   │   └── repositories/ # Data-access boundaries
+│   │   ├── repositories/ # Data-access boundaries
+│   │   ├── schemas/      # Explicit request and response models
+│   │   └── services/     # Authentication and application use cases
 │   ├── migrations/       # Versioned SQLite schema changes
 │   ├── worker/           # Single-process OCR worker
 │   └── tests/            # Backend tests

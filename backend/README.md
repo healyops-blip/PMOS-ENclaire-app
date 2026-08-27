@@ -18,6 +18,7 @@ python -m pip install -e '.[dev]'
 python -m alembic upgrade head
 pytest
 ruff check .
+uvicorn pomi_backend.main:app --reload
 ```
 
 The default database path is `backend/runtime/pomi.db`. Set
@@ -29,3 +30,22 @@ The default database path is `backend/runtime/pomi.db`. Set
 - `user_session` references the account `uid` and stores only `session_hash`.
 - SQLite foreign keys are enabled for every application connection.
 - All schema changes are versioned under `migrations/`.
+
+## Authentication API
+
+- `POST /api/auth/register` creates an account but does not automatically log in.
+- `POST /api/auth/login` returns an opaque `session_id` once.
+- `GET /api/auth/me` requires `Authorization: Bearer <session_id>`.
+
+The server stores only Argon2 password hashes and SHA-256 Session credential
+hashes. Interactive API docs are available locally and disabled when
+`POMI_ENVIRONMENT=production`.
+
+Authentication tuning is configured through environment variables:
+
+- `POMI_SESSION_TTL_SECONDS`
+- `POMI_ARGON2_TIME_COST`
+- `POMI_ARGON2_MEMORY_COST_KIB`
+- `POMI_ARGON2_PARALLELISM`
+- `POMI_AUTH_RATE_LIMIT_ATTEMPTS`
+- `POMI_AUTH_RATE_LIMIT_WINDOW_SECONDS`
