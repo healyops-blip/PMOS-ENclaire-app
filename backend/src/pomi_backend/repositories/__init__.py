@@ -11,15 +11,18 @@ from pomi_backend.repositories.health import (
     WeightRepository,
 )
 from pomi_backend.repositories.ocr import OCRRepository
+from pomi_backend.repositories.orders import MedicalOrderRepository, ReconciliationRepository
 
 __all__ = [
     "AuthRepository",
     "DocumentRepository",
     "MedicationDailyRepository",
     "MedicationEventRepository",
+    "MedicalOrderRepository",
     "MedicationRepository",
     "MenstrualCycleRepository",
     "OCRRepository",
     "PatientRepository",
+    "ReconciliationRepository",
     "WeightRepository",
 ]

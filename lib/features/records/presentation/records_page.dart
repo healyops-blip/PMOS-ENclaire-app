@@ -368,6 +368,7 @@ class _DocumentDetailPageState extends State<DocumentDetailPage> {
                   builder: (_) => OcrTaskPage(
                     repository: widget.ocrRepository,
                     document: document,
+                    documentRepository: widget.repository,
                   ),
                 ),
               ),

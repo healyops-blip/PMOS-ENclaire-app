@@ -15,6 +15,7 @@ from pomi_backend.services.auth import AuthError
 from pomi_backend.services.documents import DocumentService
 from pomi_backend.services.medications import MedicationService
 from pomi_backend.services.ocr import OCRTaskService
+from pomi_backend.services.orders import MedicalOrderService, ReconciliationService
 from pomi_backend.services.patient import PatientProfileService
 
 bearer_scheme = HTTPBearer(auto_error=False, scheme_name="SessionBearer")
@@ -100,3 +101,23 @@ def get_medication_service(
 
 
 MedicationServiceDependency = Annotated[MedicationService, Depends(get_medication_service)]
+
+
+def get_medical_order_service(
+    session: DatabaseSession, account: CurrentAccount
+) -> MedicalOrderService:
+    return MedicalOrderService(session, account)
+
+
+MedicalOrderServiceDependency = Annotated[MedicalOrderService, Depends(get_medical_order_service)]
+
+
+def get_reconciliation_service(
+    session: DatabaseSession, account: CurrentAccount
+) -> ReconciliationService:
+    return ReconciliationService(session, account)
+
+
+ReconciliationServiceDependency = Annotated[
+    ReconciliationService, Depends(get_reconciliation_service)
+]

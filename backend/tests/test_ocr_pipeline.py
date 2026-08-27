@@ -69,7 +69,12 @@ def _create(client: TestClient, headers: dict[str, str], document: dict) -> dict
 def _payload(kind: str) -> dict[str, Any]:
     drafts = {
         "lab_report": {"facility": " Pomi Hospital ", "report_date": None, "items": []},
-        "medical_order": {"facility": None, "order_date": None, "medications": []},
+        "medical_order": {
+            "facility": None,
+            "order_date": None,
+            "order_text": None,
+            "medications": [],
+        },
         "imaging_text_report": {
             "facility": None,
             "report_date": None,

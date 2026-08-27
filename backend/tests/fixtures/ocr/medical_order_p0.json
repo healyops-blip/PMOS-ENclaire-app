@@ -1,0 +1,53 @@
+[
+  {
+    "case_id": "order-metformin-cn",
+    "source_text": "盐酸二甲双胍片 500mg 每日2次 口服 30天",
+    "expected": {
+      "drug_name": "盐酸二甲双胍",
+      "dosage_value": 500,
+      "dosage_unit": "mg",
+      "frequency": "每日2次"
+    }
+  },
+  {
+    "case_id": "order-metformin-en",
+    "source_text": "Metformin 0.5 g PO twice daily for 4 weeks",
+    "expected": {
+      "drug_name": "Metformin",
+      "dosage_value": 0.5,
+      "dosage_unit": "g",
+      "frequency": "twice daily"
+    }
+  },
+  {
+    "case_id": "order-yasmin-cn",
+    "source_text": "屈螺酮炔雌醇片 每次1片 每日1次 连服21日",
+    "expected": {
+      "drug_name": "屈螺酮炔雌醇片",
+      "dosage_value": 1,
+      "dosage_unit": "片",
+      "frequency": "每日1次"
+    }
+  },
+  {
+    "case_id": "order-vitamin-d3-cn",
+    "source_text": "维生素D3 1000 IU 每日一次 早餐后",
+    "expected": {
+      "drug_name": "维生素D3",
+      "dosage_value": 1000,
+      "dosage_unit": "IU",
+      "frequency": "每日一次"
+    }
+  },
+  {
+    "case_id": "order-explicit-stop",
+    "source_text": "停用二甲双胍 500mg 每日2次，自2026-08-27起",
+    "expected": {
+      "drug_name": "二甲双胍",
+      "dosage_value": 500,
+      "dosage_unit": "mg",
+      "frequency": "每日2次",
+      "explicitly_stopped": true
+    }
+  }
+]

@@ -6,8 +6,10 @@ from fastapi import APIRouter, Request, status
 from pydantic import BaseModel, ConfigDict
 
 from pomi_backend.api.business import success
-from pomi_backend.api.dependencies import OCRTaskServiceDependency
+from pomi_backend.api.dependencies import MedicalOrderServiceDependency, OCRTaskServiceDependency
+from pomi_backend.schemas.orders import MedicalOrderConfirmation
 from pomi_backend.services.ocr import task_data
+from pomi_backend.services.orders import medical_order_data
 
 router = APIRouter(prefix="/api/ocr/tasks", tags=["ocr"])
 
@@ -43,3 +45,17 @@ def get_ocr_result(task_id: str, request: Request, service: OCRTaskServiceDepend
 def retry_ocr_task(task_id: str, request: Request, service: OCRTaskServiceDependency) -> dict:
     task, created = service.retry(task_id)
     return success(request, {**task_data(task), "reused": not created})
+
+
+@router.post("/{task_id}/confirm", status_code=status.HTTP_201_CREATED)
+def confirm_medical_order(
+    task_id: str,
+    payload: MedicalOrderConfirmation,
+    request: Request,
+    service: MedicalOrderServiceDependency,
+) -> dict:
+    orders, created = service.confirm(task_id, payload)
+    return success(
+        request,
+        {"items": [medical_order_data(order) for order in orders], "reused": not created},
+    )

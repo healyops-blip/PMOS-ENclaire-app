@@ -11,11 +11,19 @@ from pomi_backend.db.models.health import (
     WeightRecord,
 )
 from pomi_backend.db.models.ocr import OCRFieldResult, OCRResult, OCRTask
+from pomi_backend.db.models.orders import (
+    MedicalOrder,
+    MedicationReconciliation,
+    MedicationReconciliationItem,
+)
 
 __all__ = [
     "Medication",
     "MedicationDaily",
     "MedicationEvent",
+    "MedicalOrder",
+    "MedicationReconciliation",
+    "MedicationReconciliationItem",
     "MenstrualCycle",
     "OCRFieldResult",
     "OCRResult",
