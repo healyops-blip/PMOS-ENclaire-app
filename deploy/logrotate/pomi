@@ -1,0 +1,25 @@
+/var/log/pomi/*.log {
+    daily
+    rotate 14
+    size 20M
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+    create 0640 pomi pomi
+}
+
+/var/log/nginx/pomi-api-*.log {
+    daily
+    rotate 14
+    size 20M
+    missingok
+    notifempty
+    compress
+    delaycompress
+    sharedscripts
+    postrotate
+        [ ! -f /run/nginx.pid ] || kill -USR1 $(cat /run/nginx.pid)
+    endscript
+}

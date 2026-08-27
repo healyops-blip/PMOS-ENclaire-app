@@ -6,13 +6,16 @@ info:
     Pomi P0 Flutter/FastAPI contract. All medical data in the hackathon build is
     simulated. OCR output remains a draft until explicitly confirmed by the user.
     Hospital certification is a Flutter-only local demo and is intentionally absent.
+    Authentication and health endpoints are already implemented and therefore use
+    their direct response models. The remaining business endpoints are the agreed
+    P0 contract and use the ApiSuccess/ApiError envelope until implemented.
 servers:
-  - url: https://api.healy1012-ops.top/api
+  - url: https://api.healy1012-ops.top
     description: Demo server
-  - url: http://127.0.0.1:8000/api
+  - url: http://127.0.0.1:8000
     description: Local development
 security:
-  - SessionId: []
+  - SessionBearer: []
 tags:
   - name: System
   - name: Auth
@@ -28,33 +31,40 @@ tags:
   - name: Rules
 
 paths:
-  /health:
+  /health/live:
     get:
       tags: [System]
-      operationId: getHealth
-      summary: Service health and contract version
+      operationId: getLiveness
+      summary: Check whether the FastAPI process is alive
       security: []
       responses:
         '200':
-          description: Healthy
+          description: Process is alive
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiSuccess'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/Health'
+                $ref: '#/components/schemas/Health'
 
-  /auth/register:
+  /health/ready:
+    get:
+      tags: [System]
+      operationId: getReadiness
+      summary: Check whether FastAPI and SQLite are ready
+      security: []
+      responses:
+        '200':
+          description: API and database are ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+
+  /api/auth/register:
     post:
       tags: [Auth]
       operationId: register
-      summary: Register an account and create a session
+      summary: Register an account without creating a session
       security: []
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -67,18 +77,15 @@ paths:
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiSuccess'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/AuthSession'
+                $ref: '#/components/schemas/AccountResponse'
         '409':
-          $ref: '#/components/responses/ErrorResponse'
+          $ref: '#/components/responses/AuthErrorResponse'
         '422':
-          $ref: '#/components/responses/ErrorResponse'
+          $ref: '#/components/responses/AuthErrorResponse'
+        '429':
+          $ref: '#/components/responses/AuthErrorResponse'
 
-  /auth/login:
+  /api/auth/login:
     post:
       tags: [Auth]
       operationId: login
@@ -96,61 +103,41 @@ paths:
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiSuccess'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/AuthSession'
+                $ref: '#/components/schemas/LoginResponse'
         '401':
-          $ref: '#/components/responses/ErrorResponse'
+          $ref: '#/components/responses/AuthErrorResponse'
+        '422':
+          $ref: '#/components/responses/AuthErrorResponse'
         '429':
-          $ref: '#/components/responses/ErrorResponse'
+          $ref: '#/components/responses/AuthErrorResponse'
 
-  /auth/session:
+  /api/auth/me:
     get:
       tags: [Auth]
-      operationId: getSession
-      summary: Restore the current session and next route
+      operationId: getCurrentAccount
+      summary: Restore the current account from a Bearer session
       responses:
         '200':
-          description: Active session
+          description: Current account
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiSuccess'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/SessionInfo'
+                $ref: '#/components/schemas/AccountResponse'
         '401':
-          $ref: '#/components/responses/ErrorResponse'
+          $ref: '#/components/responses/AuthErrorResponse'
 
-  /auth/logout:
+  /api/auth/logout:
     post:
       tags: [Auth]
       operationId: logout
       summary: Revoke the current session
       responses:
-        '200':
+        '204':
           description: Session revoked
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiSuccess'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        required: [revoked]
-                        properties:
-                          revoked:
-                            type: boolean
-                            const: true
+        '401':
+          $ref: '#/components/responses/AuthErrorResponse'
 
-  /patient/profile:
+  /api/patient/profile:
     get:
       tags: [Patient]
       operationId: getPatientProfile
@@ -196,7 +183,7 @@ paths:
         '422':
           $ref: '#/components/responses/ErrorResponse'
 
-  /dashboard:
+  /api/dashboard:
     get:
       tags: [Dashboard]
       operationId: getDashboard
@@ -221,7 +208,7 @@ paths:
                       data:
                         $ref: '#/components/schemas/Dashboard'
 
-  /medications:
+  /api/medications:
     get:
       tags: [Medications]
       operationId: listMedications
@@ -272,7 +259,7 @@ paths:
         '422':
           $ref: '#/components/responses/ErrorResponse'
 
-  /medications/{medication_id}:
+  /api/medications/{medication_id}:
     put:
       tags: [Medications]
       operationId: updateMedication
@@ -304,7 +291,7 @@ paths:
         '422':
           $ref: '#/components/responses/ErrorResponse'
 
-  /medications/{medication_id}/events:
+  /api/medications/{medication_id}/events:
     get:
       tags: [Medications]
       operationId: listMedicationEvents
@@ -326,7 +313,7 @@ paths:
                         items:
                           $ref: '#/components/schemas/MedicationEvent'
 
-  /medications/{medication_id}/daily-status:
+  /api/medications/{medication_id}/daily-status:
     put:
       tags: [Medications]
       operationId: setMedicationDailyStatus
@@ -352,7 +339,7 @@ paths:
                       data:
                         $ref: '#/components/schemas/MedicationDaily'
 
-  /medication-daily:
+  /api/medication-daily:
     get:
       tags: [Medications]
       operationId: listMedicationDaily
@@ -388,7 +375,7 @@ paths:
                       data:
                         $ref: '#/components/schemas/MedicationDailyRange'
 
-  /cycles:
+  /api/cycles:
     get:
       tags: [Cycles]
       operationId: listCycles
@@ -435,7 +422,7 @@ paths:
         '409':
           $ref: '#/components/responses/ErrorResponse'
 
-  /cycles/{cycle_id}:
+  /api/cycles/{cycle_id}:
     put:
       tags: [Cycles]
       operationId: updateCycle
@@ -470,7 +457,7 @@ paths:
         '409':
           $ref: '#/components/responses/ErrorResponse'
 
-  /weights:
+  /api/weights:
     get:
       tags: [Weights]
       operationId: listWeights
@@ -526,7 +513,7 @@ paths:
                       data:
                         $ref: '#/components/schemas/WeightRecord'
 
-  /weights/{weight_id}:
+  /api/weights/{weight_id}:
     put:
       tags: [Weights]
       operationId: updateWeight
@@ -557,7 +544,7 @@ paths:
                       data:
                         $ref: '#/components/schemas/WeightRecord'
 
-  /documents:
+  /api/documents:
     get:
       tags: [Documents]
       operationId: listDocuments
@@ -632,7 +619,7 @@ paths:
         '415':
           $ref: '#/components/responses/ErrorResponse'
 
-  /documents/{document_id}:
+  /api/documents/{document_id}:
     get:
       tags: [Documents]
       operationId: getDocument
@@ -672,7 +659,7 @@ paths:
                       data:
                         $ref: '#/components/schemas/DeleteResult'
 
-  /documents/{document_id}/revisions:
+  /api/documents/{document_id}/revisions:
     get:
       tags: [Documents]
       operationId: listDocumentRevisions
@@ -733,7 +720,7 @@ paths:
         '409':
           $ref: '#/components/responses/ErrorResponse'
 
-  /documents/{document_id}/revisions/{revision_id}/file:
+  /api/documents/{document_id}/revisions/{revision_id}/file:
     get:
       tags: [Documents]
       operationId: downloadDocumentRevision
@@ -774,7 +761,7 @@ paths:
         '404':
           $ref: '#/components/responses/ErrorResponse'
 
-  /ocr/tasks:
+  /api/ocr/tasks:
     post:
       tags: [OCR]
       operationId: createOcrTask
@@ -802,7 +789,7 @@ paths:
         '409':
           $ref: '#/components/responses/ErrorResponse'
 
-  /ocr/tasks/{task_id}:
+  /api/ocr/tasks/{task_id}:
     get:
       tags: [OCR]
       operationId: getOcrTask
@@ -822,7 +809,7 @@ paths:
                       data:
                         $ref: '#/components/schemas/OcrTask'
 
-  /ocr/tasks/{task_id}/result:
+  /api/ocr/tasks/{task_id}/result:
     get:
       tags: [OCR]
       operationId: getOcrResult
@@ -844,7 +831,7 @@ paths:
         '409':
           $ref: '#/components/responses/ErrorResponse'
 
-  /ocr/tasks/{task_id}/confirm:
+  /api/ocr/tasks/{task_id}/confirm:
     post:
       tags: [OCR]
       operationId: confirmOcrResult
@@ -875,7 +862,7 @@ paths:
         '422':
           $ref: '#/components/responses/ErrorResponse'
 
-  /ocr/tasks/{task_id}/retry:
+  /api/ocr/tasks/{task_id}/retry:
     post:
       tags: [OCR]
       operationId: retryOcrTask
@@ -902,7 +889,7 @@ paths:
                       data:
                         $ref: '#/components/schemas/OcrTask'
 
-  /medication-reconciliations:
+  /api/medication-reconciliations:
     post:
       tags: [Reconciliations]
       operationId: createMedicationReconciliation
@@ -928,7 +915,7 @@ paths:
                       data:
                         $ref: '#/components/schemas/MedicationReconciliation'
 
-  /medication-reconciliations/{reconciliation_id}:
+  /api/medication-reconciliations/{reconciliation_id}:
     get:
       tags: [Reconciliations]
       operationId: getMedicationReconciliation
@@ -976,7 +963,7 @@ paths:
         '422':
           $ref: '#/components/responses/ErrorResponse'
 
-  /patient-notes:
+  /api/patient-notes:
     get:
       tags: [Reports]
       operationId: getLatestPatientNote
@@ -1018,7 +1005,7 @@ paths:
                       data:
                         $ref: '#/components/schemas/PatientNote'
 
-  /patient-notes/{note_id}:
+  /api/patient-notes/{note_id}:
     put:
       tags: [Reports]
       operationId: updatePatientNote
@@ -1049,7 +1036,7 @@ paths:
                       data:
                         $ref: '#/components/schemas/PatientNote'
 
-  /reports:
+  /api/reports:
     get:
       tags: [Reports]
       operationId: listReports
@@ -1096,7 +1083,7 @@ paths:
         '409':
           $ref: '#/components/responses/ErrorResponse'
 
-  /reports/{report_id}:
+  /api/reports/{report_id}:
     get:
       tags: [Reports]
       operationId: getReport
@@ -1116,7 +1103,7 @@ paths:
                       data:
                         $ref: '#/components/schemas/ReportDetail'
 
-  /reports/{report_id}/pdf:
+  /api/reports/{report_id}/pdf:
     post:
       tags: [Reports]
       operationId: createReportPdf
@@ -1155,7 +1142,7 @@ paths:
                       data:
                         $ref: '#/components/schemas/ReportPdf'
 
-  /reports/{report_id}/pdf/file:
+  /api/reports/{report_id}/pdf/file:
     get:
       tags: [Reports]
       operationId: downloadReportPdf
@@ -1173,7 +1160,7 @@ paths:
         '409':
           $ref: '#/components/responses/ErrorResponse'
 
-  /deterministic-rules:
+  /api/deterministic-rules:
     get:
       tags: [Rules]
       operationId: listDeterministicRules
@@ -1193,7 +1180,7 @@ paths:
                         items:
                           $ref: '#/components/schemas/DeterministicRule'
 
-  /deterministic-rules/{rule_id}:
+  /api/deterministic-rules/{rule_id}:
     put:
       tags: [Rules]
       operationId: updateDeterministicRule
@@ -1226,7 +1213,7 @@ paths:
         '403':
           $ref: '#/components/responses/ErrorResponse'
 
-  /rule-executions/{execution_id}:
+  /api/rule-executions/{execution_id}:
     get:
       tags: [Rules]
       operationId: getRuleExecution
@@ -1253,10 +1240,10 @@ paths:
 
 components:
   securitySchemes:
-    SessionId:
-      type: apiKey
-      in: header
-      name: X-Session-ID
+    SessionBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque-session-id
 
   parameters:
     IdempotencyKey:
@@ -1335,6 +1322,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ApiError'
+    AuthErrorResponse:
+      description: Implemented authentication API error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
 
   schemas:
     ApiSuccess:
@@ -1385,8 +1378,10 @@ components:
       type: string
       enum:
         - VALIDATION_ERROR
-        - ACCOUNT_NAME_EXISTS
+        - ACCOUNT_NAME_TAKEN
         - INVALID_CREDENTIALS
+        - AUTHENTICATION_REQUIRED
+        - AUTH_RATE_LIMITED
         - SESSION_EXPIRED
         - FORBIDDEN_RESOURCE
         - RESOURCE_NOT_FOUND
@@ -1409,109 +1404,116 @@ components:
 
     Health:
       type: object
-      required: [status, service, api_version, server_time]
+      additionalProperties: false
+      required: [status]
       properties:
         status:
           type: string
-          enum: [ok, degraded]
-        service:
-          type: string
-          const: pomi-api
-        api_version:
-          type: string
-        server_time:
-          type: string
-          format: date-time
-        database:
-          type: string
-          enum: [ok, unavailable]
-        worker:
-          type: string
-          enum: [ok, stale, unavailable]
-
-    ClientPlatform:
-      type: string
-      enum: [android, ios, web]
-
-    AccountType:
-      type: string
-      enum: [new_user, returning_user]
-
-    NextRoute:
-      type: string
-      enum: [/onboarding, /dashboard]
+          const: ok
 
     RegisterRequest:
       type: object
-      required: [account_name, password, client_platform]
+      additionalProperties: false
+      required: [account_name, password]
       properties:
         account_name:
           type: string
           minLength: 3
-          maxLength: 32
-          pattern: '^[A-Za-z0-9_.-]+$'
+          maxLength: 64
+          description: Trimmed and normalized to lowercase before the backend applies ^[a-z0-9][a-z0-9_.-]{2,63}$.
         password:
           type: string
           minLength: 8
-          maxLength: 72
+          maxLength: 128
           format: password
+          description: Must contain at least one letter and one number.
         phone_number:
           type: [string, 'null']
           maxLength: 32
-          description: Optional unverified profile data; never a P0 login credential.
-        client_platform:
-          $ref: '#/components/schemas/ClientPlatform'
-        device_name:
-          type: [string, 'null']
-          maxLength: 100
+          description: Optional and unverified; spaces and hyphens are removed before validating optional + followed by 7-20 digits.
 
     LoginRequest:
       type: object
-      required: [account_name, password, client_platform]
+      additionalProperties: false
+      required: [account_name, password]
       properties:
         account_name:
           type: string
-          minLength: 1
-          maxLength: 32
+          minLength: 3
+          maxLength: 64
+          description: Trimmed and normalized to lowercase by the backend.
         password:
           type: string
           minLength: 1
-          maxLength: 72
+          maxLength: 128
           format: password
         client_platform:
-          $ref: '#/components/schemas/ClientPlatform'
+          type: [string, 'null']
+          maxLength: 32
         device_name:
           type: [string, 'null']
-          maxLength: 100
+          maxLength: 128
 
-    SessionInfo:
+    AccountResponse:
       type: object
-      required: [uid, account_name, account_type, expires_at, onboarding_required, next_route]
+      required: [uid, account_name, account_type, onboarding_completed, status, phone_number, phone_verified]
       properties:
         uid:
           type: string
+          format: uuid
         account_name:
           type: string
         account_type:
-          $ref: '#/components/schemas/AccountType'
+          type: string
+          enum: [user, admin]
+        onboarding_completed:
+          type: boolean
+        status:
+          type: string
+          enum: [active, disabled, locked]
+        phone_number:
+          type: [string, 'null']
+        phone_verified:
+          type: boolean
+
+    LoginResponse:
+      type: object
+      required: [session_id, token_type, expires_at, account]
+      properties:
+        session_id:
+          type: string
+          minLength: 32
+          readOnly: true
+        token_type:
+          type: string
+          const: Bearer
         expires_at:
           type: string
           format: date-time
-        onboarding_required:
-          type: boolean
-        next_route:
-          $ref: '#/components/schemas/NextRoute'
+        account:
+          $ref: '#/components/schemas/AccountResponse'
 
-    AuthSession:
-      allOf:
-        - $ref: '#/components/schemas/SessionInfo'
-        - type: object
-          required: [session_id]
-          properties:
-            session_id:
-              type: string
-              minLength: 32
-              writeOnly: true
+    AuthErrorDetail:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum:
+            - VALIDATION_ERROR
+            - ACCOUNT_NAME_TAKEN
+            - INVALID_CREDENTIALS
+            - AUTHENTICATION_REQUIRED
+            - AUTH_RATE_LIMITED
+        message:
+          type: string
+
+    AuthErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          $ref: '#/components/schemas/AuthErrorDetail'
 
     Gender:
       type: string

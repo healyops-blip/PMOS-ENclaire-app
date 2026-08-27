@@ -6,7 +6,7 @@
 >
 > 机器可读契约：`contracts/openapi/pomi-api-v1.yaml`
 
-本文用于让 Flutter、FastAPI、OCR Worker 和测试同学在不反复猜字段的情况下并行开工。若本文示例与 OpenAPI 字段冲突，以 OpenAPI 为准；业务边界冲突时先更新本文和 OpenAPI，再改代码。
+本文用于让 Flutter、FastAPI、OCR Worker 和测试同学在不反复猜字段的情况下并行开工。认证接口已经落地，必须以 `backend/src/pomi_backend`、`docs/backend-api.md` 和对应测试为准；其他尚未实现的业务接口以 OpenAPI 为准。业务边界冲突时先更新本文和 OpenAPI，再改代码。
 
 ## 1. 当前 P0 边界
 
@@ -54,18 +54,29 @@
 
 ### 3.1 地址与鉴权
 
-- 服务端基地址：`https://api.healy1012-ops.top/api`
-- 本地示例：`http://127.0.0.1:8000/api`
+- 服务根地址：`https://api.healy1012-ops.top`
+- 本地根地址：`http://127.0.0.1:8000`
+- 业务接口统一使用 `/api` 前缀；健康检查使用根路径下的 `/health/live`、`/health/ready`。
 - 除注册、登录和健康检查外，请求头必须携带：
 
 ```http
-X-Session-ID: <random-session-id>
+Authorization: Bearer <session_id>
 ```
 
-- Flutter 仅把 `session_id` 写入系统安全存储；服务端数据库只保存 SHA-256/HMAC 后的会话哈希。
+- Flutter 仅把 `session_id` 写入系统安全存储；服务端数据库只保存 SHA-256 后的会话哈希。
 - 会话默认 7 天过期，退出立即撤销。
 
-### 3.2 统一 JSON 响应
+### 3.2 JSON 响应
+
+已经实现的认证和健康检查接口保持当前直接响应结构：
+
+- `/health/live`、`/health/ready`：`{"status":"ok"}`。
+- 注册和 `/api/auth/me`：直接返回 `AccountResponse`。
+- 登录：直接返回 `LoginResponse`。
+- 退出：`204 No Content`，无响应体。
+- 认证错误：`{"error":{"code":"...","message":"..."}}`。
+
+下列统一包络仅用于尚未实现的患者、用药、材料、OCR、报告等业务接口：
 
 成功：
 
@@ -94,7 +105,7 @@ X-Session-ID: <random-session-id>
 }
 ```
 
-文件流接口直接返回二进制，不套统一 JSON。
+文件流接口直接返回二进制，不套统一 JSON。后端实现新业务接口时不得擅自套用认证接口的直接结构；若团队决定统一改造，需同时修改 OpenAPI、Flutter DTO、测试和本文。
 
 ### 3.3 时间、ID、空值和分页
 
@@ -107,7 +118,7 @@ X-Session-ID: <random-session-id>
 
 ### 3.4 幂等和并发
 
-- 下列创建请求必须携带 `Idempotency-Key`：注册、文件上传、OCR 创建/重试、对账创建、报告生成、PDF 生成。
+- 下列创建请求必须携带 `Idempotency-Key`：文件上传、OCR 创建/重试、对账创建、报告生成、PDF 生成。当前注册接口不要求该 Header。
 - 服务端对同一会话和幂等键返回同一资源，不重复写入。
 - 更新接口携带 `updated_at` 或 `expected_revision_id`；版本不一致返回 `409 RESOURCE_VERSION_CONFLICT`。
 - Flutter 按钮提交期间禁用；每日用药可乐观更新，失败必须回滚。
@@ -123,11 +134,11 @@ X-Session-ID: <random-session-id>
 
 | 模块 | 方法与路径 | Flutter 使用位置 | 后端产出 |
 |---|---|---|---|
-| 健康检查 | `GET /api/health` | 开发诊断 | 版本、时间、依赖状态 |
-| 注册 | `POST /api/auth/register` | 注册页 | 账号、会话、下一路由 |
-| 登录 | `POST /api/auth/login` | 登录页 | 会话、初始化状态 |
-| 会话恢复 | `GET /api/auth/session` | App 启动 | 当前账号和下一路由 |
-| 退出 | `POST /api/auth/logout` | 我的 | 撤销会话 |
+| 健康检查 | `GET /health/live`、`GET /health/ready` | 开发/部署诊断 | 固定 `{status: ok}`；ready 额外检查数据库 |
+| 注册 | `POST /api/auth/register` | 注册页 | 账号；不创建会话，随后调用登录 |
+| 登录 | `POST /api/auth/login` | 登录页 | Session、过期时间、账号状态 |
+| 会话恢复 | `GET /api/auth/me` | App 启动 | 当前账号；前端根据 `onboarding_completed` 路由 |
+| 退出 | `POST /api/auth/logout` | 我的 | `204` 并撤销当前 Session |
 | 画像 | `GET/PUT /api/patient/profile` | 四步引导、我的 | 患者画像和完成状态 |
 | Dashboard | `GET /api/dashboard` | 首页 | 倒计时、今日药物、月统计、报告入口 |
 | 用药列表 | `GET/POST /api/medications` | 用药管理 | 当前/历史用药 |
@@ -168,23 +179,25 @@ X-Session-ID: <random-session-id>
 
 | 字段 | 类型 | 必填 | 说明 |
 |---|---|---:|---|
-| `account_name` | string | 是 | 3–32 字符，全局唯一 |
-| `password` | string | 是 | 8–72 字符，仅通过 HTTPS 传输 |
-| `phone_number` | string/null | 否 | 可选资料，当前不验证且不能登录 |
-| `client_platform` | enum | 是 | `android`、`ios`、`web` |
-| `device_name` | string/null | 否 | 用户可识别设备名 |
+| `account_name` | string | 是 | 3–64 字符；后端去空格并转小写；首字符为小写字母/数字，其余允许小写字母、数字、`.`、`_`、`-` |
+| `password` | string | 是 | 8–128 字符，至少一个字母和一个数字，仅通过 HTTPS 传输 |
+| `phone_number` | string/null | 否 | 7–20 位数字，可带 `+`；后端移除空格/连字符；当前不验证且不能登录 |
 
-响应 `data`：`uid`、`account_name`、`account_type`、`session_id`、`expires_at`、`onboarding_required`、`next_route`。
+成功返回 `201` 和直接 `AccountResponse`：`uid`、`account_name`、`account_type`、`onboarding_completed`、`status`、`phone_number`、`phone_verified`。注册不返回 `session_id`，前端注册成功后必须再调用登录。
 
 #### `POST /api/auth/login`
 
-请求：`account_name`、`password`、`client_platform`、`device_name`。
+请求：必填 `account_name`、`password`；可选 `client_platform`（最长 32）、`device_name`（最长 128）。
 
-响应同注册。账号或密码错误统一返回 `INVALID_CREDENTIALS`，不能泄露账号是否存在。
+成功直接返回 `LoginResponse`：`session_id`、固定为 `Bearer` 的 `token_type`、`expires_at`、`account`。其中 `account` 字段结构同注册响应。账号不存在、密码错误或账号不可登录统一返回 `INVALID_CREDENTIALS`，不能泄露账号是否存在。
 
-#### `GET /api/auth/session`
+#### `GET /api/auth/me`
 
-响应：`uid`、`account_name`、`account_type`、`expires_at`、`onboarding_required`、`next_route`。用于 App 重启恢复，不返回新的 `session_id`。
+携带 Bearer Session，直接返回 `AccountResponse`，不返回新的 `session_id`。`account_type` 为 `user/admin`；账号状态为 `active/disabled/locked`。前端根据 `onboarding_completed=false/true` 分别进入首次引导页或 Dashboard。
+
+#### `POST /api/auth/logout`
+
+携带 Bearer Session，成功返回 `204 No Content`。前端不能解析 JSON；收到成功响应后删除安全存储中的 `session_id`。
 
 ### 5.2 患者画像
 
@@ -330,7 +343,17 @@ item 字段：`id`、`existing_medication_id`、`new_medical_order_id`、`medica
 
 PDF 对象字段：`report_id`、`file_id`、`generation_status`、`file_name`、`mime_type`、`file_size_bytes`、`file_hash`、`generated_at`、`download_url`、`download_expires_at`、`failure_reason`。
 
-### 5.10 后端接口与数据表映射
+### 5.10 确定性规则与执行追溯
+
+`GET /api/deterministic-rules` 仅供管理端使用，返回规则数组。每条规则字段：`id`、`rule_key`、`rule_type`、`rule_name`、`parameters`、`priority`、`enabled`、`updated_at`。
+
+- `rule_type`：`reference_range/date_source/freshness/unit_conversion/comparability/reconciliation`。
+- `parameters` 只能保存经过 Schema 验证的 JSON 参数，不允许保存或执行 Python 表达式。
+- `PUT /api/deterministic-rules/{rule_id}` 请求字段：`parameters`、`priority`、`enabled`、`updated_at`；最后一个字段用于并发冲突检测。
+
+`GET /api/rule-executions/{execution_id}` 返回：`id`、`rule_id`、`source_type`、`source_id`、`input_digest`、`input`、`output`、`explanation`、`executed_at`。前端普通用户页面不直接调用；报告来源调试和审计使用。
+
+### 5.11 后端接口与数据表映射
 
 | 接口域 | 主表 | 同事务/关联表 |
 |---|---|---|
@@ -359,18 +382,19 @@ PDF 对象字段：`report_id`、`file_id`、`generation_status`、`file_name`�
 
 | HTTP | `error.code` | Flutter 动作 |
 |---:|---|---|
-| 400 | `VALIDATION_ERROR` | 标注字段，不清空用户输入 |
+| 422 | `VALIDATION_ERROR` | 标注字段，不清空用户输入；认证请求也包括多余字段 |
 | 401 | `INVALID_CREDENTIALS` | 登录页提示，不说明账号是否存在 |
-| 401 | `SESSION_EXPIRED` | 清安全存储并跳登录 |
+| 401 | `AUTHENTICATION_REQUIRED` | 清安全存储并跳登录；覆盖缺失、无效、撤销或过期 Session |
 | 403 | `FORBIDDEN_RESOURCE` | 提示无权访问，不重试 |
 | 404 | `RESOURCE_NOT_FOUND` | 返回上一页并刷新 |
-| 409 | `ACCOUNT_NAME_EXISTS` | 注册页定位账号字段 |
+| 409 | `ACCOUNT_NAME_TAKEN` | 注册页定位账号字段 |
 | 409 | `RESOURCE_VERSION_CONFLICT` | 重新拉取详情，提示内容已更新 |
 | 409 | `RECONCILIATION_REQUIRED` | 跳用药对账页 |
 | 413 | `FILE_TOO_LARGE` / `IMAGE_TOO_LARGE` | 重新选择或压缩 |
 | 415 | `UNSUPPORTED_FORMAT` / `MULTI_PAGE_PDF` | 显示支持格式 |
 | 422 | `SCHEMA_VALIDATION_FAILED` / `CRITICAL_FIELD_MISSING` | 打开草稿并突出字段 |
-| 429 | `RATE_LIMITED` | 按 `retry_after_seconds` 延迟 |
+| 429 | `AUTH_RATE_LIMITED` | 认证页按 `Retry-After` Header 倒计时 |
+| 429 | `RATE_LIMITED` | 其他业务接口按 `retry_after_seconds` 延迟 |
 | 502 | `INVALID_MODEL_JSON` | 允许重试；预置材料可提示兜底 |
 | 504 | `MODEL_TIMEOUT` | 允许重试；不要创建正式数据 |
 | 409 | `REPORT_SOURCE_INCOMPLETE` | 显示缺少哪些确认数据 |
@@ -378,15 +402,36 @@ PDF 对象字段：`report_id`、`file_id`、`generation_status`、`file_name`�
 
 ## 7. 并行开工顺序
 
-### 工作包 A：基础与账号（后端先行）
+### 7.1 可直接领取的任务看板
 
-后端：统一响应、异常中间件、SQLite 迁移、密码哈希、会话、注册/登录/恢复/退出、画像。
+`已完成` 表示仓库中已有代码和测试；`待开发` 表示接口字段已冻结、可以直接领取。领取后在团队看板补负责人和 PR 链接，不要通过聊天临时改字段。
 
-前端：AuthRepository、SessionStore、真实登录/注册、启动路由、画像 DTO 与分步保存。
+| ID | 状态 | 领取方 | 工作内容 | 依赖 | 交付与验收 |
+|---|---|---|---|---|---|
+| BE-00 | 已完成 | 后端 | 账号注册、登录、`/auth/me`、退出、SQLite Session、限流 | 无 | `backend/tests` 已覆盖；不得破坏现有响应 |
+| FE-00 | 已完成 | 前端 | Dio Bearer Header、系统安全存储 | BE-00 | Header 为 `Authorization: Bearer`，清 Session 后不再发送 |
+| FE-01 | 待开发 | 前端 | `AccountDto`、`LoginResponseDto`、`AuthRepository`，登录/注册页接真接口，冷启动恢复 | BE-00 | 注册后自动登录；401 清 Session；按 `onboarding_completed` 路由 |
+| BE-01 | 待开发 | 后端 | 患者画像 GET/PUT 和引导完成事务 | BE-00 | 分步保存、字段校验、完成状态和 409 测试 |
+| FE-02 | 待开发 | 前端 | 四步引导接画像接口，移除账号路由中的 `DemoAccount` 依赖 | FE-01、BE-01 | 杀进程重开不丢步骤；完成后进入 Dashboard |
+| BE-02 | 待开发 | 后端 | 用药、事件、每日三状态、经期、体重、Dashboard 聚合 | BE-01 | `unrecorded` 不等于 `missed`；事件不可覆盖；同日体重幂等 |
+| FE-03 | 待开发 | 前端 | Dashboard/用药/经期/体重 Repository 与页面状态 | BE-02 | 成功、空数据、加载、401、409、500 均有页面状态 |
+| BE-03 | 待开发 | 后端 | 材料、修订、私有文件流、OCR 任务/草稿/确认/重试 | BE-01 | 文件限制、租约、字段级来源、确认事务和失败测试 |
+| FE-04 | 待开发 | 前端 | 上传进度、2 秒 OCR 轮询、四类确认页和错误恢复 | BE-03 | 页面退出停止轮询；未确认草稿不进入正式数据 |
+| BE-04 | 待开发 | 后端 | 医嘱对账、规则执行、患者自述、报告快照、PDF | BE-02、BE-03 | 旧药不自动停；快照不可变；PDF 和 App 同源 |
+| FE-05 | 待开发 | 前端 | 对账、报告三层、PDF 下载/分享/打印 | BE-04 | 所有来源可追溯；生成中/失败/完成状态明确 |
+| QA-01 | 待开发 | 联调/测试 | OpenAPI 契约测试、后端 fixture、Flutter Repository 测试、端到端验收 | 对应 BE/FE | 同一字段在 OpenAPI、Pydantic、DTO 和 fixture 中一致 |
+
+### 7.2 工作包说明
+
+#### 工作包 A：基础与账号（后端先行）
+
+后端：认证、异常中间件、SQLite 迁移、密码哈希、会话、注册/登录/恢复/退出已经实现；下一步实现画像，并保持现有认证响应兼容。
+
+前端：AuthRepository、SessionStore、真实登录/注册、启动路由、画像 DTO 与分步保存。注册流程必须执行“注册成功 → 登录 → 安全保存 Session”；冷启动通过 `/api/auth/me` 恢复。
 
 完成定义：新账号真实入库；重启可恢复会话；新用户进引导，老用户进 Dashboard。
 
-### 工作包 B：日常记录（可与 A 后半段并行）
+#### 工作包 B：日常记录（可与 A 后半段并行）
 
 后端：用药/事件/每日状态、经期、体重、Dashboard 聚合。
 
@@ -394,7 +439,7 @@ PDF 对象字段：`report_id`、`file_id`、`generation_status`、`file_name`�
 
 完成定义：三状态互斥且未记录不等于漏服；历史不被覆盖；同日体重幂等。
 
-### 工作包 C：文件与 OCR
+#### 工作包 C：文件与 OCR
 
 后端：私有文件、修订、OCR 任务/租约 Worker、Qwen 适配器、四类 Schema、字段级结果。
 
@@ -402,7 +447,7 @@ PDF 对象字段：`report_id`、`file_id`、`generation_status`、`file_name`�
 
 完成定义：未确认草稿不进正式数据；任一正式字段可追溯至原件修订。
 
-### 工作包 D：对账与报告
+#### 工作包 D：对账与报告
 
 后端：确定性规则、用药对账事务、患者自述、不可变报告、来源关系、PDF Worker。
 
@@ -410,7 +455,7 @@ PDF 对象字段：`report_id`、`file_id`、`generation_status`、`file_name`�
 
 完成定义：旧药未出现不自动停药；快照不随源数据静默变化；PDF与 App 报告来自同一快照。
 
-### 工作包 E：联调与验收
+#### 工作包 E：联调与验收
 
 - 后端先根据 OpenAPI 生成 stub，前端根据相同契约写 DTO/Repository。
 - 每个工作包提供成功、空数据、401、422、409 和 500 fixture。
@@ -439,7 +484,7 @@ CertificationRepository  // 当前仅本地实现，不调用 FastAPI
 ## 9. 后端目录落位
 
 ```text
-backend/app/
+backend/src/pomi_backend/
 ├── api/            # auth, patient, dashboard, medications, cycles, weights,
 │                   # documents, ocr, reconciliations, reports, rules
 ├── schemas/        # 与 OpenAPI 同名的 Pydantic request/response

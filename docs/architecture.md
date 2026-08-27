@@ -14,13 +14,12 @@ PMOS-ENclaire-app/
 ├── android/              # Android host project
 ├── ios/                  # iOS host project
 ├── backend/
-│   ├── app/
-│   │   ├── api/          # FastAPI routes, including authentication
-│   │   ├── core/         # Configuration, security, and shared infrastructure
-│   │   ├── models/       # SQLite persistence models
-│   │   ├── schemas/      # Request and response models
-│   │   ├── services/     # Application and integration services
-│   │   └── repositories/ # Data-access boundaries
+│   ├── src/pomi_backend/
+│   │   ├── api/          # FastAPI routes, auth dependencies, and error handling
+│   │   ├── db/           # SQLAlchemy engine and persistence models
+│   │   ├── repositories/ # Data-access boundaries
+│   │   ├── schemas/      # Explicit request and response models
+│   │   └── services/     # Authentication and application use cases
 │   ├── migrations/       # Versioned SQLite schema changes
 │   ├── worker/           # Single-process OCR worker
 │   └── tests/            # Backend tests

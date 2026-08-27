@@ -20,9 +20,9 @@ class PomiApiClient {
 
   void useSession(String? sessionId) {
     if (sessionId == null || sessionId.isEmpty) {
-      dio.options.headers.remove('X-Session-ID');
+      dio.options.headers.remove('Authorization');
     } else {
-      dio.options.headers['X-Session-ID'] = sessionId;
+      dio.options.headers['Authorization'] = 'Bearer $sessionId';
     }
   }
 }
