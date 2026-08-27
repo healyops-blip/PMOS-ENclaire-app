@@ -28,9 +28,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _lastPeriod = TextEditingController();
   final _nextVisit = TextEditingController();
   final Set<String> _medications = {};
+  final List<String> _customCycleRanges = [];
+  final List<String> _customMedicationOptions = [];
   int _step = 0;
   String _cycleRange = '35-45 天';
   bool _saving = false;
+
+  static const _cycleOptions = ['21-28 天', '28-35 天', '35-45 天', '45 天以上'];
 
   static const _medicationOptions = {
     '二甲双胍': '按当前医嘱',
@@ -39,6 +43,45 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     '维生素 D3': '按产品说明',
     '叶酸': '按产品说明',
   };
+
+  Future<void> _addCycleRange() async {
+    final value = await showDialog<String>(
+      context: context,
+      builder:
+          (context) => const _AddItemDialog(
+            title: '添加月经周期',
+            label: '周期长度',
+            hint: '例如：30-40 天',
+          ),
+    );
+    if (value == null) return;
+    var normalized = value.trim();
+    if (!normalized.contains('天')) normalized = '$normalized 天';
+    if (!_cycleOptions.contains(normalized) &&
+        !_customCycleRanges.contains(normalized)) {
+      _customCycleRanges.add(normalized);
+    }
+    setState(() => _cycleRange = normalized);
+  }
+
+  Future<void> _addMedication() async {
+    final value = await showDialog<String>(
+      context: context,
+      builder:
+          (context) => const _AddItemDialog(
+            title: '添加药品或补剂',
+            label: '名称',
+            hint: '输入药品或补剂名称',
+          ),
+    );
+    if (value == null) return;
+    final normalized = value.trim();
+    if (!_medicationOptions.containsKey(normalized) &&
+        !_customMedicationOptions.contains(normalized)) {
+      _customMedicationOptions.add(normalized);
+    }
+    setState(() => _medications.add(normalized));
+  }
 
   @override
   void dispose() {
@@ -232,7 +275,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           '/api/medications',
           data: {
             'drug_name': name,
-            'dosage_text': _medicationOptions[name],
+            'dosage_text': _medicationOptions[name] ?? '用户自定义',
             'frequency': null,
             'current_status': 'active',
           },
@@ -479,8 +522,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         spacing: _onboardingLabelGap,
         runSpacing: _onboardingLabelGap,
         children:
-            ['21-28 天', '28-35 天', '35-45 天', '45 天以上']
-                .map(
+            [..._cycleOptions, ..._customCycleRanges]
+                .map<Widget>(
                   (value) => ChoiceChip(
                     label: Text(value),
                     selected: _cycleRange == value,
@@ -492,7 +535,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     onSelected: (_) => setState(() => _cycleRange = value),
                   ),
                 )
-                .toList(),
+                .toList()
+              ..add(
+                _RoundAddButton(tooltip: '添加新的月经周期', onPressed: _addCycleRange),
+              ),
       ),
       const SizedBox(height: _onboardingSectionGap),
       _validationSlot(
@@ -522,7 +568,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       ),
       const SizedBox(height: _onboardingLabelGap),
       const Text(
-        '未列出的项目可以进入首页后手动添加。',
+        '未列出的项目可点击 + 手动添加。',
         style: TextStyle(color: pomiMuted, fontSize: 12),
       ),
       const SizedBox(height: _onboardingSectionGap),
@@ -530,8 +576,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         spacing: _onboardingLabelGap,
         runSpacing: _onboardingLabelGap,
         children:
-            _medicationOptions.keys
-                .map(
+            [..._medicationOptions.keys, ..._customMedicationOptions]
+                .map<Widget>(
                   (name) => FilterChip(
                     label: Text(name),
                     selected: _medications.contains(name),
@@ -545,10 +591,124 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         }),
                   ),
                 )
-                .toList(),
+                .toList()
+              ..add(
+                _RoundAddButton(tooltip: '添加药品或补剂', onPressed: _addMedication),
+              ),
       ),
     ],
   );
+}
+
+class _RoundAddButton extends StatelessWidget {
+  const _RoundAddButton({required this.tooltip, required this.onPressed});
+
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton.outlined(
+      onPressed: onPressed,
+      tooltip: tooltip,
+      icon: const Icon(Icons.add_rounded, size: 20),
+      style: IconButton.styleFrom(
+        fixedSize: const Size.square(40),
+        foregroundColor: pomiPurple,
+        backgroundColor: Colors.white,
+        side: const BorderSide(color: pomiLine),
+        shape: const CircleBorder(),
+      ),
+    );
+  }
+}
+
+class _AddItemDialog extends StatefulWidget {
+  const _AddItemDialog({
+    required this.title,
+    required this.label,
+    required this.hint,
+  });
+
+  final String title;
+  final String label;
+  final String hint;
+
+  @override
+  State<_AddItemDialog> createState() => _AddItemDialogState();
+}
+
+class _AddItemDialogState extends State<_AddItemDialog> {
+  final _controller = TextEditingController();
+  String? _errorText;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final value = _controller.text.trim();
+    if (value.isEmpty) {
+      setState(() => _errorText = '请输入内容');
+      return;
+    }
+    Navigator.pop(context, value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 40),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 300),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                widget.title,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: _onboardingSectionGap),
+              TextField(
+                controller: _controller,
+                autofocus: true,
+                maxLength: 24,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _submit(),
+                decoration: InputDecoration(
+                  labelText: widget.label,
+                  hintText: widget.hint,
+                  errorText: _errorText,
+                  counterText: '',
+                ),
+              ),
+              const SizedBox(height: _onboardingLabelGap),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('取消'),
+                  ),
+                  const SizedBox(width: _onboardingLabelGap),
+                  FilledButton(onPressed: _submit, child: const Text('添加')),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _DatePickerCard extends StatefulWidget {
