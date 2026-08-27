@@ -8,7 +8,6 @@ from datetime import UTC, datetime
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
-    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -17,6 +16,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from pomi_backend.db.base import Base
+from pomi_backend.db.types import UTCDateTime
 
 
 def utc_now() -> datetime:
@@ -39,16 +39,14 @@ class UserAccount(Base):
     account_name: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     phone_number: Mapped[str | None] = mapped_column(String(32))
-    phone_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    phone_verified_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     account_type: Mapped[str] = mapped_column(String(16), nullable=False, default="user")
     onboarding_completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="active")
-    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=utc_now
-    )
+    last_login_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now
+        UTCDateTime, nullable=False, default=utc_now, onupdate=utc_now
     )
 
     sessions: Mapped[list[UserSession]] = relationship(
@@ -71,14 +69,10 @@ class UserSession(Base):
         nullable=False,
     )
     session_hash: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
-    issued_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=utc_now
-    )
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    last_active_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=utc_now
-    )
+    issued_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, default=utc_now)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    last_active_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, default=utc_now)
     client_platform: Mapped[str | None] = mapped_column(String(32))
     device_name: Mapped[str | None] = mapped_column(String(128))
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="active")
