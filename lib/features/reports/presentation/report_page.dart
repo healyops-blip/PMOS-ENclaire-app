@@ -1,6 +1,5 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -788,10 +787,6 @@ class _SourceLayer extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 18),
-        const PomiSectionTitle(title: '材料认证演示'),
-        const SizedBox(height: 8),
-        const _CertificationEntry(),
         const SizedBox(height: 14),
         const Text(
           '原始材料与结构化数据仅供复诊沟通，不构成诊断或治疗建议。',
@@ -799,76 +794,6 @@ class _SourceLayer extends StatelessWidget {
           style: TextStyle(color: PomiColors.textMuted, fontSize: 10),
         ),
       ],
-    );
-  }
-}
-
-class _CertificationEntry extends ConsumerStatefulWidget {
-  const _CertificationEntry();
-
-  @override
-  ConsumerState<_CertificationEntry> createState() =>
-      _CertificationEntryState();
-}
-
-class _CertificationEntryState extends ConsumerState<_CertificationEntry> {
-  CertificationStatus _status = CertificationStatus.notStarted;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    final record = await ref
-        .read(certificationRepositoryProvider)
-        .read('document-lab-006', 'revision-v2');
-    if (mounted) setState(() => _status = record.status);
-  }
-
-  Future<void> _open() async {
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const CertificationPage()));
-    await _load();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final succeeded = _status == CertificationStatus.succeeded;
-    return PomiSectionCard(
-      onTap: _open,
-      child: Row(
-        children: [
-          Icon(
-            succeeded ? Icons.verified_rounded : Icons.verified_user_outlined,
-            color: succeeded ? PomiColors.success : PomiColors.primary,
-            size: 32,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  succeeded ? '演示认证已完成' : '当前材料版本可进行本地认证演示',
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  succeeded ? '水印只绑定检测单 V2，替换版本后需重新认证' : '不包含真实医院签发、医生身份或链上交易',
-                  style: const TextStyle(
-                    color: PomiColors.textMuted,
-                    fontSize: 10,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Icon(Icons.chevron_right_rounded),
-        ],
-      ),
     );
   }
 }

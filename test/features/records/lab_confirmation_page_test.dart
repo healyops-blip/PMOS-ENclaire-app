@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:pmos_enclaire/features/records/presentation/lab_confirmation_page.dart';
@@ -11,8 +12,10 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final repository = _LabRepository();
       await tester.pumpWidget(
-        MaterialApp(
-          home: LabConfirmationPage(repository: repository, task: _task),
+        ProviderScope(
+          child: MaterialApp(
+            home: LabConfirmationPage(repository: repository, task: _task),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -75,6 +78,7 @@ void main() {
 
       expect(repository.confirmCalls, 2);
       expect(find.byKey(const Key('lab-confirmation-success')), findsOneWidget);
+      expect(find.byKey(const Key('certification-entry-card')), findsOneWidget);
       expect(find.text('已确认 1 项正式数据'), findsOneWidget);
       expect(find.text('5.200000 mmol/L'), findsOneWidget);
     },

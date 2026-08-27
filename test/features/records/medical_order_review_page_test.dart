@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:pmos_enclaire/features/records/data/order_reconciliation_repository.dart';
@@ -10,8 +11,10 @@ void main() {
     (tester) async {
       final gateway = _Gateway(twoOrders: true);
       await tester.pumpWidget(
-        MaterialApp(
-          home: OcrPendingConfirmationPage(repository: gateway, task: _task),
+        ProviderScope(
+          child: MaterialApp(
+            home: OcrPendingConfirmationPage(repository: gateway, task: _task),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -49,6 +52,7 @@ void main() {
         find.byKey(const Key('medication-reconciliation-page')),
         findsOneWidget,
       );
+      expect(find.byKey(const Key('certification-entry-card')), findsOneWidget);
       var execute = tester.widget<FilledButton>(
         find.byKey(const Key('execute-reconciliation')),
       );
@@ -76,8 +80,10 @@ void main() {
   ) async {
     final gateway = _Gateway(failConfirm: true, fieldError: true);
     await tester.pumpWidget(
-      MaterialApp(
-        home: OcrPendingConfirmationPage(repository: gateway, task: _task),
+      ProviderScope(
+        child: MaterialApp(
+          home: OcrPendingConfirmationPage(repository: gateway, task: _task),
+        ),
       ),
     );
     await tester.pumpAndSettle();
