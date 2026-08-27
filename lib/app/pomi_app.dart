@@ -6,7 +6,9 @@ import 'package:pmos_enclaire/features/auth/data/auth_repository.dart';
 import 'package:pmos_enclaire/features/auth/data/session_store.dart';
 import 'package:pmos_enclaire/features/auth/domain/demo_account.dart';
 import 'package:pmos_enclaire/features/auth/presentation/login_page.dart';
+import 'package:pmos_enclaire/features/cycle/data/cycle_repository.dart';
 import 'package:pmos_enclaire/features/dashboard/presentation/dashboard_page.dart';
+import 'package:pmos_enclaire/features/medications/data/medication_repository.dart';
 import 'package:pmos_enclaire/features/onboarding/presentation/onboarding_page.dart';
 import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
 import 'package:pmos_enclaire/features/weight/data/weight_repository.dart';
@@ -24,6 +26,8 @@ class PomiApp extends StatefulWidget {
     this.weightRepository,
     this.apiClient,
     this.now,
+    this.cycleRepository,
+    this.medicationRepository,
     super.key,
   });
 
@@ -32,6 +36,8 @@ class PomiApp extends StatefulWidget {
   final WeightRepository? weightRepository;
   final PomiApiClient? apiClient;
   final DateTime Function()? now;
+  final CycleRepository? cycleRepository;
+  final MedicationRepository? medicationRepository;
 
   @override
   State<PomiApp> createState() => _PomiAppState();
@@ -52,6 +58,16 @@ class _PomiAppState extends State<PomiApp> {
       (widget.authRepository is DemoAuthRepository
           ? MemoryWeightRepository.seeded()
           : ApiWeightRepository(_apiClient));
+  late final CycleRepository? _cycleRepository =
+      widget.cycleRepository ??
+      (widget.authRepository is DemoAuthRepository
+          ? null
+          : FastApiCycleRepository(_apiClient));
+  late final MedicationRepository? _medicationRepository =
+      widget.medicationRepository ??
+      (widget.authRepository is DemoAuthRepository
+          ? null
+          : FastApiMedicationRepository(_apiClient));
 
   late final GoRouter _router = GoRouter(
     initialLocation: PomiRoutes.login,
@@ -108,6 +124,8 @@ class _PomiAppState extends State<PomiApp> {
             profileRepository: _profileRepository,
             weightRepository: _weightRepository,
             now: widget.now,
+            cycleRepository: _cycleRepository,
+            medicationRepository: _medicationRepository,
           );
         },
       ),

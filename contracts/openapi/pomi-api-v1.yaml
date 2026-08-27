@@ -459,7 +459,7 @@ paths:
     delete:
       tags: [Cycles]
       operationId: deleteCycle
-      summary: Logically delete a menstrual cycle
+      summary: Soft-delete a menstrual cycle
       parameters:
         - name: cycle_id
           in: path
@@ -469,7 +469,7 @@ paths:
             format: uuid
       responses:
         '204':
-          description: Cycle logically deleted
+          description: Cycle deleted
         '404':
           $ref: '#/components/responses/ErrorResponse'
 
@@ -1719,11 +1719,19 @@ components:
 
     MedicationStatus:
       type: string
-      enum: [active, paused, stopped, unknown]
+      enum: [active, paused, stopped]
 
     MedicationEventType:
       type: string
-      enum: [started, adjusted, paused, resumed, stopped]
+      enum: [created, adjusted, paused, resumed, stopped]
+
+    MedicationUpdateEventType:
+      type: string
+      enum: [adjusted, paused, resumed, stopped]
+
+    MedicationSourceCategory:
+      type: string
+      enum: [prescribed, supplement, other_long_term]
 
     MedicationSourceType:
       type: string
@@ -1743,9 +1751,6 @@ components:
         specification:
           type: [string, 'null']
           maxLength: 200
-        dosage_text:
-          type: [string, 'null']
-          maxLength: 300
         dosage_value:
           type: [number, 'null']
           minimum: 0
@@ -1763,8 +1768,10 @@ components:
       allOf:
         - $ref: '#/components/schemas/MedicationInstruction'
         - type: object
-          required: [drug_name, start_date, source_type, event_date]
+          required: [drug_name, source_category, start_date, event_date]
           properties:
+            source_category:
+              $ref: '#/components/schemas/MedicationSourceCategory'
             start_date:
               type: string
               format: date
@@ -1787,15 +1794,10 @@ components:
           required: [event_type, event_date, updated_at]
           properties:
             event_type:
-              $ref: '#/components/schemas/MedicationEventType'
+              $ref: '#/components/schemas/MedicationUpdateEventType'
             event_date:
               type: string
               format: date
-            end_date:
-              type: [string, 'null']
-              format: date
-            current_status:
-              $ref: '#/components/schemas/MedicationStatus'
             stop_source:
               oneOf:
                 - $ref: '#/components/schemas/StopSource'
@@ -1819,7 +1821,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/MedicationInstruction'
         - type: object
-          required: [id, patient_id, drug_name, current_status, source_type, created_at, updated_at]
+          required: [id, patient_id, drug_name, status, source_category, created_at, updated_at]
           properties:
             id:
               type: string
@@ -1835,13 +1837,10 @@ components:
             end_date:
               type: [string, 'null']
               format: date
-            current_status:
+            status:
               $ref: '#/components/schemas/MedicationStatus'
-            source_type:
-              $ref: '#/components/schemas/MedicationSourceType'
-            source_document_id:
-              type: [string, 'null']
-              format: uuid
+            source_category:
+              $ref: '#/components/schemas/MedicationSourceCategory'
             replaces_medication_id:
               type: [string, 'null']
               format: uuid
@@ -1855,7 +1854,7 @@ components:
 
     MedicationEvent:
       type: object
-      required: [id, medication_id, event_type, event_date, confirmed_at]
+      required: [id, medication_id, event_type, event_date, created_at]
       properties:
         id:
           type: string
@@ -1883,7 +1882,7 @@ components:
             - type: 'null'
         note:
           type: [string, 'null']
-        confirmed_at:
+        created_at:
           type: string
           format: date-time
 
@@ -1914,12 +1913,32 @@ components:
       allOf:
         - $ref: '#/components/schemas/PageMeta'
         - type: object
-          required: [items]
+          required: [server_date, items, groups]
           properties:
+            server_date:
+              type: string
+              format: date
+              description: Server business date used for all medication writes.
             items:
               type: array
               items:
                 $ref: '#/components/schemas/Medication'
+            groups:
+              type: object
+              required: [prescribed, supplement, other_long_term]
+              properties:
+                prescribed:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Medication'
+                supplement:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Medication'
+                other_long_term:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Medication'
 
     MedicationDailyUpsert:
       type: object
@@ -1936,16 +1955,16 @@ components:
       allOf:
         - $ref: '#/components/schemas/MedicationDailyUpsert'
         - type: object
-          required: [id, medication_id, recorded_at]
+          required: [medication_id]
           properties:
             id:
-              type: string
+              type: [string, 'null']
               format: uuid
             medication_id:
               type: string
               format: uuid
             recorded_at:
-              type: string
+              type: [string, 'null']
               format: date-time
 
     ThreeStateStats:

@@ -210,7 +210,7 @@ class MedicationDailyRepository(PatientScopedRepository):
 
 class MenstrualCycleRepository(PatientScopedRepository):
     model = MenstrualCycle
-    update_fields = frozenset({"start_date", "end_date", "note"})
+    update_fields = frozenset({"start_date", "end_date", "flow_level", "note", "source_type"})
 
     def get(self, record_id: str) -> MenstrualCycle | None:
         return self.session.scalar(
@@ -221,17 +221,34 @@ class MenstrualCycleRepository(PatientScopedRepository):
             )
         )
 
-    def list(self) -> list[MenstrualCycle]:
+    def list(
+        self,
+        *,
+        from_date: date | None = None,
+        to_date: date | None = None,
+    ) -> list[MenstrualCycle]:
+        statement = select(MenstrualCycle).where(
+            MenstrualCycle.patient_id == self.patient_id,
+            MenstrualCycle.deleted_at.is_(None),
+        )
+        if from_date is not None:
+            statement = statement.where(MenstrualCycle.start_date >= from_date)
+        if to_date is not None:
+            statement = statement.where(MenstrualCycle.start_date <= to_date)
         return list(
             self.session.scalars(
-                select(MenstrualCycle)
-                .where(
-                    MenstrualCycle.patient_id == self.patient_id,
-                    MenstrualCycle.deleted_at.is_(None),
+                statement.order_by(
+                    MenstrualCycle.start_date.desc(),
+                    MenstrualCycle.created_at.desc(),
                 )
-                .order_by(MenstrualCycle.start_date.desc())
             )
         )
+
+    def active(self, cycle_id: str) -> MenstrualCycle | None:
+        cycle = self.get(cycle_id)
+        if cycle is None or cycle.deleted_at is not None:
+            return None
+        return cycle
 
     def update(self, cycle: MenstrualCycle, **changes: Any) -> MenstrualCycle:
         active_cycle = self.get(cycle.id)

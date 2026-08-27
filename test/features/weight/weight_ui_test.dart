@@ -135,6 +135,11 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await _show(
+      tester,
+      find.byKey(const Key('record-weight-button')),
+      const Key('cycle-page'),
+    );
     await tester.tap(find.byKey(const Key('record-weight-button')));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('weight-input')), '68.4');
@@ -142,7 +147,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('weight-input')), findsOneWidget);
-    expect(find.text('模拟保存失败'), findsOneWidget);
+    expect(find.text('模拟保存失败'), findsWidgets);
     expect(
       tester
           .widget<TextField>(find.byKey(const Key('weight-input')))

@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pmos_enclaire/app/pomi_app.dart';
 import 'package:pmos_enclaire/core/network/pomi_api_client.dart';
 import 'package:pmos_enclaire/features/auth/data/auth_repository.dart';
+import 'package:pmos_enclaire/features/cycle/data/cycle_repository.dart';
+import 'package:pmos_enclaire/features/medications/data/medication_repository.dart';
 import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
 import 'package:pmos_enclaire/features/weight/data/weight_repository.dart';
 
@@ -17,6 +19,8 @@ class MainApp extends StatelessWidget {
     this.weightRepository,
     this.apiClient,
     this.now,
+    this.cycleRepository,
+    this.medicationRepository,
     super.key,
   });
 
@@ -25,6 +29,8 @@ class MainApp extends StatelessWidget {
   final WeightRepository? weightRepository;
   final PomiApiClient? apiClient;
   final DateTime Function()? now;
+  final CycleRepository? cycleRepository;
+  final MedicationRepository? medicationRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -35,6 +41,8 @@ class MainApp extends StatelessWidget {
         weightRepository: weightRepository,
         apiClient: apiClient,
         now: now,
+        cycleRepository: cycleRepository,
+        medicationRepository: medicationRepository,
       ),
     );
   }

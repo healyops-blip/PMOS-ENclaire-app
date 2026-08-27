@@ -248,11 +248,12 @@ PUT 允许分步部分更新。请求中的 `complete_onboarding=true` 只有在
 
 `id`、`drug_name`、`normalized_drug_name`、`specification`、`dosage_text`、`dosage_value`、`dosage_unit`、`frequency`、`route`、`start_date`、`end_date`、`current_status`、`source_type`、`source_document_id`、`replaces_medication_id`、`created_at`、`updated_at`。
 
-- `current_status`：`active/paused/stopped/unknown`。
+- `current_status`：`active/paused/stopped`。
 - 新增/编辑请求还包含 `change_reason`、`event_date`、`note`。
 - 停药必须附带 `stop_source`：`written_order/verbal_doctor/patient_self/other`。
-- 后端每次修改生成 `medication_event`，事件类型：`started/adjusted/paused/resumed/stopped`。
-- 剂量或频率调整不能覆盖旧记录：结束旧版本并创建新版本，新版本通过 `replaces_medication_id` 指向旧版本。
+- 后端每次修改生成不可变 `medication_event`，事件类型：`created/adjusted/paused/resumed/stopped`。
+- 剂量或频率调整不得覆盖原记录：旧版本结束生效，新增版本通过 `replaces_medication_id` 关联。
+- `GET /api/medications` 同时返回 `server_date`；Flutter 必须用该业务日期读取月度状态并提交当天状态，不使用设备本地日期判定“今天”。
 
 每日状态请求：
 
@@ -260,7 +261,7 @@ PUT 允许分步部分更新。请求中的 `complete_onboarding=true` 只有在
 |---|---|---:|---|
 | `record_date` | date | 是 | 设备选择日期，后端校验 |
 | `intake_status` | enum | 是 | `taken/missed/unrecorded` |
-唯一键为 `patient_id + medication_id + record_date`，重复 PUT 覆盖当日状态但不创建重复行。
+唯一键为 `patient_id + medication_id + record_date`，重复 PUT 覆盖当日状态但不创建重复行。仅业务当天允许写入；`unrecorded` 删除明确状态行，并按药物生效、暂停、恢复、调整和停用区间动态计算。
 
 ### 5.5 经期与体重
 
