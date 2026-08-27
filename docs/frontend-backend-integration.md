@@ -246,7 +246,8 @@ PUT 允许分步部分更新。请求中的 `complete_onboarding=true` 只有在
 - `current_status`：`active/stopped/unknown`。
 - 新增/编辑请求还包含 `change_reason`、`event_date`、`note`。
 - 停药必须附带 `stop_source`：`written_order/verbal_doctor/patient_self/other`。
-- 后端每次修改生成 `medication_event`，事件类型：`started/adjusted/continued/stopped`。
+- 后端每次修改生成不可变 `medication_event`，事件类型：`created/adjusted/paused/resumed/stopped`。
+- 剂量或频率调整不得覆盖原记录：旧版本结束生效，新增版本通过 `replaces_medication_id` 关联。
 
 每日状态请求：
 
@@ -258,7 +259,7 @@ PUT 允许分步部分更新。请求中的 `complete_onboarding=true` 只有在
 | `actual_dosage_unit` | string/null | 否 | 实际剂量单位 |
 | `note` | string/null | 否 | 最长 500 字 |
 
-唯一键为 `patient_id + medication_id + record_date`，重复 PUT 覆盖当日状态但不创建重复行。
+唯一键为 `patient_id + medication_id + record_date`，重复 PUT 覆盖当日状态但不创建重复行。仅业务当天允许写入；`unrecorded` 删除明确状态行，并按药物生效、暂停、恢复、调整和停用区间动态计算。
 
 ### 5.5 经期与体重
 

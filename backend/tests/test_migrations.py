@@ -40,10 +40,14 @@ def test_initial_migration_is_repeatable_and_safe(tmp_path: Path, monkeypatch: M
 
     account_columns = {column["name"] for column in inspector.get_columns("user_account")}
     session_columns = {column["name"] for column in inspector.get_columns("user_session")}
+    medication_columns = {column["name"] for column in inspector.get_columns("medication")}
+    event_columns = {column["name"] for column in inspector.get_columns("medication_event")}
     assert "password_hash" in account_columns
     assert "password" not in account_columns
     assert "session_hash" in session_columns
     assert "session_id" not in session_columns
+    assert "idempotency_key" in medication_columns
+    assert "stop_source" in event_columns
 
     unique_account_columns = {
         tuple(constraint["column_names"])
@@ -59,7 +63,7 @@ def test_initial_migration_is_repeatable_and_safe(tmp_path: Path, monkeypatch: M
 
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-            "20260827_0021"
+            "20260827_0022"
         )
     command.downgrade(config, "20260826_0001")
     inspector = inspect(engine)

@@ -13,6 +13,7 @@ from pomi_backend.db.models import UserAccount
 from pomi_backend.services import AuthService
 from pomi_backend.services.auth import AuthError
 from pomi_backend.services.documents import DocumentService
+from pomi_backend.services.medications import MedicationService
 from pomi_backend.services.ocr import OCRTaskService
 from pomi_backend.services.patient import PatientProfileService
 
@@ -84,3 +85,18 @@ def get_ocr_task_service(
 
 
 OCRTaskServiceDependency = Annotated[OCRTaskService, Depends(get_ocr_task_service)]
+
+
+def get_medication_service(
+    request: Request,
+    session: DatabaseSession,
+    account: CurrentAccount,
+) -> MedicationService:
+    return MedicationService(
+        session,
+        account,
+        request.app.state.business_date_provider(),
+    )
+
+
+MedicationServiceDependency = Annotated[MedicationService, Depends(get_medication_service)]

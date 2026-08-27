@@ -51,6 +51,24 @@ void main() {
     );
   });
 
+  testWidgets('dashboard uses an explicit action for active missed status', (
+    tester,
+  ) async {
+    _setPhoneViewport(tester);
+    await _loginExistingUser(tester);
+
+    final status = find.byKey(const Key('medication-status-1'));
+    await tester.longPress(status);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('mark-medication-missed')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(of: status, matching: find.text('主动漏服')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('uses account password login and registration without SMS', (
     tester,
   ) async {
