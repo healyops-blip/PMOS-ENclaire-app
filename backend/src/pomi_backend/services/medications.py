@@ -82,6 +82,8 @@ def daily_data(
     medication: Medication,
     record_date: date,
     record: MedicationDaily | None,
+    *,
+    editable: bool,
 ) -> dict[str, Any]:
     return {
         "id": record.id if record is not None else None,
@@ -89,6 +91,8 @@ def daily_data(
         "record_date": record_date.isoformat(),
         "intake_status": record.intake_status if record is not None else "unrecorded",
         "recorded_at": _iso(record.recorded_at) if record is not None else None,
+        "recorded_by_uid": record.recorded_by_uid if record is not None else None,
+        "editable": editable,
     }
 
 
@@ -366,10 +370,21 @@ class MedicationService:
         self, medication_id: str, payload: MedicationDailyUpsert
     ) -> dict[str, Any]:
         medication = self.owned(medication_id)
-        if payload.record_date != self.business_date:
+        editable_from = self.business_date - timedelta(days=6)
+        if payload.record_date < editable_from:
             raise BusinessError(
                 "HISTORICAL_DAILY_STATUS_READ_ONLY",
-                "Only today's medication status can be changed.",
+                "Medication status older than the seven-day edit window is read-only.",
+                409,
+                details={
+                    "business_date": self.business_date.isoformat(),
+                    "editable_from": editable_from.isoformat(),
+                },
+            )
+        if payload.record_date > self.business_date:
+            raise BusinessError(
+                "FUTURE_DAILY_STATUS_NOT_ALLOWED",
+                "Future medication status cannot be recorded.",
                 409,
                 details={"business_date": self.business_date.isoformat()},
             )
@@ -387,7 +402,8 @@ class MedicationService:
             if record is not None:
                 self.session.delete(record)
                 self.session.commit()
-            return daily_data(medication, payload.record_date, None)
+            daily = daily_data(medication, payload.record_date, None, editable=True)
+            return self._daily_mutation_result(daily)
         if record is None:
             record = MedicationDaily(
                 patient_id=medication.patient_id,
@@ -399,8 +415,10 @@ class MedicationService:
             self.session.add(record)
         else:
             if record.intake_status == payload.intake_status:
-                return daily_data(medication, payload.record_date, record)
+                daily = daily_data(medication, payload.record_date, record, editable=True)
+                return self._daily_mutation_result(daily)
             record.intake_status = payload.intake_status
+            record.recorded_by_uid = self.account.uid
             record.recorded_at = utc_now()
         try:
             self.session.commit()
@@ -417,10 +435,21 @@ class MedicationService:
                 raise
             if record.intake_status != payload.intake_status:
                 record.intake_status = payload.intake_status
+                record.recorded_by_uid = self.account.uid
                 record.recorded_at = utc_now()
                 self.session.commit()
         self.session.refresh(record)
-        return daily_data(medication, payload.record_date, record)
+        daily = daily_data(medication, payload.record_date, record, editable=True)
+        return self._daily_mutation_result(daily)
+
+    def _daily_mutation_result(self, daily: dict[str, Any]) -> dict[str, Any]:
+        month_start = self.business_date.replace(day=1)
+        return {
+            **daily,
+            "business_date": self.business_date.isoformat(),
+            "editable_from": (self.business_date - timedelta(days=6)).isoformat(),
+            "month_summary": self.daily_range(month_start, self.business_date),
+        }
 
     def daily_range(
         self,
@@ -454,7 +483,14 @@ class MedicationService:
                     if not self._is_expected(medication, current):
                         continue
                     record = explicit.get((medication.id, current))
-                    item = daily_data(medication, current, record)
+                    item = daily_data(
+                        medication,
+                        current,
+                        record,
+                        editable=self.business_date - timedelta(days=6)
+                        <= current
+                        <= self.business_date,
+                    )
                     items.append(item)
                     counts[item["intake_status"]] += 1
                 current += timedelta(days=1)
@@ -465,6 +501,8 @@ class MedicationService:
             "taken_count": counts["taken"],
             "missed_count": counts["missed"],
             "unrecorded_count": counts["unrecorded"],
+            "business_date": self.business_date.isoformat(),
+            "editable_from": (self.business_date - timedelta(days=6)).isoformat(),
         }
 
     def _is_expected(self, medication: Medication, target: date) -> bool:

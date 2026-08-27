@@ -157,6 +157,23 @@ class _DashboardPageState extends State<DashboardPage> {
     if (selected != null) await _setMedicationStatus(index, selected);
   }
 
+  Future<void> _openMedicationManager() async {
+    if (_dashboardController.offline) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('离线状态不能修改用药')));
+      return;
+    }
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => MedicationPage(
+          initialMedications: _medications,
+          repository: _medicationRepository,
+        ),
+      ),
+    );
+    if (mounted) await _dashboardController.load();
+  }
+
   @override
   void dispose() {
     _dashboardController
@@ -188,23 +205,7 @@ class _DashboardPageState extends State<DashboardPage> {
               weightController: _weightController,
               onStatusTap: _toggleTaken,
               onStatusLongPress: _showStatusActions,
-              onMedicationManage: () async {
-                if (_dashboardController.offline) {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(const SnackBar(content: Text('离线状态不能修改用药')));
-                  return;
-                }
-                await Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => MedicationPage(
-                      initialMedications: _medications,
-                      repository: _medicationRepository,
-                    ),
-                  ),
-                );
-                if (mounted) await _dashboardController.load();
-              },
+              onMedicationManage: _openMedicationManager,
               onReport: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (_) => ReportGeneratorPage(

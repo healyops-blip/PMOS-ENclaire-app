@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:pmos_enclaire/core/theme/pomi_theme.dart';
 import 'package:pmos_enclaire/core/widgets/pomi_surfaces.dart';
 import 'package:pmos_enclaire/features/dashboard/domain/medication.dart';
+import 'package:pmos_enclaire/features/medications/application/medication_history_controller.dart';
 import 'package:pmos_enclaire/features/medications/data/medication_repository.dart';
+import 'package:pmos_enclaire/features/medications/domain/medication_daily_history.dart';
 
 class MedicationPage extends StatefulWidget {
   const MedicationPage({
@@ -23,6 +25,8 @@ class _MedicationPageState extends State<MedicationPage> {
       widget.repository ?? DemoMedicationRepository(widget.initialMedications);
   late List<Medication> _medications = [...widget.initialMedications];
   List<MedicationEvent> _events = const [];
+  MedicationHistoryController? _dailyController;
+  Medication? _dailyMedication;
   bool _loading = false;
 
   @override
@@ -70,6 +74,13 @@ class _MedicationPageState extends State<MedicationPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
+              key: const Key('open-medication-daily-history'),
+              leading: const Icon(Icons.event_available_rounded),
+              title: const Text('每日服用记录'),
+              subtitle: const Text('最近 7 天可补录，更早记录只读'),
+              onTap: () => Navigator.pop(context, 'daily'),
+            ),
+            ListTile(
               leading: const Icon(Icons.history_rounded),
               title: const Text('查看事件时间线'),
               onTap: () => Navigator.pop(context, 'history'),
@@ -103,7 +114,9 @@ class _MedicationPageState extends State<MedicationPage> {
       ),
     );
     if (action == null) return;
-    if (action == 'history') {
+    if (action == 'daily') {
+      await _loadDailyHistory(medication);
+    } else if (action == 'history') {
       await _loadHistory(medication);
     } else if (action == 'adjusted') {
       await _adjust(index, medication);
@@ -154,6 +167,63 @@ class _MedicationPageState extends State<MedicationPage> {
     } catch (error) {
       _showError(error);
     }
+  }
+
+  Future<void> _loadDailyHistory(Medication medication) async {
+    final controller = MedicationHistoryController(
+      repository: _repository,
+      medicationId: medication.id,
+    );
+    try {
+      await controller.load();
+      if (mounted) {
+        _dailyController
+          ?..removeListener(_syncDailyHistory)
+          ..dispose();
+        controller.addListener(_syncDailyHistory);
+        setState(() {
+          _dailyMedication = medication;
+          _dailyController = controller;
+        });
+      }
+    } catch (error) {
+      _showError(error);
+    }
+  }
+
+  void _syncDailyHistory() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _changeDailyStatus(int index, MedicationStatus status) async {
+    final controller = _dailyController;
+    final history = controller?.history;
+    final medication = _dailyMedication;
+    if (_loading || history == null || medication == null) return;
+    final record = history.items[index];
+    if (!record.editable) return;
+    setState(() {
+      _loading = true;
+    });
+    try {
+      await controller!.setStatus(index, status);
+      final refreshed = await _repository.listMedications();
+      if (!mounted) return;
+      setState(() => _medications = refreshed);
+    } catch (error) {
+      if (!mounted) return;
+      _showError(error);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _dailyController
+      ?..removeListener(_syncDailyHistory)
+      ..dispose();
+    super.dispose();
   }
 
   Future<void> _runMutation(Future<void> Function() mutation) async {
@@ -228,6 +298,21 @@ class _MedicationPageState extends State<MedicationPage> {
             const SizedBox(height: 10),
           ],
           const SizedBox(height: 10),
+          PomiSectionTitle(
+            title: _dailyMedication == null
+                ? '每日服用记录'
+                : '${_dailyMedication!.name} · 每日记录',
+          ),
+          const SizedBox(height: 8),
+          PomiSectionCard(
+            child: _dailyController?.history == null
+                ? const Text('从药物菜单打开每日记录，可补录或修改最近 7 天状态。')
+                : _DailyHistoryPanel(
+                    history: _dailyController!.history!,
+                    onChanged: _changeDailyStatus,
+                  ),
+          ),
+          const SizedBox(height: 10),
           const PomiSectionTitle(title: '事件时间线'),
           const SizedBox(height: 8),
           PomiSectionCard(
@@ -248,6 +333,140 @@ class _MedicationPageState extends State<MedicationPage> {
     );
   }
 }
+
+class _DailyHistoryPanel extends StatelessWidget {
+  const _DailyHistoryPanel({required this.history, required this.onChanged});
+
+  final MedicationDailyHistory history;
+  final void Function(int index, MedicationStatus status) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: [
+            PomiPill(
+              label: '已服用 ${history.takenCount}',
+              color: PomiColors.success,
+            ),
+            PomiPill(
+              label: '主动漏服 ${history.missedCount}',
+              color: PomiColors.warning,
+            ),
+            PomiPill(
+              label: '未记录 ${history.unrecordedCount}',
+              color: PomiColors.textMuted,
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '${_shortDate(history.editableFrom)} 至 '
+          '${_shortDate(history.businessDate)} 可修改；更早日期只读。',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 4),
+        for (var index = 0; index < history.items.length; index++)
+          _DailyHistoryRow(
+            key: Key('daily-history-${_dateKey(history.items[index].date)}'),
+            record: history.items[index],
+            last: index == history.items.length - 1,
+            onChanged: (status) => onChanged(index, status),
+          ),
+      ],
+    );
+  }
+}
+
+class _DailyHistoryRow extends StatelessWidget {
+  const _DailyHistoryRow({
+    required this.record,
+    required this.last,
+    required this.onChanged,
+    super.key,
+  });
+
+  final MedicationDailyRecord record;
+  final bool last;
+  final ValueChanged<MedicationStatus> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color) = switch (record.status) {
+      MedicationStatus.taken => ('已服用', PomiColors.success),
+      MedicationStatus.missed => ('主动漏服', PomiColors.warning),
+      MedicationStatus.unrecorded => ('未记录', PomiColors.textMuted),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        border: last
+            ? null
+            : const Border(bottom: BorderSide(color: Color(0x126A4C93))),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 76,
+            child: Text(
+              _shortDate(record.date),
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(color: color, fontWeight: FontWeight.w600),
+            ),
+          ),
+          if (record.editable)
+            PopupMenuButton<MedicationStatus>(
+              key: Key('edit-daily-${_dateKey(record.date)}'),
+              tooltip: '修改当日状态',
+              onSelected: onChanged,
+              itemBuilder: (_) => const [
+                PopupMenuItem(
+                  value: MedicationStatus.taken,
+                  child: Text('已服用'),
+                ),
+                PopupMenuItem(
+                  value: MedicationStatus.missed,
+                  child: Text('主动漏服'),
+                ),
+                PopupMenuItem(
+                  value: MedicationStatus.unrecorded,
+                  child: Text('撤销为未记录'),
+                ),
+              ],
+              child: const PomiPill(label: '可修改', color: PomiColors.primary),
+            )
+          else
+            const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.lock_outline_rounded, size: 14),
+                SizedBox(width: 3),
+                Text('只读', style: TextStyle(fontSize: 11)),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+String _shortDate(DateTime date) =>
+    '${date.month.toString().padLeft(2, '0')}-'
+    '${date.day.toString().padLeft(2, '0')}';
+
+String _dateKey(DateTime date) =>
+    '${date.year.toString().padLeft(4, '0')}-'
+    '${date.month.toString().padLeft(2, '0')}-'
+    '${date.day.toString().padLeft(2, '0')}';
 
 class _MedicationDraft {
   const _MedicationDraft({

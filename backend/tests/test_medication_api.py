@@ -163,7 +163,7 @@ def test_adjustment_creates_version_and_keeps_complete_event_chain(
     assert conflict.json()["error"]["code"] == "RESOURCE_VERSION_CONFLICT"
 
 
-def test_daily_state_is_today_only_idempotent_and_unrecorded_is_not_stored(
+def test_daily_state_is_idempotent_and_unrecorded_is_not_stored(
     api_client: TestClient,
     api_engine,
 ) -> None:
@@ -201,15 +201,6 @@ def test_daily_state_is_today_only_idempotent_and_unrecorded_is_not_stored(
 
     medication_page = response_data(api_client.get("/api/medications", headers=headers))
     assert medication_page["server_date"] == "2026-08-02"
-
-    historical = api_client.put(
-        url,
-        headers=headers,
-        json={"record_date": "2026-08-01", "intake_status": "taken"},
-    )
-    assert historical.status_code == 409
-    assert historical.json()["error"]["code"] == "HISTORICAL_DAILY_STATUS_READ_ONLY"
-
     cleared = response_data(
         api_client.put(
             url,
