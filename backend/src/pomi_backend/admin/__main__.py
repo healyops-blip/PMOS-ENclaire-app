@@ -8,6 +8,7 @@ import os
 from collections.abc import Sequence
 
 from pomi_backend.admin.accounts import AccountNotFound, reset_password, seed_initial_accounts
+from pomi_backend.admin.health_seed import seed_health_data
 from pomi_backend.config import Settings
 from pomi_backend.db import build_engine, build_session_factory
 from pomi_backend.services.security import PasswordManager
@@ -27,6 +28,9 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser(
         "seed-accounts", help="Idempotently create initial and returning accounts"
+    )
+    subparsers.add_parser(
+        "seed-health", help="Idempotently create synthetic health records for seeded accounts"
     )
     reset_parser = subparsers.add_parser(
         "reset-password", help="Reset one account password and revoke all Sessions"
@@ -67,6 +71,31 @@ def main(argv: Sequence[str] | None = None) -> int:
                         f"{result.account_name}: {action}; "
                         f"uid={result.uid}; onboarding_completed={result.onboarding_completed}"
                     )
+                return 0
+
+            if args.command == "seed-health":
+                from pomi_backend.repositories import AuthRepository
+
+                repository = AuthRepository(session)
+                first_time = repository.get_account_by_name(
+                    os.getenv("POMI_FIRST_TIME_ACCOUNT_NAME", "first-time-user")
+                )
+                returning = repository.get_account_by_name(
+                    os.getenv("POMI_RETURNING_ACCOUNT_NAME", "returning-user")
+                )
+                if first_time is None or returning is None:
+                    raise ValueError("run pomi-admin seed-accounts before seed-health")
+                result = seed_health_data(
+                    session,
+                    new_account_uid=first_time.uid,
+                    returning_account_uid=returning.uid,
+                )
+                print(
+                    "Health seed completed; "
+                    f"new_patient_id={result.new_patient_id}; "
+                    f"returning_patient_id={result.returning_patient_id}; "
+                    f"created_rows={result.created_rows}"
+                )
                 return 0
 
             revoked_count = reset_password(

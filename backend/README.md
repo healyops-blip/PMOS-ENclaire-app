@@ -72,10 +72,14 @@ terminal echo unless the corresponding one-shot environment variable is set.
 
 ```bash
 pomi-admin seed-accounts
+pomi-admin seed-health
 pomi-admin reset-password ACCOUNT_NAME
 ```
 
 `seed-accounts` idempotently creates `first-time-user` and `returning-user`.
+`seed-health` keeps the first-time user's health records empty and idempotently
+adds synthetic medications, events, daily statuses, cycles, and weights for the
+returning user. Run it only after `seed-accounts`.
 `reset-password` changes the hash and revokes every active Session for the
 account. Neither operation is exposed as an HTTP endpoint.
 
