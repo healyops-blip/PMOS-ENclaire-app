@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pmos_enclaire/features/auth/data/auth_repository.dart';
+import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/main.dart';
 
 void main() {
@@ -179,52 +180,66 @@ void main() {
     expect(find.text('演示认证'), findsOneWidget);
   });
 
-  testWidgets('upload flow reaches OCR confirmation and reconciliation', (
+  testWidgets(
+    'document upload requires preview and external-processing consent',
+    (tester) async {
+      _setPhoneViewport(tester);
+      await _loginExistingUser(tester);
+
+      await tester.tap(find.byKey(const Key('upload-button')));
+      await tester.pumpAndSettle();
+      expect(find.text('选择材料类型'), findsOneWidget);
+      expect(find.text('化验／检测'), findsOneWidget);
+      expect(find.text('医嘱／处方'), findsOneWidget);
+      expect(find.text('影像文字报告'), findsOneWidget);
+      expect(find.text('门诊病历／就诊记录'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('material-type-prescription')));
+      await tester.pumpAndSettle();
+      expect(find.text('上传医嘱'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('upload-demo-option')));
+      await tester.pumpAndSettle();
+      expect(find.text('确认材料预览'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('confirm-document-preview')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('confirm-external-ocr')));
+      await tester.pumpAndSettle();
+      expect(find.text('医嘱已安全保存，可在材料列表查看'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('nav-记录')));
+      await tester.pumpAndSettle();
+      expect(find.text('pomi-demo-material.png'), findsOneWidget);
+    },
+  );
+
+  testWidgets('declining external processing creates no upload request', (
     tester,
   ) async {
     _setPhoneViewport(tester);
-    await _loginExistingUser(tester);
+    final repository = _UploadCountingDocumentRepository();
+    await tester.pumpWidget(
+      MainApp(
+        authRepository: const DemoAuthRepository(),
+        documentRepository: repository,
+      ),
+    );
+    await tester.tap(find.byKey(const Key('demo-login-button')));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('upload-button')));
     await tester.pumpAndSettle();
-    expect(find.text('选择材料类型'), findsOneWidget);
-    expect(find.text('化验／检测'), findsOneWidget);
-    expect(find.text('医嘱／处方'), findsOneWidget);
-    expect(find.text('影像文字报告'), findsOneWidget);
-    expect(find.text('门诊病历／就诊记录'), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('material-type-prescription')));
+    await tester.tap(find.byKey(const Key('material-type-laboratory')));
     await tester.pumpAndSettle();
-    expect(find.text('上传医嘱'), findsOneWidget);
-
     await tester.tap(find.byKey(const Key('upload-demo-option')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('confirm-external-ocr')));
+    await tester.tap(find.byKey(const Key('confirm-document-preview')));
     await tester.pumpAndSettle();
-    await tester.pump(const Duration(milliseconds: 900));
-    expect(find.text('识别完成'), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('ocr-review-button')));
+    await tester.tap(find.byKey(const Key('decline-external-ocr')));
     await tester.pumpAndSettle();
-    expect(find.text('待确认草稿 · 医嘱'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('confirm-draft-盐酸二甲双胍缓释片')));
-    await tester.tap(find.byKey(const Key('confirm-draft-肌醇')));
-    await tester.pump();
-
-    final confirmOcr = find.byKey(const Key('confirm-ocr-button'));
-    await tester.ensureVisible(confirmOcr);
-    await tester.tap(confirmOcr);
-    await tester.pumpAndSettle();
-    expect(find.text('用药对账'), findsOneWidget);
-
-    final confirmReconciliation = find.byKey(
-      const Key('confirm-reconciliation-button'),
-    );
-    await tester.ensureVisible(confirmReconciliation);
-    await tester.tap(confirmReconciliation);
-    await tester.pumpAndSettle();
-    expect(find.text('材料已确认，用药清单已更新'), findsOneWidget);
+    expect(repository.uploadRequests, 0);
+    expect(find.byKey(const Key('document-upload-progress')), findsNothing);
   });
 
   testWidgets('dashboard generates the three-layer report UI', (tester) async {
@@ -278,4 +293,26 @@ Future<void> _loginExistingUser(WidgetTester tester) async {
   await tester.tap(find.byKey(const Key('demo-login-button')));
   await tester.pumpAndSettle();
   expect(find.byKey(const Key('dashboard-page')), findsOneWidget);
+}
+
+class _UploadCountingDocumentRepository extends DemoDocumentRepository {
+  int uploadRequests = 0;
+
+  @override
+  Future<MedicalDocument> upload({
+    required SelectedDocumentFile file,
+    required String documentType,
+    required String consentVersion,
+    required String idempotencyKey,
+    required void Function(int sent, int total) onProgress,
+  }) {
+    uploadRequests++;
+    return super.upload(
+      file: file,
+      documentType: documentType,
+      consentVersion: consentVersion,
+      idempotencyKey: idempotencyKey,
+      onProgress: onProgress,
+    );
+  }
 }

@@ -11,6 +11,7 @@ import 'package:pmos_enclaire/features/dashboard/presentation/dashboard_page.dar
 import 'package:pmos_enclaire/features/medications/data/medication_repository.dart';
 import 'package:pmos_enclaire/features/onboarding/presentation/onboarding_page.dart';
 import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
+import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/weight/data/weight_repository.dart';
 
 abstract final class PomiRoutes {
@@ -23,6 +24,7 @@ class PomiApp extends StatefulWidget {
   const PomiApp({
     this.authRepository,
     this.profileRepository,
+    this.documentRepository,
     this.weightRepository,
     this.apiClient,
     this.now,
@@ -33,6 +35,7 @@ class PomiApp extends StatefulWidget {
 
   final AuthRepository? authRepository;
   final PatientProfileRepository? profileRepository;
+  final DocumentRepository? documentRepository;
   final WeightRepository? weightRepository;
   final PomiApiClient? apiClient;
   final DateTime Function()? now;
@@ -53,6 +56,11 @@ class _PomiAppState extends State<PomiApp> {
       (widget.authRepository is DemoAuthRepository
           ? DemoPatientProfileRepository()
           : FastApiPatientProfileRepository(_apiClient));
+  late final DocumentRepository _documentRepository =
+      widget.documentRepository ??
+      (widget.authRepository is DemoAuthRepository
+          ? DemoDocumentRepository()
+          : FastApiDocumentRepository(_apiClient));
   late final WeightRepository _weightRepository =
       widget.weightRepository ??
       (widget.authRepository is DemoAuthRepository
@@ -122,6 +130,7 @@ class _PomiAppState extends State<PomiApp> {
           return DashboardPage(
             account: account,
             profileRepository: _profileRepository,
+            documentRepository: _documentRepository,
             weightRepository: _weightRepository,
             now: widget.now,
             cycleRepository: _cycleRepository,

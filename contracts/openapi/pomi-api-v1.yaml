@@ -570,15 +570,6 @@ paths:
           in: query
           schema:
             $ref: '#/components/schemas/DocumentType'
-        - name: encounter_id
-          in: query
-          schema:
-            type: string
-            format: uuid
-        - name: upload_status
-          in: query
-          schema:
-            $ref: '#/components/schemas/UploadStatus'
         - $ref: '#/components/parameters/Cursor'
         - $ref: '#/components/parameters/Limit'
       responses:
@@ -612,9 +603,6 @@ paths:
                   format: binary
                 document_type:
                   $ref: '#/components/schemas/DocumentType'
-                encounter_id:
-                  type: [string, 'null']
-                  format: uuid
                 external_processing_consent_version:
                   type: [string, 'null']
                   maxLength: 40
@@ -709,7 +697,7 @@ paths:
           multipart/form-data:
             schema:
               type: object
-              required: [file, replacement_reason]
+              required: [file, replacement_reason, expected_current_revision_id]
               properties:
                 file:
                   type: string
@@ -761,6 +749,14 @@ paths:
                 type: string
           content:
             image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            application/pdf:
               schema:
                 type: string
                 format: binary
@@ -2223,7 +2219,7 @@ components:
 
     UploadStatus:
       type: string
-      enum: [uploaded, processing, ready, failed, deleted]
+      enum: [uploaded, ready, failed, deleted]
 
     Document:
       type: object
@@ -2234,9 +2230,6 @@ components:
           format: uuid
         patient_id:
           type: string
-          format: uuid
-        encounter_id:
-          type: [string, 'null']
           format: uuid
         document_type:
           $ref: '#/components/schemas/DocumentType'
@@ -2291,6 +2284,15 @@ components:
           pattern: '^[a-f0-9]{64}$'
         file_size_bytes:
           type: integer
+        mime_type:
+          type: string
+          enum: [image/jpeg, image/png, application/pdf]
+        pixel_count:
+          type: [integer, 'null']
+          maximum: 25000000
+        page_count:
+          type: integer
+          const: 1
         replaced_revision_id:
           type: [string, 'null']
           format: uuid

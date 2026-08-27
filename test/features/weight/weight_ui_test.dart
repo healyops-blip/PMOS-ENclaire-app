@@ -9,6 +9,7 @@ import 'package:pmos_enclaire/features/auth/domain/account.dart';
 import 'package:pmos_enclaire/features/auth/domain/demo_account.dart';
 import 'package:pmos_enclaire/features/dashboard/presentation/dashboard_page.dart';
 import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
+import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/weight/application/weight_controller.dart';
 import 'package:pmos_enclaire/features/weight/data/weight_repository.dart';
 import 'package:pmos_enclaire/features/weight/domain/weight_record.dart';
@@ -30,6 +31,7 @@ void main() {
         home: DashboardPage(
           account: DemoAccount.existingUser,
           profileRepository: DemoPatientProfileRepository(),
+          documentRepository: DemoDocumentRepository(),
           weightRepository: repository,
           now: () => DateTime(2031, 2, 18),
         ),
@@ -100,6 +102,7 @@ void main() {
         home: DashboardPage(
           account: DemoAccount.newUser,
           profileRepository: DemoPatientProfileRepository(),
+          documentRepository: DemoDocumentRepository(),
           weightRepository: MemoryWeightRepository(),
         ),
       ),

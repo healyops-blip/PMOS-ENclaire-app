@@ -13,6 +13,7 @@ import 'package:pmos_enclaire/features/profile/presentation/profile_page.dart';
 import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
 import 'package:pmos_enclaire/features/records/presentation/records_page.dart';
 import 'package:pmos_enclaire/features/records/presentation/upload_flow.dart';
+import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/reports/presentation/report_page.dart';
 import 'package:pmos_enclaire/features/weight/application/weight_controller.dart';
 import 'package:pmos_enclaire/features/weight/data/weight_repository.dart';
@@ -21,6 +22,7 @@ class DashboardPage extends StatefulWidget {
   const DashboardPage({
     required this.account,
     required this.profileRepository,
+    required this.documentRepository,
     required this.weightRepository,
     this.now,
     this.cycleRepository,
@@ -30,6 +32,7 @@ class DashboardPage extends StatefulWidget {
 
   final DemoAccount account;
   final PatientProfileRepository profileRepository;
+  final DocumentRepository documentRepository;
   final WeightRepository weightRepository;
   final DateTime Function()? now;
   final CycleRepository? cycleRepository;
@@ -41,6 +44,7 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   int _selectedTab = 0;
+  int _recordsVersion = 0;
   late final WeightController _weightController;
   late List<Medication> _medications = widget.medicationRepository == null
       ? const [
@@ -209,7 +213,10 @@ class _DashboardPageState extends State<DashboardPage> {
               weightController: _weightController,
               now: widget.now,
             ),
-            const RecordsPage(),
+            RecordsPage(
+              key: ValueKey(_recordsVersion),
+              repository: widget.documentRepository,
+            ),
             ProfilePage(
               account: widget.account,
               repository: widget.profileRepository,
@@ -219,7 +226,11 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       floatingActionButton: FloatingActionButton(
         key: const Key('upload-button'),
-        onPressed: () => showUploadFlow(context),
+        onPressed: () => showUploadFlow(
+          context,
+          repository: widget.documentRepository,
+          onUploaded: () => setState(() => _recordsVersion++),
+        ),
         backgroundColor: PomiColors.primary,
         foregroundColor: Colors.white,
         shape: const CircleBorder(),

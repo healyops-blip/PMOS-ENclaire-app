@@ -288,13 +288,15 @@ PUT 允许分步部分更新。请求中的 `complete_onboarding=true` 只有在
 - `imaging_text_report`
 - `outpatient_record`
 
-上传使用 `multipart/form-data`：`file`、`document_type`、可选 `encounter_id`、可选 `external_processing_consent_version`。
+上传使用 `multipart/form-data`：`file`、`document_type`、可选 `external_processing_consent_version`，并在 Header 发送 8–128 字符的 `Idempotency-Key`。提示版本发生实质变化后 Flutter 必须重新确认；拒绝时不得发送上传请求。
 
-材料响应字段：`id`、`patient_id`、`encounter_id`、`document_type`、`original_file_name`、`mime_type`、`file_size_bytes`、`pixel_count`、`page_count`、`file_hash`、`upload_status`、`current_revision_id`、`uploaded_at`、`deleted_at`。
+材料响应字段：`id`、`patient_id`、`document_type`、`original_file_name`、`mime_type`、`file_size_bytes`、`pixel_count`、`page_count`、`file_hash`、`upload_status`、`current_revision_id`、`uploaded_at`、`updated_at`、`deleted_at`、`purge_after`。
 
-修订字段：`id`、`document_id`、`revision_number`、`file_hash`、`file_size_bytes`、`replaced_revision_id`、`replacement_reason`、`is_current`、`created_at`。
+修订字段：`id`、`document_id`、`revision_number`、`file_hash`、`file_size_bytes`、`mime_type`、`pixel_count`、`page_count`、`replaced_revision_id`、`replacement_reason`、`is_current`、`created_at`。替换请求还必须发送 `expected_current_revision_id` 和新的 `Idempotency-Key`，过期版本返回 `RESOURCE_VERSION_CONFLICT`。
 
-替换文件必须创建新修订；OCR 字段纠错不创建文件修订。软删除后普通列表立即不可见，但已被报告快照引用的修订继续可追溯。
+替换文件必须创建新修订；OCR 字段纠错不创建文件修订。软删除响应包含 `document_id`、`deleted_at`、`purge_after` 和 `retained_revision_ids`，之后普通列表立即不可见。`pomi-admin purge-documents` 只清理超过 7 天且未被报告快照引用的物理文件，审计元数据继续保留。
+
+客户端与服务端共同限制 JPG/JPEG/PNG/单页 PDF、20 MiB 和 25MP。文件下载只通过带 Session 的私有接口，响应使用 `Cache-Control: private, no-store`、SHA-256 `ETag` 和 `X-Content-Type-Options: nosniff`，不能拼接静态 URL。
 
 ### 5.7 OCR 任务与四类草稿
 
