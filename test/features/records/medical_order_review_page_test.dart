@@ -191,6 +191,17 @@ class _Gateway implements OcrRepository, MedicalOrderGateway {
   Future<OcrTask> retry(String taskId) async => _task;
 
   @override
+  Future<OcrFallbackEligibility> fallbackEligibility(String taskId) =>
+      throw UnimplementedError();
+
+  @override
+  Future<OcrTask> useFallback(
+    String taskId, {
+    required bool accept,
+    required String dataVersion,
+  }) => throw UnimplementedError();
+
+  @override
   Future<LabConfirmationResult> confirmLab({
     required String taskId,
     required String resultId,

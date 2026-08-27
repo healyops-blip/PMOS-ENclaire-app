@@ -62,7 +62,7 @@ Future<void> showUploadFlow(
 
   SelectedDocumentFile? file;
   try {
-    file = await _pickMaterial(source);
+    file = await _pickMaterial(source, type);
     if (file == null) return;
     if (source != _UploadSource.demo) await validateSelectedDocument(file);
   } on DocumentFailure catch (error) {
@@ -135,11 +135,14 @@ Future<void> showUploadFlow(
   );
 }
 
-Future<SelectedDocumentFile?> _pickMaterial(_UploadSource source) async {
+Future<SelectedDocumentFile?> _pickMaterial(
+  _UploadSource source,
+  MedicalMaterialType type,
+) async {
   if (source == _UploadSource.demo) {
-    final data = await rootBundle.load('assets/images/pomi_logo.png');
+    final data = await rootBundle.load('assets/demo/${type.apiValue}.png');
     return SelectedDocumentFile(
-      name: 'pomi-demo-material.png',
+      name: 'pomi-demo-${type.apiValue}.png',
       bytes: data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
     );
   }

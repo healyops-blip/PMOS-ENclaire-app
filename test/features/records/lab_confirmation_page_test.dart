@@ -179,6 +179,17 @@ class _LabRepository implements OcrRepository {
   Future<OcrTask> retry(String taskId) => throw UnimplementedError();
 
   @override
+  Future<OcrFallbackEligibility> fallbackEligibility(String taskId) =>
+      throw UnimplementedError();
+
+  @override
+  Future<OcrTask> useFallback(
+    String taskId, {
+    required bool accept,
+    required String dataVersion,
+  }) => throw UnimplementedError();
+
+  @override
   Future<List<int>> sourceFile(OcrTask task) async => const [];
 
   @override

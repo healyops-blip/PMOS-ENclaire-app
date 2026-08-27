@@ -1,0 +1,2702 @@
+[
+  {
+    "sample_id": "lab_report-01",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 101,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 01",
+        "report_date": "2026-07-01",
+        "items": [
+          {
+            "name": "LH",
+            "value": 4.1,
+            "unit": "IU/L"
+          }
+        ]
+      },
+      "fields": [
+        {
+          "path": "items.0.name",
+          "source_text": "LH",
+          "value": "LH",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "items.0.value",
+          "source_text": "4.1",
+          "value": 4.1,
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "items.0.unit",
+          "source_text": "IU/L",
+          "value": "IU/L",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "report_date",
+          "source_text": "2026-07-01",
+          "value": "2026-07-01",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "facility",
+          "source_text": "POMI SYNTHETIC CLINIC 01",
+          "value": "POMI SYNTHETIC CLINIC 01",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "lab_report-02",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 102,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 02",
+        "report_date": "2026-07-02",
+        "items": [
+          {
+            "name": "LH",
+            "value": 4.2,
+            "unit": "IU/L"
+          }
+        ]
+      },
+      "fields": [
+        {
+          "path": "items.0.name",
+          "source_text": "LH",
+          "value": "LH",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "items.0.value",
+          "source_text": "4.2",
+          "value": 4.2,
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "items.0.unit",
+          "source_text": "IU/L",
+          "value": "IU/L",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "report_date",
+          "source_text": "2026-07-02",
+          "value": "2026-07-02",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "facility",
+          "source_text": "POMI SYNTHETIC CLINIC 02",
+          "value": "POMI SYNTHETIC CLINIC 02",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "lab_report-03",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 103,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 03",
+        "report_date": "2026-07-03",
+        "items": [
+          {
+            "name": "LH",
+            "value": 4.3,
+            "unit": "IU/L"
+          }
+        ]
+      },
+      "fields": [
+        {
+          "path": "items.0.name",
+          "source_text": "LH",
+          "value": "LH",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "items.0.value",
+          "source_text": "4.3",
+          "value": 4.3,
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "items.0.unit",
+          "source_text": "IU/L",
+          "value": "IU/L",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "report_date",
+          "source_text": "2026-07-03",
+          "value": "2026-07-03",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "facility",
+          "source_text": "POMI SYNTHETIC CLINIC 03",
+          "value": "POMI SYNTHETIC CLINIC 03",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "lab_report-04",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 104,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 04",
+        "report_date": "2026-07-04",
+        "items": [
+          {
+            "name": "LH",
+            "value": 4.4,
+            "unit": "IU/L"
+          }
+        ]
+      },
+      "fields": [
+        {
+          "path": "items.0.name",
+          "source_text": "LH",
+          "value": "LH",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "items.0.value",
+          "source_text": "4.4",
+          "value": 4.4,
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "items.0.unit",
+          "source_text": "IU/L",
+          "value": "IU/L",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "report_date",
+          "source_text": "2026-07-04",
+          "value": "2026-07-04",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "facility",
+          "source_text": "POMI SYNTHETIC CLINIC 04",
+          "value": "POMI SYNTHETIC CLINIC 04",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "lab_report-05",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 105,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 05",
+        "report_date": "2026-07-05",
+        "items": [
+          {
+            "name": "LH",
+            "value": 4.5,
+            "unit": "IU/L"
+          }
+        ]
+      },
+      "fields": [
+        {
+          "path": "items.0.name",
+          "source_text": "LH",
+          "value": "LH",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "items.0.value",
+          "source_text": "4.5",
+          "value": 4.5,
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "items.0.unit",
+          "source_text": "IU/L",
+          "value": "IU/L",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "report_date",
+          "source_text": "2026-07-05",
+          "value": "2026-07-05",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "facility",
+          "source_text": "POMI SYNTHETIC CLINIC 05",
+          "value": "POMI SYNTHETIC CLINIC 05",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "lab_report-06",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 106,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 06",
+        "report_date": "2026-07-06",
+        "items": [
+          {
+            "name": "LH",
+            "value": 4.6,
+            "unit": "IU/L"
+          }
+        ]
+      },
+      "fields": [
+        {
+          "path": "items.0.name",
+          "source_text": "LH",
+          "value": "LH",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "items.0.value",
+          "source_text": "4.6",
+          "value": 4.6,
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "items.0.unit",
+          "source_text": "IU/L",
+          "value": "IU/L",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "report_date",
+          "source_text": "2026-07-06",
+          "value": "2026-07-06",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "facility",
+          "source_text": "POMI SYNTHETIC CLINIC 06",
+          "value": "POMI SYNTHETIC CLINIC 06",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "lab_report-07",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 107,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 07",
+        "report_date": "2026-07-07",
+        "items": [
+          {
+            "name": "LH",
+            "value": 4.7,
+            "unit": "IU/L"
+          }
+        ]
+      },
+      "fields": [
+        {
+          "path": "items.0.name",
+          "source_text": "LH",
+          "value": "LH",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "items.0.value",
+          "source_text": "4.7",
+          "value": 4.7,
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "items.0.unit",
+          "source_text": "IU/L",
+          "value": "IU/L",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "report_date",
+          "source_text": "2026-07-07",
+          "value": "2026-07-07",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "facility",
+          "source_text": "POMI SYNTHETIC CLINIC 07",
+          "value": "POMI SYNTHETIC CLINIC 07",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "lab_report-08",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 108,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 08",
+        "report_date": "2026-07-08",
+        "items": [
+          {
+            "name": "LH",
+            "value": 4.8,
+            "unit": "IU/L"
+          }
+        ]
+      },
+      "fields": [
+        {
+          "path": "items.0.name",
+          "source_text": "LH",
+          "value": "LH",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "items.0.value",
+          "source_text": "4.8",
+          "value": 4.8,
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "items.0.unit",
+          "source_text": "IU/L",
+          "value": "IU/L",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "report_date",
+          "source_text": "2026-07-08",
+          "value": "2026-07-08",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "facility",
+          "source_text": "POMI SYNTHETIC CLINIC 08",
+          "value": "POMI SYNTHETIC CLINIC 08",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "lab_report-09",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 109,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 09",
+        "report_date": "2026-07-09",
+        "items": [
+          {
+            "name": "LH",
+            "value": 4.9,
+            "unit": "IU/L"
+          }
+        ]
+      },
+      "fields": [
+        {
+          "path": "items.0.name",
+          "source_text": "LH",
+          "value": "LH",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "items.0.value",
+          "source_text": "4.9",
+          "value": 4.9,
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "items.0.unit",
+          "source_text": "IU/L",
+          "value": "IU/L",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "report_date",
+          "source_text": "2026-07-09",
+          "value": "2026-07-09",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "facility",
+          "source_text": "POMI SYNTHETIC CLINIC 09",
+          "value": "POMI SYNTHETIC CLINIC 09",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "lab_report-10",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 110,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 10",
+        "report_date": "2026-07-10",
+        "items": [
+          {
+            "name": "LH",
+            "value": 5.0,
+            "unit": "IU/L"
+          }
+        ]
+      },
+      "fields": [
+        {
+          "path": "items.0.name",
+          "source_text": "LH",
+          "value": "LH",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "items.0.value",
+          "source_text": "5.0",
+          "value": 5.0,
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "items.0.unit",
+          "source_text": "IU/L",
+          "value": "IU/L",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "report_date",
+          "source_text": "2026-07-10",
+          "value": "2026-07-10",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "facility",
+          "source_text": "POMI SYNTHETIC CLINIC 10",
+          "value": "POMI SYNTHETIC CLINIC 10",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "medical_order-01",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 101,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 01",
+        "order_date": "2026-07-01",
+        "order_text": "METFORMIN-1 500 mg twice daily",
+        "medications": [
+          {
+            "drug_name": "METFORMIN-1",
+            "specification": "500 mg/tablet",
+            "dosage_value": 500,
+            "dosage_unit": "mg",
+            "frequency": "twice daily",
+            "course": "28 days",
+            "route": "oral",
+            "instructions": "Take after meals",
+            "raw_order_text": "METFORMIN-1 500 mg twice daily",
+            "explicitly_stopped": false
+          }
+        ]
+      },
+      "fields": [
+        {
+          "path": "medications.0.drug_name",
+          "source_text": "METFORMIN-1",
+          "value": "METFORMIN-1",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.dosage_value",
+          "source_text": "500",
+          "value": 500,
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.dosage_unit",
+          "source_text": "mg",
+          "value": "mg",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.frequency",
+          "source_text": "twice daily",
+          "value": "twice daily",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "order_date",
+          "source_text": "2026-07-01",
+          "value": "2026-07-01",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.route",
+          "source_text": "oral",
+          "value": "oral",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "medical_order-02",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 102,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 02",
+        "order_date": "2026-07-02",
+        "order_text": "METFORMIN-2 500 mg twice daily",
+        "medications": [
+          {
+            "drug_name": "METFORMIN-2",
+            "specification": "500 mg/tablet",
+            "dosage_value": 500,
+            "dosage_unit": "mg",
+            "frequency": "twice daily",
+            "course": "28 days",
+            "route": "oral",
+            "instructions": "Take after meals",
+            "raw_order_text": "METFORMIN-2 500 mg twice daily",
+            "explicitly_stopped": false
+          }
+        ]
+      },
+      "fields": [
+        {
+          "path": "medications.0.drug_name",
+          "source_text": "METFORMIN-2",
+          "value": "METFORMIN-2",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.dosage_value",
+          "source_text": "500",
+          "value": 500,
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.dosage_unit",
+          "source_text": "mg",
+          "value": "mg",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.frequency",
+          "source_text": "twice daily",
+          "value": "twice daily",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "order_date",
+          "source_text": "2026-07-02",
+          "value": "2026-07-02",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.route",
+          "source_text": "oral",
+          "value": "oral",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "medical_order-03",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 103,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 03",
+        "order_date": "2026-07-03",
+        "order_text": "METFORMIN-3 500 mg twice daily",
+        "medications": [
+          {
+            "drug_name": "METFORMIN-3",
+            "specification": "500 mg/tablet",
+            "dosage_value": 500,
+            "dosage_unit": "mg",
+            "frequency": "twice daily",
+            "course": "28 days",
+            "route": "oral",
+            "instructions": "Take after meals",
+            "raw_order_text": "METFORMIN-3 500 mg twice daily",
+            "explicitly_stopped": false
+          }
+        ]
+      },
+      "fields": [
+        {
+          "path": "medications.0.drug_name",
+          "source_text": "METFORMIN-3",
+          "value": "METFORMIN-3",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.dosage_value",
+          "source_text": "500",
+          "value": 500,
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.dosage_unit",
+          "source_text": "mg",
+          "value": "mg",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.frequency",
+          "source_text": "twice daily",
+          "value": "twice daily",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "order_date",
+          "source_text": "2026-07-03",
+          "value": "2026-07-03",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.route",
+          "source_text": "oral",
+          "value": "oral",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "medical_order-04",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 104,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 04",
+        "order_date": "2026-07-04",
+        "order_text": "METFORMIN-4 500 mg twice daily",
+        "medications": [
+          {
+            "drug_name": "METFORMIN-4",
+            "specification": "500 mg/tablet",
+            "dosage_value": 500,
+            "dosage_unit": "mg",
+            "frequency": "twice daily",
+            "course": "28 days",
+            "route": "oral",
+            "instructions": "Take after meals",
+            "raw_order_text": "METFORMIN-4 500 mg twice daily",
+            "explicitly_stopped": false
+          }
+        ]
+      },
+      "fields": [
+        {
+          "path": "medications.0.drug_name",
+          "source_text": "METFORMIN-4",
+          "value": "METFORMIN-4",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.dosage_value",
+          "source_text": "500",
+          "value": 500,
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.dosage_unit",
+          "source_text": "mg",
+          "value": "mg",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.frequency",
+          "source_text": "twice daily",
+          "value": "twice daily",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "order_date",
+          "source_text": "2026-07-04",
+          "value": "2026-07-04",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.route",
+          "source_text": "oral",
+          "value": "oral",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "medical_order-05",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 105,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 05",
+        "order_date": "2026-07-05",
+        "order_text": "METFORMIN-5 500 mg twice daily",
+        "medications": [
+          {
+            "drug_name": "METFORMIN-5",
+            "specification": "500 mg/tablet",
+            "dosage_value": 500,
+            "dosage_unit": "mg",
+            "frequency": "twice daily",
+            "course": "28 days",
+            "route": "oral",
+            "instructions": "Take after meals",
+            "raw_order_text": "METFORMIN-5 500 mg twice daily",
+            "explicitly_stopped": false
+          }
+        ]
+      },
+      "fields": [
+        {
+          "path": "medications.0.drug_name",
+          "source_text": "METFORMIN-5",
+          "value": "METFORMIN-5",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.dosage_value",
+          "source_text": "500",
+          "value": 500,
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.dosage_unit",
+          "source_text": "mg",
+          "value": "mg",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.frequency",
+          "source_text": "twice daily",
+          "value": "twice daily",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "order_date",
+          "source_text": "2026-07-05",
+          "value": "2026-07-05",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.route",
+          "source_text": "oral",
+          "value": "oral",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "medical_order-06",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 106,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 06",
+        "order_date": "2026-07-06",
+        "order_text": "METFORMIN-6 500 mg twice daily",
+        "medications": [
+          {
+            "drug_name": "METFORMIN-6",
+            "specification": "500 mg/tablet",
+            "dosage_value": 500,
+            "dosage_unit": "mg",
+            "frequency": "twice daily",
+            "course": "28 days",
+            "route": "oral",
+            "instructions": "Take after meals",
+            "raw_order_text": "METFORMIN-6 500 mg twice daily",
+            "explicitly_stopped": false
+          }
+        ]
+      },
+      "fields": [
+        {
+          "path": "medications.0.drug_name",
+          "source_text": "METFORMIN-6",
+          "value": "METFORMIN-6",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.dosage_value",
+          "source_text": "500",
+          "value": 500,
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.dosage_unit",
+          "source_text": "mg",
+          "value": "mg",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.frequency",
+          "source_text": "twice daily",
+          "value": "twice daily",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "order_date",
+          "source_text": "2026-07-06",
+          "value": "2026-07-06",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.route",
+          "source_text": "oral",
+          "value": "oral",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "medical_order-07",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 107,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 07",
+        "order_date": "2026-07-07",
+        "order_text": "METFORMIN-7 500 mg twice daily",
+        "medications": [
+          {
+            "drug_name": "METFORMIN-7",
+            "specification": "500 mg/tablet",
+            "dosage_value": 500,
+            "dosage_unit": "mg",
+            "frequency": "twice daily",
+            "course": "28 days",
+            "route": "oral",
+            "instructions": "Take after meals",
+            "raw_order_text": "METFORMIN-7 500 mg twice daily",
+            "explicitly_stopped": false
+          }
+        ]
+      },
+      "fields": [
+        {
+          "path": "medications.0.drug_name",
+          "source_text": "METFORMIN-7",
+          "value": "METFORMIN-7",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.dosage_value",
+          "source_text": "500",
+          "value": 500,
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.dosage_unit",
+          "source_text": "mg",
+          "value": "mg",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.frequency",
+          "source_text": "twice daily",
+          "value": "twice daily",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "order_date",
+          "source_text": "2026-07-07",
+          "value": "2026-07-07",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.route",
+          "source_text": "oral",
+          "value": "oral",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "medical_order-08",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 108,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 08",
+        "order_date": "2026-07-08",
+        "order_text": "METFORMIN-8 500 mg twice daily",
+        "medications": [
+          {
+            "drug_name": "METFORMIN-8",
+            "specification": "500 mg/tablet",
+            "dosage_value": 500,
+            "dosage_unit": "mg",
+            "frequency": "twice daily",
+            "course": "28 days",
+            "route": "oral",
+            "instructions": "Take after meals",
+            "raw_order_text": "METFORMIN-8 500 mg twice daily",
+            "explicitly_stopped": false
+          }
+        ]
+      },
+      "fields": [
+        {
+          "path": "medications.0.drug_name",
+          "source_text": "METFORMIN-8",
+          "value": "METFORMIN-8",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.dosage_value",
+          "source_text": "500",
+          "value": 500,
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.dosage_unit",
+          "source_text": "mg",
+          "value": "mg",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.frequency",
+          "source_text": "twice daily",
+          "value": "twice daily",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "order_date",
+          "source_text": "2026-07-08",
+          "value": "2026-07-08",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.route",
+          "source_text": "oral",
+          "value": "oral",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "medical_order-09",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 109,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 09",
+        "order_date": "2026-07-09",
+        "order_text": "METFORMIN-9 500 mg twice daily",
+        "medications": [
+          {
+            "drug_name": "METFORMIN-9",
+            "specification": "500 mg/tablet",
+            "dosage_value": 500,
+            "dosage_unit": "mg",
+            "frequency": "twice daily",
+            "course": "28 days",
+            "route": "oral",
+            "instructions": "Take after meals",
+            "raw_order_text": "METFORMIN-9 500 mg twice daily",
+            "explicitly_stopped": false
+          }
+        ]
+      },
+      "fields": [
+        {
+          "path": "medications.0.drug_name",
+          "source_text": "METFORMIN-9",
+          "value": "METFORMIN-9",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.dosage_value",
+          "source_text": "500",
+          "value": 500,
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.dosage_unit",
+          "source_text": "mg",
+          "value": "mg",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.frequency",
+          "source_text": "twice daily",
+          "value": "twice daily",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "order_date",
+          "source_text": "2026-07-09",
+          "value": "2026-07-09",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.route",
+          "source_text": "oral",
+          "value": "oral",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "medical_order-10",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 110,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 10",
+        "order_date": "2026-07-10",
+        "order_text": "METFORMIN-10 500 mg twice daily",
+        "medications": [
+          {
+            "drug_name": "METFORMIN-10",
+            "specification": "500 mg/tablet",
+            "dosage_value": 500,
+            "dosage_unit": "mg",
+            "frequency": "twice daily",
+            "course": "28 days",
+            "route": "oral",
+            "instructions": "Take after meals",
+            "raw_order_text": "METFORMIN-10 500 mg twice daily",
+            "explicitly_stopped": false
+          }
+        ]
+      },
+      "fields": [
+        {
+          "path": "medications.0.drug_name",
+          "source_text": "METFORMIN-10",
+          "value": "METFORMIN-10",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.dosage_value",
+          "source_text": "500",
+          "value": 500,
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.dosage_unit",
+          "source_text": "mg",
+          "value": "mg",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.frequency",
+          "source_text": "twice daily",
+          "value": "twice daily",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "order_date",
+          "source_text": "2026-07-10",
+          "value": "2026-07-10",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medications.0.route",
+          "source_text": "oral",
+          "value": "oral",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "imaging_text_report-01",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 101,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 01",
+        "examination_name": "Pelvic ultrasound",
+        "body_part": "Pelvis",
+        "examination_date": "2026-07-01",
+        "report_date": "2026-07-01",
+        "modality": "US",
+        "findings": "Synthetic finding 1: bilateral ovaries visualized.",
+        "impression": "Synthetic impression 1: no acute finding."
+      },
+      "fields": [
+        {
+          "path": "examination_name",
+          "source_text": "Pelvic ultrasound",
+          "value": "Pelvic ultrasound",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "findings",
+          "source_text": "Synthetic finding 1: bilateral ovaries visualized.",
+          "value": "Synthetic finding 1: bilateral ovaries visualized.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "impression",
+          "source_text": "Synthetic impression 1: no acute finding.",
+          "value": "Synthetic impression 1: no acute finding.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "examination_date",
+          "source_text": "2026-07-01",
+          "value": "2026-07-01",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "modality",
+          "source_text": "US",
+          "value": "US",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "imaging_text_report-02",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 102,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 02",
+        "examination_name": "Pelvic ultrasound",
+        "body_part": "Pelvis",
+        "examination_date": "2026-07-02",
+        "report_date": "2026-07-02",
+        "modality": "US",
+        "findings": "Synthetic finding 2: bilateral ovaries visualized.",
+        "impression": "Synthetic impression 2: no acute finding."
+      },
+      "fields": [
+        {
+          "path": "examination_name",
+          "source_text": "Pelvic ultrasound",
+          "value": "Pelvic ultrasound",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "findings",
+          "source_text": "Synthetic finding 2: bilateral ovaries visualized.",
+          "value": "Synthetic finding 2: bilateral ovaries visualized.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "impression",
+          "source_text": "Synthetic impression 2: no acute finding.",
+          "value": "Synthetic impression 2: no acute finding.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "examination_date",
+          "source_text": "2026-07-02",
+          "value": "2026-07-02",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "modality",
+          "source_text": "US",
+          "value": "US",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "imaging_text_report-03",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 103,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 03",
+        "examination_name": "Pelvic ultrasound",
+        "body_part": "Pelvis",
+        "examination_date": "2026-07-03",
+        "report_date": "2026-07-03",
+        "modality": "US",
+        "findings": "Synthetic finding 3: bilateral ovaries visualized.",
+        "impression": "Synthetic impression 3: no acute finding."
+      },
+      "fields": [
+        {
+          "path": "examination_name",
+          "source_text": "Pelvic ultrasound",
+          "value": "Pelvic ultrasound",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "findings",
+          "source_text": "Synthetic finding 3: bilateral ovaries visualized.",
+          "value": "Synthetic finding 3: bilateral ovaries visualized.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "impression",
+          "source_text": "Synthetic impression 3: no acute finding.",
+          "value": "Synthetic impression 3: no acute finding.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "examination_date",
+          "source_text": "2026-07-03",
+          "value": "2026-07-03",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "modality",
+          "source_text": "US",
+          "value": "US",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "imaging_text_report-04",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 104,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 04",
+        "examination_name": "Pelvic ultrasound",
+        "body_part": "Pelvis",
+        "examination_date": "2026-07-04",
+        "report_date": "2026-07-04",
+        "modality": "US",
+        "findings": "Synthetic finding 4: bilateral ovaries visualized.",
+        "impression": "Synthetic impression 4: no acute finding."
+      },
+      "fields": [
+        {
+          "path": "examination_name",
+          "source_text": "Pelvic ultrasound",
+          "value": "Pelvic ultrasound",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "findings",
+          "source_text": "Synthetic finding 4: bilateral ovaries visualized.",
+          "value": "Synthetic finding 4: bilateral ovaries visualized.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "impression",
+          "source_text": "Synthetic impression 4: no acute finding.",
+          "value": "Synthetic impression 4: no acute finding.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "examination_date",
+          "source_text": "2026-07-04",
+          "value": "2026-07-04",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "modality",
+          "source_text": "US",
+          "value": "US",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "imaging_text_report-05",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 105,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 05",
+        "examination_name": "Pelvic ultrasound",
+        "body_part": "Pelvis",
+        "examination_date": "2026-07-05",
+        "report_date": "2026-07-05",
+        "modality": "US",
+        "findings": "Synthetic finding 5: bilateral ovaries visualized.",
+        "impression": "Synthetic impression 5: no acute finding."
+      },
+      "fields": [
+        {
+          "path": "examination_name",
+          "source_text": "Pelvic ultrasound",
+          "value": "Pelvic ultrasound",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "findings",
+          "source_text": "Synthetic finding 5: bilateral ovaries visualized.",
+          "value": "Synthetic finding 5: bilateral ovaries visualized.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "impression",
+          "source_text": "Synthetic impression 5: no acute finding.",
+          "value": "Synthetic impression 5: no acute finding.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "examination_date",
+          "source_text": "2026-07-05",
+          "value": "2026-07-05",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "modality",
+          "source_text": "US",
+          "value": "US",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "imaging_text_report-06",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 106,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 06",
+        "examination_name": "Pelvic ultrasound",
+        "body_part": "Pelvis",
+        "examination_date": "2026-07-06",
+        "report_date": "2026-07-06",
+        "modality": "US",
+        "findings": "Synthetic finding 6: bilateral ovaries visualized.",
+        "impression": "Synthetic impression 6: no acute finding."
+      },
+      "fields": [
+        {
+          "path": "examination_name",
+          "source_text": "Pelvic ultrasound",
+          "value": "Pelvic ultrasound",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "findings",
+          "source_text": "Synthetic finding 6: bilateral ovaries visualized.",
+          "value": "Synthetic finding 6: bilateral ovaries visualized.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "impression",
+          "source_text": "Synthetic impression 6: no acute finding.",
+          "value": "Synthetic impression 6: no acute finding.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "examination_date",
+          "source_text": "2026-07-06",
+          "value": "2026-07-06",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "modality",
+          "source_text": "US",
+          "value": "US",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "imaging_text_report-07",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 107,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 07",
+        "examination_name": "Pelvic ultrasound",
+        "body_part": "Pelvis",
+        "examination_date": "2026-07-07",
+        "report_date": "2026-07-07",
+        "modality": "US",
+        "findings": "Synthetic finding 7: bilateral ovaries visualized.",
+        "impression": "Synthetic impression 7: no acute finding."
+      },
+      "fields": [
+        {
+          "path": "examination_name",
+          "source_text": "Pelvic ultrasound",
+          "value": "Pelvic ultrasound",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "findings",
+          "source_text": "Synthetic finding 7: bilateral ovaries visualized.",
+          "value": "Synthetic finding 7: bilateral ovaries visualized.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "impression",
+          "source_text": "Synthetic impression 7: no acute finding.",
+          "value": "Synthetic impression 7: no acute finding.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "examination_date",
+          "source_text": "2026-07-07",
+          "value": "2026-07-07",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "modality",
+          "source_text": "US",
+          "value": "US",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "imaging_text_report-08",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 108,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 08",
+        "examination_name": "Pelvic ultrasound",
+        "body_part": "Pelvis",
+        "examination_date": "2026-07-08",
+        "report_date": "2026-07-08",
+        "modality": "US",
+        "findings": "Synthetic finding 8: bilateral ovaries visualized.",
+        "impression": "Synthetic impression 8: no acute finding."
+      },
+      "fields": [
+        {
+          "path": "examination_name",
+          "source_text": "Pelvic ultrasound",
+          "value": "Pelvic ultrasound",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "findings",
+          "source_text": "Synthetic finding 8: bilateral ovaries visualized.",
+          "value": "Synthetic finding 8: bilateral ovaries visualized.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "impression",
+          "source_text": "Synthetic impression 8: no acute finding.",
+          "value": "Synthetic impression 8: no acute finding.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "examination_date",
+          "source_text": "2026-07-08",
+          "value": "2026-07-08",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "modality",
+          "source_text": "US",
+          "value": "US",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "imaging_text_report-09",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 109,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 09",
+        "examination_name": "Pelvic ultrasound",
+        "body_part": "Pelvis",
+        "examination_date": "2026-07-09",
+        "report_date": "2026-07-09",
+        "modality": "US",
+        "findings": "Synthetic finding 9: bilateral ovaries visualized.",
+        "impression": "Synthetic impression 9: no acute finding."
+      },
+      "fields": [
+        {
+          "path": "examination_name",
+          "source_text": "Pelvic ultrasound",
+          "value": "Pelvic ultrasound",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "findings",
+          "source_text": "Synthetic finding 9: bilateral ovaries visualized.",
+          "value": "Synthetic finding 9: bilateral ovaries visualized.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "impression",
+          "source_text": "Synthetic impression 9: no acute finding.",
+          "value": "Synthetic impression 9: no acute finding.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "examination_date",
+          "source_text": "2026-07-09",
+          "value": "2026-07-09",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "modality",
+          "source_text": "US",
+          "value": "US",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "imaging_text_report-10",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 110,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 10",
+        "examination_name": "Pelvic ultrasound",
+        "body_part": "Pelvis",
+        "examination_date": "2026-07-10",
+        "report_date": "2026-07-10",
+        "modality": "US",
+        "findings": "Synthetic finding 10: bilateral ovaries visualized.",
+        "impression": "Synthetic impression 10: no acute finding."
+      },
+      "fields": [
+        {
+          "path": "examination_name",
+          "source_text": "Pelvic ultrasound",
+          "value": "Pelvic ultrasound",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "findings",
+          "source_text": "Synthetic finding 10: bilateral ovaries visualized.",
+          "value": "Synthetic finding 10: bilateral ovaries visualized.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "impression",
+          "source_text": "Synthetic impression 10: no acute finding.",
+          "value": "Synthetic impression 10: no acute finding.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "examination_date",
+          "source_text": "2026-07-10",
+          "value": "2026-07-10",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "modality",
+          "source_text": "US",
+          "value": "US",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "outpatient_record-01",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 101,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 01",
+        "department": "Endocrinology",
+        "doctor_name": "Demo Doctor 1",
+        "visit_date": "2026-07-01",
+        "chief_complaint": "Irregular cycles",
+        "diagnosis_summary": "Synthetic diagnosis 1: irregular cycle.",
+        "treatment_plan": "Record symptoms",
+        "medical_advice": "Synthetic advice 1: follow up in four weeks."
+      },
+      "fields": [
+        {
+          "path": "visit_date",
+          "source_text": "2026-07-01",
+          "value": "2026-07-01",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "diagnosis_summary",
+          "source_text": "Synthetic diagnosis 1: irregular cycle.",
+          "value": "Synthetic diagnosis 1: irregular cycle.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medical_advice",
+          "source_text": "Synthetic advice 1: follow up in four weeks.",
+          "value": "Synthetic advice 1: follow up in four weeks.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "department",
+          "source_text": "Endocrinology",
+          "value": "Endocrinology",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "facility",
+          "source_text": "POMI SYNTHETIC CLINIC 01",
+          "value": "POMI SYNTHETIC CLINIC 01",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "outpatient_record-02",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 102,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 02",
+        "department": "Endocrinology",
+        "doctor_name": "Demo Doctor 2",
+        "visit_date": "2026-07-02",
+        "chief_complaint": "Irregular cycles",
+        "diagnosis_summary": "Synthetic diagnosis 2: irregular cycle.",
+        "treatment_plan": "Record symptoms",
+        "medical_advice": "Synthetic advice 2: follow up in four weeks."
+      },
+      "fields": [
+        {
+          "path": "visit_date",
+          "source_text": "2026-07-02",
+          "value": "2026-07-02",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "diagnosis_summary",
+          "source_text": "Synthetic diagnosis 2: irregular cycle.",
+          "value": "Synthetic diagnosis 2: irregular cycle.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medical_advice",
+          "source_text": "Synthetic advice 2: follow up in four weeks.",
+          "value": "Synthetic advice 2: follow up in four weeks.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "department",
+          "source_text": "Endocrinology",
+          "value": "Endocrinology",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "facility",
+          "source_text": "POMI SYNTHETIC CLINIC 02",
+          "value": "POMI SYNTHETIC CLINIC 02",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "outpatient_record-03",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 103,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 03",
+        "department": "Endocrinology",
+        "doctor_name": "Demo Doctor 3",
+        "visit_date": "2026-07-03",
+        "chief_complaint": "Irregular cycles",
+        "diagnosis_summary": "Synthetic diagnosis 3: irregular cycle.",
+        "treatment_plan": "Record symptoms",
+        "medical_advice": "Synthetic advice 3: follow up in four weeks."
+      },
+      "fields": [
+        {
+          "path": "visit_date",
+          "source_text": "2026-07-03",
+          "value": "2026-07-03",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "diagnosis_summary",
+          "source_text": "Synthetic diagnosis 3: irregular cycle.",
+          "value": "Synthetic diagnosis 3: irregular cycle.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medical_advice",
+          "source_text": "Synthetic advice 3: follow up in four weeks.",
+          "value": "Synthetic advice 3: follow up in four weeks.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "department",
+          "source_text": "Endocrinology",
+          "value": "Endocrinology",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "facility",
+          "source_text": "POMI SYNTHETIC CLINIC 03",
+          "value": "POMI SYNTHETIC CLINIC 03",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "outpatient_record-04",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 104,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 04",
+        "department": "Endocrinology",
+        "doctor_name": "Demo Doctor 4",
+        "visit_date": "2026-07-04",
+        "chief_complaint": "Irregular cycles",
+        "diagnosis_summary": "Synthetic diagnosis 4: irregular cycle.",
+        "treatment_plan": "Record symptoms",
+        "medical_advice": "Synthetic advice 4: follow up in four weeks."
+      },
+      "fields": [
+        {
+          "path": "visit_date",
+          "source_text": "2026-07-04",
+          "value": "2026-07-04",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "diagnosis_summary",
+          "source_text": "Synthetic diagnosis 4: irregular cycle.",
+          "value": "Synthetic diagnosis 4: irregular cycle.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medical_advice",
+          "source_text": "Synthetic advice 4: follow up in four weeks.",
+          "value": "Synthetic advice 4: follow up in four weeks.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "department",
+          "source_text": "Endocrinology",
+          "value": "Endocrinology",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "facility",
+          "source_text": "POMI SYNTHETIC CLINIC 04",
+          "value": "POMI SYNTHETIC CLINIC 04",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "outpatient_record-05",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 105,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 05",
+        "department": "Endocrinology",
+        "doctor_name": "Demo Doctor 5",
+        "visit_date": "2026-07-05",
+        "chief_complaint": "Irregular cycles",
+        "diagnosis_summary": "Synthetic diagnosis 5: irregular cycle.",
+        "treatment_plan": "Record symptoms",
+        "medical_advice": "Synthetic advice 5: follow up in four weeks."
+      },
+      "fields": [
+        {
+          "path": "visit_date",
+          "source_text": "2026-07-05",
+          "value": "2026-07-05",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "diagnosis_summary",
+          "source_text": "Synthetic diagnosis 5: irregular cycle.",
+          "value": "Synthetic diagnosis 5: irregular cycle.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medical_advice",
+          "source_text": "Synthetic advice 5: follow up in four weeks.",
+          "value": "Synthetic advice 5: follow up in four weeks.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "department",
+          "source_text": "Endocrinology",
+          "value": "Endocrinology",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "facility",
+          "source_text": "POMI SYNTHETIC CLINIC 05",
+          "value": "POMI SYNTHETIC CLINIC 05",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "outpatient_record-06",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 106,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 06",
+        "department": "Endocrinology",
+        "doctor_name": "Demo Doctor 6",
+        "visit_date": "2026-07-06",
+        "chief_complaint": "Irregular cycles",
+        "diagnosis_summary": "Synthetic diagnosis 6: irregular cycle.",
+        "treatment_plan": "Record symptoms",
+        "medical_advice": "Synthetic advice 6: follow up in four weeks."
+      },
+      "fields": [
+        {
+          "path": "visit_date",
+          "source_text": "2026-07-06",
+          "value": "2026-07-06",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "diagnosis_summary",
+          "source_text": "Synthetic diagnosis 6: irregular cycle.",
+          "value": "Synthetic diagnosis 6: irregular cycle.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medical_advice",
+          "source_text": "Synthetic advice 6: follow up in four weeks.",
+          "value": "Synthetic advice 6: follow up in four weeks.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "department",
+          "source_text": "Endocrinology",
+          "value": "Endocrinology",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "facility",
+          "source_text": "POMI SYNTHETIC CLINIC 06",
+          "value": "POMI SYNTHETIC CLINIC 06",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "outpatient_record-07",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 107,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 07",
+        "department": "Endocrinology",
+        "doctor_name": "Demo Doctor 7",
+        "visit_date": "2026-07-07",
+        "chief_complaint": "Irregular cycles",
+        "diagnosis_summary": "Synthetic diagnosis 7: irregular cycle.",
+        "treatment_plan": "Record symptoms",
+        "medical_advice": "Synthetic advice 7: follow up in four weeks."
+      },
+      "fields": [
+        {
+          "path": "visit_date",
+          "source_text": "2026-07-07",
+          "value": "2026-07-07",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "diagnosis_summary",
+          "source_text": "Synthetic diagnosis 7: irregular cycle.",
+          "value": "Synthetic diagnosis 7: irregular cycle.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medical_advice",
+          "source_text": "Synthetic advice 7: follow up in four weeks.",
+          "value": "Synthetic advice 7: follow up in four weeks.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "department",
+          "source_text": "Endocrinology",
+          "value": "Endocrinology",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "facility",
+          "source_text": "POMI SYNTHETIC CLINIC 07",
+          "value": "POMI SYNTHETIC CLINIC 07",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "outpatient_record-08",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 108,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 08",
+        "department": "Endocrinology",
+        "doctor_name": "Demo Doctor 8",
+        "visit_date": "2026-07-08",
+        "chief_complaint": "Irregular cycles",
+        "diagnosis_summary": "Synthetic diagnosis 8: irregular cycle.",
+        "treatment_plan": "Record symptoms",
+        "medical_advice": "Synthetic advice 8: follow up in four weeks."
+      },
+      "fields": [
+        {
+          "path": "visit_date",
+          "source_text": "2026-07-08",
+          "value": "2026-07-08",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "diagnosis_summary",
+          "source_text": "Synthetic diagnosis 8: irregular cycle.",
+          "value": "Synthetic diagnosis 8: irregular cycle.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medical_advice",
+          "source_text": "Synthetic advice 8: follow up in four weeks.",
+          "value": "Synthetic advice 8: follow up in four weeks.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "department",
+          "source_text": "Endocrinology",
+          "value": "Endocrinology",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "facility",
+          "source_text": "POMI SYNTHETIC CLINIC 08",
+          "value": "POMI SYNTHETIC CLINIC 08",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "outpatient_record-09",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 109,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 09",
+        "department": "Endocrinology",
+        "doctor_name": "Demo Doctor 9",
+        "visit_date": "2026-07-09",
+        "chief_complaint": "Irregular cycles",
+        "diagnosis_summary": "Synthetic diagnosis 9: irregular cycle.",
+        "treatment_plan": "Record symptoms",
+        "medical_advice": "Synthetic advice 9: follow up in four weeks."
+      },
+      "fields": [
+        {
+          "path": "visit_date",
+          "source_text": "2026-07-09",
+          "value": "2026-07-09",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "diagnosis_summary",
+          "source_text": "Synthetic diagnosis 9: irregular cycle.",
+          "value": "Synthetic diagnosis 9: irregular cycle.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medical_advice",
+          "source_text": "Synthetic advice 9: follow up in four weeks.",
+          "value": "Synthetic advice 9: follow up in four weeks.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "department",
+          "source_text": "Endocrinology",
+          "value": "Endocrinology",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "facility",
+          "source_text": "POMI SYNTHETIC CLINIC 09",
+          "value": "POMI SYNTHETIC CLINIC 09",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "outpatient_record-10",
+    "source": "qwen3-vl-offline-perfect-fixture",
+    "status": "succeeded",
+    "duration_ms": 110,
+    "model": "offline-test-double",
+    "prompt_version": "pomi-ocr-v1",
+    "schema_version": "pomi-ocr-schema-v1",
+    "payload": {
+      "draft": {
+        "facility": "POMI SYNTHETIC CLINIC 10",
+        "department": "Endocrinology",
+        "doctor_name": "Demo Doctor 10",
+        "visit_date": "2026-07-10",
+        "chief_complaint": "Irregular cycles",
+        "diagnosis_summary": "Synthetic diagnosis 10: irregular cycle.",
+        "treatment_plan": "Record symptoms",
+        "medical_advice": "Synthetic advice 10: follow up in four weeks."
+      },
+      "fields": [
+        {
+          "path": "visit_date",
+          "source_text": "2026-07-10",
+          "value": "2026-07-10",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "diagnosis_summary",
+          "source_text": "Synthetic diagnosis 10: irregular cycle.",
+          "value": "Synthetic diagnosis 10: irregular cycle.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "medical_advice",
+          "source_text": "Synthetic advice 10: follow up in four weeks.",
+          "value": "Synthetic advice 10: follow up in four weeks.",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "department",
+          "source_text": "Endocrinology",
+          "value": "Endocrinology",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        },
+        {
+          "path": "facility",
+          "source_text": "POMI SYNTHETIC CLINIC 10",
+          "value": "POMI SYNTHETIC CLINIC 10",
+          "confidence": 1.0,
+          "uncertainty_reason": null,
+          "source_region": null
+        }
+      ]
+    }
+  }
+]

@@ -19,6 +19,8 @@ class MedicalDocument {
     this.pixelCount,
     this.pageCount = 1,
     this.fileHash = '',
+    this.latestOcrResultSource,
+    this.latestOcrFallbackVersion,
   });
 
   final String id;
@@ -31,8 +33,11 @@ class MedicalDocument {
   final String fileHash;
   final String currentRevisionId;
   final DateTime uploadedAt;
+  final String? latestOcrResultSource;
+  final String? latestOcrFallbackVersion;
 
   bool get isPdf => mimeType == 'application/pdf';
+  bool get usesOcrFallback => latestOcrResultSource == 'fallback';
 
   factory MedicalDocument.fromJson(Map<String, dynamic> json) =>
       MedicalDocument(
@@ -45,6 +50,9 @@ class MedicalDocument {
         pageCount: json['page_count'] as int? ?? 1,
         fileHash: json['file_hash'] as String? ?? '',
         currentRevisionId: json['current_revision_id'] as String,
+        latestOcrResultSource: json['latest_ocr_result_source'] as String?,
+        latestOcrFallbackVersion:
+            json['latest_ocr_fallback_version'] as String?,
         uploadedAt: DateTime.parse(json['uploaded_at'] as String),
       );
 }

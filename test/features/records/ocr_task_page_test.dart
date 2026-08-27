@@ -64,9 +64,50 @@ void main() {
     await tester.pump();
     expect(repository.retryCalls, 1);
   });
+
+  testWidgets(
+    'exact demo fallback requires an explicit choice and stays marked',
+    (tester) async {
+      final repository = _SequenceRepository(const [])
+        ..createValue = _task(
+          OcrTaskStatus.failed,
+          category: 'provider_unavailable',
+        )
+        ..fallbackValue = const OcrFallbackEligibility(
+          eligible: true,
+          reason: 'exact_match',
+          dataVersion: 'pomi-demo-fallback-v1',
+        );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: OcrTaskPage(repository: repository, document: _document),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(find.byKey(const Key('ocr-fallback-button')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('ocr-fallback-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('decline-ocr-fallback')));
+      await tester.pumpAndSettle();
+      expect(repository.fallbackChoices, [false]);
+      expect(find.byKey(const Key('ocr-retry-button')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('ocr-fallback-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('accept-ocr-fallback')));
+      await tester.pumpAndSettle();
+      expect(repository.fallbackChoices, [false, true]);
+      expect(find.byKey(const Key('ocr-fallback-badge')), findsOneWidget);
+      expect(find.byKey(const Key('ocr-confirmation-entry')), findsOneWidget);
+    },
+  );
 }
 
-OcrTask _task(OcrTaskStatus status, {String? category}) => OcrTask(
+OcrTask _task(
+  OcrTaskStatus status, {
+  String? category,
+  bool fallback = false,
+}) => OcrTask(
   id: 'task-1',
   documentId: 'doc-1',
   documentRevisionId: 'rev-1',
@@ -74,6 +115,14 @@ OcrTask _task(OcrTaskStatus status, {String? category}) => OcrTask(
   status: status,
   attemptNumber: 1,
   providerAttempts: 1,
+  resultSource: fallback ? 'fallback' : null,
+  fallback: fallback
+      ? const OcrFallbackAudit(
+          dataVersion: 'pomi-demo-fallback-v1',
+          triggerCategory: 'provider_unavailable',
+          triggerCode: 'OCR_UNAVAILABLE',
+        )
+      : null,
   error: category == null
       ? null
       : OcrTaskFailure(
@@ -99,6 +148,11 @@ class _SequenceRepository implements OcrRepository {
   OcrTask? createValue;
   int getCalls = 0;
   int retryCalls = 0;
+  OcrFallbackEligibility fallbackValue = const OcrFallbackEligibility(
+    eligible: false,
+    reason: 'file_not_registered',
+  );
+  final List<bool> fallbackChoices = [];
 
   @override
   Future<OcrTask> create({
@@ -123,6 +177,22 @@ class _SequenceRepository implements OcrRepository {
   Future<OcrTask> retry(String taskId) async {
     retryCalls += 1;
     return _task(OcrTaskStatus.queued);
+  }
+
+  @override
+  Future<OcrFallbackEligibility> fallbackEligibility(String taskId) async =>
+      fallbackValue;
+
+  @override
+  Future<OcrTask> useFallback(
+    String taskId, {
+    required bool accept,
+    required String dataVersion,
+  }) async {
+    fallbackChoices.add(accept);
+    return accept
+        ? _task(OcrTaskStatus.pendingConfirmation, fallback: true)
+        : _task(OcrTaskStatus.failed, category: 'provider_unavailable');
   }
 
   @override

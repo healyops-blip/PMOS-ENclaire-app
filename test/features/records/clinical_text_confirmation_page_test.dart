@@ -208,6 +208,17 @@ class _ClinicalRepository implements OcrRepository {
   Future<OcrTask> retry(String taskId) => throw UnimplementedError();
 
   @override
+  Future<OcrFallbackEligibility> fallbackEligibility(String taskId) =>
+      throw UnimplementedError();
+
+  @override
+  Future<OcrTask> useFallback(
+    String taskId, {
+    required bool accept,
+    required String dataVersion,
+  }) => throw UnimplementedError();
+
+  @override
   Future<LabConfirmationResult> confirmLab({
     required String taskId,
     required String resultId,

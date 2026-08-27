@@ -35,6 +35,7 @@ def test_initial_migration_is_repeatable_and_safe(tmp_path: Path, monkeypatch: M
         "medication_reconciliation_item",
         "menstrual_cycle",
         "ocr_field_result",
+        "ocr_fallback_use",
         "ocr_result",
         "ocr_task",
         "outpatient_record",
@@ -69,7 +70,7 @@ def test_initial_migration_is_repeatable_and_safe(tmp_path: Path, monkeypatch: M
 
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-            "20260827_0024_merge"
+            "20260827_0025"
         )
     command.downgrade(config, "20260826_0001")
     inspector = inspect(engine)

@@ -23,6 +23,7 @@ from pomi_backend.schemas.clinical_text import (
     ImagingTextConfirmation,
     OutpatientConfirmation,
 )
+from pomi_backend.services.ocr_fallback import mark_fallback_confirmed
 
 
 def _record_data(record: ImagingReport | OutpatientRecord, task: OCRTask) -> dict[str, Any]:
@@ -98,6 +99,7 @@ class ClinicalTextConfirmationService:
                 self.records.add_imaging(record)
             else:
                 self.records.add_outpatient(record)
+            self.session.flush()
             result.user_modified_data = payload.confirmed_data
             result.confirmed_data = confirmed.model_dump(mode="json")
             decisions = {item.field_path: item for item in payload.field_confirmations}
@@ -117,6 +119,12 @@ class ClinicalTextConfirmationService:
                         "accepted" if value == field.parsed_value else "corrected"
                     )
             task.status = "confirmed"
+            mark_fallback_confirmed(
+                self.session,
+                task,
+                uid=self.account.uid,
+                confirmed_at=record.confirmed_at,
+            )
             self.session.commit()
             self.session.refresh(record)
             return {**_record_data(record, task), "reused": False}

@@ -1,0 +1,2082 @@
+[
+  {
+    "sample_id": "lab_report-01",
+    "material_type": "lab_report",
+    "file": "samples/lab_report-01.png",
+    "sha256": "7386657b8caea45de4425904e32039271d8312720df07fcac63e8cc6eca5bc07",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.items.0.name",
+        "expected": "LH",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.items.0.value",
+        "expected": 4.1,
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.items.0.unit",
+        "expected": "IU/L",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.report_date",
+        "expected": "2026-07-01",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.facility",
+        "expected": "POMI SYNTHETIC CLINIC 01",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "lab_report-02",
+    "material_type": "lab_report",
+    "file": "samples/lab_report-02.png",
+    "sha256": "075d455940957b782788cf11e82841fd4685bd6624eb15ecd80c8b2acd56b190",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.items.0.name",
+        "expected": "LH",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.items.0.value",
+        "expected": 4.2,
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.items.0.unit",
+        "expected": "IU/L",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.report_date",
+        "expected": "2026-07-02",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.facility",
+        "expected": "POMI SYNTHETIC CLINIC 02",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "lab_report-03",
+    "material_type": "lab_report",
+    "file": "samples/lab_report-03.png",
+    "sha256": "6dd9363f960d19aa7d27e566924919a3f977e1f0e6afa19e04a25b3ae0b6e755",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.items.0.name",
+        "expected": "LH",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.items.0.value",
+        "expected": 4.3,
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.items.0.unit",
+        "expected": "IU/L",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.report_date",
+        "expected": "2026-07-03",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.facility",
+        "expected": "POMI SYNTHETIC CLINIC 03",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "lab_report-04",
+    "material_type": "lab_report",
+    "file": "samples/lab_report-04.png",
+    "sha256": "971739ae74b0ebe1f89beedfd2b13db7a1dee4922db5497ab089442153211098",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.items.0.name",
+        "expected": "LH",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.items.0.value",
+        "expected": 4.4,
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.items.0.unit",
+        "expected": "IU/L",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.report_date",
+        "expected": "2026-07-04",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.facility",
+        "expected": "POMI SYNTHETIC CLINIC 04",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "lab_report-05",
+    "material_type": "lab_report",
+    "file": "samples/lab_report-05.png",
+    "sha256": "288a3ef81bb073f106a29dc9d637deb106e0eaab17f35357791a0431a749df11",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.items.0.name",
+        "expected": "LH",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.items.0.value",
+        "expected": 4.5,
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.items.0.unit",
+        "expected": "IU/L",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.report_date",
+        "expected": "2026-07-05",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.facility",
+        "expected": "POMI SYNTHETIC CLINIC 05",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "lab_report-06",
+    "material_type": "lab_report",
+    "file": "samples/lab_report-06.png",
+    "sha256": "bbc800a174ce71b88340539fa418918d42cd2114af5b170f37255c16a6c7d4f9",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.items.0.name",
+        "expected": "LH",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.items.0.value",
+        "expected": 4.6,
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.items.0.unit",
+        "expected": "IU/L",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.report_date",
+        "expected": "2026-07-06",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.facility",
+        "expected": "POMI SYNTHETIC CLINIC 06",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "lab_report-07",
+    "material_type": "lab_report",
+    "file": "samples/lab_report-07.png",
+    "sha256": "16acbad075c97b1b069bbcb6b7d3c09f65c2c924187c44862a86bef0ea56c2af",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.items.0.name",
+        "expected": "LH",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.items.0.value",
+        "expected": 4.7,
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.items.0.unit",
+        "expected": "IU/L",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.report_date",
+        "expected": "2026-07-07",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.facility",
+        "expected": "POMI SYNTHETIC CLINIC 07",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "lab_report-08",
+    "material_type": "lab_report",
+    "file": "samples/lab_report-08.png",
+    "sha256": "cef68f26aaefaebb6c094ad31e467c51281d9d7d0ae8dd6d37854724a0d61e91",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.items.0.name",
+        "expected": "LH",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.items.0.value",
+        "expected": 4.8,
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.items.0.unit",
+        "expected": "IU/L",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.report_date",
+        "expected": "2026-07-08",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.facility",
+        "expected": "POMI SYNTHETIC CLINIC 08",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "lab_report-09",
+    "material_type": "lab_report",
+    "file": "samples/lab_report-09.png",
+    "sha256": "deff67c0f1aeaefeeefd79ae66bb56b38e26a0fb73ef9fb7e18806c8ebbdcca8",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.items.0.name",
+        "expected": "LH",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.items.0.value",
+        "expected": 4.9,
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.items.0.unit",
+        "expected": "IU/L",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.report_date",
+        "expected": "2026-07-09",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.facility",
+        "expected": "POMI SYNTHETIC CLINIC 09",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "lab_report-10",
+    "material_type": "lab_report",
+    "file": "samples/lab_report-10.png",
+    "sha256": "2371cc3fb838fba0423dba171798788acfa8dddb09c54d9df6e8c2d658d96942",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.items.0.name",
+        "expected": "LH",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.items.0.value",
+        "expected": 5.0,
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.items.0.unit",
+        "expected": "IU/L",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.report_date",
+        "expected": "2026-07-10",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.facility",
+        "expected": "POMI SYNTHETIC CLINIC 10",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "medical_order-01",
+    "material_type": "medical_order",
+    "file": "samples/medical_order-01.png",
+    "sha256": "0ba81f6e0bb9fef2f80be2cf981ca9d262113df0fc234b7a1e23b35323b6e461",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.medications.0.drug_name",
+        "expected": "METFORMIN-1",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.dosage_value",
+        "expected": 500,
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.dosage_unit",
+        "expected": "mg",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.frequency",
+        "expected": "twice daily",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.order_date",
+        "expected": "2026-07-01",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.medications.0.route",
+        "expected": "oral",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "medical_order-02",
+    "material_type": "medical_order",
+    "file": "samples/medical_order-02.png",
+    "sha256": "cd6f1449d58aee141ef1643facded021b224bc5426fb56f60176142bab2e13b8",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.medications.0.drug_name",
+        "expected": "METFORMIN-2",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.dosage_value",
+        "expected": 500,
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.dosage_unit",
+        "expected": "mg",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.frequency",
+        "expected": "twice daily",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.order_date",
+        "expected": "2026-07-02",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.medications.0.route",
+        "expected": "oral",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "medical_order-03",
+    "material_type": "medical_order",
+    "file": "samples/medical_order-03.png",
+    "sha256": "1ec4a6d4401578c89fa1f5ab7c1fbcf55d0dc338e48b1fffd0fb8aeba032b212",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.medications.0.drug_name",
+        "expected": "METFORMIN-3",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.dosage_value",
+        "expected": 500,
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.dosage_unit",
+        "expected": "mg",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.frequency",
+        "expected": "twice daily",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.order_date",
+        "expected": "2026-07-03",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.medications.0.route",
+        "expected": "oral",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "medical_order-04",
+    "material_type": "medical_order",
+    "file": "samples/medical_order-04.png",
+    "sha256": "41b0c84bd1eb293c40beec0cb870d5d7558ba8c129794ac3e70529f025fc0417",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.medications.0.drug_name",
+        "expected": "METFORMIN-4",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.dosage_value",
+        "expected": 500,
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.dosage_unit",
+        "expected": "mg",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.frequency",
+        "expected": "twice daily",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.order_date",
+        "expected": "2026-07-04",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.medications.0.route",
+        "expected": "oral",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "medical_order-05",
+    "material_type": "medical_order",
+    "file": "samples/medical_order-05.png",
+    "sha256": "61b0989548ae5e6e7b4ad08143f8c2dd51b91cb8527ac6b0d530289382a8b8e4",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.medications.0.drug_name",
+        "expected": "METFORMIN-5",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.dosage_value",
+        "expected": 500,
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.dosage_unit",
+        "expected": "mg",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.frequency",
+        "expected": "twice daily",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.order_date",
+        "expected": "2026-07-05",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.medications.0.route",
+        "expected": "oral",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "medical_order-06",
+    "material_type": "medical_order",
+    "file": "samples/medical_order-06.png",
+    "sha256": "403399599b718d1678f6f25e4ea8ef96a4e1b87133bd565689039ab8fb77477d",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.medications.0.drug_name",
+        "expected": "METFORMIN-6",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.dosage_value",
+        "expected": 500,
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.dosage_unit",
+        "expected": "mg",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.frequency",
+        "expected": "twice daily",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.order_date",
+        "expected": "2026-07-06",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.medications.0.route",
+        "expected": "oral",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "medical_order-07",
+    "material_type": "medical_order",
+    "file": "samples/medical_order-07.png",
+    "sha256": "c97a25665d58105421dea99772ea10a3e13ceca57e46b8e2a968e204bb08813c",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.medications.0.drug_name",
+        "expected": "METFORMIN-7",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.dosage_value",
+        "expected": 500,
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.dosage_unit",
+        "expected": "mg",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.frequency",
+        "expected": "twice daily",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.order_date",
+        "expected": "2026-07-07",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.medications.0.route",
+        "expected": "oral",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "medical_order-08",
+    "material_type": "medical_order",
+    "file": "samples/medical_order-08.png",
+    "sha256": "1bebf482ab6fb2d7ae8e2da5c8d21d724474ed2bd2ad781cdfee1a0ca44ab5ee",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.medications.0.drug_name",
+        "expected": "METFORMIN-8",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.dosage_value",
+        "expected": 500,
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.dosage_unit",
+        "expected": "mg",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.frequency",
+        "expected": "twice daily",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.order_date",
+        "expected": "2026-07-08",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.medications.0.route",
+        "expected": "oral",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "medical_order-09",
+    "material_type": "medical_order",
+    "file": "samples/medical_order-09.png",
+    "sha256": "372f5bd6ec32c8c4edc19870b464d10fda0cb6a70dcaf2e02eaaf0c5196b9ae8",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.medications.0.drug_name",
+        "expected": "METFORMIN-9",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.dosage_value",
+        "expected": 500,
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.dosage_unit",
+        "expected": "mg",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.frequency",
+        "expected": "twice daily",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.order_date",
+        "expected": "2026-07-09",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.medications.0.route",
+        "expected": "oral",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "medical_order-10",
+    "material_type": "medical_order",
+    "file": "samples/medical_order-10.png",
+    "sha256": "87e60b96ef3b768c84bb29ad4f3c20b7f0c4345622536d78f9e6342b79e79fec",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.medications.0.drug_name",
+        "expected": "METFORMIN-10",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.dosage_value",
+        "expected": 500,
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.dosage_unit",
+        "expected": "mg",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.medications.0.frequency",
+        "expected": "twice daily",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.order_date",
+        "expected": "2026-07-10",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.medications.0.route",
+        "expected": "oral",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "imaging_text_report-01",
+    "material_type": "imaging_text_report",
+    "file": "samples/imaging_text_report-01.png",
+    "sha256": "d6ca521240a8af1755abee3e4157b2dd89ae9678cf495c0adab669fb7fcc14f6",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.examination_name",
+        "expected": "Pelvic ultrasound",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.findings",
+        "expected": "Synthetic finding 1: bilateral ovaries visualized.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.impression",
+        "expected": "Synthetic impression 1: no acute finding.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.examination_date",
+        "expected": "2026-07-01",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.modality",
+        "expected": "US",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "imaging_text_report-02",
+    "material_type": "imaging_text_report",
+    "file": "samples/imaging_text_report-02.png",
+    "sha256": "e0736f53dac38935457b8c83272367a0ffe6aac804c711992e8beae3563868c2",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.examination_name",
+        "expected": "Pelvic ultrasound",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.findings",
+        "expected": "Synthetic finding 2: bilateral ovaries visualized.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.impression",
+        "expected": "Synthetic impression 2: no acute finding.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.examination_date",
+        "expected": "2026-07-02",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.modality",
+        "expected": "US",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "imaging_text_report-03",
+    "material_type": "imaging_text_report",
+    "file": "samples/imaging_text_report-03.png",
+    "sha256": "0f561a24ccc5f973a3025d1cabf8e187d98e1c26082b017072942a87a7d476a5",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.examination_name",
+        "expected": "Pelvic ultrasound",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.findings",
+        "expected": "Synthetic finding 3: bilateral ovaries visualized.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.impression",
+        "expected": "Synthetic impression 3: no acute finding.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.examination_date",
+        "expected": "2026-07-03",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.modality",
+        "expected": "US",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "imaging_text_report-04",
+    "material_type": "imaging_text_report",
+    "file": "samples/imaging_text_report-04.png",
+    "sha256": "fd2bdec5a2db45d7d31f47aa41365261a5f2a1eee6b4500f0bd328c87c045133",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.examination_name",
+        "expected": "Pelvic ultrasound",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.findings",
+        "expected": "Synthetic finding 4: bilateral ovaries visualized.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.impression",
+        "expected": "Synthetic impression 4: no acute finding.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.examination_date",
+        "expected": "2026-07-04",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.modality",
+        "expected": "US",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "imaging_text_report-05",
+    "material_type": "imaging_text_report",
+    "file": "samples/imaging_text_report-05.png",
+    "sha256": "3f9fb08514a897237c3de597549685bb52965827c5e99a19bd0749459bb26e71",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.examination_name",
+        "expected": "Pelvic ultrasound",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.findings",
+        "expected": "Synthetic finding 5: bilateral ovaries visualized.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.impression",
+        "expected": "Synthetic impression 5: no acute finding.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.examination_date",
+        "expected": "2026-07-05",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.modality",
+        "expected": "US",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "imaging_text_report-06",
+    "material_type": "imaging_text_report",
+    "file": "samples/imaging_text_report-06.png",
+    "sha256": "1e8226fe266b336567b8ca607f055ee042069428d59ae3419bcfaf03c346a343",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.examination_name",
+        "expected": "Pelvic ultrasound",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.findings",
+        "expected": "Synthetic finding 6: bilateral ovaries visualized.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.impression",
+        "expected": "Synthetic impression 6: no acute finding.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.examination_date",
+        "expected": "2026-07-06",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.modality",
+        "expected": "US",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "imaging_text_report-07",
+    "material_type": "imaging_text_report",
+    "file": "samples/imaging_text_report-07.png",
+    "sha256": "b1df08506844259dde693b1ae7362cb553435a938e21c79edd3b87b3e64044aa",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.examination_name",
+        "expected": "Pelvic ultrasound",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.findings",
+        "expected": "Synthetic finding 7: bilateral ovaries visualized.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.impression",
+        "expected": "Synthetic impression 7: no acute finding.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.examination_date",
+        "expected": "2026-07-07",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.modality",
+        "expected": "US",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "imaging_text_report-08",
+    "material_type": "imaging_text_report",
+    "file": "samples/imaging_text_report-08.png",
+    "sha256": "e82e14b9376637ce5311d9ae8599feae2dc85cbfefd87978b54224ab8d25316b",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.examination_name",
+        "expected": "Pelvic ultrasound",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.findings",
+        "expected": "Synthetic finding 8: bilateral ovaries visualized.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.impression",
+        "expected": "Synthetic impression 8: no acute finding.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.examination_date",
+        "expected": "2026-07-08",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.modality",
+        "expected": "US",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "imaging_text_report-09",
+    "material_type": "imaging_text_report",
+    "file": "samples/imaging_text_report-09.png",
+    "sha256": "b1ba94b0b56c058c5811d2b7173bdf488ec358b530cb9f159dcafd5fc87aa4df",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.examination_name",
+        "expected": "Pelvic ultrasound",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.findings",
+        "expected": "Synthetic finding 9: bilateral ovaries visualized.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.impression",
+        "expected": "Synthetic impression 9: no acute finding.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.examination_date",
+        "expected": "2026-07-09",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.modality",
+        "expected": "US",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "imaging_text_report-10",
+    "material_type": "imaging_text_report",
+    "file": "samples/imaging_text_report-10.png",
+    "sha256": "fe82b1a7e9d4c1b6fcff2d3f9b1ea778acfc914469f8f00ba4f52a9aef6d9214",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.examination_name",
+        "expected": "Pelvic ultrasound",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.findings",
+        "expected": "Synthetic finding 10: bilateral ovaries visualized.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.impression",
+        "expected": "Synthetic impression 10: no acute finding.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.examination_date",
+        "expected": "2026-07-10",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.modality",
+        "expected": "US",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "outpatient_record-01",
+    "material_type": "outpatient_record",
+    "file": "samples/outpatient_record-01.png",
+    "sha256": "230ca95031d8e1ad75ac58a59024f716785f200b6a5ee78ba1dbca189e8d4ce1",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.visit_date",
+        "expected": "2026-07-01",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.diagnosis_summary",
+        "expected": "Synthetic diagnosis 1: irregular cycle.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.medical_advice",
+        "expected": "Synthetic advice 1: follow up in four weeks.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.department",
+        "expected": "Endocrinology",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.facility",
+        "expected": "POMI SYNTHETIC CLINIC 01",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "outpatient_record-02",
+    "material_type": "outpatient_record",
+    "file": "samples/outpatient_record-02.png",
+    "sha256": "e2d1adfbf3a7bcba0e82f5587e63b25aa42833195b7b67e603bcfb39b6efa94c",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.visit_date",
+        "expected": "2026-07-02",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.diagnosis_summary",
+        "expected": "Synthetic diagnosis 2: irregular cycle.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.medical_advice",
+        "expected": "Synthetic advice 2: follow up in four weeks.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.department",
+        "expected": "Endocrinology",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.facility",
+        "expected": "POMI SYNTHETIC CLINIC 02",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "outpatient_record-03",
+    "material_type": "outpatient_record",
+    "file": "samples/outpatient_record-03.png",
+    "sha256": "0c7177f6df2d83d9b72b36d86a3968ce9facba6b4ca8dfa89b72f342a7f7d6ee",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.visit_date",
+        "expected": "2026-07-03",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.diagnosis_summary",
+        "expected": "Synthetic diagnosis 3: irregular cycle.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.medical_advice",
+        "expected": "Synthetic advice 3: follow up in four weeks.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.department",
+        "expected": "Endocrinology",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.facility",
+        "expected": "POMI SYNTHETIC CLINIC 03",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "outpatient_record-04",
+    "material_type": "outpatient_record",
+    "file": "samples/outpatient_record-04.png",
+    "sha256": "0bac39fa014311a3d6937de1312ab20f6a7eac27871c191c8816fb603b57224a",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.visit_date",
+        "expected": "2026-07-04",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.diagnosis_summary",
+        "expected": "Synthetic diagnosis 4: irregular cycle.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.medical_advice",
+        "expected": "Synthetic advice 4: follow up in four weeks.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.department",
+        "expected": "Endocrinology",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.facility",
+        "expected": "POMI SYNTHETIC CLINIC 04",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "outpatient_record-05",
+    "material_type": "outpatient_record",
+    "file": "samples/outpatient_record-05.png",
+    "sha256": "57ea902f353f2ae31e62678ab1e9ce22d79559e22911a0289f5daaed4e5419be",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.visit_date",
+        "expected": "2026-07-05",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.diagnosis_summary",
+        "expected": "Synthetic diagnosis 5: irregular cycle.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.medical_advice",
+        "expected": "Synthetic advice 5: follow up in four weeks.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.department",
+        "expected": "Endocrinology",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.facility",
+        "expected": "POMI SYNTHETIC CLINIC 05",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "outpatient_record-06",
+    "material_type": "outpatient_record",
+    "file": "samples/outpatient_record-06.png",
+    "sha256": "ccbc9bf84276edeb7b4f85d085696a207faa6ceb7ef266b36920e1dd8eb78efb",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.visit_date",
+        "expected": "2026-07-06",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.diagnosis_summary",
+        "expected": "Synthetic diagnosis 6: irregular cycle.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.medical_advice",
+        "expected": "Synthetic advice 6: follow up in four weeks.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.department",
+        "expected": "Endocrinology",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.facility",
+        "expected": "POMI SYNTHETIC CLINIC 06",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "outpatient_record-07",
+    "material_type": "outpatient_record",
+    "file": "samples/outpatient_record-07.png",
+    "sha256": "757696a74cb9fff39378d59e29cf53b9cb249c76ab11aafd6c3eee008cd303c2",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.visit_date",
+        "expected": "2026-07-07",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.diagnosis_summary",
+        "expected": "Synthetic diagnosis 7: irregular cycle.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.medical_advice",
+        "expected": "Synthetic advice 7: follow up in four weeks.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.department",
+        "expected": "Endocrinology",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.facility",
+        "expected": "POMI SYNTHETIC CLINIC 07",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "outpatient_record-08",
+    "material_type": "outpatient_record",
+    "file": "samples/outpatient_record-08.png",
+    "sha256": "1188f569f1554fb8aa92d79b59e681f212274751729e2a855e92219327a95844",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.visit_date",
+        "expected": "2026-07-08",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.diagnosis_summary",
+        "expected": "Synthetic diagnosis 8: irregular cycle.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.medical_advice",
+        "expected": "Synthetic advice 8: follow up in four weeks.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.department",
+        "expected": "Endocrinology",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.facility",
+        "expected": "POMI SYNTHETIC CLINIC 08",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "outpatient_record-09",
+    "material_type": "outpatient_record",
+    "file": "samples/outpatient_record-09.png",
+    "sha256": "9ecce1ce0ff7dda06b807f62bcbd77fe285f0485a6f75377a04230a76744b8aa",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.visit_date",
+        "expected": "2026-07-09",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.diagnosis_summary",
+        "expected": "Synthetic diagnosis 9: irregular cycle.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.medical_advice",
+        "expected": "Synthetic advice 9: follow up in four weeks.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.department",
+        "expected": "Endocrinology",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.facility",
+        "expected": "POMI SYNTHETIC CLINIC 09",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  },
+  {
+    "sample_id": "outpatient_record-10",
+    "material_type": "outpatient_record",
+    "file": "samples/outpatient_record-10.png",
+    "sha256": "4bc282007c7bd5fbacc0bb985534e4449cfa64b1998eb0dfc16c9811c939b592",
+    "synthetic": true,
+    "contains_real_patient_data": false,
+    "gold_fields": [
+      {
+        "path": "draft.visit_date",
+        "expected": "2026-07-10",
+        "priority": "P0",
+        "allowed_values": [],
+        "critical": true,
+        "error_note": "Critical demo-path transcription"
+      },
+      {
+        "path": "draft.diagnosis_summary",
+        "expected": "Synthetic diagnosis 10: irregular cycle.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.medical_advice",
+        "expected": "Synthetic advice 10: follow up in four weeks.",
+        "priority": "P1",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.department",
+        "expected": "Endocrinology",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      },
+      {
+        "path": "draft.facility",
+        "expected": "POMI SYNTHETIC CLINIC 10",
+        "priority": "P2",
+        "allowed_values": [],
+        "critical": false,
+        "error_note": "Exact synthetic text"
+      }
+    ]
+  }
+]

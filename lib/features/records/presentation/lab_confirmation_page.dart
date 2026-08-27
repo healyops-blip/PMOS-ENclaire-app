@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
+import 'package:pmos_enclaire/features/records/presentation/ocr_fallback_badge.dart';
 import 'package:printing/printing.dart';
 
 class LabConfirmationPage extends StatefulWidget {
@@ -187,6 +188,10 @@ class _LabConfirmationPageState extends State<LabConfirmationPage> {
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
+            if (widget.task.isFallback) ...[
+              const OcrFallbackBadge(),
+              const SizedBox(height: 12),
+            ],
             _sourcePanel(snapshot.data!),
             const SizedBox(height: 12),
             const Card(
