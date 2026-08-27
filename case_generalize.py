@@ -169,7 +169,8 @@ def replace_text(
     font_path,
     font_size=24,
     color=(0, 0, 0),
-    method="sample"
+    method="sample",
+    align="left"
 ):
     x1, y1, x2, y2 = bbox
 
@@ -209,8 +210,14 @@ def replace_text(
     text_width = bbox_text[2] - bbox_text[0]
     text_height = bbox_text[3] - bbox_text[1]
 
-    # 默认左对齐，稍微向右缩进 1px，避免贴边
-    tx = x1 + 1
+    # 对齐方式：left/center/right
+    if align == "right":
+        tx = max(x1 + 1, x2 - text_width - 1)
+    elif align == "center":
+        tx = x1 + (max_width - text_width) / 2
+    else:
+        # 左对齐，稍微向右缩进 1px，避免贴边
+        tx = x1 + 1
     ty = y1 + (max_height - text_height) / 2
 
     draw.text((tx, ty), text, font=font, fill=color)
@@ -630,17 +637,26 @@ def generate_case(
     data
 ):
     image = Image.open(input_path).convert("RGB")
-
-    if report_type == "医嘱_处方":
-        image = draw_prescription_mobile_shell(image)
-    elif report_type == "影像文字报告":
-        image = draw_imaging_report_shell(image)
-    elif report_type == "化验_检测报告":
-        image = draw_lab_report_shell(image)
+    layout_mode = config.get("layout", "default")
+    if layout_mode == "default":
+        if report_type == "医嘱_处方":
+            image = draw_prescription_mobile_shell(image)
+        elif report_type == "影像文字报告":
+            image = draw_imaging_report_shell(image)
+        elif report_type == "化验_检测报告":
+            image = draw_lab_report_shell(image)
+    else:
+        # plain_horizontal: 仅清空整图为白底，随后按横板纯文字布局输出，不绘制任何底色/表格
+        from PIL import ImageDraw
+        W, H = image.size
+        ImageDraw.Draw(image).rectangle([0, 0, W, H], fill=(255, 255, 255))
 
     # 使用传入的数据（不再重新生成，确保与 truth 一致）
     module = get_report_type(report_type)
-    fields = module.get_fields()
+    if layout_mode == "plain_horizontal":
+        fields = build_plain_horizontal_fields(report_type, data)
+    else:
+        fields = module.get_fields()
 
     # 替换字段
     for field in fields:
@@ -650,7 +666,9 @@ def generate_case(
 
         # 针对“门诊病历_就诊记录”减少色块拼接感：
         # 在需要的行先绘制统一宽度的浅灰面板，再直接在上面写字（method='none'），避免多次采样清底造成的色差边界。
-        if report_type == "门诊病历_就诊记录":
+        if layout_mode == "plain_horizontal":
+            draw_method = "none"
+        elif report_type == "门诊病历_就诊记录":
             # 门诊病历在 clean_base 中已经统一铺好了浅灰底，这里直接写字避免再次清底造成色块拼接
             draw_method = "none"
         elif report_type == "影像文字报告":
@@ -669,37 +687,39 @@ def generate_case(
             font_path=config["font_path"],
             font_size=field.get("font_size", 24),
             color=tuple(field.get("color", [0, 0, 0])),
-            method=draw_method
+            method=draw_method,
+            align=field.get("align", "left")
         )
 
-    # Logo 替换 - 使用脚本所在目录
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    logo_dir = os.path.join(script_dir, "logo")
-    # 优先使用配置中的 logo 文件名
-    preferred_logo = hospital_info.get("logo")
-    candidate_paths = []
-    if preferred_logo:
-        candidate_paths.append(os.path.join(logo_dir, preferred_logo))
-    # 兼容：如果 logo 文件以医院名称命名（不含后缀），尝试常见后缀
-    hosp_name = hospital_info.get("name", "").strip()
-    if hosp_name:
-        for ext in (".png", ".jpg", ".jpeg"):
-            candidate_paths.append(os.path.join(logo_dir, hosp_name + ext))
+    # Logo 替换（可通过 config.skip_logo 关闭） - 使用脚本所在目录
+    if layout_mode != "plain_horizontal" and not config.get("skip_logo", False):
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        logo_dir = os.path.join(script_dir, "logo")
+        # 优先使用配置中的 logo 文件名
+        preferred_logo = hospital_info.get("logo")
+        candidate_paths = []
+        if preferred_logo:
+            candidate_paths.append(os.path.join(logo_dir, preferred_logo))
+        # 兼容：如果 logo 文件以医院名称命名（不含后缀），尝试常见后缀
+        hosp_name = hospital_info.get("name", "").strip()
+        if hosp_name:
+            for ext in (".png", ".jpg", ".jpeg"):
+                candidate_paths.append(os.path.join(logo_dir, hosp_name + ext))
 
-    logo_path = None
-    for p in candidate_paths:
-        if os.path.exists(p):
-            logo_path = p
-            break
+        logo_path = None
+        for p in candidate_paths:
+            if os.path.exists(p):
+                logo_path = p
+                break
 
-    if logo_path and report_type != "医嘱_处方":
-        image = replace_logo(image, logo_path, logo_bbox)
-    elif report_type == "医嘱_处方":
-        # 医嘱_处方样本是移动端病历/处方页面，右上角应保留小程序菜单胶囊，
-        # 不贴医院 logo，否则会变成传统纸质处方笺，布局与 sample_input 不一致。
-        pass
-    else:
-        print(f"[WARNING] 未找到匹配的 Logo 文件，已跳过。尝试过: {', '.join(candidate_paths)}")
+        if logo_path and report_type != "医嘱_处方":
+            image = replace_logo(image, logo_path, logo_bbox)
+        elif report_type == "医嘱_处方":
+            # 医嘱_处方样本是移动端病历/处方页面，右上角应保留小程序菜单胶囊，
+            # 不贴医院 logo，否则会变成传统纸质处方笺，布局与 sample_input 不一致。
+            pass
+        else:
+            print(f"[WARNING] 未找到匹配的 Logo 文件，已跳过。尝试过: {', '.join(candidate_paths)}")
 
     # 图片增强
     image = augment_image(image, config)
@@ -717,6 +737,108 @@ def generate_case(
         json.dump(truth_data, f, ensure_ascii=False, indent=2)
 
     return truth_data
+
+
+def build_plain_horizontal_fields(report_type, data):
+    """
+    横板纯文字布局（不画底色/表格/面板），仅将已有文字信息以横向区块排列：
+    - 顶部：医院全称 + 报告类型标题
+    - 基本信息：姓名/性别/年龄/病历号/就诊或检查日期/科室/医生
+    - 其余内容按原类型要点简洁展示
+    统一在 A4-like 纵向图上按横条摆放，字段 bbox 跨整行，便于阅读。
+    """
+    # 统一版式参数
+    # A4纵向 + 窄边距（左右各 ~36px，顶部~30px），高密度排版
+    left = 36
+    right = 1210
+    y = 30
+    gap = 34  # 行距较紧凑
+    def row(name, text, size=22, color=(0, 0, 0), align="left", height=30):
+        nonlocal y
+        box = [left, y, right, y + height]
+        y += max(gap, height)
+        return {"name": name, "bbox": box, "template": text, "font_size": size, "color": list(color), "align": align}
+
+    title_map = {
+        "影像文字报告": "超声影像文字报告",
+        "化验_检测报告": "检验报告单",
+        "医嘱_处方": "处方",
+        "门诊病历_就诊记录": "门诊病历",
+    }
+
+    fields = []
+    # 顶部医院 + 标题
+    # 顶部居中：医院名大号加粗风格（这里通过字号模拟加粗），下方小一号的报告类型
+    fields.append(row("hospital", "{hospital}", size=30, align="center"))
+    fields.append(row("title", title_map.get(report_type, report_type), size=22, align="center"))
+
+    # 基础信息
+    # 患者基本信息：横向多列（用较宽的行，字段间以空格分隔，模拟多列）
+    fields.append(row("p_name", "患者姓名：{name}      性别：{gender}      年龄：{age}岁      科室：{department}", size=20))
+    fields.append(row("p_ids", "门诊号：{patient_id}      申请医生：{doctor}", size=20))
+    date_label = "检查日期" if report_type in ("影像文字报告", "化验_检测报告") else "就诊日期"
+    fields.append(row("date", f"{date_label}：{{exam_date}}", size=20))
+    y += 6  # 小间隙
+
+    if report_type == "影像文字报告":
+        # 关键所见与提示
+        fields.append(row("findings1", "{right_ovary_line}", size=20))
+        fields.append(row("findings2", "{left_ovary_line}", size=20))
+        fields.append(row("findings3", "{pelvic_effusion_line}", size=20))
+        fields.append(row("impression", "{impression_line}", size=20))
+        fields.append(row("recommendation", "{recommendation_line}", size=20))
+        y += 16
+        # 底部小字
+        fields.append(row("sign", "报告时间：{exam_date}      报告医师：{doctor}", size=18))
+    elif report_type == "化验_检测报告":
+        # 构建表头行，模拟传统LIS表格（仅使用文字行，不绘制格线，后续由绘制器加线）
+        # 列含：序号、项目名称、方法、结果、单位、参考范围
+        # 表头
+        fields.append(row("tbl_header", "序号    项目名称                                   方法        结果      单位      参考范围", size=20))
+        # 数据行（保持已有数值与字段）
+        rows = [
+            (1, "白细胞计数(WBC)", "自动", "{wbc}", "×10^9/L", "4-12"),
+            (2, "红细胞计数(RBC)", "自动", "{rbc}", "×10^12/L", "4-6"),
+            (3, "血红蛋白(HGB)", "比色", "{hgb}", "g/L", "110-180"),
+            (4, "血小板计数(PLT)", "自动", "{plt}", "×10^9/L", "100-350"),
+            (5, "谷丙转氨酶(ALT)", "速率法", "{alt}", "U/L", "5-45"),
+            (6, "谷草转氨酶(AST)", "速率法", "{ast}", "U/L", "5-45"),
+            (7, "空腹血糖(GLU)", "葡萄糖氧化酶法", "{glu}", "mmol/L", "3-8"),
+            (8, "高密度脂蛋白(HDL)", "直接法", "{hdl}", "mmol/L", "0.8-2.0"),
+            (9, "低密度脂蛋白(LDL)", "直接法", "{ldl}", "mmol/L", "2-4"),
+        ]
+        for no, item, method, val, unit, ref in rows:
+            # 排列：序号(左)、项目(左)、方法(居中)、结果(右)、单位(左小字)、参考范围(左小字)
+            fields.append(row(f"lab_{no}_row", f"{no:>2}    {item:<36}  {method:<10}  {val:>6}    {unit:<8}  {ref}", size=20))
+        y += 12
+        # 备注/说明区（2-4行）
+        fields.append(row("note1", "备注：{advice}", size=18))
+        # 底部签名/时间
+        fields.append(row("footer1", "检验时间：{exam_date}      报告时间：{exam_date}", size=18))
+        fields.append(row("footer2", "检验者：{doctor}      审核者：", size=18))
+    elif report_type == "医嘱_处方":
+        # 每种药一行，后续行给出用法/用量/疗程
+        meds = [
+            ("med1", "{med1_name} {med1_spec}"),
+            ("med2", "{med2_name} {med2_spec}"),
+            ("med3", "{med3_name} {med3_spec}"),
+        ]
+        for key, disp in meds:
+            fields.append(row(f"{key}_line1", f"药品：{disp}", size=20))
+            fields.append(row(f"{key}_line2", f"用法：{{{key}_usage}}    频次：{{{key}_freq}}", size=18))
+            fields.append(row(f"{key}_line3", f"疗程：{{{key}_days}}    备注：{{{key}_instruction}}", size=18))
+        y += 10
+        fields.append(row("sign", "医生：{doctor}", size=18))
+    elif report_type == "门诊病历_就诊记录":
+        fields.append(row("vital", "体征：体温 {temp}℃    心率 {hr}次/分    血压 {bp}mmHg    呼吸 {rr}次/分", size=20))
+        fields.append(row("symptoms", "主诉：{symptom1}、{symptom2}、{symptom3}", size=20))
+        fields.append(row("history", "现病史：患者因{symptom1}、{symptom2}就诊，病程约{age}天。", size=20))
+        fields.append(row("diagnosis", "诊断：{diagnosis}", size=20))
+        fields.append(row("treatment", "处理：{treatment}", size=20))
+        fields.append(row("advice", "建议：{advice}", size=20))
+        fields.append(row("followup", "复诊：{followup_days}天后", size=20))
+
+    return fields
 
 
 # ============================================================
@@ -825,6 +947,10 @@ def main():
     parser.add_argument("--font-path", help="字体路径")
     parser.add_argument("--logo-bbox", default="50,20,200,100",
                         help="Logo 替换区域 x1,y1,x2,y2")
+    parser.add_argument("--no-logo", action="store_true", help="不在页面上贴医院Logo，仅在标题中展示医院全称")
+    parser.add_argument("--layout", choices=["default", "plain_horizontal"], default="default",
+                        help="版式：default=按原始模板壳渲染；plain_horizontal=横板纯文字，不铺底色/表格")
+    parser.add_argument("--start", type=int, default=1, help="起始编号（用于病历号与文件名的顺序编号）")
 
     args = parser.parse_args()
 
@@ -847,7 +973,9 @@ def main():
         "noise_probability": 0.2,
         "noise_std": 3,
         "jpeg_quality_min": 85,
-        "jpeg_quality_max": 100
+        "jpeg_quality_max": 100,
+        "skip_logo": bool(args.no_logo),
+        "layout": args.layout,
     }
 
     # Logo bbox
@@ -865,8 +993,18 @@ def main():
         print(f"错误: 输入图片不存在: {input_path}")
         return
 
-    # 生成病例
-    for i in range(1, args.num + 1):
+    # 生成病例（顺序编号，确保编号唯一且与文件名一致）
+    start_index = args.start if args.start >= 1 else 1
+    end_index = start_index + args.num - 1
+    # 病历号前缀：按类型保持既有风格
+    pid_prefix_map = {
+        "影像文字报告": "P",
+        "化验_检测报告": "LA",
+        "医嘱_处方": "PR",
+        "门诊病历_就诊记录": "MR",
+    }
+
+    for i in range(start_index, end_index + 1):
         filename = f"case_{i:05d}.jpg"
         output_path = os.path.join(report_dir, filename)
 
@@ -879,7 +1017,19 @@ def main():
         module = get_report_type(args.type)
         data = module.generate_data()
         data["department"] = random.choice(DEPARTMENTS)
-        data["hospital"] = hospital_info["name"]
+        # 仅保留中文医院名（若原始包含英文并列展示）
+        name_full = hospital_info["name"]
+        try:
+            import re
+            m = re.search(r"[A-Za-z]", name_full)
+            hosp_cn = name_full[:m.start()].strip() if m else name_full.strip()
+        except Exception:
+            hosp_cn = name_full
+        data["hospital"] = hosp_cn
+        # 覆盖病历号，确保唯一且可追溯
+        data["patient_id"] = f"{pid_prefix_map.get(args.type, 'ID')}{i:05d}"
+        # 性别强制为女（各模块已是女，这里再次兜底）
+        data["gender"] = "女"
 
         # 构建 truth
         truth = build_truth_data(args.type, hospital_info, data, filename)

@@ -81,6 +81,13 @@ def get_fields():
 
     fields = [
         {
+            "name": "hospital_name",
+            "bbox": [56, 30, 860, 68],
+            "template": "{hospital}",
+            "font_size": 24,
+            "color": [30, 96, 150]
+        },
+        {
             "name": "title",
             "bbox": [56, 28, 720, 92],
             "template": "检验报告单",

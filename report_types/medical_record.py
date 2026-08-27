@@ -84,6 +84,12 @@ def get_fields():
     """返回字段定义列表"""
     return [
         {
+            "name": "hospital_name",
+            "bbox": [55, 10, 1202, 42],
+            "template": "{hospital}",
+            "font_size": 24
+        },
+        {
             "name": "title",
             "bbox": [55, 43, 1202, 151],
             "template": "门诊病历",

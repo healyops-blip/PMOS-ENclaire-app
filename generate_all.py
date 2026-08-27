@@ -65,17 +65,18 @@ def main():
     parser.add_argument("--num-per-type", type=int, default=20, help="姣忕绫诲瀷鐢熸垚鏁伴噺")
     parser.add_argument("--font-path", default=FONT_PATH, help="瀛椾綋璺緞")
     parser.add_argument("--seed", type=int, default=None, help="闅忔満绉嶅瓙")
-    parser.add_argument("--unique-run-dir", action="store_true", help="鍦ㄨ緭鍑虹洰褰曚笅鏂板缓鍞竴瀛愮洰褰曪紝閬垮厤瑕嗙洊鏃х粨鏋?)
-    parser.add_argument("--emit-clean-bases", action="store_true", help="瀵煎嚭姣忕绫诲瀷鐨勫共鍑€搴曞浘渚涙鏌?)
-    parser.add_argument("--clean-fill-mode", choices=["sample", "white", "gray"], default="sample", help="娓呯悊搴曡壊鐨勬柟寮?)
-    parser.add_argument("--logo-clean-mode", choices=["safe", "detect", "none"], default="safe", help="娓呯悊logo鍖哄煙绛栫暐锛歴afe=浠呮墿灞昹ogo妗? detect=妫€娴嬪苟闆? none=鍙湪logo妗嗗唴")
-    parser.add_argument("--logo-clean-pad", type=int, default=6, help="safe妯″紡涓?logo 妗嗗悜鍥涘懆鎵╁睍鐨勫儚绱?)
-    parser.add_argument("--gender", choices=["鐢?, "濂?, "random"], default="random", help="鎬у埆鐢熸垚绛栫暐锛氱敺/濂?闅忔満")
-    parser.add_argument("--pcos-only", action="store_true", default=True, help="浠呰緭鍑轰笌澶氬泭鍗靛发鐩稿叧鐨勫唴瀹癸紙鍗拌薄/寤鸿/璇婃柇绛夊己鍒朵负PCOS鐩稿叧锛夆€斺€旈粯璁ゅ紑鍚?)
-    parser.add_argument("--allow-non-pcos", action="store_true", default=False, help="鍏佽鐢熸垚闈濸COS鎻忚堪锛堟樉寮忓紑鍚墠浼氱敓鏁堬級")
-    parser.add_argument("--numeric-only", action="store_true", help="浠呬慨鏀规暟鍊煎瓧娈碉紝鍏朵粬鏂囨湰鍥哄畾锛堥粯璁よ仛鐒COS鍦烘櫙锛?)
-    parser.add_argument("--jitter-percent", type=float, default=10.0, help="鏁板€肩浉瀵瑰熀鍑嗙殑鏈€澶у亸宸櫨鍒嗘瘮锛堜緥濡?0琛ㄧず卤10%锛?)
-    parser.add_argument("--jitter-mode", choices=["off", "first"], default="first", help="鏁板€兼姈鍔ㄥ熀鍑嗭細off鍏抽棴锛沠irst鐢ㄦ湰娆¤繍琛屾瘡绫诲瀷棣栦緥涓哄熀鍑?)
+    parser.add_argument("--unique-run-dir", action="store_true", help="在输出目录下新建唯一子目录，避免覆盖旧结果")
+    parser.add_argument("--emit-clean-bases", action="store_true", help="额外导出每种类型的干净底图用于检查")
+    parser.add_argument("--clean-fill-mode", choices=["sample", "white", "gray"], default="sample", help="清理底色的方式")
+    parser.add_argument("--logo-clean-mode", choices=["safe", "detect", "none"], default="safe", help="清理logo区域策略：safe=仅扩展logo框 detect=检测并集 none=仅logo框内")
+    parser.add_argument("--logo-clean-pad", type=int, default=6, help="safe模式下logo框向四周扩展的像素")
+    parser.add_argument("--gender", choices=["男", "女", "random"], default="random", help="性别生成策略：男/女/随机")
+    parser.add_argument("--pcos-only", action="store_true", default=True, help="仅输出与PCOS相关的内容（诊断/建议/结论均限定为PCOS相关，默认开启）")
+    parser.add_argument("--allow-non-pcos", action="store_true", default=False, help="允许生成非PCOS描述（显式开启前不会生效）")
+    parser.add_argument("--numeric-only", action="store_true", help="只修改数值字段，其他文本固定（默认仍做PCOS场景）")
+    parser.add_argument("--jitter-percent", type=float, default=10.0, help="数值相对基准的最大扰动百分比，例如10表示±10%")
+    parser.add_argument("--jitter-mode", choices=["off", "first"], default="first", help="数值扰动基准：off关闭，first为本次运行每类型首例为基准")
+    parser.add_argument("--no-logo", action="store_true", help="不在页面上贴医院Logo，仅在标题中展示医院全称")
     args = parser.parse_args()
 
     # 璁剧疆闅忔満绉嶅瓙锛堝彲澶嶇幇锛?
@@ -109,7 +110,7 @@ def main():
         args.pcos_only = False
     else:
         args.pcos_only = True
-
+            config = {
     # 榛樿閰嶇疆
     config = {
         "font_path": args.font_path,
@@ -117,8 +118,9 @@ def main():
         "brightness_range": [0.95, 1.05],
         "contrast_range": [0.95, 1.05],
         "blur_probability": 0.2,
-        "noise_probability": 0.2,
-        "noise_std": 3,
+                "jpeg_quality_min": 85,
+                "jpeg_quality_max": 100,
+                "skip_logo": bool(args.no_logo),
         "jpeg_quality_min": 85,
         "jpeg_quality_max": 100
     }

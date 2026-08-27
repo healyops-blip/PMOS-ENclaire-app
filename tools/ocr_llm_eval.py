@@ -360,11 +360,43 @@ def run(args: argparse.Namespace) -> int:
     api_key = None if args.dry_run else get_api_key(args.api_key_env)
     cases = list(iter_cases(args.result_dir, args.limit, args.report_type))
     output = args.output or default_output_path(args.result_dir, args.model)
+    started_at = datetime.now().isoformat(timespec="seconds")
     aggregate_stats: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
     by_report_type: Dict[str, Dict[str, Dict[str, int]]] = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
     entries: List[Dict[str, Any]] = []
     status_counter: Counter[str] = Counter()
     diff_cases = 0
+
+    def build_result() -> Dict[str, Any]:
+        aggregate_summary = summarize_stats(aggregate_stats)
+        ok_cases = status_counter.get("ok", 0)
+        return {
+            "meta": {
+                "started_at": started_at,
+                "updated_at": datetime.now().isoformat(timespec="seconds"),
+                "model": args.model,
+                "endpoint": args.endpoint,
+                "result_dir": os.path.abspath(args.result_dir),
+                "prompt": OCR_PROMPT,
+                "dry_run": args.dry_run,
+            },
+            "summary": {
+                "case_count": len(cases),
+                "completed_case_count": len(entries),
+                "ok_cases": ok_cases,
+                "error_cases": status_counter.get("error", 0),
+                "missing_file_cases": status_counter.get("missing_file", 0),
+                "diff_cases": diff_cases,
+                "exact_case_match_rate": round((ok_cases - diff_cases) / ok_cases, 6) if ok_cases else None,
+                "field_stats": aggregate_summary,
+                "by_report_type": {rt: summarize_stats(stats) for rt, stats in sorted(by_report_type.items())},
+            },
+            "entries": entries,
+        }
+
+    def flush_result() -> None:
+        write_json(output, build_result())
+
     print(f"开始评测: cases={len(cases)}, model={args.model}, dry_run={args.dry_run}")
     print(f"结果将写入: {output}")
     for idx, case in enumerate(cases, 1):
@@ -375,6 +407,7 @@ def run(args: argparse.Namespace) -> int:
             entry.update({"status": "missing_file", "error": {"image_path": case.get("image_path"), "truth_path": case.get("truth_path")}})
             status_counter["missing_file"] += 1
             entries.append(entry)
+            flush_result()
             continue
         truth = case["truth"]
         raw_text = ""
@@ -402,31 +435,12 @@ def run(args: argparse.Namespace) -> int:
             entry.update({"status": "error", "error": str(e), "traceback": traceback.format_exc(limit=5), "raw_model_text": raw_text, "truth": truth})
             status_counter["error"] += 1
         entries.append(entry)
+        flush_result()
         if args.sleep > 0 and idx < len(cases):
             time.sleep(args.sleep)
-    aggregate_summary = summarize_stats(aggregate_stats)
+    result = build_result()
+    aggregate_summary = result["summary"]["field_stats"]
     ok_cases = status_counter.get("ok", 0)
-    result = {
-        "meta": {
-            "started_at": datetime.now().isoformat(timespec="seconds"),
-            "model": args.model,
-            "endpoint": args.endpoint,
-            "result_dir": os.path.abspath(args.result_dir),
-            "prompt": OCR_PROMPT,
-            "dry_run": args.dry_run,
-        },
-        "summary": {
-            "case_count": len(cases),
-            "ok_cases": ok_cases,
-            "error_cases": status_counter.get("error", 0),
-            "missing_file_cases": status_counter.get("missing_file", 0),
-            "diff_cases": diff_cases,
-            "exact_case_match_rate": round((ok_cases - diff_cases) / ok_cases, 6) if ok_cases else None,
-            "field_stats": aggregate_summary,
-            "by_report_type": {rt: summarize_stats(stats) for rt, stats in sorted(by_report_type.items())},
-        },
-        "entries": entries,
-    }
     write_json(output, result)
     overall = aggregate_summary.get("__overall_field_accuracy__", {})
     print("\n评测完成")

@@ -123,7 +123,7 @@ def get_fields():
         # 顶部移动端导航/状态栏（原图是病历小程序截图，不是传统纸质处方笺）
         {"name": "status_time", "bbox": [70, 55, 180, 104], "template": "21:51", "font_size": 28, "method": "none", "color": [90, 90, 90]},
         {"name": "nav_back", "bbox": [48, 162, 110, 230], "template": "＜", "font_size": 46, "method": "none"},
-        {"name": "nav_title", "bbox": [520, 176, 740, 238], "template": "病历", "font_size": 48, "method": "none"},
+        {"name": "nav_title", "bbox": [300, 168, 900, 238], "template": "{hospital}", "font_size": 40, "method": "none"},
         {"name": "nav_menu", "bbox": [932, 168, 1210, 238], "template": "...       ◎", "font_size": 38, "method": "none"},
         {
             "name": "title",

@@ -11,9 +11,16 @@ __pycache__/
 # Generated outputs
 /result/
 result*/
+outputs/
+outputs*/
 _debug*/
 _regen*/
 _imaging_crop_probe/
+.ssh/
+
+# Temp work dirs
+_tmp*/
+_tmp_out_mr/
 .ssh/
 
 # Logs and temp
