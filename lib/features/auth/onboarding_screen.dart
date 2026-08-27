@@ -6,6 +6,11 @@ import 'package:go_router/go_router.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 
+const _onboardingContentPadding = EdgeInsets.all(16);
+const _onboardingFieldSlotHeight = 76.0;
+const _onboardingSectionGap = 16.0;
+const _onboardingLabelGap = 8.0;
+
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -292,17 +297,21 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
-                    child: FilledButton(
-                      onPressed: _saving ? null : (_step == 2 ? _save : _next),
-                      child:
-                          _saving
-                              ? const SizedBox.square(
-                                dimension: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                              : Text(_step == 2 ? '完成，进入首页' : '下一步'),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed:
+                            _saving ? null : (_step == 2 ? _save : _next),
+                        child:
+                            _saving
+                                ? const SizedBox.square(
+                                  dimension: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                                : Text(_step == 2 ? '完成，进入首页' : '下一步'),
+                      ),
                     ),
                   ),
                 ],
@@ -316,7 +325,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   Widget _basicStep() => _StepCard(
     showFrame: false,
-    padding: const EdgeInsets.all(16),
+    padding: _onboardingContentPadding,
     children: [
       _validationSlot(
         TextFormField(
@@ -427,7 +436,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     ],
   );
 
-  Widget _validationSlot(Widget child) => SizedBox(height: 76, child: child);
+  Widget _validationSlot(Widget child) =>
+      SizedBox(height: _onboardingFieldSlotHeight, child: child);
 
   String? _yearValidator(String? value) {
     final year = int.tryParse(value ?? '');
@@ -446,23 +456,28 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   Widget _cycleStep() => _StepCard(
     showFrame: false,
-    padding: const EdgeInsets.all(16),
+    padding: _onboardingContentPadding,
     children: [
-      TextFormField(
-        controller: _lastPeriod,
-        readOnly: true,
-        onTap: () => _chooseDate(_lastPeriod),
-        decoration: const InputDecoration(
-          labelText: '最近一次经期开始日期（选填）',
-          suffixIcon: Icon(Icons.calendar_today_outlined),
+      _validationSlot(
+        TextFormField(
+          controller: _lastPeriod,
+          readOnly: true,
+          onTap: () => _chooseDate(_lastPeriod),
+          decoration: const InputDecoration(
+            labelText: '最近一次经期开始日期（选填）',
+            suffixIcon: Icon(Icons.calendar_today_outlined),
+            helperText: '\u00A0',
+            helperStyle: TextStyle(fontSize: 12, height: 1),
+            errorStyle: TextStyle(fontSize: 12, height: 1),
+          ),
         ),
       ),
-      const SizedBox(height: 18),
+      const SizedBox(height: _onboardingSectionGap),
       const Text('月经周期', style: TextStyle(fontWeight: FontWeight.w700)),
-      const SizedBox(height: 10),
+      const SizedBox(height: _onboardingLabelGap),
       Wrap(
-        spacing: 8,
-        runSpacing: 8,
+        spacing: _onboardingLabelGap,
+        runSpacing: _onboardingLabelGap,
         children:
             ['21-28 天', '28-35 天', '35-45 天', '45 天以上']
                 .map(
@@ -479,14 +494,19 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 )
                 .toList(),
       ),
-      const SizedBox(height: 18),
-      TextFormField(
-        controller: _nextVisit,
-        readOnly: true,
-        onTap: () => _chooseDate(_nextVisit, future: true),
-        decoration: const InputDecoration(
-          labelText: '预计下次就诊日期（选填）',
-          suffixIcon: Icon(Icons.event_available_outlined),
+      const SizedBox(height: _onboardingSectionGap),
+      _validationSlot(
+        TextFormField(
+          controller: _nextVisit,
+          readOnly: true,
+          onTap: () => _chooseDate(_nextVisit, future: true),
+          decoration: const InputDecoration(
+            labelText: '预计下次就诊日期（选填）',
+            suffixIcon: Icon(Icons.event_available_outlined),
+            helperText: '\u00A0',
+            helperStyle: TextStyle(fontSize: 12, height: 1),
+            errorStyle: TextStyle(fontSize: 12, height: 1),
+          ),
         ),
       ),
     ],
@@ -494,21 +514,21 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   Widget _medicationStep() => _StepCard(
     showFrame: false,
-    padding: const EdgeInsets.all(16),
+    padding: _onboardingContentPadding,
     children: [
       const Text(
         '选择当前正在使用的药品或补剂',
         style: TextStyle(fontWeight: FontWeight.w700),
       ),
-      const SizedBox(height: 6),
+      const SizedBox(height: _onboardingLabelGap),
       const Text(
         '未列出的项目可以进入首页后手动添加。',
         style: TextStyle(color: pomiMuted, fontSize: 12),
       ),
-      const SizedBox(height: 12),
+      const SizedBox(height: _onboardingSectionGap),
       Wrap(
-        spacing: 8,
-        runSpacing: 8,
+        spacing: _onboardingLabelGap,
+        runSpacing: _onboardingLabelGap,
         children:
             _medicationOptions.keys
                 .map(
