@@ -305,7 +305,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               controller: _birthYear,
               readOnly: true,
               onTap: () => _chooseYear(_birthYear, fallbackYear: 1997),
-              textAlign: TextAlign.center,
+              textAlign: TextAlign.left,
               decoration: const InputDecoration(
                 labelText: '出生年份',
                 floatingLabelAlignment: FloatingLabelAlignment.start,
@@ -319,7 +319,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               controller: _diagnosisYear,
               readOnly: true,
               onTap: () => _chooseYear(_diagnosisYear, fallbackYear: 2023),
-              textAlign: TextAlign.center,
+              textAlign: TextAlign.left,
               decoration: const InputDecoration(
                 labelText: '确诊年份',
                 floatingLabelAlignment: FloatingLabelAlignment.start,
