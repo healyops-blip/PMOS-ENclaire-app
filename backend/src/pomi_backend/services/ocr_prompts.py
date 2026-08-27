@@ -1,0 +1,164 @@
+"""Versioned prompts and strict JSON Schemas for supported medical materials."""
+
+from __future__ import annotations
+
+from typing import Any
+
+PROMPT_VERSION = "pomi-ocr-v1"
+SCHEMA_VERSION = "pomi-ocr-schema-v1"
+
+
+def _draft_schema(material_type: str) -> dict[str, Any]:
+    schemas: dict[str, dict[str, Any]] = {
+        "lab_report": {
+            "type": "object",
+            "properties": {
+                "facility": {"type": ["string", "null"]},
+                "report_date": {"type": ["string", "null"]},
+                "items": {"type": "array", "items": {"type": "object"}},
+            },
+            "required": ["items"],
+            "additionalProperties": False,
+        },
+        "medical_order": {
+            "type": "object",
+            "properties": {
+                "facility": {"type": ["string", "null"]},
+                "order_date": {"type": ["string", "null"]},
+                "order_text": {"type": ["string", "null"]},
+                "medications": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "drug_name": {"type": ["string", "null"]},
+                            "specification": {"type": ["string", "null"]},
+                            "dosage_value": {"type": ["number", "null"]},
+                            "dosage_unit": {"type": ["string", "null"]},
+                            "frequency": {"type": ["string", "null"]},
+                            "course": {"type": ["string", "null"]},
+                            "route": {"type": ["string", "null"]},
+                            "instructions": {"type": ["string", "null"]},
+                            "raw_order_text": {"type": ["string", "null"]},
+                            "explicitly_stopped": {"type": "boolean"},
+                        },
+                        "required": [
+                            "drug_name",
+                            "specification",
+                            "dosage_value",
+                            "dosage_unit",
+                            "frequency",
+                            "course",
+                            "route",
+                            "instructions",
+                            "raw_order_text",
+                            "explicitly_stopped",
+                        ],
+                        "additionalProperties": False,
+                    },
+                },
+            },
+            "required": ["order_text", "medications"],
+            "additionalProperties": False,
+        },
+        "imaging_text_report": {
+            "type": "object",
+            "properties": {
+                "facility": {"type": ["string", "null"]},
+                "examination_name": {"type": ["string", "null"]},
+                "body_part": {"type": ["string", "null"]},
+                "examination_date": {"type": ["string", "null"]},
+                "report_date": {"type": ["string", "null"]},
+                "modality": {"type": ["string", "null"]},
+                "findings": {"type": ["string", "null"]},
+                "impression": {"type": ["string", "null"]},
+            },
+            "required": ["findings", "impression"],
+            "additionalProperties": False,
+        },
+        "outpatient_record": {
+            "type": "object",
+            "properties": {
+                "facility": {"type": ["string", "null"]},
+                "department": {"type": ["string", "null"]},
+                "doctor_name": {"type": ["string", "null"]},
+                "visit_date": {"type": ["string", "null"]},
+                "chief_complaint": {"type": ["string", "null"]},
+                "diagnosis_summary": {"type": ["string", "null"]},
+                "treatment_plan": {"type": ["string", "null"]},
+                "medical_advice": {"type": ["string", "null"]},
+            },
+            "required": ["visit_date", "diagnosis_summary", "medical_advice"],
+            "additionalProperties": False,
+        },
+    }
+    return schemas[material_type]
+
+
+def schema_for(material_type: str) -> dict[str, Any]:
+    """Return the material-specific extraction envelope schema."""
+
+    return {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+            "draft": _draft_schema(material_type),
+            "fields": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "path": {"type": "string", "minLength": 1, "maxLength": 300},
+                        "source_text": {"type": ["string", "null"]},
+                        "value": {},
+                        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+                        "uncertainty_reason": {"type": ["string", "null"]},
+                        "source_region": {
+                            "oneOf": [
+                                {"type": "null"},
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "page": {"type": "integer", "minimum": 1},
+                                        "x": {"type": "number", "minimum": 0, "maximum": 1},
+                                        "y": {"type": "number", "minimum": 0, "maximum": 1},
+                                        "width": {"type": "number", "minimum": 0, "maximum": 1},
+                                        "height": {"type": "number", "minimum": 0, "maximum": 1},
+                                    },
+                                    "required": ["page", "x", "y", "width", "height"],
+                                    "additionalProperties": False,
+                                },
+                            ]
+                        },
+                    },
+                    "required": ["path", "source_text", "value", "confidence"],
+                    "additionalProperties": False,
+                },
+            },
+        },
+        "required": ["draft", "fields"],
+        "additionalProperties": False,
+    }
+
+
+def prompt_for(material_type: str) -> str:
+    labels = {
+        "lab_report": "化验/检验报告",
+        "medical_order": "医嘱/处方",
+        "imaging_text_report": "影像文字报告",
+        "outpatient_record": "门诊病历",
+    }
+    base = (
+        f"你是医疗材料文字转录工具。材料类型已由用户确定为{labels[material_type]}。"
+        "只转录可见文字，不作诊断、不推测缺失信息。严格按所给 JSON Schema 输出。"
+        "draft 保存结构化草稿；fields 为每个叶字段提供 JSON path、原文、解析值、0-1 "
+        "置信度、不确定原因和归一化来源区域。看不清时保留 null 并说明原因。"
+    )
+    if material_type != "medical_order":
+        return base
+    return base + (
+        " 对每一种药仅从这一次响应中分别提取药名、规格、单次剂量、剂量单位、"
+        "频率、疗程、途径、用法和完整原文片段；不得把规格、剂量、频率或疗程合并。"
+        "只有原文明确写明停药时 explicitly_stopped 才能为 true。不得推测药品标准 ID，"
+        "不得调用或假设第二个模型。"
+    )

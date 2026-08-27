@@ -12,7 +12,11 @@ from sqlalchemy.orm import Session
 from pomi_backend.db.models import UserAccount
 from pomi_backend.services import AuthService
 from pomi_backend.services.auth import AuthError
+from pomi_backend.services.clinical_text import ClinicalTextConfirmationService
+from pomi_backend.services.documents import DocumentService
 from pomi_backend.services.medications import MedicationService
+from pomi_backend.services.ocr import OCRTaskService
+from pomi_backend.services.orders import MedicalOrderService, ReconciliationService
 from pomi_backend.services.patient import PatientProfileService
 from pomi_backend.services.patient_notes import PatientNoteService
 
@@ -77,6 +81,24 @@ def get_patient_note_service(
 PatientNoteServiceDependency = Annotated[PatientNoteService, Depends(get_patient_note_service)]
 
 
+def get_document_service(
+    request: Request, session: DatabaseSession, account: CurrentAccount
+) -> DocumentService:
+    return DocumentService(session, account, request.app.state.settings.storage_root)
+
+
+DocumentServiceDependency = Annotated[DocumentService, Depends(get_document_service)]
+
+
+def get_ocr_task_service(
+    request: Request, session: DatabaseSession, account: CurrentAccount
+) -> OCRTaskService:
+    return OCRTaskService(session, account, model_name=request.app.state.settings.ocr_model)
+
+
+OCRTaskServiceDependency = Annotated[OCRTaskService, Depends(get_ocr_task_service)]
+
+
 def get_medication_service(
     request: Request,
     session: DatabaseSession,
@@ -90,3 +112,34 @@ def get_medication_service(
 
 
 MedicationServiceDependency = Annotated[MedicationService, Depends(get_medication_service)]
+
+
+def get_medical_order_service(
+    session: DatabaseSession, account: CurrentAccount
+) -> MedicalOrderService:
+    return MedicalOrderService(session, account)
+
+
+MedicalOrderServiceDependency = Annotated[MedicalOrderService, Depends(get_medical_order_service)]
+
+
+def get_reconciliation_service(
+    session: DatabaseSession, account: CurrentAccount
+) -> ReconciliationService:
+    return ReconciliationService(session, account)
+
+
+ReconciliationServiceDependency = Annotated[
+    ReconciliationService, Depends(get_reconciliation_service)
+]
+
+
+def get_clinical_text_confirmation_service(
+    session: DatabaseSession, account: CurrentAccount
+) -> ClinicalTextConfirmationService:
+    return ClinicalTextConfirmationService(session, account)
+
+
+ClinicalTextConfirmationServiceDependency = Annotated[
+    ClinicalTextConfirmationService, Depends(get_clinical_text_confirmation_service)
+]

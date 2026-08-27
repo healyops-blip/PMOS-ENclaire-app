@@ -12,6 +12,8 @@ import 'package:pmos_enclaire/features/profile/presentation/profile_page.dart';
 import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
 import 'package:pmos_enclaire/features/records/presentation/records_page.dart';
 import 'package:pmos_enclaire/features/records/presentation/upload_flow.dart';
+import 'package:pmos_enclaire/features/records/data/document_repository.dart';
+import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:pmos_enclaire/features/reports/presentation/report_page.dart';
 import 'package:pmos_enclaire/features/reports/data/patient_note_repository.dart';
 import 'package:pmos_enclaire/features/weight/application/weight_controller.dart';
@@ -24,6 +26,8 @@ class DashboardPage extends StatefulWidget {
     this.patientNoteRepository,
     this.medicationRepository,
     this.weightRepository,
+    this.documentRepository,
+    this.ocrRepository,
     super.key,
   });
 
@@ -32,6 +36,8 @@ class DashboardPage extends StatefulWidget {
   final PatientNoteRepository? patientNoteRepository;
   final MedicationRepository? medicationRepository;
   final WeightRepository? weightRepository;
+  final DocumentRepository? documentRepository;
+  final OcrRepository? ocrRepository;
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -40,6 +46,9 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   int _selectedTab = 0;
   late final WeightController _weightController;
+  int _recordsVersion = 0;
+  late final DocumentRepository _documentRepository;
+  late final OcrRepository _ocrRepository;
   late List<Medication> _medications = const [
     Medication(
       id: 'demo-metformin',
@@ -75,6 +84,8 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void initState() {
     super.initState();
+    _documentRepository = widget.documentRepository ?? DemoDocumentRepository();
+    _ocrRepository = widget.ocrRepository ?? DemoOcrRepository();
     _weightController = WeightController(
       widget.weightRepository ?? MemoryWeightRepository.seeded(),
     )..addListener(_onWeightChanged);
@@ -192,7 +203,11 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
             ),
             CyclePage(weightController: _weightController),
-            const RecordsPage(),
+            RecordsPage(
+              key: ValueKey(_recordsVersion),
+              repository: _documentRepository,
+              ocrRepository: _ocrRepository,
+            ),
             ProfilePage(
               account: widget.account,
               repository:
@@ -203,7 +218,12 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       floatingActionButton: FloatingActionButton(
         key: const Key('upload-button'),
-        onPressed: () => showUploadFlow(context),
+        onPressed: () => showUploadFlow(
+          context,
+          repository: _documentRepository,
+          ocrRepository: _ocrRepository,
+          onUploaded: () => setState(() => _recordsVersion++),
+        ),
         backgroundColor: PomiColors.primary,
         foregroundColor: Colors.white,
         shape: const CircleBorder(),

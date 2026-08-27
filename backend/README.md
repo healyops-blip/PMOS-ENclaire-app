@@ -8,6 +8,9 @@ Use environment variables for production configuration and external API keys.
 
 ## API contracts
 
+- OCR task, Worker, retry, and Flutter polling contract:
+  [`../docs/ocr-pipeline.md`](../docs/ocr-pipeline.md)
+
 - 已经实现并通过测试的认证接口：
   [`../docs/backend-api.md`](../docs/backend-api.md)
 - 全部 P0 前后端分工与字段说明：
@@ -32,10 +35,23 @@ python -m alembic upgrade head
 pytest
 ruff check .
 uvicorn pomi_backend.main:app --reload
+pomi-ocr-worker --once
 ```
 
 The default database path is `backend/runtime/pomi.db`. Set
 `POMI_DATABASE_URL` to use another SQLite path or a PostgreSQL connection later.
+
+## OCR worker
+
+FastAPI creates and reads OCR tasks but never executes model calls inside a request.
+Run `pomi-ocr-worker` as a separate single-process service. It claims work through
+expiring SQLite leases and can resume a task whose worker stopped before the provider
+call. If a worker stops while a provider request is in flight, the task becomes
+`timed_out` instead of silently resending protected medical data.
+
+Qwen3-VL configuration is server-only: `POMI_OCR_API_KEY`, `POMI_OCR_API_BASE_URL`,
+`POMI_OCR_MODEL`, `POMI_OCR_TIMEOUT_SECONDS`, and `POMI_OCR_LEASE_SECONDS`. Never put
+the key in Flutter, a database row, logs, or source control.
 
 ## Current authentication persistence
 
@@ -73,6 +89,7 @@ terminal echo unless the corresponding one-shot environment variable is set.
 ```bash
 pomi-admin seed-accounts
 pomi-admin seed-health
+pomi-admin purge-documents
 pomi-admin reset-password ACCOUNT_NAME
 ```
 
@@ -80,6 +97,9 @@ pomi-admin reset-password ACCOUNT_NAME
 `seed-health` keeps the first-time user's health records empty and idempotently
 adds synthetic medications, events, daily statuses, cycles, and weights for the
 returning user. Run it only after `seed-accounts`.
+`purge-documents` removes expired physical files for soft-deleted documents after
+the seven-day retention period; immutable report references must be registered by
+the report module before enabling its scheduled timer.
 `reset-password` changes the hash and revokes every active Session for the
 account. Neither operation is exposed as an HTTP endpoint.
 
@@ -95,6 +115,27 @@ account. Neither operation is exposed as an HTTP endpoint.
 The server business date uses `POMI_BUSINESS_TIMEZONE` (`Asia/Singapore` by
 default). Daily totals exclude future dates and derive expected days from every
 start, pause, resume, adjustment, and stop boundary.
+
+## Medical-order confirmation and reconciliation
+
+- Qwen3-VL produces one `medical_order` draft containing `order_text` and a
+  `medications` array. Each item keeps drug name, specification, single dose,
+  unit, frequency, course, route, instructions, source text, and explicit-stop
+  evidence separate.
+- `POST /api/ocr/tasks/{task_id}/confirm` requires every extracted item with
+  `confirmed: true`. Missing drug name, positive dose, unit, frequency, date, or
+  raw source text rejects the whole request. Repeating a successful confirmation
+  returns the same `medical_order` rows.
+- Standard drug IDs use the exact controlled alias table in
+  `services/orders.py`. Unknown names stay `review_required`; no fuzzy or model
+  guess is persisted.
+- `POST /api/medication-reconciliations` accepts `ocr_task_id` and applies rule
+  version `pomi-med-reconcile-v1`. Suggestions are `unchanged`, `adjusted`,
+  `added`, `stopped`, `uncertain`, or `manual_review`.
+- `GET/PUT /api/medication-reconciliations/{id}` are patient scoped. PUT requires
+  one decision for every item and applies accepted changes in one transaction.
+  Omitted old drugs are always `uncertain` and never automatically stopped.
+  Explicit stopping additionally requires a date and source.
 
 ## Remaining P0 backend rules
 

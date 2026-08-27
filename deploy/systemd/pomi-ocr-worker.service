@@ -1,0 +1,40 @@
+[Unit]
+Description=Pomi single-process OCR worker
+After=network-online.target pomi-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pomi
+Group=pomi
+WorkingDirectory=/opt/pomi/current/backend
+EnvironmentFile=/etc/pomi/pomi.env
+ExecStart=/opt/pomi/current/backend/.venv/bin/pomi-ocr-worker --poll-seconds 1
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=210s
+KillSignal=SIGTERM
+UMask=0077
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadWritePaths=/var/lib/pomi /var/log/pomi
+MemoryMax=1G
+TasksMax=128
+
+StandardOutput=append:/var/log/pomi/ocr-worker.log
+StandardError=append:/var/log/pomi/ocr-worker-error.log
+
+[Install]
+WantedBy=multi-user.target

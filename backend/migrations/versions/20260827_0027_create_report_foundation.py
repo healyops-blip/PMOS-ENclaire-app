@@ -13,7 +13,10 @@ from alembic import op
 import pomi_backend.db.types
 
 revision: str = "20260827_0027"
-down_revision: str | None = "20260827_0015"
+down_revision: str | tuple[str, str] | None = (
+    "20260827_0015",
+    "20260827_0024_merge",
+)
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

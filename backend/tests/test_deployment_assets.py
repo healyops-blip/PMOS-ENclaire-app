@@ -22,6 +22,13 @@ def test_systemd_service_is_loopback_only_and_hardened() -> None:
     assert "ProtectSystem=strict" in service
     assert "EnvironmentFile=/etc/pomi/pomi.env" in service
 
+    worker = read("deploy/systemd/pomi-ocr-worker.service")
+    assert "pomi-ocr-worker --poll-seconds 1" in worker
+    assert "NoNewPrivileges=true" in worker
+    assert "ProtectSystem=strict" in worker
+    assert "EnvironmentFile=/etc/pomi/pomi.env" in worker
+    assert "--workers" not in worker
+
 
 def test_nginx_has_tls_limits_and_local_upstream() -> None:
     nginx = read("deploy/nginx/pomi-api.conf")

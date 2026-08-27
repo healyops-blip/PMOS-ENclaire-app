@@ -14,6 +14,7 @@ from pomi_backend.api.auth import router as auth_router
 from pomi_backend.api.business import BusinessError
 from pomi_backend.api.cycles import cycle_error_handler
 from pomi_backend.api.cycles import router as cycles_router
+from pomi_backend.api.documents import router as documents_router
 from pomi_backend.api.errors import (
     auth_error_handler,
     business_error_handler,
@@ -21,10 +22,13 @@ from pomi_backend.api.errors import (
     validation_error_handler,
 )
 from pomi_backend.api.health import router as health_router
+from pomi_backend.api.labs import router as labs_router
 from pomi_backend.api.medications import router as medications_router
 from pomi_backend.api.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
+from pomi_backend.api.ocr import router as ocr_router
 from pomi_backend.api.patient import router as patient_router
 from pomi_backend.api.patient_notes import router as patient_notes_router
+from pomi_backend.api.reconciliations import router as reconciliations_router
 from pomi_backend.api.weights import router as weights_router
 from pomi_backend.config import Settings
 from pomi_backend.db import build_engine, build_session_factory
@@ -46,6 +50,7 @@ def create_app(*, settings: Settings | None = None, engine: Engine | None = None
     )
 
     active_engine = engine or build_engine(active_settings.database_url)
+    active_settings.storage_root.mkdir(parents=True, exist_ok=True)
     app.state.settings = active_settings
     app.state.engine = active_engine
     app.state.session_factory = build_session_factory(active_engine)
@@ -77,6 +82,10 @@ def create_app(*, settings: Settings | None = None, engine: Engine | None = None
     app.include_router(patient_router)
     app.include_router(patient_notes_router)
     app.include_router(weights_router)
+    app.include_router(documents_router)
+    app.include_router(ocr_router)
+    app.include_router(labs_router)
+    app.include_router(reconciliations_router)
     return app
 
 

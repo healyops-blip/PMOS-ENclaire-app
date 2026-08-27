@@ -11,6 +11,8 @@ import 'package:pmos_enclaire/features/onboarding/presentation/onboarding_page.d
 import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
 import 'package:pmos_enclaire/features/reports/data/patient_note_repository.dart';
 import 'package:pmos_enclaire/features/weight/data/weight_repository.dart';
+import 'package:pmos_enclaire/features/records/data/document_repository.dart';
+import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 
 abstract final class PomiRoutes {
   static const login = '/login';
@@ -24,6 +26,8 @@ class PomiApp extends StatefulWidget {
     this.profileRepository,
     this.patientNoteRepository,
     this.weightRepository,
+    this.documentRepository,
+    this.ocrRepository,
     super.key,
   });
 
@@ -31,6 +35,8 @@ class PomiApp extends StatefulWidget {
   final PatientProfileRepository? profileRepository;
   final PatientNoteRepository? patientNoteRepository;
   final WeightRepository? weightRepository;
+  final DocumentRepository? documentRepository;
+  final OcrRepository? ocrRepository;
 
   @override
   State<PomiApp> createState() => _PomiAppState();
@@ -51,6 +57,16 @@ class _PomiAppState extends State<PomiApp> {
       (widget.authRepository is DemoAuthRepository
           ? DemoPatientNoteRepository()
           : FastApiPatientNoteRepository(_apiClient));
+  late final DocumentRepository _documentRepository =
+      widget.documentRepository ??
+      (widget.authRepository is DemoAuthRepository
+          ? DemoDocumentRepository()
+          : FastApiDocumentRepository(_apiClient));
+  late final OcrRepository _ocrRepository =
+      widget.ocrRepository ??
+      (widget.authRepository is DemoAuthRepository
+          ? DemoOcrRepository()
+          : FastApiOcrRepository(_apiClient));
 
   late final GoRouter _router = GoRouter(
     initialLocation: PomiRoutes.login,
@@ -107,6 +123,8 @@ class _PomiAppState extends State<PomiApp> {
             profileRepository: _profileRepository,
             patientNoteRepository: _patientNoteRepository,
             weightRepository: widget.weightRepository,
+            documentRepository: _documentRepository,
+            ocrRepository: _ocrRepository,
           );
         },
       ),
