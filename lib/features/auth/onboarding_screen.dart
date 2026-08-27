@@ -544,13 +544,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               ),
       ),
       const SizedBox(height: _onboardingSectionGap),
+      const Text('下次就诊', style: TextStyle(fontWeight: FontWeight.w700)),
+      const SizedBox(height: _onboardingLabelGap),
       _validationSlot(
         TextFormField(
           controller: _nextVisit,
           readOnly: true,
           onTap: () => _chooseDate(_nextVisit, future: true),
           decoration: const InputDecoration(
-            labelText: '下次就诊（选填）',
+            labelText: '就诊日期（选填）',
             suffixIcon: Icon(Icons.event_available_outlined),
             helperText: '\u00A0',
             helperStyle: TextStyle(fontSize: 12, height: 1),
