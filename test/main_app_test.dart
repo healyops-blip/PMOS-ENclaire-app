@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pmos_enclaire/features/auth/data/auth_repository.dart';
 import 'package:pmos_enclaire/main.dart';
 
 void main() {
   testWidgets('shows both fixed demo accounts on the login screen', (
     tester,
   ) async {
-    await tester.pumpWidget(const MainApp());
+    await tester.pumpWidget(
+      const MainApp(authRepository: DemoAuthRepository()),
+    );
 
     expect(find.byKey(const Key('login-page')), findsOneWidget);
     expect(find.text('新用户演示'), findsWidgets);
@@ -17,7 +20,9 @@ void main() {
   testWidgets('existing demo user opens the dashboard and updates medication', (
     tester,
   ) async {
-    await tester.pumpWidget(const MainApp());
+    await tester.pumpWidget(
+      const MainApp(authRepository: DemoAuthRepository()),
+    );
 
     final loginButton = find.byKey(const Key('demo-login-button'));
     await tester.ensureVisible(loginButton);
@@ -68,7 +73,9 @@ void main() {
     tester,
   ) async {
     _setPhoneViewport(tester);
-    await tester.pumpWidget(const MainApp());
+    await tester.pumpWidget(
+      const MainApp(authRepository: DemoAuthRepository()),
+    );
 
     expect(find.byKey(const Key('auth-identifier-field')), findsOneWidget);
     expect(find.byKey(const Key('auth-password-field')), findsOneWidget);
@@ -117,7 +124,9 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(const MainApp());
+    await tester.pumpWidget(
+      const MainApp(authRepository: DemoAuthRepository()),
+    );
     await tester.tap(find.byKey(const Key('account-preset-new-user')));
     await tester.tap(find.byKey(const Key('demo-login-button')));
     await tester.pumpAndSettle();
@@ -265,7 +274,7 @@ void _setPhoneViewport(WidgetTester tester) {
 }
 
 Future<void> _loginExistingUser(WidgetTester tester) async {
-  await tester.pumpWidget(const MainApp());
+  await tester.pumpWidget(const MainApp(authRepository: DemoAuthRepository()));
   await tester.tap(find.byKey(const Key('demo-login-button')));
   await tester.pumpAndSettle();
   expect(find.byKey(const Key('dashboard-page')), findsOneWidget);

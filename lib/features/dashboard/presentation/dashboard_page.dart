@@ -9,6 +9,7 @@ import 'package:pmos_enclaire/features/medications/application/medication_status
 import 'package:pmos_enclaire/features/medications/data/medication_repository.dart';
 import 'package:pmos_enclaire/features/medications/presentation/medication_page.dart';
 import 'package:pmos_enclaire/features/profile/presentation/profile_page.dart';
+import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
 import 'package:pmos_enclaire/features/records/presentation/records_page.dart';
 import 'package:pmos_enclaire/features/records/presentation/upload_flow.dart';
 import 'package:pmos_enclaire/features/reports/presentation/report_page.dart';
@@ -16,11 +17,13 @@ import 'package:pmos_enclaire/features/reports/presentation/report_page.dart';
 class DashboardPage extends StatefulWidget {
   const DashboardPage({
     required this.account,
+    required this.profileRepository,
     this.medicationRepository,
     super.key,
   });
 
   final DemoAccount account;
+  final PatientProfileRepository profileRepository;
   final MedicationRepository? medicationRepository;
 
   @override
@@ -29,35 +32,37 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   int _selectedTab = 0;
-  late List<Medication> _medications = const [
-    Medication(
-      id: 'demo-metformin',
-      name: '二甲双胍',
-      dose: '500 mg · 晚餐随餐',
-      group: '多囊用药',
-      status: MedicationStatus.taken,
-      takenDays: 22,
-      missedDays: 2,
-    ),
-    Medication(
-      id: 'demo-yasmin',
-      name: '优思明',
-      dose: '1 片 · 每晚',
-      group: '多囊用药',
-      status: MedicationStatus.unrecorded,
-      takenDays: 20,
-      missedDays: 1,
-    ),
-    Medication(
-      id: 'demo-vitamin-d3',
-      name: '维生素 D3',
-      dose: '1000 IU · 早餐后',
-      group: '日常补剂',
-      status: MedicationStatus.taken,
-      takenDays: 24,
-      missedDays: 1,
-    ),
-  ];
+  late List<Medication> _medications = widget.medicationRepository == null
+      ? const [
+          Medication(
+            id: 'demo-metformin',
+            name: '二甲双胍',
+            dose: '500 mg · 晚餐随餐',
+            group: '多囊用药',
+            status: MedicationStatus.taken,
+            takenDays: 22,
+            missedDays: 2,
+          ),
+          Medication(
+            id: 'demo-yasmin',
+            name: '优思明',
+            dose: '1 片 · 每晚',
+            group: '多囊用药',
+            status: MedicationStatus.unrecorded,
+            takenDays: 20,
+            missedDays: 1,
+          ),
+          Medication(
+            id: 'demo-vitamin-d3',
+            name: '维生素 D3',
+            dose: '1000 IU · 早餐后',
+            group: '日常补剂',
+            status: MedicationStatus.taken,
+            takenDays: 24,
+            missedDays: 1,
+          ),
+        ]
+      : const [];
   late final MedicationRepository _medicationRepository;
   late final MedicationStatusController _medicationStatusController;
 
@@ -70,6 +75,20 @@ class _DashboardPageState extends State<DashboardPage> {
       gateway: _medicationRepository,
       medications: _medications,
     )..addListener(_syncMedicationStatus);
+    _refreshMedications();
+  }
+
+  Future<void> _refreshMedications() async {
+    try {
+      final medications = await _medicationRepository.listMedications();
+      if (mounted) {
+        _medicationStatusController.replaceMedications(medications);
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('用药数据加载失败：$error')));
+    }
   }
 
   void _syncMedicationStatus() {
@@ -166,7 +185,10 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
             const CyclePage(),
             const RecordsPage(),
-            ProfilePage(account: widget.account),
+            ProfilePage(
+              account: widget.account,
+              repository: widget.profileRepository,
+            ),
           ],
         ),
       ),

@@ -3,6 +3,8 @@ import 'package:pmos_enclaire/core/network/pomi_api_client.dart';
 import 'package:pmos_enclaire/features/dashboard/domain/medication.dart';
 
 abstract interface class MedicationDailyGateway {
+  Future<DateTime> businessDate();
+
   Future<void> setDailyStatus(
     String medicationId,
     DateTime date,
@@ -50,25 +52,37 @@ class FastApiMedicationRepository implements MedicationRepository {
   final PomiApiClient _client;
 
   @override
+  Future<DateTime> businessDate() async {
+    try {
+      final response = await _client.dio.get<Map<String, dynamic>>(
+        '/medications',
+      );
+      return _rememberBusinessDate(_data(response.data));
+    } on DioException catch (error) {
+      throw MedicationFailure(_message(error));
+    }
+  }
+
+  @override
   Future<List<Medication>> listMedications() async {
     try {
-      final today = DateTime.now();
-      final responses = await Future.wait([
-        _client.dio.get<Map<String, dynamic>>('/medications'),
-        _client.dio.get<Map<String, dynamic>>(
-          '/medication-daily',
-          queryParameters: {
-            'from': _date(DateTime(today.year, today.month)),
-            'to': _date(today),
-          },
-        ),
-      ]);
-      final data = _data(responses[0].data);
+      final medicationResponse = await _client.dio.get<Map<String, dynamic>>(
+        '/medications',
+      );
+      final data = _data(medicationResponse.data);
+      final today = _rememberBusinessDate(data);
+      final dailyResponse = await _client.dio.get<Map<String, dynamic>>(
+        '/medication-daily',
+        queryParameters: {
+          'from': _date(DateTime(today.year, today.month)),
+          'to': _date(today),
+        },
+      );
       final medications = (data['items'] as List<dynamic>)
           .cast<Map<String, dynamic>>()
           .map(Medication.fromJson)
           .toList(growable: false);
-      final dailyItems = (_data(responses[1].data)['items'] as List<dynamic>)
+      final dailyItems = (_data(dailyResponse.data)['items'] as List<dynamic>)
           .cast<Map<String, dynamic>>();
       final todayKey = _date(today);
       final todayStatus = <String, MedicationStatus>{};
@@ -111,7 +125,7 @@ class FastApiMedicationRepository implements MedicationRepository {
     String? dosageUnit,
     String? frequency,
   }) async {
-    final date = _date(startDate);
+    final date = _date(await businessDate());
     try {
       final response = await _client.dio.post<Map<String, dynamic>>(
         '/medications',
@@ -152,11 +166,12 @@ class FastApiMedicationRepository implements MedicationRepository {
       throw const MedicationFailure('用药版本时间缺失，请刷新后重试');
     }
     try {
+      final eventDate = await businessDate();
       final response = await _client.dio.put<Map<String, dynamic>>(
         '/medications/${medication.id}',
         data: {
           'event_type': eventType,
-          'event_date': _date(DateTime.now()),
+          'event_date': _date(eventDate),
           'updated_at': medication.updatedAt!.toIso8601String(),
           'dosage_value': ?dosageValue,
           'dosage_unit': ?dosageUnit,
@@ -222,6 +237,14 @@ class FastApiMedicationRepository implements MedicationRepository {
     return '网络请求失败，请检查连接后重试';
   }
 
+  DateTime _rememberBusinessDate(Map<String, dynamic> data) {
+    final value = data['server_date'];
+    if (value is! String) {
+      throw const MedicationFailure('服务端未返回业务日期，请稍后重试');
+    }
+    return DateTime.parse(value);
+  }
+
   static String _date(DateTime value) =>
       '${value.year.toString().padLeft(4, '0')}-'
       '${value.month.toString().padLeft(2, '0')}-'
@@ -229,10 +252,17 @@ class FastApiMedicationRepository implements MedicationRepository {
 }
 
 class DemoMedicationRepository implements MedicationRepository {
-  DemoMedicationRepository([List<Medication> initial = const []])
-    : _medications = [...initial];
+  DemoMedicationRepository([
+    List<Medication> initial = const [],
+    DateTime Function()? now,
+  ]) : _medications = [...initial],
+       _now = now ?? DateTime.now;
 
   final List<Medication> _medications;
+  final DateTime Function() _now;
+
+  @override
+  Future<DateTime> businessDate() async => _now();
 
   @override
   Future<List<Medication>> listMedications() async =>

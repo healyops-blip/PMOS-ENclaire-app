@@ -2,5 +2,6 @@
 
 from pomi_backend.services.auth import AuthService
 from pomi_backend.services.medications import MedicationService
+from pomi_backend.services.patient import PatientProfileService
 
-__all__ = ["AuthService", "MedicationService"]
+__all__ = ["AuthService", "MedicationService", "PatientProfileService"]

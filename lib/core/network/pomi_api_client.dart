@@ -1,20 +1,23 @@
 import 'package:dio/dio.dart';
 
+const pomiApiBaseUrl = String.fromEnvironment(
+  'POMI_API_BASE_URL',
+  defaultValue: 'https://api.healy1012-ops.top/api',
+);
+
 class PomiApiClient {
-  PomiApiClient({
-    String baseUrl = 'https://api.healy1012-ops.top/api',
-    Dio? dio,
-  }) : dio =
-           dio ??
-           Dio(
-             BaseOptions(
-               baseUrl: baseUrl,
-               connectTimeout: const Duration(seconds: 15),
-               receiveTimeout: const Duration(seconds: 30),
-               sendTimeout: const Duration(seconds: 30),
-               headers: const {'Accept': 'application/json'},
-             ),
-           );
+  PomiApiClient({String baseUrl = pomiApiBaseUrl, Dio? dio})
+    : dio =
+          dio ??
+          Dio(
+            BaseOptions(
+              baseUrl: baseUrl,
+              connectTimeout: const Duration(seconds: 15),
+              receiveTimeout: const Duration(seconds: 30),
+              sendTimeout: const Duration(seconds: 30),
+              headers: const {'Accept': 'application/json'},
+            ),
+          );
 
   final Dio dio;
 

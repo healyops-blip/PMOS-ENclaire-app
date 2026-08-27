@@ -1,5 +1,7 @@
 """Request context and security headers for JSON API responses."""
 
+from __future__ import annotations
+
 import uuid
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -13,7 +15,6 @@ class RequestContextMiddleware:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
-
         headers = {key.lower(): value for key, value in scope.get("headers", [])}
         supplied = headers.get(b"x-request-id", b"").decode("ascii", errors="ignore")
         request_id = supplied[:128] if supplied else f"req_{uuid.uuid4().hex}"
