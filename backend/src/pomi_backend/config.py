@@ -13,6 +13,7 @@ DEFAULT_ARGON2_PARALLELISM = 4
 DEFAULT_AUTH_RATE_LIMIT_ATTEMPTS = 5
 DEFAULT_AUTH_RATE_LIMIT_WINDOW_SECONDS = 60
 DEFAULT_ALLOWED_HOSTS = ("api.healy1012-ops.top", "localhost", "127.0.0.1")
+DEFAULT_BUSINESS_TIMEZONE = "Asia/Singapore"
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,6 +29,7 @@ class Settings:
     auth_rate_limit_attempts: int = DEFAULT_AUTH_RATE_LIMIT_ATTEMPTS
     auth_rate_limit_window_seconds: int = DEFAULT_AUTH_RATE_LIMIT_WINDOW_SECONDS
     allowed_hosts: tuple[str, ...] = DEFAULT_ALLOWED_HOSTS
+    business_timezone: str = DEFAULT_BUSINESS_TIMEZONE
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -63,4 +65,5 @@ class Settings:
                 )
                 if host.strip()
             ),
+            business_timezone=os.getenv("POMI_BUSINESS_TIMEZONE", DEFAULT_BUSINESS_TIMEZONE),
         )
