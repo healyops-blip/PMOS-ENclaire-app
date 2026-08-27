@@ -6,11 +6,19 @@ import hashlib
 import json
 from typing import Any
 
+from jsonschema import validate
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from pomi_backend.api.business import BusinessError
-from pomi_backend.db.models import LabObservation, OCRFieldResult, OCRResult, OCRTask, UserAccount
+from pomi_backend.db.models import (
+    LabObservation,
+    OCRFallbackUse,
+    OCRFieldResult,
+    OCRResult,
+    OCRTask,
+    UserAccount,
+)
 from pomi_backend.db.models.auth import utc_now
 from pomi_backend.db.models.health import new_uuid
 from pomi_backend.repositories import (
@@ -25,7 +33,13 @@ from pomi_backend.services.lab_rules import (
     p0_evaluation,
     parse_number,
 )
-from pomi_backend.services.ocr_prompts import PROMPT_VERSION, SCHEMA_VERSION
+from pomi_backend.services.ocr_fallback import (
+    ALLOWED_FAILURE_CATEGORIES,
+    FALLBACK_DATA_VERSION,
+    fallback_match,
+    mark_fallback_confirmed,
+)
+from pomi_backend.services.ocr_prompts import PROMPT_VERSION, SCHEMA_VERSION, schema_for
 
 
 def task_data(task: OCRTask) -> dict[str, Any]:
@@ -151,6 +165,13 @@ class OCRTaskService:
             raise BusinessError("RESOURCE_NOT_FOUND", "OCR task was not found.", 404)
         return task
 
+    def data(self, task: OCRTask) -> dict[str, Any]:
+        fallback = self.repository.fallback_use(task.id)
+        return {
+            **task_data(task),
+            "fallback": None if fallback is None else self._fallback_data(fallback),
+        }
+
     def create(self, document_id: str, revision_id: str) -> tuple[OCRTask, bool]:
         document = self.documents.get(document_id)
         if document is None:
@@ -215,11 +236,108 @@ class OCRTaskService:
                 "revision_number": revision.revision_number,
                 "file_endpoint": (f"/api/documents/{document.id}/revisions/{revision.id}/file"),
             }
-        return result_data(
+        data = result_data(
             result,
             self.repository.fields(result.id),
             source_document=source,
         )
+        data["result_source"] = task.result_source
+        fallback = self.repository.fallback_use(task.id)
+        data["fallback"] = None if fallback is None else self._fallback_data(fallback)
+        return data
+
+    def fallback_eligibility(self, task_id: str) -> dict[str, Any]:
+        task = self.owned(task_id)
+        eligible, reason = self._fallback_match(task)
+        return {
+            "eligible": eligible is not None,
+            "data_version": FALLBACK_DATA_VERSION if eligible is not None else None,
+            "reason": reason,
+        }
+
+    def use_fallback(self, task_id: str, *, accept: bool, data_version: str) -> dict[str, Any]:
+        task = self.owned(task_id)
+        if not accept:
+            return {**self.data(task), "fallback_declined": True}
+        if data_version != FALLBACK_DATA_VERSION:
+            raise BusinessError(
+                "OCR_FALLBACK_NOT_AVAILABLE", "No matching demo fallback is available.", 409
+            )
+        existing = self.repository.result(task.id)
+        if existing is not None:
+            if task.result_source == "fallback":
+                return {**self.data(task), "reused": True}
+            raise BusinessError("OCR_RESULT_ALREADY_EXISTS", "OCR task already has a result.", 409)
+        match, _ = self._fallback_match(task)
+        if match is None:
+            raise BusinessError(
+                "OCR_FALLBACK_NOT_AVAILABLE", "No matching demo fallback is available.", 409
+            )
+        validate(instance=match.payload, schema=schema_for(task.material_type))
+        trigger_category = task.error_category or "provider_unavailable"
+        trigger_code = task.error_code or "OCR_PROVIDER_UNAVAILABLE"
+        try:
+            file_hash = self._revision_hash(task)
+            result = OCRResult(
+                id=new_uuid(),
+                task_id=task.id,
+                raw_response={
+                    "source": "fallback",
+                    "data_version": match.data_version,
+                    "matched_sha256": file_hash,
+                },
+                validated_draft=match.payload["draft"],
+            )
+            self.session.add(result)
+            self.session.flush()
+            self.session.add_all(
+                [
+                    OCRFieldResult(
+                        id=new_uuid(),
+                        result_id=result.id,
+                        field_path=field["path"],
+                        source_text=field.get("source_text"),
+                        parsed_value=field.get("value"),
+                        confidence=float(field["confidence"]),
+                        uncertainty_reason=field.get("uncertainty_reason"),
+                        source_region=field.get("source_region"),
+                    )
+                    for field in match.payload["fields"]
+                ]
+            )
+            now = utc_now()
+            self.session.add(
+                OCRFallbackUse(
+                    id=new_uuid(),
+                    task_id=task.id,
+                    patient_id=task.patient_id,
+                    document_id=task.document_id,
+                    document_revision_id=task.document_revision_id,
+                    file_hash=file_hash,
+                    material_type=task.material_type,
+                    data_version=match.data_version,
+                    trigger_category=trigger_category,
+                    trigger_code=trigger_code,
+                    selected_by_uid=self.account.uid,
+                    selected_at=now,
+                )
+            )
+            task.status = "pending_confirmation"
+            task.result_source = "fallback"
+            task.error_category = None
+            task.error_code = None
+            task.error_message = None
+            task.finished_at = now
+            task.updated_at = now
+            self.session.commit()
+            self.session.refresh(task)
+        except IntegrityError:
+            self.session.rollback()
+            task = self.owned(task_id)
+            if task.result_source != "fallback":
+                raise
+            return {**self.data(task), "reused": True}
+        return {**self.data(task), "reused": False}
 
     def confirm_lab(self, task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         task = self.owned(task_id)
@@ -381,6 +499,7 @@ class OCRTaskService:
         task.status = "confirmed"
         task.finished_at = task.finished_at or confirmed_at
         task.updated_at = confirmed_at
+        mark_fallback_confirmed(self.session, task, uid=self.account.uid, confirmed_at=confirmed_at)
         self.session.commit()
         for observation in observations:
             self.session.refresh(observation)
@@ -544,6 +663,45 @@ class OCRTaskService:
         if observation is None:
             raise BusinessError("RESOURCE_NOT_FOUND", "Lab observation was not found.", 404)
         return lab_observation_data(observation)
+
+    def _fallback_match(self, task: OCRTask) -> tuple[Any | None, str]:
+        if task.status not in {"failed", "timed_out"}:
+            return None, "task_not_failed"
+        if task.error_category not in ALLOWED_FAILURE_CATEGORIES:
+            return None, "failure_not_eligible"
+        document = self.documents.get(task.document_id)
+        if document is None:
+            return None, "document_not_available"
+        revision = self.documents.revision(task.document_id, task.document_revision_id)
+        if revision is None:
+            return None, "revision_not_available"
+        match = fallback_match(revision.file_hash, task.material_type, FALLBACK_DATA_VERSION)
+        return (match, "exact_match" if match is not None else "file_not_registered")
+
+    def _revision_hash(self, task: OCRTask) -> str:
+        if self.documents.get(task.document_id) is None:
+            raise BusinessError("RESOURCE_NOT_FOUND", "Document was not found.", 404)
+        revision = self.documents.revision(task.document_id, task.document_revision_id)
+        if revision is None:
+            raise BusinessError("RESOURCE_NOT_FOUND", "Document revision was not found.", 404)
+        return revision.file_hash.casefold()
+
+    @staticmethod
+    def _fallback_data(fallback: OCRFallbackUse) -> dict[str, Any]:
+        return {
+            "result_source": "fallback",
+            "data_version": fallback.data_version,
+            "trigger_reason": {
+                "category": fallback.trigger_category,
+                "code": fallback.trigger_code,
+            },
+            "selected_by_uid": fallback.selected_by_uid,
+            "selected_at": fallback.selected_at.isoformat(),
+            "confirmed_by_uid": fallback.confirmed_by_uid,
+            "confirmed_at": (
+                fallback.confirmed_at.isoformat() if fallback.confirmed_at is not None else None
+            ),
+        }
 
     @staticmethod
     def _key(*parts: str) -> str:

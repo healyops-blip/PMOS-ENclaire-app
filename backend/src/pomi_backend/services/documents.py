@@ -13,7 +13,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from pomi_backend.api.business import BusinessError
-from pomi_backend.db.models import Document, DocumentRevision, UserAccount
+from pomi_backend.db.models import (
+    Document,
+    DocumentRevision,
+    OCRFallbackUse,
+    OCRTask,
+    UserAccount,
+)
 from pomi_backend.db.models.auth import utc_now
 from pomi_backend.db.models.health import new_uuid
 from pomi_backend.repositories import DocumentRepository, PatientRepository
@@ -78,7 +84,29 @@ class DocumentService:
         revision = self.repository.revision(document.id, document.current_revision_id)
         if revision is None:
             raise BusinessError("RESOURCE_NOT_FOUND", "Current revision was not found.", 404)
-        return document_data(document, revision)
+        value = document_data(document, revision)
+        task = self.session.scalar(
+            select(OCRTask)
+            .where(
+                OCRTask.patient_id == self.patient.patient_id,
+                OCRTask.document_id == document.id,
+                OCRTask.document_revision_id == revision.id,
+            )
+            .order_by(OCRTask.created_at.desc(), OCRTask.id.desc())
+            .limit(1)
+        )
+        value["latest_ocr_result_source"] = task.result_source if task is not None else None
+        fallback = (
+            None
+            if task is None
+            else self.session.scalar(
+                select(OCRFallbackUse).where(OCRFallbackUse.task_id == task.id)
+            )
+        )
+        value["latest_ocr_fallback_version"] = (
+            fallback.data_version if fallback is not None else None
+        )
+        return value
 
     def upload(
         self,

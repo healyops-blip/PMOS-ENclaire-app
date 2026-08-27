@@ -211,7 +211,7 @@ void main() {
 
       await tester.tap(find.byKey(const Key('nav-记录')));
       await tester.pumpAndSettle();
-      expect(find.text('pomi-demo-material.png'), findsOneWidget);
+      expect(find.text('pomi-demo-medical_order.png'), findsOneWidget);
     },
   );
 

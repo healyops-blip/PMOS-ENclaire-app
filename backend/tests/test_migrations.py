@@ -35,6 +35,7 @@ def test_initial_migration_is_repeatable_and_safe(tmp_path: Path, monkeypatch: M
         "medication_reconciliation_item",
         "menstrual_cycle",
         "ocr_field_result",
+        "ocr_fallback_use",
         "ocr_result",
         "ocr_task",
         "outpatient_record",
@@ -82,7 +83,7 @@ def test_initial_migration_is_repeatable_and_safe(tmp_path: Path, monkeypatch: M
 
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-            "20260827_0031"
+            "20260827_0032"
         )
     command.downgrade(config, "20260826_0001")
     inspector = inspect(engine)
@@ -121,9 +122,14 @@ def test_laboratory_migration_upgrades_the_current_main_schema(
         "medical_order",
         "medication_reconciliation",
         "medication_reconciliation_item",
+        "ocr_fallback_use",
     } <= set(inspect(engine).get_table_names())
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-            "20260827_0031"
+            "20260827_0032"
         )
+    command.downgrade(config, "20260827_0031")
+    assert "ocr_fallback_use" not in inspect(engine).get_table_names()
+    command.upgrade(config, "head")
+    assert "ocr_fallback_use" in inspect(engine).get_table_names()
     engine.dispose()

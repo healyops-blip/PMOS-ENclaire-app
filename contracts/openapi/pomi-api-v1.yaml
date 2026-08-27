@@ -840,6 +840,52 @@ paths:
         '404':
           $ref: '#/components/responses/ErrorResponse'
 
+  /api/ocr/tasks/{task_id}/fallback:
+    get:
+      tags: [OCR]
+      operationId: getOcrFallbackEligibility
+      summary: Check exact registered demo fallback eligibility
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Eligibility without exposing a fallback result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/OcrFallbackEligibility'
+    post:
+      tags: [OCR]
+      operationId: useOcrFallback
+      summary: Explicitly accept or decline an exact-match synthetic fallback
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OcrFallbackChoice'
+      responses:
+        '200':
+          description: Task unchanged on decline or moved to pending confirmation on acceptance
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/OcrTask'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
   /api/ocr/tasks/{task_id}/confirm:
     post:
       tags: [OCR]
@@ -2351,6 +2397,12 @@ components:
         current_revision_id:
           type: string
           format: uuid
+        latest_ocr_result_source:
+          oneOf:
+            - $ref: '#/components/schemas/OcrResultSource'
+            - type: 'null'
+        latest_ocr_fallback_version:
+          type: [string, 'null']
         uploaded_at:
           type: string
           format: date-time
@@ -2448,7 +2500,60 @@ components:
 
     OcrResultSource:
       type: string
-      enum: [qwen3-vl]
+      enum: [qwen3-vl, fallback]
+
+    OcrFallbackAudit:
+      type: object
+      required: [result_source, data_version, trigger_reason, selected_by_uid, selected_at]
+      properties:
+        result_source:
+          type: string
+          const: fallback
+        data_version:
+          type: string
+        trigger_reason:
+          type: object
+          required: [category, code]
+          properties:
+            category:
+              type: string
+              enum: [network, timeout, provider_unavailable]
+            code:
+              type: string
+        selected_by_uid:
+          type: string
+          format: uuid
+        selected_at:
+          type: string
+          format: date-time
+        confirmed_by_uid:
+          type: [string, 'null']
+          format: uuid
+        confirmed_at:
+          type: [string, 'null']
+          format: date-time
+
+    OcrFallbackEligibility:
+      type: object
+      required: [eligible, data_version, reason]
+      properties:
+        eligible:
+          type: boolean
+        data_version:
+          type: [string, 'null']
+        reason:
+          type: string
+          enum: [exact_match, task_not_failed, failure_not_eligible, file_not_registered]
+
+    OcrFallbackChoice:
+      type: object
+      additionalProperties: false
+      required: [accept, data_version]
+      properties:
+        accept:
+          type: boolean
+        data_version:
+          type: string
 
     OcrTaskCreate:
       type: object
@@ -2506,6 +2611,10 @@ components:
         result_source:
           oneOf:
             - $ref: '#/components/schemas/OcrResultSource'
+            - type: 'null'
+        fallback:
+          oneOf:
+            - $ref: '#/components/schemas/OcrFallbackAudit'
             - type: 'null'
         reused:
           type: boolean
@@ -2706,6 +2815,12 @@ components:
         confirmed_data:
           type: [object, 'null']
           additionalProperties: true
+        result_source:
+          $ref: '#/components/schemas/OcrResultSource'
+        fallback:
+          oneOf:
+            - $ref: '#/components/schemas/OcrFallbackAudit'
+            - type: 'null'
         fields:
           type: array
           items:

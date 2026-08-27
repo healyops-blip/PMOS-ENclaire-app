@@ -24,6 +24,7 @@ from pomi_backend.schemas.clinical_text import (
     ImagingTextConfirmation,
     OutpatientConfirmation,
 )
+from pomi_backend.services.ocr_fallback import mark_fallback_confirmed
 
 
 def _record_data(
@@ -176,6 +177,12 @@ class ClinicalTextConfirmationService:
             task.status = "confirmed"
             task.finished_at = task.finished_at or finished_at
             task.updated_at = finished_at
+            mark_fallback_confirmed(
+                self.session,
+                task,
+                uid=self.account.uid,
+                confirmed_at=record.confirmed_at,
+            )
             self.session.commit()
             self.session.refresh(record)
             return _record_data(record, task, reused=False)

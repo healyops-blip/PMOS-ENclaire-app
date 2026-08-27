@@ -13,7 +13,6 @@ from pomi_backend.api.dependencies import (
 )
 from pomi_backend.schemas.clinical_text import ClinicalTextConfirmRequest
 from pomi_backend.schemas.orders import MedicalOrderConfirmation
-from pomi_backend.services.ocr import task_data
 from pomi_backend.services.orders import medical_order_data, medical_order_p0
 
 router = APIRouter(prefix="/api/ocr/tasks", tags=["ocr"])
@@ -24,6 +23,13 @@ class CreateOCRTaskRequest(BaseModel):
 
     document_id: str
     document_revision_id: str
+
+
+class UseFallbackRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    accept: bool
+    data_version: str = Field(min_length=1, max_length=40)
 
 
 class LabConfirmationItem(BaseModel):
@@ -61,17 +67,37 @@ def create_ocr_task(
     service: OCRTaskServiceDependency,
 ) -> dict:
     task, created = service.create(payload.document_id, payload.document_revision_id)
-    return success(request, {**task_data(task), "reused": not created})
+    return success(request, {**service.data(task), "reused": not created})
 
 
 @router.get("/{task_id}")
 def get_ocr_task(task_id: str, request: Request, service: OCRTaskServiceDependency) -> dict:
-    return success(request, task_data(service.owned(task_id)))
+    return success(request, service.data(service.owned(task_id)))
 
 
 @router.get("/{task_id}/result")
 def get_ocr_result(task_id: str, request: Request, service: OCRTaskServiceDependency) -> dict:
     return success(request, service.result(service.owned(task_id)))
+
+
+@router.get("/{task_id}/fallback")
+def get_fallback_eligibility(
+    task_id: str, request: Request, service: OCRTaskServiceDependency
+) -> dict:
+    return success(request, service.fallback_eligibility(task_id))
+
+
+@router.post("/{task_id}/fallback")
+def use_ocr_fallback(
+    task_id: str,
+    payload: UseFallbackRequest,
+    request: Request,
+    service: OCRTaskServiceDependency,
+) -> dict:
+    return success(
+        request,
+        service.use_fallback(task_id, accept=payload.accept, data_version=payload.data_version),
+    )
 
 
 @router.post("/{task_id}/confirm")
@@ -104,4 +130,4 @@ def confirm_ocr_lab(
 @router.post("/{task_id}/retry", status_code=status.HTTP_201_CREATED)
 def retry_ocr_task(task_id: str, request: Request, service: OCRTaskServiceDependency) -> dict:
     task, created = service.retry(task_id)
-    return success(request, {**task_data(task), "reused": not created})
+    return success(request, {**service.data(task), "reused": not created})

@@ -34,6 +34,7 @@ from pomi_backend.repositories import (
 )
 from pomi_backend.schemas.orders import MedicalOrderConfirmation, ReconciliationExecute
 from pomi_backend.services.medications import instruction_data, medication_data
+from pomi_backend.services.ocr_fallback import mark_fallback_confirmed
 
 RECONCILIATION_RULE_VERSION = "pomi-med-reconcile-v1"
 
@@ -341,6 +342,7 @@ class MedicalOrderService:
             task.status = "confirmed"
             task.finished_at = task.finished_at or now
             task.updated_at = now
+            mark_fallback_confirmed(self.session, task, uid=self.account.uid, confirmed_at=now)
             self.session.commit()
         except IntegrityError:
             self.session.rollback()

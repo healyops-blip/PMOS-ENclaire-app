@@ -1,0 +1,51 @@
+{
+  "status": "NOT_RUN",
+  "reason": "Must be completed on an Android emulator and at least one physical Android device.",
+  "executed_at": null,
+  "executed_by": null,
+  "app_commit": null,
+  "apk_sha256": null,
+  "emulator": {"model": null, "api_level": null, "result": "NOT_RUN"},
+  "physical_device": {"model": null, "android_version": null, "result": "NOT_RUN"},
+  "material_paths": {
+    "lab_report": {"result": "NOT_RUN", "evidence": []},
+    "medical_order": {"result": "NOT_RUN", "evidence": []},
+    "imaging_text_report": {"result": "NOT_RUN", "evidence": []},
+    "outpatient_record": {"result": "NOT_RUN", "evidence": []}
+  },
+  "steps_required_for_each_material": {
+    "manual_type_selection": "NOT_RUN",
+    "camera_upload": "NOT_RUN",
+    "gallery_upload": "NOT_RUN",
+    "single_page_pdf_upload": "NOT_RUN",
+    "first_external_processing_consent": "NOT_RUN",
+    "queued_and_processing": "NOT_RUN",
+    "background_and_resume": "NOT_RUN",
+    "original_comparison": "NOT_RUN",
+    "field_edit_and_confirmation": "NOT_RUN",
+    "formal_data_query": "NOT_RUN",
+    "source_revision_trace": "NOT_RUN"
+  },
+  "medical_order_extra_steps": {
+    "old_new_comparison": "NOT_RUN",
+    "decision_for_every_item": "NOT_RUN",
+    "version_replacement": "NOT_RUN",
+    "event_chain_reconstruction": "NOT_RUN",
+    "absent_old_medication_not_auto_stopped": "NOT_RUN"
+  },
+  "resilience": {
+    "network_timeout": "NOT_RUN",
+    "schema_error": "NOT_RUN",
+    "worker_restart": "NOT_RUN",
+    "duplicate_tap": "NOT_RUN",
+    "manual_retry": "NOT_RUN",
+    "idempotency": "NOT_RUN"
+  },
+  "security": {
+    "unregistered_fallback_denied": "NOT_RUN",
+    "fallback_requires_confirmation": "NOT_RUN",
+    "cross_uid_denied": "NOT_RUN",
+    "log_redaction_reviewed": "NOT_RUN"
+  },
+  "evidence": []
+}

@@ -6,6 +6,7 @@ import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:pmos_enclaire/features/records/data/order_reconciliation_repository.dart';
 import 'package:pmos_enclaire/features/records/presentation/medical_order_review_page.dart';
 import 'package:pmos_enclaire/features/records/presentation/clinical_text_confirmation_page.dart';
+import 'package:pmos_enclaire/features/records/presentation/ocr_fallback_badge.dart';
 import 'package:pmos_enclaire/features/records/presentation/lab_confirmation_page.dart';
 
 class OcrTaskPage extends StatefulWidget {
@@ -32,6 +33,7 @@ class _OcrTaskPageState extends State<OcrTaskPage> with WidgetsBindingObserver {
   Timer? _timer;
   bool _foreground = true;
   bool _requesting = false;
+  OcrFallbackEligibility? _fallbackEligibility;
 
   @override
   void initState() {
@@ -73,6 +75,7 @@ class _OcrTaskPageState extends State<OcrTaskPage> with WidgetsBindingObserver {
         _requesting = false;
       });
       _schedule();
+      unawaited(_loadFallbackEligibility(task));
     } on Object catch (error) {
       if (!mounted) return;
       setState(() {
@@ -98,6 +101,7 @@ class _OcrTaskPageState extends State<OcrTaskPage> with WidgetsBindingObserver {
         _task = task;
         _requestError = null;
       });
+      unawaited(_loadFallbackEligibility(task));
     } on Object catch (error) {
       if (mounted) setState(() => _requestError = error);
     } finally {
@@ -111,6 +115,7 @@ class _OcrTaskPageState extends State<OcrTaskPage> with WidgetsBindingObserver {
     setState(() {
       _requesting = true;
       _requestError = null;
+      _fallbackEligibility = null;
     });
     try {
       final task = await widget.repository.retry(_task!.id);
@@ -122,6 +127,77 @@ class _OcrTaskPageState extends State<OcrTaskPage> with WidgetsBindingObserver {
       if (mounted) setState(() => _requesting = false);
     }
     if (mounted) _schedule();
+  }
+
+  Future<void> _loadFallbackEligibility(OcrTask task) async {
+    if (task.status != OcrTaskStatus.failed &&
+        task.status != OcrTaskStatus.timedOut) {
+      if (mounted && _fallbackEligibility != null) {
+        setState(() => _fallbackEligibility = null);
+      }
+      return;
+    }
+    try {
+      final eligibility = await widget.repository.fallbackEligibility(task.id);
+      if (mounted && _task?.id == task.id) {
+        setState(() => _fallbackEligibility = eligibility);
+      }
+    } on Object {
+      // Retry remains available; fallback availability must fail closed.
+    }
+  }
+
+  Future<void> _chooseFallback() async {
+    final task = _task;
+    final eligibility = _fallbackEligibility;
+    if (task == null ||
+        eligibility?.eligible != true ||
+        eligibility?.dataVersion == null) {
+      return;
+    }
+    final accepted = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('使用预置演示兜底？'),
+        content: const Text(
+          '这不是 Qwen3-VL 实时识别结果。仅当前预置模拟文件可用，结果会持续标记为“演示兜底”，并且仍需对照原件修改和确认。',
+        ),
+        actions: [
+          TextButton(
+            key: const Key('decline-ocr-fallback'),
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('拒绝并保留失败状态'),
+          ),
+          FilledButton(
+            key: const Key('accept-ocr-fallback'),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('明确使用演示兜底'),
+          ),
+        ],
+      ),
+    );
+    if (accepted == null || !mounted) return;
+    setState(() {
+      _requesting = true;
+      _requestError = null;
+    });
+    try {
+      final updated = await widget.repository.useFallback(
+        task.id,
+        accept: accepted,
+        dataVersion: eligibility!.dataVersion!,
+      );
+      if (!mounted) return;
+      setState(() {
+        _task = updated;
+        _fallbackEligibility = accepted ? null : eligibility;
+      });
+    } on Object catch (error) {
+      if (mounted) setState(() => _requestError = error);
+    } finally {
+      if (mounted) setState(() => _requesting = false);
+    }
   }
 
   void _openConfirmation() {
@@ -172,6 +248,10 @@ class _OcrTaskPageState extends State<OcrTaskPage> with WidgetsBindingObserver {
                     _subtitle(task?.status),
                 textAlign: TextAlign.center,
               ),
+              if (task?.isFallback ?? false) ...[
+                const SizedBox(height: 14),
+                const OcrFallbackBadge(),
+              ],
               const SizedBox(height: 20),
               if (_requesting || task == null || task.status.isPolling)
                 const CircularProgressIndicator(
@@ -180,12 +260,20 @@ class _OcrTaskPageState extends State<OcrTaskPage> with WidgetsBindingObserver {
               if (_requestError != null && task == null)
                 FilledButton(onPressed: _create, child: const Text('重试创建任务')),
               if (task?.status == OcrTaskStatus.failed ||
-                  task?.status == OcrTaskStatus.timedOut)
+                  task?.status == OcrTaskStatus.timedOut) ...[
                 FilledButton(
                   key: const Key('ocr-retry-button'),
                   onPressed: _requesting ? null : _retry,
                   child: const Text('重新识别'),
                 ),
+                if (_fallbackEligibility?.eligible ?? false)
+                  OutlinedButton.icon(
+                    key: const Key('ocr-fallback-button'),
+                    onPressed: _requesting ? null : _chooseFallback,
+                    icon: const Icon(Icons.science_outlined),
+                    label: const Text('使用预置演示兜底'),
+                  ),
+              ],
               if (task?.status == OcrTaskStatus.pendingConfirmation)
                 FilledButton(
                   key: const Key('ocr-confirmation-entry'),
@@ -253,6 +341,10 @@ class OcrPendingConfirmationPage extends StatelessWidget {
     body: ListView(
       padding: const EdgeInsets.all(20),
       children: [
+        if (task.isFallback) ...[
+          const OcrFallbackBadge(),
+          const SizedBox(height: 12),
+        ],
         const Text('识别草稿尚未写入正式医疗记录，请在后续确认页面逐项核对。'),
         const SizedBox(height: 12),
         for (final field in result.fields)
