@@ -15,6 +15,7 @@ import 'package:pmos_enclaire/features/onboarding/presentation/onboarding_page.d
 import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
 import 'package:pmos_enclaire/features/reports/data/patient_note_repository.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
+import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:pmos_enclaire/features/weight/data/weight_repository.dart';
 
 abstract final class PomiRoutes {
@@ -30,6 +31,7 @@ class PomiApp extends StatefulWidget {
     this.dashboardRepository,
     this.patientNoteRepository,
     this.documentRepository,
+    this.ocrRepository,
     this.weightRepository,
     this.apiClient,
     this.now,
@@ -43,6 +45,7 @@ class PomiApp extends StatefulWidget {
   final DashboardRepository? dashboardRepository;
   final PatientNoteRepository? patientNoteRepository;
   final DocumentRepository? documentRepository;
+  final OcrRepository? ocrRepository;
   final WeightRepository? weightRepository;
   final PomiApiClient? apiClient;
   final DateTime Function()? now;
@@ -85,6 +88,11 @@ class _PomiAppState extends State<PomiApp> {
       (widget.authRepository is DemoAuthRepository
           ? DemoDocumentRepository()
           : FastApiDocumentRepository(_apiClient));
+  late final OcrRepository _ocrRepository =
+      widget.ocrRepository ??
+      (widget.authRepository is DemoAuthRepository
+          ? DemoOcrRepository()
+          : FastApiOcrRepository(_apiClient));
   late final WeightRepository _weightRepository =
       widget.weightRepository ??
       (widget.authRepository is DemoAuthRepository
@@ -181,6 +189,7 @@ class _PomiAppState extends State<PomiApp> {
             },
             patientNoteRepository: _patientNoteRepository,
             documentRepository: _documentRepository,
+            ocrRepository: _ocrRepository,
             weightRepository: _weightRepository,
             now: widget.now,
             cycleRepository: _cycleRepository,

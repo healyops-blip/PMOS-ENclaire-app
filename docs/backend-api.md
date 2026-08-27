@@ -1,6 +1,6 @@
 # Pomi 后端接口文档
 
-本文档描述当前已经实现并可供 Flutter 客户端联调的 FastAPI 接口。接口以实际代码、Schema 和自动化测试为准；尚未实现的患者画像、OCR、报告和区块链接口不在本文档中。
+本文档描述当前已经实现并可供 Flutter 客户端联调的 FastAPI 接口。接口以实际代码、Schema 和自动化测试为准。OCR 任务、结果、重试和 Worker 契约见 [`ocr-pipeline.md`](ocr-pipeline.md)；OCR 正式确认、对账和其他后续接口仍不得提前调用。
 
 ## 1. 公共约定
 

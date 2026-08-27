@@ -41,6 +41,12 @@ PMOS-ENclaire-app/
 - SQLite owns application data, sessions, task state, and file metadata. Schema
   changes are committed as migrations.
 - The OCR worker processes queued jobs outside the API request lifecycle.
+- OCR uses a provider boundary. The current Qwen3-VL adapter owns authentication and
+  request/response translation; the task state machine and tests depend only on the
+  provider protocol. Prompt and JSON Schema versions are persisted with every task.
+- A provider response is stored as an authenticated raw result, validated draft, and
+  field-level evidence. It remains `pending_confirmation` and creates no formal medical
+  data in this stage.
 - Uploaded medical files live in a private server directory and are accessed only
   after session and user authorization checks.
 - Passwords are stored only as Argon2 or bcrypt hashes. Session identifiers are

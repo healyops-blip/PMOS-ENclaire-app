@@ -169,3 +169,37 @@ def test_patient_note_workflow_contract_matches_issue_27() -> None:
     )
     copy = paths["/api/patient-notes/{note_id}/copy"]["post"]
     assert copy["requestBody"]["required"] is True
+
+
+def test_ocr_contract_matches_worker_status_and_material_schemas() -> None:
+    contract = load_contract()
+    paths = contract["paths"]
+    schemas = contract["components"]["schemas"]
+
+    assert paths["/api/ocr/tasks"]["post"]["responses"].get("201") is not None
+    assert paths["/api/ocr/tasks/{task_id}/retry"]["post"]["responses"].get("201") is not None
+    assert schemas["OcrTaskStatus"]["enum"] == [
+        "queued",
+        "processing",
+        "pending_confirmation",
+        "confirmed",
+        "failed",
+        "timed_out",
+    ]
+    assert schemas["OcrResultSource"]["enum"] == ["qwen3-vl"]
+    field = schemas["OcrFieldResult"]
+    assert {"path", "source_text", "parsed_value", "confidence"} <= set(field["required"])
+    draft_refs = schemas["OcrDraftResult"]["properties"]["validated_draft"]["oneOf"]
+    assert [item["$ref"].rsplit("/", 1)[-1] for item in draft_refs] == [
+        "LabDraft",
+        "MedicalOrderDraft",
+        "ImagingTextDraft",
+        "OutpatientRecordDraft",
+    ]
+    assert set(schemas["LabDraft"]["properties"]) == {
+        "hospital_name",
+        "sample_date",
+        "report_date",
+        "items",
+    }
+    assert "drug_name" in schemas["MedicalOrderItemDraft"]["properties"]
