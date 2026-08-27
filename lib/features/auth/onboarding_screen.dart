@@ -56,14 +56,83 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     bool future = false,
   }) async {
     final now = DateTime.now();
-    final picked = await showDatePicker(
+    final today = DateTime(now.year, now.month, now.day);
+    final minimumDate = future ? today : DateTime(2000);
+    final maximumDate =
+        future ? DateTime(now.year + 3, now.month, now.day) : today;
+    final parsedDate = DateTime.tryParse(controller.text);
+    var selectedDate =
+        parsedDate != null &&
+                !parsedDate.isBefore(minimumDate) &&
+                !parsedDate.isAfter(maximumDate)
+            ? parsedDate
+            : future
+            ? today.add(const Duration(days: 14))
+            : today;
+
+    final picked = await showDialog<DateTime>(
       context: context,
-      firstDate: future ? now : DateTime(2000),
-      lastDate: future ? DateTime(now.year + 3) : now,
-      initialDate: future ? now.add(const Duration(days: 14)) : now,
+      builder:
+          (context) => Dialog(
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 340),
+              child: SizedBox(
+                height: 350,
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('取消'),
+                          ),
+                          Text(
+                            future ? '选择就诊日期' : '选择经期日期',
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          TextButton(
+                            onPressed:
+                                () => Navigator.pop(context, selectedDate),
+                            child: const Text('确定'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    Expanded(
+                      child: CupertinoDatePicker(
+                        mode: CupertinoDatePickerMode.date,
+                        dateOrder: DatePickerDateOrder.ymd,
+                        initialDateTime: selectedDate,
+                        minimumDate: minimumDate,
+                        maximumDate: maximumDate,
+                        minimumYear: minimumDate.year,
+                        maximumYear: maximumDate.year,
+                        backgroundColor: Colors.white,
+                        onDateTimeChanged: (value) => selectedDate = value,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
     );
     if (picked != null) {
-      controller.text = picked.toIso8601String().substring(0, 10);
+      controller.text =
+          '${picked.year.toString().padLeft(4, '0')}-'
+          '${picked.month.toString().padLeft(2, '0')}-'
+          '${picked.day.toString().padLeft(2, '0')}';
     }
   }
 
