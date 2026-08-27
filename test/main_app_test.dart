@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pmos_enclaire/features/auth/data/auth_repository.dart';
+import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/main.dart';
 
 void main() {
@@ -47,6 +48,24 @@ void main() {
     );
     expect(
       find.descendant(of: secondMedicationStatus, matching: find.text('已服用')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('dashboard uses an explicit action for active missed status', (
+    tester,
+  ) async {
+    _setPhoneViewport(tester);
+    await _loginExistingUser(tester);
+
+    final status = find.byKey(const Key('medication-status-1'));
+    await tester.longPress(status);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('mark-medication-missed')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(of: status, matching: find.text('主动漏服')),
       findsOneWidget,
     );
   });
@@ -194,6 +213,35 @@ void main() {
     },
   );
 
+  testWidgets('declining external processing creates no upload request', (
+    tester,
+  ) async {
+    _setPhoneViewport(tester);
+    final repository = _UploadCountingDocumentRepository();
+    await tester.pumpWidget(
+      MainApp(
+        authRepository: const DemoAuthRepository(),
+        documentRepository: repository,
+      ),
+    );
+    await tester.tap(find.byKey(const Key('demo-login-button')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('upload-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('material-type-laboratory')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('upload-demo-option')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('confirm-document-preview')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('decline-external-ocr')));
+    await tester.pumpAndSettle();
+
+    expect(repository.uploadRequests, 0);
+    expect(find.byKey(const Key('document-upload-progress')), findsNothing);
+  });
+
   testWidgets('dashboard generates the three-layer report UI', (tester) async {
     _setPhoneViewport(tester);
     await _loginExistingUser(tester);
@@ -245,4 +293,26 @@ Future<void> _loginExistingUser(WidgetTester tester) async {
   await tester.tap(find.byKey(const Key('demo-login-button')));
   await tester.pumpAndSettle();
   expect(find.byKey(const Key('dashboard-page')), findsOneWidget);
+}
+
+class _UploadCountingDocumentRepository extends DemoDocumentRepository {
+  int uploadRequests = 0;
+
+  @override
+  Future<MedicalDocument> upload({
+    required SelectedDocumentFile file,
+    required String documentType,
+    required String consentVersion,
+    required String idempotencyKey,
+    required void Function(int sent, int total) onProgress,
+  }) {
+    uploadRequests++;
+    return super.upload(
+      file: file,
+      documentType: documentType,
+      consentVersion: consentVersion,
+      idempotencyKey: idempotencyKey,
+      onProgress: onProgress,
+    );
+  }
 }

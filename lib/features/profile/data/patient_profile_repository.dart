@@ -175,7 +175,8 @@ class DemoPatientProfileRepository implements PatientProfileRepository {
       primaryCondition: input.primaryCondition,
       nextVisitDate: input.nextVisitDate,
       healthGoal: input.healthGoal,
-      onboardingCompleted: input.completeOnboarding,
+      onboardingCompleted:
+          _profile.onboardingCompleted || input.completeOnboarding,
       updatedAt: _profile.updatedAt.add(const Duration(seconds: 1)),
     );
     return _profile;
