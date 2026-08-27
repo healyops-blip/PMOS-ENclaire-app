@@ -220,6 +220,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     repository: widget.patientNoteRepository,
                     reportRepository:
                         widget.reportRepository ?? DemoReportRepository(),
+                    documentRepository: widget.documentRepository,
                   ),
                 ),
               ),

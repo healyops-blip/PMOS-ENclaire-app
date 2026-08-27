@@ -256,23 +256,18 @@ void main() {
     expect(find.text('2 · 趋势'), findsOneWidget);
     expect(find.text('3 · 来源'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('report-pdf-menu')));
+    final metric = find.byKey(const Key('report-summary-metric-glucose'));
+    await tester.ensureVisible(metric);
+    await tester.tap(metric);
     await tester.pumpAndSettle();
-    expect(find.text('保存 PDF'), findsOneWidget);
-    expect(find.text('分享 PDF'), findsOneWidget);
-    expect(find.text('打印 PDF'), findsOneWidget);
-    await tester.tapAt(const Offset(12, 180));
+    expect(find.text('完整趋势'), findsOneWidget);
+    expect(find.text('空腹血糖'), findsWidgets);
+    final sourcePoint = find.byKey(const Key('report-point-source-3'));
+    await tester.ensureVisible(sourcePoint);
+    await tester.tap(sourcePoint);
     await tester.pumpAndSettle();
-
-    await tester.tap(find.text('2 · 趋势'));
-    await tester.pumpAndSettle();
-    expect(find.text('空腹血糖 · 完整趋势'), findsOneWidget);
-
-    final sourceButton = find.byKey(const Key('view-report-source-button'));
-    await tester.ensureVisible(sourceButton);
-    await tester.tap(sourceButton);
-    await tester.pumpAndSettle();
-    expect(find.text('原始化验单预览 · 模拟材料'), findsOneWidget);
+    expect(find.text('来源 #3'), findsOneWidget);
+    expect(find.text('化验单 3.png'), findsOneWidget);
   });
 
   testWidgets('patient statement confirms, copies and explicitly skips', (

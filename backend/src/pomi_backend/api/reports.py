@@ -50,4 +50,4 @@ def get_report(
     request: Request,
     service: ReportSnapshotServiceDependency,
 ) -> dict:
-    return success(request, service.get(report_id))
+    return success(request, service.detail(report_id))

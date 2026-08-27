@@ -21,14 +21,14 @@ void main() {
               'can_generate': false,
               'confirmed_source_count': 4,
             };
-          } else if (options.path == '/reports/report-1') {
-            data = _report;
-          } else if (options.method == 'GET') {
+          } else if (options.method == 'GET' && options.path == '/reports') {
             data = {
               'items': [_report],
               'next_cursor': null,
               'has_more': false,
             };
+          } else if (options.method == 'GET') {
+            data = _reportDetail;
           } else {
             data = _report;
           }
@@ -52,7 +52,7 @@ void main() {
     expect(preflight.missingSections, ['labs']);
     expect(created.reportId, 'report-1');
     expect(listed.single.snapshotHash, 'a' * 64);
-    expect(detail.snapshot?['summary'], isA<Map>());
+    expect(detail.item.reportId, 'report-1');
     expect(requests.map((request) => request.path), [
       '/reports/preflight',
       '/reports',
@@ -142,10 +142,6 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
       expect(find.byKey(const Key('report-page')), findsOneWidget);
-      expect(
-        find.text('Confirmed statement returned verbatim.'),
-        findsOneWidget,
-      );
       expect(reports.attempts, 2);
     },
   );
@@ -170,8 +166,8 @@ class _FlakyReportRepository implements ReportRepository {
   Future<List<ReportSnapshotItem>> list() async => const [];
 
   @override
-  Future<ReportSnapshotItem> get(String reportId) async =>
-      ReportSnapshotItem.fromJson(_report);
+  Future<ReportDetail> get(String reportId) async =>
+      ReportDetail.fromJson(_reportDetail);
 
   @override
   Future<ReportPreflight> preflight(String? patientNoteId) async =>
@@ -212,5 +208,27 @@ const _report = <String, dynamic>{
     'sources': <dynamic>[],
   },
   'date_sources': <String, dynamic>{},
+  'data_freshness': <String, dynamic>{},
+};
+
+final _reportDetail = <String, dynamic>{..._report, ..._demoDetailForTest};
+
+const _demoDetailForTest = <String, dynamic>{
+  'metadata': <String, dynamic>{},
+  'summary': <String, dynamic>{
+    'profile': <String, dynamic>{},
+    'current_medications': <dynamic>[],
+    'latest_observations': <dynamic>[],
+    'missing_sections': <String>[],
+    'disclaimers': <String>[],
+  },
+  'trends': <String, dynamic>{
+    'labs': <dynamic>[],
+    'weights': <dynamic>[],
+    'cycles': <dynamic>[],
+    'medication_daily': <dynamic>[],
+  },
+  'records': <String, dynamic>{},
+  'sources': <dynamic>[],
   'data_freshness': <String, dynamic>{},
 };

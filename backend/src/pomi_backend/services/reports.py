@@ -33,6 +33,7 @@ from pomi_backend.db.models import (
 )
 from pomi_backend.db.models.health import new_uuid
 from pomi_backend.repositories import (
+    DocumentRepository,
     PatientNoteRepository,
     PatientRepository,
     ReportSnapshotRepository,
@@ -104,6 +105,7 @@ class ReportSnapshotService:
         self.business_date = business_date
         self.profile = PatientRepository(session).get_or_create(account.uid)
         self.notes = PatientNoteRepository(session, self.profile.patient_id)
+        self.documents = DocumentRepository(session, self.profile.patient_id)
         self.reports = ReportSnapshotRepository(session, self.profile.patient_id)
         self.sources = ReportSourceRepository(session, self.reports)
 
@@ -122,7 +124,7 @@ class ReportSnapshotService:
         source_digest = self._source_digest(state, sections, source_drafts)
         existing = self.reports.find_by_source_digest(source_digest)
         if existing is not None and existing.report_status == "succeeded":
-            return self._detail(existing, has_updates=False, reused=True), True
+            return self._list_item(existing, has_updates=False, reused=True), True
 
         previous = self.reports.latest_succeeded()
         generated_at = datetime.now(UTC)
@@ -168,12 +170,12 @@ class ReportSnapshotService:
             self.session.rollback()
             existing = self.reports.find_by_source_digest(source_digest)
             if existing is not None and existing.report_status == "succeeded":
-                return self._detail(existing, has_updates=False, reused=True), True
+                return self._list_item(existing, has_updates=False, reused=True), True
             raise
         except Exception:
             self.session.rollback()
             raise
-        return self._detail(report, has_updates=False, reused=False), False
+        return self._list_item(report, has_updates=False, reused=False), False
 
     def list(self) -> list[dict[str, Any]]:
         eligible = self._latest_eligible_note()
@@ -192,20 +194,161 @@ class ReportSnapshotService:
             )
         return items
 
-    def get(self, report_id: str) -> dict[str, Any]:
+    def detail(self, report_id: str) -> dict[str, Any]:
+        """Return one successful immutable snapshot with traceable source metadata."""
         report = self.reports.get(report_id)
-        if report is None or report.report_status != "succeeded":
+        if report is None or report.report_status != "succeeded" or report.snapshot_json is None:
             raise BusinessError("RESOURCE_NOT_FOUND", "Report was not found.", 404)
-        snapshot = report.snapshot_json or {}
-        sections = list(snapshot.get("metadata", {}).get("include_sections", []))
-        eligible = self._latest_eligible_note()
-        state, _, source_drafts = self._collect(eligible, sections)
-        current_digest = self._source_digest(state, sections, source_drafts)
-        return self._detail(
+
+        snapshot = report.snapshot_json
+        source_rows = {source.id: source for source in self.sources.list_for_report(report.id)}
+        source_records = self._snapshot_records(snapshot)
+        source_nodes = []
+        for stored in snapshot.get("sources", []):
+            node_id = stored.get("node_id")
+            row = source_rows.get(node_id)
+            if row is None:
+                continue
+            record = source_records.get(row.source_record_id, {})
+            if not record and row.source_type == "patient_note":
+                record = {
+                    "id": row.source_record_id,
+                    "text": snapshot.get("summary", {}).get("patient_note_text"),
+                    "empty_state": snapshot.get("summary", {}).get("patient_note_empty_state"),
+                }
+            elif not record and row.source_type == "patient_profile":
+                record = snapshot.get("summary", {}).get("profile", {})
+            source_nodes.append(self._source_detail(stored, row, record))
+
+        detail = self._list_item(
             report,
-            has_updates=current_digest != report.source_digest,
+            has_updates=self._has_updates(report),
             reused=False,
         )
+        detail.update(
+            {
+                "metadata": snapshot.get("metadata", {}),
+                "summary": snapshot.get("summary", {}),
+                "trends": snapshot.get("trends", {}),
+                "records": snapshot.get("records", {}),
+                "sources": source_nodes,
+                "data_freshness": report.freshness_result_json or {},
+            }
+        )
+        return detail
+
+    def _has_updates(self, report: ReportSnapshot) -> bool:
+        snapshot = report.snapshot_json or {}
+        sections = list(snapshot.get("metadata", {}).get("include_sections", []))
+        state, _, source_drafts = self._collect(self._latest_eligible_note(), sections)
+        return self._source_digest(state, sections, source_drafts) != report.source_digest
+
+    @staticmethod
+    def _snapshot_records(snapshot: dict[str, Any]) -> dict[str, dict[str, Any]]:
+        records: dict[str, dict[str, Any]] = {}
+
+        def visit(value: Any) -> None:
+            if isinstance(value, dict):
+                record_id = value.get("id")
+                if isinstance(record_id, str):
+                    records[record_id] = value
+                for key, nested in value.items():
+                    if key != "sources":
+                        visit(nested)
+            elif isinstance(value, list):
+                for nested in value:
+                    visit(nested)
+
+        visit(snapshot)
+        return records
+
+    def _source_detail(
+        self,
+        stored: dict[str, Any],
+        source: ReportSource,
+        record: dict[str, Any],
+    ) -> dict[str, Any]:
+        original_value = next(
+            (
+                record[key]
+                for key in (
+                    "raw_value",
+                    "weight_kg",
+                    "intake_status",
+                    "start_date",
+                    "text",
+                    "drug_name",
+                    "findings",
+                    "diagnosis_summary",
+                )
+                if record.get(key) is not None
+            ),
+            None,
+        )
+        reference = record.get("reference_range_raw")
+        if reference is None and (
+            record.get("reference_lower") is not None or record.get("reference_upper") is not None
+        ):
+            reference = f"{record.get('reference_lower', '')}–{record.get('reference_upper', '')}"
+
+        return {
+            "node_id": source.id,
+            "source_number": stored.get("source_number"),
+            "source_type": source.source_type,
+            "source_record_id": source.source_record_id,
+            "origin_kind": source.origin_kind,
+            "document_id": source.document_id,
+            "document_revision_id": source.document_revision_id,
+            "rule_execution_id": source.rule_execution_id,
+            "original_value": None if original_value is None else str(original_value),
+            "original_unit": record.get("original_unit"),
+            "normalized_value": record.get("normalized_value", record.get("numeric_value")),
+            "normalized_unit": record.get("normalized_unit", record.get("standard_unit")),
+            "reference_range_text": reference,
+            "material_date": record.get("date"),
+            "date_source": record.get("date_source"),
+            "freshness": record.get("freshness", "unknown"),
+            "comparability": record.get("comparability", "not_applicable"),
+            "exclusion_reason": record.get("exclusion_reason"),
+            "snapshot_record": record,
+            "file": self._source_file(source),
+        }
+
+    def _source_file(self, source: ReportSource) -> dict[str, Any] | None:
+        if source.document_id is None or source.document_revision_id is None:
+            return None
+        document = self.documents.get(source.document_id, include_deleted=True)
+        revision = self.documents.revision(source.document_id, source.document_revision_id)
+        if document is None or revision is None:
+            return {
+                "status": "unavailable",
+                "url": None,
+                "error_code": "SOURCE_FILE_NOT_FOUND",
+                "error_message": "原始文件暂时不可用，快照中的结构化原值仍可查看。",
+            }
+        if document.deleted_at is not None or document.upload_status != "ready":
+            return {
+                "status": "unavailable",
+                "url": None,
+                "mime_type": revision.mime_type,
+                "file_name": document.original_file_name,
+                "revision_number": revision.revision_number,
+                "file_hash": revision.file_hash,
+                "error_code": "SOURCE_FILE_UNAVAILABLE",
+                "error_message": "原始文件暂时不可用，快照中的结构化原值仍可查看。",
+            }
+        return {
+            "status": "available",
+            "url": (
+                f"/api/documents/{source.document_id}/revisions/{source.document_revision_id}/file"
+            ),
+            "mime_type": revision.mime_type,
+            "file_name": document.original_file_name,
+            "revision_number": revision.revision_number,
+            "file_hash": revision.file_hash,
+            "error_code": None,
+            "error_message": None,
+        }
 
     def preflight(self, payload: ReportCreate) -> dict[str, Any]:
         sections = sorted(set(payload.include_sections))
@@ -961,19 +1104,4 @@ class ReportSnapshotService:
             "missing_sections": (report.snapshot_json or {})
             .get("summary", {})
             .get("missing_sections", []),
-        }
-
-    @classmethod
-    def _detail(
-        cls,
-        report: ReportSnapshot,
-        *,
-        has_updates: bool,
-        reused: bool,
-    ) -> dict[str, Any]:
-        return {
-            **cls._list_item(report, has_updates=has_updates, reused=reused),
-            "snapshot": report.snapshot_json,
-            "date_sources": report.date_source_json or {},
-            "data_freshness": report.freshness_result_json or {},
         }

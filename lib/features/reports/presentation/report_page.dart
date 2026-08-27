@@ -7,11 +7,11 @@ import 'package:pmos_enclaire/core/theme/pomi_theme.dart';
 import 'package:pmos_enclaire/core/widgets/demo_badge.dart';
 import 'package:pmos_enclaire/core/widgets/pomi_line_chart.dart';
 import 'package:pmos_enclaire/core/widgets/pomi_surfaces.dart';
-import 'package:pmos_enclaire/features/certification/application/certification_providers.dart';
-import 'package:pmos_enclaire/features/certification/domain/certification_record.dart';
-import 'package:pmos_enclaire/features/certification/presentation/certification_page.dart';
+import 'package:pmos_enclaire/features/certification/data/certification_repository.dart';
 import 'package:pmos_enclaire/features/reports/data/patient_note_repository.dart';
 import 'package:pmos_enclaire/features/reports/data/report_repository.dart';
+import 'package:pmos_enclaire/features/reports/presentation/report_viewer_page.dart';
+import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:printing/printing.dart';
 
 enum _PdfAction { save, share, print }
@@ -20,11 +20,18 @@ class ReportGeneratorPage extends StatefulWidget {
   ReportGeneratorPage({
     required this.repository,
     ReportRepository? reportRepository,
+    DocumentRepository? documentRepository,
+    CertificationRepository? certificationRepository,
     super.key,
-  }) : reportRepository = reportRepository ?? DemoReportRepository();
+  }) : reportRepository = reportRepository ?? DemoReportRepository(),
+       documentRepository = documentRepository ?? DemoDocumentRepository(),
+       certificationRepository =
+           certificationRepository ?? LocalCertificationRepository();
 
   final PatientNoteRepository repository;
   final ReportRepository reportRepository;
+  final DocumentRepository documentRepository;
+  final CertificationRepository certificationRepository;
 
   @override
   State<ReportGeneratorPage> createState() => _ReportGeneratorPageState();
@@ -153,14 +160,18 @@ class _ReportGeneratorPageState extends State<ReportGeneratorPage> {
         _note?.id,
         confirmIncomplete: preflight.missingSections.isNotEmpty,
       );
-      final detail = report.snapshot == null
-          ? await widget.reportRepository.get(report.reportId)
-          : report;
       final reports = await widget.reportRepository.list();
       if (!mounted) return;
       setState(() => _reports = reports);
       await Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(builder: (_) => ReportPage(report: detail)),
+        MaterialPageRoute<void>(
+          builder: (_) => ReportViewerPage(
+            report: report,
+            repository: widget.reportRepository,
+            documentRepository: widget.documentRepository,
+            certificationRepository: widget.certificationRepository,
+          ),
+        ),
       );
     } on Exception catch (error) {
       if (mounted) setState(() => _error = error.toString());
@@ -176,12 +187,15 @@ class _ReportGeneratorPageState extends State<ReportGeneratorPage> {
       _error = null;
     });
     try {
-      final detail = report.snapshot == null
-          ? await widget.reportRepository.get(report.reportId)
-          : report;
-      if (!mounted) return;
       await Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => ReportPage(report: detail)),
+        MaterialPageRoute<void>(
+          builder: (_) => ReportViewerPage(
+            report: report,
+            repository: widget.reportRepository,
+            documentRepository: widget.documentRepository,
+            certificationRepository: widget.certificationRepository,
+          ),
+        ),
       );
     } on Exception catch (error) {
       if (mounted) setState(() => _error = error.toString());

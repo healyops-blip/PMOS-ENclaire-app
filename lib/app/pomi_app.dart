@@ -243,6 +243,7 @@ class _PomiAppState extends State<PomiApp> {
   Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'Pomi',
+      restorationScopeId: 'pomi-app',
       debugShowCheckedModeBanner: false,
       theme: PomiTheme.light,
       routerConfig: _router,

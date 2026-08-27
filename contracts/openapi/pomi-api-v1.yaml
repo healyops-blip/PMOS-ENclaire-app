@@ -1261,7 +1261,7 @@ paths:
                   - type: object
                     properties:
                       data:
-                        $ref: '#/components/schemas/ReportDetail'
+                        $ref: '#/components/schemas/ReportListItem'
         '409':
           $ref: '#/components/responses/ErrorResponse'
 
@@ -1269,7 +1269,7 @@ paths:
     get:
       tags: [Reports]
       operationId: getReport
-      summary: Get summary, trends, and source traceability
+      summary: Read one immutable report snapshot with three-layer traceability
       parameters:
         - $ref: '#/components/parameters/ReportId'
       responses:
@@ -3510,31 +3510,43 @@ components:
 
     TrendPoint:
       type: object
-      required: [source_id, raw_value, date, date_source, abnormal_status]
+      required: [node_id, source_number, raw_value, freshness, comparability, abnormal_status, default_collapsed]
       properties:
-        source_id:
+        node_id:
           type: string
           format: uuid
-        value:
+        source_number:
+          type: integer
+          minimum: 1
+        normalized_value:
           type: [number, 'null']
         raw_value:
           type: string
-        unit:
+        original_unit:
+          type: [string, 'null']
+        normalized_unit:
           type: [string, 'null']
         date:
-          type: string
+          type: [string, 'null']
           format: date
         date_source:
+          type: [string, 'null']
+        freshness:
           type: string
-          enum: [sample_date, report_date, encounter_date, measured_at, record_date]
+          enum: [current, caution, stale, archived, unknown]
+        comparability:
+          type: string
+          enum: [comparable, incomparable]
         abnormal_status:
           $ref: '#/components/schemas/AbnormalStatus'
         exclusion_reason:
           type: [string, 'null']
+        default_collapsed:
+          type: boolean
 
     ReportTrend:
       type: object
-      required: [metric_id, metric_name, comparability, points]
+      required: [metric_id, metric_name, comparability, display_mode, points]
       properties:
         metric_id:
           type: string
@@ -3546,6 +3558,9 @@ components:
           $ref: '#/components/schemas/Comparability'
         comparability_reason:
           type: [string, 'null']
+        display_mode:
+          type: string
+          enum: [single_result, comparison, trend]
         points:
           type: array
           items:
@@ -3553,17 +3568,23 @@ components:
 
     ReportSource:
       type: object
-      required: [source_number, source_type, source_id, date_source]
+      required: [node_id, source_number, source_type, source_record_id, origin_kind, freshness, comparability, snapshot_record]
       properties:
+        node_id:
+          type: string
+          format: uuid
         source_number:
           type: integer
           minimum: 1
         source_type:
           type: string
-          enum: [lab_observation, medical_order, imaging_report, outpatient_record, menstrual_cycle, weight_record, medication_daily, patient_note]
-        source_id:
+          enum: [patient_profile, patient_note, medication, medication_event, medication_daily, menstrual_cycle, weight_record, lab_observation, medical_order, imaging_report, outpatient_record, rule_execution]
+        source_record_id:
           type: string
           format: uuid
+        origin_kind:
+          type: string
+          enum: [medical_document, patient_manual, system_record, rule_execution]
         document_id:
           type: [string, 'null']
           format: uuid
@@ -3577,16 +3598,81 @@ components:
           type: [string, 'null']
         original_unit:
           type: [string, 'null']
+        normalized_value:
+          type: [number, 'null']
+        normalized_unit:
+          type: [string, 'null']
         reference_range_text:
           type: [string, 'null']
         material_date:
           type: [string, 'null']
           format: date
         date_source:
+          type: [string, 'null']
+        freshness:
           type: string
-        file_url:
+          enum: [current, caution, stale, archived, unknown]
+        comparability:
+          type: string
+          enum: [comparable, caution, incomparable, not_applicable]
+        exclusion_reason:
+          type: [string, 'null']
+        snapshot_record:
+          type: object
+          additionalProperties: true
+          description: Frozen structured value copied from this report snapshot, never the current business row.
+        file:
+          oneOf:
+            - $ref: '#/components/schemas/ReportSourceFile'
+            - type: 'null'
+
+    ReportSourceFile:
+      type: object
+      required: [status, url]
+      properties:
+        status:
+          type: string
+          enum: [available, unavailable]
+        url:
           type: [string, 'null']
           format: uri-reference
+          description: Session-protected explicit-revision file endpoint; never a public URL.
+        mime_type:
+          type: [string, 'null']
+        file_name:
+          type: [string, 'null']
+        revision_number:
+          type: [integer, 'null']
+        file_hash:
+          type: [string, 'null']
+        error_code:
+          type: [string, 'null']
+        error_message:
+          type: [string, 'null']
+
+    ReportTrends:
+      type: object
+      required: [labs, weights, cycles, medication_daily]
+      properties:
+        labs:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportTrend'
+        weights:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        cycles:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        medication_daily:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
 
     ReportSummary:
       type: object
@@ -3621,15 +3707,22 @@ components:
       allOf:
         - $ref: '#/components/schemas/ReportListItem'
         - type: object
-          required: [snapshot, date_sources, data_freshness]
+          required: [metadata, summary, trends, records, sources, data_freshness]
           properties:
-            snapshot:
-              type: object
-              description: Immutable summary, trends, records, sources, and version metadata.
-              additionalProperties: true
-            date_sources:
+            metadata:
               type: object
               additionalProperties: true
+            summary:
+              $ref: '#/components/schemas/ReportSummary'
+            trends:
+              $ref: '#/components/schemas/ReportTrends'
+            records:
+              type: object
+              additionalProperties: true
+            sources:
+              type: array
+              items:
+                $ref: '#/components/schemas/ReportSource'
             data_freshness:
               type: object
               additionalProperties: true
