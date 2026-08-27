@@ -1,0 +1,16 @@
+title = "Pomi secret scanning"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allow only documented and test-only synthetic passwords"
+condition = "AND"
+paths = [
+  '''^docs/backend-api\.md$''',
+  '''^backend/tests/test_admin_accounts\.py$''',
+]
+regexes = [
+  '''^StrongPass123$''',
+  '''^IgnoredPass123$''',
+]

@@ -1,0 +1,17 @@
+[Unit]
+Description=Back up the Pomi SQLite database
+ConditionPathExists=/var/lib/pomi/pomi.db
+
+[Service]
+Type=oneshot
+User=pomi
+Group=pomi
+EnvironmentFile=/etc/pomi/pomi.env
+ExecStart=/usr/bin/bash /opt/pomi/current/deploy/scripts/backup_sqlite.sh
+UMask=0077
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/pomi /var/backups/pomi

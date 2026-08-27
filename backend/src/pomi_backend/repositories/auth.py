@@ -71,6 +71,22 @@ class AuthRepository:
             select(UserSession).where(UserSession.session_hash == session_hash)
         )
 
+    def update_last_login(self, account: UserAccount, *, at: datetime | None = None) -> None:
+        account.last_login_at = at or datetime.now(UTC)
+        self._session.flush()
+
+    def update_password_hash(self, account: UserAccount, password_hash: str) -> None:
+        account.password_hash = password_hash
+        self._session.flush()
+
+    def touch_session(self, user_session: UserSession, *, at: datetime | None = None) -> None:
+        user_session.last_active_at = at or datetime.now(UTC)
+        self._session.flush()
+
+    def expire_session(self, user_session: UserSession) -> None:
+        user_session.status = "expired"
+        self._session.flush()
+
     def revoke_session(self, session_hash: str, *, at: datetime | None = None) -> bool:
         revoked_at = at or datetime.now(UTC)
         result = self._session.execute(
