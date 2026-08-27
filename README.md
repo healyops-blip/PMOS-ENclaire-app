@@ -44,7 +44,9 @@ python3 tools/web_preview_proxy.py --root build/web
 ```
 
 Open `http://127.0.0.1:3001`. Override `--upstream` when testing against a
-different HTTPS API.
+different HTTPS API. The button in the upper-right corner switches between the
+server API and the local API at `http://127.0.0.1:8000`; switching resets the
+Preview's browser login state.
 
 ## Quality checks
 

@@ -5,10 +5,13 @@ from __future__ import annotations
 
 import argparse
 import http.client
+import json
 import ssl
+import threading
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit
+from typing import ClassVar
+from urllib.parse import SplitResult, urlsplit
 
 HOP_BY_HOP_HEADERS = {
     "connection",
@@ -23,7 +26,48 @@ HOP_BY_HOP_HEADERS = {
 
 
 class PreviewHandler(SimpleHTTPRequestHandler):
-    upstream = urlsplit("https://api.healy1012-ops.top")
+    backends: ClassVar[dict[str, SplitResult]] = {
+        "local": urlsplit("http://127.0.0.1:8000"),
+        "server": urlsplit("https://api.healy1012-ops.top"),
+    }
+    backend_mode: ClassVar[str] = "server"
+    backend_lock: ClassVar[threading.Lock] = threading.Lock()
+
+    @classmethod
+    def _backend_state(cls) -> tuple[str, str]:
+        with cls.backend_lock:
+            mode = cls.backend_mode
+            return mode, cls.backends[mode].geturl()
+
+    def _send_json(self, status: int, payload: dict[str, str]) -> None:
+        body = json.dumps(payload, ensure_ascii=False).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
+    def _handle_backend_state(self) -> None:
+        mode, upstream = self._backend_state()
+        self._send_json(200, {"mode": mode, "upstream": upstream})
+
+    def _handle_backend_switch(self) -> None:
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            payload = json.loads(self.rfile.read(length) or b"{}")
+        except (ValueError, json.JSONDecodeError):
+            self._send_json(400, {"error": "INVALID_JSON"})
+            return
+
+        mode = payload.get("mode") if isinstance(payload, dict) else None
+        if mode not in self.backends:
+            self._send_json(400, {"error": "INVALID_BACKEND"})
+            return
+        with self.backend_lock:
+            type(self).backend_mode = mode
+        self._handle_backend_state()
 
     def _is_proxy_request(self) -> bool:
         path = urlsplit(self.path).path
@@ -41,12 +85,21 @@ class PreviewHandler(SimpleHTTPRequestHandler):
         if body is not None:
             request_headers["Content-Length"] = str(len(body))
 
-        connection = http.client.HTTPSConnection(
-            self.upstream.hostname,
-            self.upstream.port or 443,
-            timeout=30,
-            context=ssl.create_default_context(),
-        )
+        mode, _ = self._backend_state()
+        upstream = self.backends[mode]
+        if upstream.scheme == "https":
+            connection = http.client.HTTPSConnection(
+                upstream.hostname,
+                upstream.port or 443,
+                timeout=30,
+                context=ssl.create_default_context(),
+            )
+        else:
+            connection = http.client.HTTPConnection(
+                upstream.hostname,
+                upstream.port or 80,
+                timeout=30,
+            )
         try:
             connection.request(
                 self.command, self.path, body=body, headers=request_headers
@@ -72,13 +125,23 @@ class PreviewHandler(SimpleHTTPRequestHandler):
             connection.close()
 
     def do_GET(self) -> None:
-        self._proxy() if self._is_proxy_request() else super().do_GET()
+        if urlsplit(self.path).path == "/__preview/backend":
+            self._handle_backend_state()
+        elif self._is_proxy_request():
+            self._proxy()
+        else:
+            super().do_GET()
 
     def do_HEAD(self) -> None:
         self._proxy() if self._is_proxy_request() else super().do_HEAD()
 
     def do_POST(self) -> None:
-        self._proxy() if self._is_proxy_request() else self.send_error(405)
+        if urlsplit(self.path).path == "/__preview/backend":
+            self._handle_backend_switch()
+        elif self._is_proxy_request():
+            self._proxy()
+        else:
+            self.send_error(405)
 
     def do_PUT(self) -> None:
         self._proxy() if self._is_proxy_request() else self.send_error(405)
@@ -91,6 +154,10 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--upstream", default="https://api.healy1012-ops.top")
+    parser.add_argument("--local-upstream", default="http://127.0.0.1:8000")
+    parser.add_argument(
+        "--backend", choices=("local", "server"), default="server"
+    )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=3001)
     return parser.parse_args()
@@ -99,19 +166,29 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     root = args.root.resolve(strict=True)
-    PreviewHandler.upstream = urlsplit(args.upstream)
-    if (
-        PreviewHandler.upstream.scheme != "https"
-        or not PreviewHandler.upstream.hostname
-    ):
+    server_upstream = urlsplit(args.upstream)
+    local_upstream = urlsplit(args.local_upstream)
+    if server_upstream.scheme != "https" or not server_upstream.hostname:
         raise SystemExit("--upstream must be an absolute HTTPS URL")
+    if (
+        local_upstream.scheme not in {"http", "https"}
+        or local_upstream.hostname not in {"127.0.0.1", "localhost"}
+    ):
+        raise SystemExit("--local-upstream must use a loopback HTTP(S) URL")
+    PreviewHandler.backends = {
+        "local": local_upstream,
+        "server": server_upstream,
+    }
+    PreviewHandler.backend_mode = args.backend
 
     handler = lambda *handler_args, **kwargs: PreviewHandler(
         *handler_args, directory=str(root), **kwargs
     )
     server = ThreadingHTTPServer((args.host, args.port), handler)
     print(f"Preview:  http://{args.host}:{args.port}")
-    print(f"API proxy: /api/* -> {args.upstream}")
+    print(f"Local API:  {args.local_upstream}")
+    print(f"Server API: {args.upstream}")
+    print(f"Selected:   {args.backend}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
