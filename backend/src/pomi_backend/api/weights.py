@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
 from datetime import date
 from typing import Annotated
 
@@ -43,7 +42,7 @@ def weight_response(record: WeightRecord) -> WeightResponse:
 
 
 def request_id(request: Request, response: Response) -> str:
-    value = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    value = request.state.request_id
     response.headers["X-Request-ID"] = value
     return value
 

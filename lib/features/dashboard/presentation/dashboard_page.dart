@@ -688,7 +688,10 @@ class _DashboardWeightSummary extends StatelessWidget {
                   const Icon(Icons.sync_problem_rounded, size: 18),
                   const SizedBox(width: 8),
                   const Expanded(child: Text('同步失败，当前为上次数据')),
-                  TextButton(onPressed: controller.load, child: const Text('重试')),
+                  TextButton(
+                    onPressed: controller.load,
+                    child: const Text('重试'),
+                  ),
                 ],
               ),
               const SizedBox(height: 6),

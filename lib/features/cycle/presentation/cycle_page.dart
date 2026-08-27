@@ -9,24 +9,31 @@ import 'package:pmos_enclaire/features/weight/domain/weight_record.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 class CyclePage extends StatefulWidget {
-  const CyclePage({required this.weightController, super.key});
+  const CyclePage({required this.weightController, this.now, super.key});
 
   final WeightController weightController;
+  final DateTime Function()? now;
 
   @override
   State<CyclePage> createState() => _CyclePageState();
 }
 
 class _CyclePageState extends State<CyclePage> {
-  DateTime _focusedDay = DateTime(2026, 8, 27);
-  DateTime _selectedDay = DateTime(2026, 8, 27);
-  final Set<DateTime> _periodDays = {
-    for (var day = 6; day <= 10; day++) DateTime(2026, 8, day),
-  };
+  late final DateTime _today;
+  late DateTime _focusedDay;
+  late DateTime _selectedDay;
+  late final Set<DateTime> _periodDays;
 
   @override
   void initState() {
     super.initState();
+    _today = _dateOnly((widget.now ?? DateTime.now)());
+    _focusedDay = _today;
+    _selectedDay = _today;
+    _periodDays = {
+      for (var day = 1; day <= 5; day++)
+        DateTime(_today.year, _today.month, day),
+    };
     widget.weightController.addListener(_refresh);
   }
 
@@ -72,29 +79,25 @@ class _CyclePageState extends State<CyclePage> {
 
   Future<void> _recordWeight() async {
     final existing = _recordFor(_selectedDay);
-    final result = await showDialog<double>(
+    final saved = await showDialog<bool>(
       context: context,
       builder: (_) => _WeightEntryDialog(
         recordDate: _selectedDay,
         initialWeight: existing?.weightKg,
+        onSave: (weightKg) async {
+          final success = await widget.weightController.save(
+            recordDate: _selectedDay,
+            weightKg: weightKg,
+          );
+          return success
+              ? null
+              : widget.weightController.errorMessage ?? '保存失败，请稍后重试';
+        },
       ),
     );
-    if (result == null || !mounted) return;
-
-    final saved = await widget.weightController.save(
-      recordDate: _selectedDay,
-      weightKg: result,
-    );
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          saved
-              ? '体重已保存'
-              : widget.weightController.errorMessage ?? '保存失败，请稍后重试',
-        ),
-      ),
-    );
+    if (saved != true || !mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('体重已保存')));
   }
 
   @override
@@ -119,8 +122,8 @@ class _CyclePageState extends State<CyclePage> {
                 PomiSectionCard(
                   padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
                   child: TableCalendar<String>(
-                    firstDay: DateTime(2025),
-                    lastDay: DateTime(2027, 12, 31),
+                    firstDay: DateTime(2000),
+                    lastDay: _today,
                     focusedDay: _focusedDay,
                     selectedDayPredicate: (day) => isSameDay(day, _selectedDay),
                     eventLoader: (day) =>
@@ -274,10 +277,15 @@ class _CyclePageState extends State<CyclePage> {
 }
 
 class _WeightEntryDialog extends StatefulWidget {
-  const _WeightEntryDialog({required this.recordDate, this.initialWeight});
+  const _WeightEntryDialog({
+    required this.recordDate,
+    required this.onSave,
+    this.initialWeight,
+  });
 
   final DateTime recordDate;
   final double? initialWeight;
+  final Future<String?> Function(double weightKg) onSave;
 
   @override
   State<_WeightEntryDialog> createState() => _WeightEntryDialogState();
@@ -288,6 +296,7 @@ class _WeightEntryDialogState extends State<_WeightEntryDialog> {
     text: widget.initialWeight?.toStringAsFixed(1) ?? '',
   );
   String? _validationMessage;
+  bool _saving = false;
 
   @override
   void dispose() {
@@ -295,13 +304,28 @@ class _WeightEntryDialogState extends State<_WeightEntryDialog> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     final message = validateWeightInput(_controller.text);
     if (message != null) {
       setState(() => _validationMessage = message);
       return;
     }
-    Navigator.pop(context, double.parse(_controller.text.trim()));
+    setState(() {
+      _saving = true;
+      _validationMessage = null;
+    });
+    final saveError = await widget.onSave(
+      double.parse(_controller.text.trim()),
+    );
+    if (!mounted) return;
+    if (saveError == null) {
+      Navigator.pop(context, true);
+      return;
+    }
+    setState(() {
+      _saving = false;
+      _validationMessage = saveError;
+    });
   }
 
   @override
@@ -338,13 +362,13 @@ class _WeightEntryDialogState extends State<_WeightEntryDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: _saving ? null : () => Navigator.pop(context),
           child: const Text('取消'),
         ),
         FilledButton(
           key: const Key('save-weight-button'),
-          onPressed: _submit,
-          child: const Text('保存'),
+          onPressed: _saving ? null : _submit,
+          child: Text(_saving ? '保存中…' : '保存'),
         ),
       ],
     );
@@ -412,6 +436,18 @@ class _WeightTrendCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (errorMessage != null) ...[
+            Row(
+              key: const Key('weight-stale-warning'),
+              children: [
+                const Icon(Icons.sync_problem_rounded, size: 18),
+                const SizedBox(width: 8),
+                Expanded(child: Text('当前显示上次同步的数据：$errorMessage')),
+                TextButton(onPressed: onRetry, child: const Text('重试')),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ],
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
