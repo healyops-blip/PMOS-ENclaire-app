@@ -69,7 +69,10 @@ def test_initial_migration_is_repeatable_and_safe(tmp_path: Path, monkeypatch: M
     engine.dispose()
 
 
-def test_document_migration_upgrades_the_current_main_schema(tmp_path: Path) -> None:
+def test_document_migration_upgrades_the_current_main_schema(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    monkeypatch.delenv("POMI_DATABASE_URL", raising=False)
     database_url = f"sqlite:///{tmp_path / 'upgrade-from-main.db'}"
     backend_root = Path(__file__).resolve().parents[1]
     config = Config(backend_root / "alembic.ini")
