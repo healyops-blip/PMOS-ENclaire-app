@@ -371,7 +371,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                                     strokeWidth: 2,
                                   ),
                                 )
-                                : Text(_step == 2 ? '完成，进入首页' : '下一步'),
+                                : Text(_step == 2 ? '进入首页' : '下一步'),
                       ),
                     ),
                   ),
