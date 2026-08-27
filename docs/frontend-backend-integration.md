@@ -146,7 +146,7 @@ Authorization: Bearer <session_id>
 | 用药历史 | `GET /api/medications/{medication_id}/events` | 时间线 | 不可覆盖的事件链 |
 | 每日状态 | `PUT /api/medications/{medication_id}/daily-status` | 首页、用药月历 | taken/missed/unrecorded |
 | 每日状态范围 | `GET /api/medication-daily` | 月统计 | 日期范围内三状态记录 |
-| 经期 | `GET/POST /api/cycles`、`PUT /api/cycles/{cycle_id}` | 经期页 | 周期和趋势 |
+| 经期 | `GET/POST /api/cycles`、`PUT/DELETE /api/cycles/{cycle_id}` | 经期页 | 周期、趋势和逻辑删除 |
 | 体重 | `GET/POST /api/weights`、`PUT /api/weights/{weight_id}` | 经期/体重页 | 体重趋势 |
 | 材料 | `GET/POST /api/documents` | 记录页、上传页 | 材料及当前修订 |
 | 材料详情 | `GET/DELETE /api/documents/{document_id}` | 材料详情 | 详情或软删除结果 |

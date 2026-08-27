@@ -54,7 +54,7 @@ def test_initial_migration_is_repeatable_and_safe(tmp_path: Path, monkeypatch: M
 
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-            "20260827_0012"
+            "20260827_0015"
         )
     command.downgrade(config, "20260826_0001")
     inspector = inspect(engine)
