@@ -11,6 +11,7 @@ import random
 import shutil
 import argparse
 from datetime import datetime
+import re
 
 # 娣诲姞鑴氭湰鎵€鍦ㄧ洰褰曞埌璺緞
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -56,6 +57,16 @@ def compute_logo_bbox(img_size):
 # ============================================================
 # 涓荤敓鎴愰€昏緫
 # ============================================================
+
+def _hospital_cn(name: str) -> str:
+    """截断第一个拉丁字母起的内容，确保仅保留中文显示名称。"""
+    if not isinstance(name, str):
+        return str(name)
+    m = re.search(r"[A-Za-z]", name)
+    if m:
+        name = name[: m.start()]
+    return name.strip()
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -193,13 +204,17 @@ def main():
 
             # 闅忔満閫夋嫨鍖婚櫌
             hospital_info = random.choice(HOSPITALS)
+            hosp_cn = _hospital_cn(hospital_info["name"]) if isinstance(hospital_info, dict) else _hospital_cn(str(hospital_info))
 
-            print(f"  [{global_counter:03d}] {report_type}/{filename} - {hospital_info['name']}")
+            print(f"  [{global_counter:03d}] {report_type}/{filename} - {hosp_cn}")
 
             # 鐢熸垚鏁版嵁
             data = module.generate_data()
             data["department"] = random.choice(DEPARTMENTS)
-            data["hospital"] = hospital_info["name"]
+            # 医院仅保留中文
+            data["hospital"] = hosp_cn
+            # 性别强制为女
+            data["gender"] = "女"
 
             # 鍏ㄥ眬鎬у埆瑕嗙洊锛堝鎸囧畾锛?
             if args.gender != "random":
@@ -453,10 +468,10 @@ def main():
             image_rel = os.path.join(report_type, filename)
             master_truth[image_rel] = {
                 "report_type": report_type,
-                "hospital": hospital_info["name"],
+                "hospital": hosp_cn,
                 "department": data.get("department", ""),
                 "truth_file": truth_rel,
-                "truth": truth
+                "truth": truth,
             }
 
             global_counter += 1

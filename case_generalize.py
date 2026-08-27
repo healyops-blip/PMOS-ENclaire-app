@@ -1004,6 +1004,14 @@ def main():
         "门诊病历_就诊记录": "MR",
     }
 
+    import re
+    def _hospital_cn(name: str) -> str:
+        try:
+            m = re.search(r"[A-Za-z]", name)
+            return name[:m.start()].strip() if m else name.strip()
+        except Exception:
+            return name
+
     for i in range(start_index, end_index + 1):
         filename = f"case_{i:05d}.jpg"
         output_path = os.path.join(report_dir, filename)
@@ -1011,21 +1019,18 @@ def main():
         # 随机选择医院
         hospital_info = random.choice(HOSPITALS)
 
-        print(f"[{i}/{args.num}] Generating {args.type}/{filename} - {hospital_info['name']}")
+        name_full = hospital_info['name']
+        hosp_cn = _hospital_cn(name_full)
+        print(f"[{i}/{args.num}] Generating {args.type}/{filename} - {hosp_cn}")
 
         # 生成数据
         module = get_report_type(args.type)
         data = module.generate_data()
         data["department"] = random.choice(DEPARTMENTS)
         # 仅保留中文医院名（若原始包含英文并列展示）
-        name_full = hospital_info["name"]
-        try:
-            import re
-            m = re.search(r"[A-Za-z]", name_full)
-            hosp_cn = name_full[:m.start()].strip() if m else name_full.strip()
-        except Exception:
-            hosp_cn = name_full
         data["hospital"] = hosp_cn
+        # 性别强制为女
+        data["gender"] = "女"
         # 覆盖病历号，确保唯一且可追溯
         data["patient_id"] = f"{pid_prefix_map.get(args.type, 'ID')}{i:05d}"
         # 性别强制为女（各模块已是女，这里再次兜底）
