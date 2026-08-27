@@ -33,7 +33,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('dashboard-page')), findsOneWidget);
-    expect(find.text('模拟患者 · 林晓晴'), findsOneWidget);
+    expect(find.text('患者 · 林晓晴'), findsOneWidget);
     expect(find.text('今日用药'), findsOneWidget);
     final secondMedicationStatus = find.byKey(const Key('medication-status-1'));
     expect(
@@ -145,7 +145,7 @@ void main() {
     }
 
     expect(find.byKey(const Key('dashboard-page')), findsOneWidget);
-    expect(find.text('模拟患者 · 林晓晴'), findsOneWidget);
+    expect(find.text('患者 · 林晓晴'), findsOneWidget);
   });
 
   testWidgets('main navigation opens cycle records and profile pages', (

@@ -102,11 +102,26 @@ def test_dashboard_exposes_independently_failable_sections() -> None:
         "latest_report",
     }
 
-    assert sections <= set(dashboard["required"])
+    assert {"business_date", *sections} <= set(dashboard["required"])
     for name in sections:
         reference = dashboard["properties"][name]["$ref"]
         section = schemas[reference.removeprefix("#/components/schemas/")]
-        assert section["required"] == ["status", "data", "error_code"]
+        assert section["required"] == ["status", "data", "error"]
+        status_reference = section["properties"]["status"]["$ref"]
+        assert schemas[status_reference.removeprefix("#/components/schemas/")]["enum"] == [
+            "ok",
+            "empty",
+            "error",
+        ]
+        error_reference = section["properties"]["error"]["oneOf"][0]["$ref"]
+        error = schemas[error_reference.removeprefix("#/components/schemas/")]
+        assert error["required"] == ["code", "message", "retryable"]
+
+    assert dashboard["properties"]["latest_report"]["$ref"].endswith(
+        "/DashboardLatestReportSection"
+    )
+    latest = schemas["DashboardLatestReportSection"]["properties"]["data"]["oneOf"][0]
+    assert latest["$ref"].endswith("/ReportListItem")
 
 
 def test_patient_note_workflow_contract_matches_issue_27() -> None:

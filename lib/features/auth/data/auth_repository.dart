@@ -21,10 +21,11 @@ abstract interface class AuthRepository {
 }
 
 class FastApiAuthRepository implements AuthRepository {
-  FastApiAuthRepository(this.client, this.sessionStore);
+  FastApiAuthRepository(this.client, this.sessionStore, {this.onLogout});
 
   final PomiApiClient client;
   final SessionStore sessionStore;
+  final Future<void> Function()? onLogout;
 
   @override
   Future<AuthSession> login({
@@ -103,6 +104,7 @@ class FastApiAuthRepository implements AuthRepository {
     } on DioException catch (error) {
       if (error.response?.statusCode != 401) throw _failure(error);
     } finally {
+      await onLogout?.call();
       await sessionStore.clear();
       client.useSession(null);
     }

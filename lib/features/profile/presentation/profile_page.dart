@@ -41,11 +41,13 @@ class ProfilePage extends StatefulWidget {
   const ProfilePage({
     required this.account,
     required this.repository,
+    this.onLogout,
     super.key,
   });
 
   final DemoAccount account;
   final PatientProfileRepository repository;
+  final Future<void> Function()? onLogout;
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -246,8 +248,17 @@ class _ProfilePageState extends State<ProfilePage> {
                         icon: Icons.info_outline_rounded,
                         title: '关于 Pomi',
                         subtitle: '版本 0.1.0 · 演示环境',
-                        last: true,
                         onTap: () => _showNotReady(context),
+                      ),
+                      _ProfileAction(
+                        key: const Key('logout-button'),
+                        icon: Icons.logout_rounded,
+                        title: '退出登录',
+                        subtitle: '清除本账号的离线首页缓存',
+                        last: true,
+                        onTap: widget.onLogout == null
+                            ? () => _showNotReady(context)
+                            : () => widget.onLogout!(),
                       ),
                     ],
                   ),

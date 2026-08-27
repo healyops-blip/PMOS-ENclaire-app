@@ -14,12 +14,14 @@ class CyclePage extends StatefulWidget {
     this.repository,
     this.weightController,
     this.now,
+    this.writesEnabled = true,
     super.key,
   });
 
   final CycleRepository? repository;
   final WeightController? weightController;
   final DateTime Function()? now;
+  final bool writesEnabled;
 
   @override
   State<CyclePage> createState() => _CyclePageState();
@@ -141,7 +143,9 @@ class _CyclePageState extends State<CyclePage> {
               subtitle: '记录真实发生的经期，回顾周期变化',
               trailing: FilledButton.icon(
                 key: const Key('add-cycle-button'),
-                onPressed: _saving ? null : () => _openEditor(),
+                onPressed: _saving || !widget.writesEnabled
+                    ? null
+                    : () => _openEditor(),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size(0, 40),
                   padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -216,7 +220,7 @@ class _CyclePageState extends State<CyclePage> {
                 ),
                 FilledButton.icon(
                   key: const Key('empty-add-cycle-button'),
-                  onPressed: () => _openEditor(),
+                  onPressed: widget.writesEnabled ? () => _openEditor() : null,
                   icon: const Icon(Icons.add_rounded),
                   label: const Text('添加第一条记录'),
                 ),
@@ -254,7 +258,9 @@ class _CyclePageState extends State<CyclePage> {
                 ),
                 TextButton(
                   key: const Key('complete-cycle-button'),
-                  onPressed: () => _openEditor(ongoing),
+                  onPressed: widget.writesEnabled
+                      ? () => _openEditor(ongoing)
+                      : null,
                   child: const Text('补录'),
                 ),
               ],
@@ -307,7 +313,11 @@ class _CyclePageState extends State<CyclePage> {
   Widget _weightSection() {
     final controller = widget.weightController;
     if (controller == null) return const SizedBox.shrink();
-    return WeightSection(controller: controller, now: widget.now);
+    return WeightSection(
+      controller: controller,
+      now: widget.now,
+      writesEnabled: widget.writesEnabled,
+    );
   }
 
   Widget _calendar(List<MenstrualCycle> cycles) {
@@ -413,13 +423,17 @@ class _CyclePageState extends State<CyclePage> {
           IconButton(
             key: Key('edit-cycle-${cycle.id}'),
             tooltip: '编辑',
-            onPressed: _saving ? null : () => _openEditor(cycle),
+            onPressed: _saving || !widget.writesEnabled
+                ? null
+                : () => _openEditor(cycle),
             icon: const Icon(Icons.edit_outlined),
           ),
           IconButton(
             key: Key('delete-cycle-${cycle.id}'),
             tooltip: '删除',
-            onPressed: _saving ? null : () => _delete(cycle),
+            onPressed: _saving || !widget.writesEnabled
+                ? null
+                : () => _delete(cycle),
             icon: const Icon(Icons.delete_outline_rounded),
           ),
         ],

@@ -7,10 +7,16 @@ import 'package:pmos_enclaire/features/weight/domain/weight_input_validator.dart
 import 'package:pmos_enclaire/features/weight/domain/weight_record.dart';
 
 class WeightSection extends StatefulWidget {
-  const WeightSection({required this.controller, this.now, super.key});
+  const WeightSection({
+    required this.controller,
+    this.now,
+    this.writesEnabled = true,
+    super.key,
+  });
 
   final WeightController controller;
   final DateTime Function()? now;
+  final bool writesEnabled;
 
   @override
   State<WeightSection> createState() => _WeightSectionState();
@@ -127,7 +133,8 @@ class _WeightSectionState extends State<WeightSection> {
                   Expanded(
                     child: FilledButton.icon(
                       key: const Key('record-weight-button'),
-                      onPressed: widget.controller.isLoading
+                      onPressed:
+                          widget.controller.isLoading || !widget.writesEnabled
                           ? null
                           : _recordWeight,
                       icon: const Icon(Icons.monitor_weight_outlined),

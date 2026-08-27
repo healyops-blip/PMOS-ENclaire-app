@@ -10,9 +10,11 @@ paths = [
   '''^docs/backend-api\.md$''',
   '''^backend/tests/test_admin_accounts\.py$''',
   '''^backend/tests/test_medication_api\.py$''',
+  '''^backend/tests/test_dashboard_api\.py$''',
 ]
 regexes = [
   '''^StrongPass123$''',
   '''^IgnoredPass123$''',
   '''^Medication123$''',
+  '''^Dashboard123$''',
 ]
