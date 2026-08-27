@@ -86,7 +86,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       context: context,
       builder:
           (context) => Dialog(
-            backgroundColor: Colors.white,
+            backgroundColor: Colors.white.withValues(alpha: 0.7),
+            surfaceTintColor: Colors.transparent,
             insetPadding: const EdgeInsets.symmetric(horizontal: 50),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
