@@ -10,6 +10,7 @@ const _onboardingContentPadding = EdgeInsets.all(16);
 const _onboardingFieldSlotHeight = 76.0;
 const _onboardingSectionGap = 16.0;
 const _onboardingLabelGap = 8.0;
+const _onboardingSelectedColor = Color(0xFFE3D6EF);
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -531,7 +532,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     selected: _cycleRange == value,
                     showCheckmark: false,
                     backgroundColor: Colors.white,
-                    selectedColor: pomiLavender,
+                    selectedColor: _onboardingSelectedColor,
                     shape: const StadiumBorder(),
                     side: const BorderSide(color: pomiLine),
                     onSelected: (_) => setState(() => _cycleRange = value),
@@ -583,6 +584,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   (name) => FilterChip(
                     label: Text(name),
                     selected: _medications.contains(name),
+                    selectedColor: _onboardingSelectedColor,
                     onSelected:
                         (selected) => setState(() {
                           if (selected) {
