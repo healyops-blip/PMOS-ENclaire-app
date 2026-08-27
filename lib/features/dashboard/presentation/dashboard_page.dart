@@ -19,6 +19,7 @@ import 'package:pmos_enclaire/features/records/presentation/records_page.dart';
 import 'package:pmos_enclaire/features/records/presentation/upload_flow.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/reports/presentation/report_page.dart';
+import 'package:pmos_enclaire/features/reports/data/patient_note_repository.dart';
 import 'package:pmos_enclaire/features/weight/application/weight_controller.dart';
 import 'package:pmos_enclaire/features/weight/data/weight_repository.dart';
 
@@ -26,6 +27,7 @@ class DashboardPage extends StatefulWidget {
   const DashboardPage({
     required this.account,
     required this.profileRepository,
+    required this.patientNoteRepository,
     required this.documentRepository,
     required this.weightRepository,
     this.dashboardRepository,
@@ -38,6 +40,7 @@ class DashboardPage extends StatefulWidget {
 
   final DemoAccount account;
   final PatientProfileRepository profileRepository;
+  final PatientNoteRepository patientNoteRepository;
   final DocumentRepository documentRepository;
   final WeightRepository weightRepository;
   final DashboardRepository? dashboardRepository;
@@ -204,7 +207,9 @@ class _DashboardPageState extends State<DashboardPage> {
               },
               onReport: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) => const ReportGeneratorPage(),
+                  builder: (_) => ReportGeneratorPage(
+                    repository: widget.patientNoteRepository,
+                  ),
                 ),
               ),
             ),
@@ -373,8 +378,18 @@ class _DashboardBody extends StatelessWidget {
                     message: '暂无复诊报告 · 准备复诊材料',
                   )
                 else
-                  const SizedBox.shrink(),
-                _ReportCallToAction(onTap: onReport),
+                  _DashboardNotice(
+                    key: const Key('dashboard-report-latest'),
+                    icon: Icons.description_rounded,
+                    message:
+                        '最新报告已生成 · ${_displayTimestamp(snapshot!.latestReport.data!.generatedAt)}',
+                  ),
+                _ReportCallToAction(
+                  onTap: onReport,
+                  hasReport:
+                      snapshot?.latestReport.status ==
+                      DashboardSectionStatus.ok,
+                ),
                 const SizedBox(height: 20),
                 const _SectionHeader(title: '最新体重'),
                 const SizedBox(height: 8),
@@ -391,6 +406,11 @@ class _DashboardBody extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  static String _displayTimestamp(DateTime value) {
+    final local = value.toLocal();
+    return '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
   }
 }
 
@@ -1083,9 +1103,10 @@ class _LegendDot extends StatelessWidget {
 }
 
 class _ReportCallToAction extends StatelessWidget {
-  const _ReportCallToAction({required this.onTap});
+  const _ReportCallToAction({required this.onTap, required this.hasReport});
 
   final VoidCallback onTap;
+  final bool hasReport;
 
   @override
   Widget build(BuildContext context) {
@@ -1100,21 +1121,21 @@ class _ReportCallToAction extends StatelessWidget {
           padding: const EdgeInsets.all(15),
           child: Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '生成复诊报告',
-                      style: TextStyle(
+                      hasReport ? '进入复诊报告' : '生成复诊报告',
+                      style: const TextStyle(
                         color: PomiColors.primary,
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    SizedBox(height: 3),
-                    Text(
-                      '一键汇总化验 · 用药 · 经期 · 体重',
+                    const SizedBox(height: 3),
+                    const Text(
+                      '汇总化验 · 用药 · 经期 · 体重',
                       style: TextStyle(
                         color: PomiColors.textMuted,
                         fontSize: 10,
@@ -1132,9 +1153,9 @@ class _ReportCallToAction extends StatelessWidget {
                   color: PomiColors.primary,
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: const Text(
-                  '生成',
-                  style: TextStyle(
+                child: Text(
+                  hasReport ? '查看' : '生成',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,
                   ),

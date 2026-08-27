@@ -97,6 +97,27 @@ void main() {
       expect(logoutCalls, 1);
     },
   );
+
+  test('decodes only stable latest-report metadata', () {
+    final json = Map<String, dynamic>.from(_dashboardJson)
+      ..['latest_report'] = {
+        'status': 'ok',
+        'data': {
+          'report_id': 'report-1',
+          'status': 'succeeded',
+          'generated_at': '2026-08-27T10:00:00+00:00',
+          'snapshot_hash': List.filled(64, 'd').join(),
+        },
+        'error': null,
+      };
+
+    final report = DashboardSnapshot.fromJson(json).latestReport.data;
+
+    expect(report?.reportId, 'report-1');
+    expect(report?.status, 'succeeded');
+    expect(report?.generatedAt, DateTime.utc(2026, 8, 27, 10));
+    expect(report?.snapshotHash, List.filled(64, 'd').join());
+  });
 }
 
 class _RevokedRepository implements DashboardRepository {

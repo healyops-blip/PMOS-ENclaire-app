@@ -9,8 +9,35 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 OPENAPI_PATH = REPOSITORY_ROOT / "contracts/openapi/pomi-api-v1.yaml"
 
 
+class _UniqueKeyLoader(yaml.SafeLoader):
+    pass
+
+
+def _construct_unique_mapping(
+    loader: _UniqueKeyLoader, node: yaml.MappingNode, deep: bool = False
+) -> dict[Any, Any]:
+    mapping: dict[Any, Any] = {}
+    for key_node, value_node in node.value:
+        key = loader.construct_object(key_node, deep=deep)
+        if key in mapping:
+            raise AssertionError(
+                f"duplicate YAML key {key!r} at line {key_node.start_mark.line + 1}"
+            )
+        mapping[key] = loader.construct_object(value_node, deep=deep)
+    return mapping
+
+
+_UniqueKeyLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+    _construct_unique_mapping,
+)
+
+
 def load_contract() -> dict[str, Any]:
-    contract = yaml.safe_load(OPENAPI_PATH.read_text(encoding="utf-8"))
+    contract = yaml.load(
+        OPENAPI_PATH.read_text(encoding="utf-8"),
+        Loader=_UniqueKeyLoader,
+    )
     assert isinstance(contract, dict)
     return contract
 
@@ -80,8 +107,21 @@ def test_dashboard_exposes_independently_failable_sections() -> None:
         reference = dashboard["properties"][name]["$ref"]
         section = schemas[reference.removeprefix("#/components/schemas/")]
         assert section["required"] == ["status", "data", "error"]
-        assert section["properties"]["status"]["enum"] == ["ok", "empty", "error"]
-        assert {"code", "message", "retryable"} <= set(section["properties"]["error"]["properties"])
+        status_reference = section["properties"]["status"]["$ref"]
+        assert schemas[status_reference.removeprefix("#/components/schemas/")]["enum"] == [
+            "ok",
+            "empty",
+            "error",
+        ]
+        error_reference = section["properties"]["error"]["oneOf"][0]["$ref"]
+        error = schemas[error_reference.removeprefix("#/components/schemas/")]
+        assert error["required"] == ["code", "message", "retryable"]
+
+    assert dashboard["properties"]["latest_report"]["$ref"].endswith(
+        "/DashboardLatestReportSection"
+    )
+    latest = schemas["DashboardLatestReportSection"]["properties"]["data"]["oneOf"][0]
+    assert latest["$ref"].endswith("/ReportListItem")
 
 
 def test_patient_note_workflow_contract_matches_issue_27() -> None:
@@ -94,5 +134,16 @@ def test_patient_note_workflow_contract_matches_issue_27() -> None:
     for action in ("confirm", "skip", "copy"):
         assert "post" in paths[f"/api/patient-notes/{{note_id}}/{action}"]
 
-    statuses = contract["components"]["schemas"]["PatientNoteStatus"]["enum"]
+    schemas = contract["components"]["schemas"]
+    statuses = schemas["PatientNoteStatus"]["enum"]
     assert statuses == ["draft", "confirmed", "skipped", "consumed"]
+    assert schemas["PatientNoteInput"]["additionalProperties"] is False
+    assert set(schemas["PatientNoteInput"]["properties"]) == {
+        "original_text",
+        "visit_context",
+    }
+    assert {"confirmed_by_uid", "source_note_id", "consumed_at"} <= set(
+        schemas["PatientNote"]["properties"]
+    )
+    copy = paths["/api/patient-notes/{note_id}/copy"]["post"]
+    assert copy["requestBody"]["required"] is True

@@ -26,6 +26,7 @@ from pomi_backend.api.health import router as health_router
 from pomi_backend.api.medications import router as medications_router
 from pomi_backend.api.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
 from pomi_backend.api.patient import router as patient_router
+from pomi_backend.api.patient_notes import router as patient_notes_router
 from pomi_backend.api.weights import router as weights_router
 from pomi_backend.config import Settings
 from pomi_backend.db import build_engine, build_session_factory
@@ -79,6 +80,7 @@ def create_app(*, settings: Settings | None = None, engine: Engine | None = None
     app.include_router(weights_router)
     app.include_router(medications_router)
     app.include_router(patient_router)
+    app.include_router(patient_notes_router)
     app.include_router(documents_router)
     return app
 

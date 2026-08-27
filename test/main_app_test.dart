@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pmos_enclaire/features/auth/data/auth_repository.dart';
+import 'package:pmos_enclaire/features/reports/data/patient_note_repository.dart';
+import 'package:pmos_enclaire/features/reports/presentation/report_page.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/main.dart';
 
@@ -251,8 +253,15 @@ void main() {
     await tester.tap(reportEntry);
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('report-generator-page')), findsOneWidget);
+    expect(find.byKey(const Key('patient-note-field')), findsOneWidget);
+    expect(find.text('原文已确认'), findsOneWidget);
 
     final generate = find.byKey(const Key('generate-report-button'));
+    await tester.drag(
+      find.byKey(const Key('report-generator-scroll')),
+      const Offset(0, -500),
+    );
+    await tester.pumpAndSettle();
     await tester.ensureVisible(generate);
     await tester.tap(generate);
     await tester.pumpAndSettle();
@@ -278,6 +287,90 @@ void main() {
     await tester.tap(sourceButton);
     await tester.pumpAndSettle();
     expect(find.text('原始化验单预览 · 模拟材料'), findsOneWidget);
+  });
+
+  testWidgets('patient statement confirms, copies and explicitly skips', (
+    tester,
+  ) async {
+    _setPhoneViewport(tester);
+    final now = DateTime(2026, 8, 27);
+    final repository = DemoPatientNoteRepository(
+      initial: PatientNote(
+        id: 'draft-note',
+        originalText: '希望讨论睡眠问题',
+        status: PatientNoteStatus.draft,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    await tester.pumpWidget(
+      MainApp(
+        authRepository: const DemoAuthRepository(),
+        patientNoteRepository: repository,
+      ),
+    );
+    await tester.tap(find.byKey(const Key('demo-login-button')));
+    await tester.pumpAndSettle();
+    final reportEntry = find.byKey(const Key('report-cta'));
+    await tester.ensureVisible(reportEntry);
+    await tester.tap(reportEntry);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('patient-note-field')),
+      '希望讨论睡眠与疲劳问题',
+    );
+    await tester.tap(find.byKey(const Key('confirm-patient-note')));
+    await tester.pumpAndSettle();
+    expect(find.text('原文已确认'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('copy-patient-note')));
+    await tester.pumpAndSettle();
+    expect(find.text('草稿 · 待确认'), findsOneWidget);
+    expect(find.text('希望讨论睡眠与疲劳问题'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('skip-patient-note')));
+    await tester.pumpAndSettle();
+    expect(find.text('本次已明确跳过'), findsOneWidget);
+  });
+
+  testWidgets('patient statement failure preserves input and permits retry', (
+    tester,
+  ) async {
+    final now = DateTime(2026, 8, 27);
+    final repository = _RetryPatientNoteRepository(
+      PatientNote(
+        id: 'retry-note',
+        originalText: '原始内容',
+        status: PatientNoteStatus.draft,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: ReportGeneratorPage(repository: repository)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('patient-note-field')),
+      '失败后必须保留的内容',
+    );
+    final save = find.byKey(const Key('save-patient-note-draft'));
+    await tester.drag(
+      find.byKey(const Key('report-generator-scroll')),
+      const Offset(0, -160),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+    expect(find.text('模拟网络失败'), findsOneWidget);
+    expect(find.text('失败后必须保留的内容'), findsOneWidget);
+
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+    expect((await repository.latest())!.originalText, '失败后必须保留的内容');
+    expect(find.text('模拟网络失败'), findsNothing);
   });
 }
 
@@ -314,5 +407,20 @@ class _UploadCountingDocumentRepository extends DemoDocumentRepository {
       idempotencyKey: idempotencyKey,
       onProgress: onProgress,
     );
+  }
+}
+
+class _RetryPatientNoteRepository extends DemoPatientNoteRepository {
+  _RetryPatientNoteRepository(PatientNote initial) : super(initial: initial);
+
+  bool failNextUpdate = true;
+
+  @override
+  Future<PatientNote> update(String id, String text, {String? visitContext}) {
+    if (failNextUpdate) {
+      failNextUpdate = false;
+      throw const PatientNoteFailure('模拟网络失败');
+    }
+    return super.update(id, text, visitContext: visitContext);
   }
 }

@@ -61,6 +61,29 @@ class MedicationMonthSummary {
   final int unrecorded;
 }
 
+class DashboardReportSummary {
+  const DashboardReportSummary({
+    required this.reportId,
+    required this.status,
+    required this.generatedAt,
+    required this.snapshotHash,
+  });
+
+  factory DashboardReportSummary.fromJson(Map<String, dynamic> json) {
+    return DashboardReportSummary(
+      reportId: json['report_id'] as String,
+      status: json['status'] as String,
+      generatedAt: DateTime.parse(json['generated_at'] as String),
+      snapshotHash: json['snapshot_hash'] as String,
+    );
+  }
+
+  final String reportId;
+  final String status;
+  final DateTime generatedAt;
+  final String snapshotHash;
+}
+
 class DashboardSnapshot {
   const DashboardSnapshot({
     required this.businessDate,
@@ -98,7 +121,11 @@ class DashboardSnapshot {
       ),
       latestReport: DashboardSection.fromJson(
         Map<String, dynamic>.from(json['latest_report'] as Map),
-        (value) => value,
+        (value) => value == null
+            ? null
+            : DashboardReportSummary.fromJson(
+                Map<String, dynamic>.from(value as Map),
+              ),
       ),
     );
   }
@@ -107,7 +134,7 @@ class DashboardSnapshot {
   final DashboardSection<FollowUpSummary> followUp;
   final DashboardSection<List<Medication>> todayMedications;
   final DashboardSection<MedicationMonthSummary> monthSummary;
-  final DashboardSection<Object?> latestReport;
+  final DashboardSection<DashboardReportSummary> latestReport;
 }
 
 Medication _medicationFromJson(Map<String, dynamic> json) {

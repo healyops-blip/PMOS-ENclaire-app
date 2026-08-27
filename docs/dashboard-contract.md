@@ -10,7 +10,8 @@
   和已被调药版本替代的记录不会出现。
 - `monthly_medication_summary.data`: 从当月 1 日至业务日期的 `taken`、`missed`、
   `unrecorded`，按“有效药物 × 应服日期”计算，不输出依从率。
-- `latest_report.data`: 报告模块尚未生成报告时为空，不返回模拟报告。
+- `latest_report.data`: 最新成功快照的 `report_id`、`status`、`generated_at` 和
+  `snapshot_hash`；尚未生成成功报告时为空，不返回失败中间态或模拟报告，也不缓存报告正文。
 
 Flutter 的 `DashboardRepository` 负责 DTO 转换。联网成功后按 UID 将最后一次成功响应写入
 `flutter_secure_storage`；Android 上由 Keystore 保护加密存储密钥。断网时只能读取当前 UID

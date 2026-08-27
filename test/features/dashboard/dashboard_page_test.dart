@@ -8,6 +8,7 @@ import 'package:pmos_enclaire/features/dashboard/domain/medication.dart';
 import 'package:pmos_enclaire/features/dashboard/presentation/dashboard_page.dart';
 import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
+import 'package:pmos_enclaire/features/reports/data/patient_note_repository.dart';
 import 'package:pmos_enclaire/features/weight/data/weight_repository.dart';
 
 void main() {
@@ -24,6 +25,7 @@ void main() {
         home: DashboardPage(
           account: DemoAccount.existingUser,
           profileRepository: DemoPatientProfileRepository(),
+          patientNoteRepository: DemoPatientNoteRepository(),
           documentRepository: DemoDocumentRepository(),
           weightRepository: MemoryWeightRepository(),
           dashboardRepository: _OfflineRepository(),
@@ -78,6 +80,7 @@ void main() {
           home: DashboardPage(
             account: DemoAccount.existingUser,
             profileRepository: DemoPatientProfileRepository(),
+            patientNoteRepository: DemoPatientNoteRepository(),
             documentRepository: DemoDocumentRepository(),
             weightRepository: MemoryWeightRepository(),
             dashboardRepository: repository,
@@ -96,6 +99,60 @@ void main() {
       expect(find.text('重试'), findsWidgets);
     },
   );
+
+  testWidgets('shows latest successful report metadata without report body', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 1500);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: PomiTheme.light,
+        home: DashboardPage(
+          account: DemoAccount.existingUser,
+          profileRepository: DemoPatientProfileRepository(),
+          patientNoteRepository: DemoPatientNoteRepository(),
+          documentRepository: DemoDocumentRepository(),
+          weightRepository: MemoryWeightRepository(),
+          dashboardRepository: _LatestReportRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('dashboard-report-latest')), findsOneWidget);
+    expect(find.textContaining('最新报告已生成'), findsOneWidget);
+    expect(find.text('进入复诊报告'), findsOneWidget);
+    expect(find.text('查看'), findsOneWidget);
+    expect(find.textContaining('private report body'), findsNothing);
+  });
+}
+
+class _LatestReportRepository implements DashboardRepository {
+  @override
+  Future<void> clear(String uid) async {}
+
+  @override
+  Future<DashboardLoad> load(String uid) async {
+    final json = Map<String, dynamic>.from(_dashboardJson)
+      ..['latest_report'] = {
+        'status': 'ok',
+        'data': {
+          'report_id': 'report-1',
+          'status': 'succeeded',
+          'generated_at': '2026-08-27T10:00:00+00:00',
+          'snapshot_hash': List.filled(64, 'd').join(),
+        },
+        'error': null,
+      };
+    return DashboardLoad(
+      snapshot: DashboardSnapshot.fromJson(json),
+      offline: false,
+      updatedAt: DateTime(2026, 8, 27, 12),
+    );
+  }
 }
 
 class _RefreshFailureRepository implements DashboardRepository {

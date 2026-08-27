@@ -10,15 +10,19 @@ from pomi_backend.db.models.health import (
     PatientProfile,
     WeightRecord,
 )
+from pomi_backend.db.models.reports import PatientNote, ReportSnapshot, ReportSource
 
 __all__ = [
+    "Document",
+    "DocumentRevision",
     "Medication",
     "MedicationDaily",
     "MedicationEvent",
     "MenstrualCycle",
+    "PatientNote",
     "PatientProfile",
-    "Document",
-    "DocumentRevision",
+    "ReportSnapshot",
+    "ReportSource",
     "UserAccount",
     "UserSession",
     "WeightRecord",

@@ -266,7 +266,21 @@ def purge_deleted_documents(
 ) -> int:
     """Remove expired, unreferenced files while keeping audit metadata."""
 
-    referenced = is_revision_referenced or (lambda _: False)
+    if is_revision_referenced is None:
+        from pomi_backend.db.models import ReportSource
+
+        def referenced(revision_id: str) -> bool:
+            return (
+                session.scalar(
+                    select(ReportSource.id)
+                    .where(ReportSource.document_revision_id == revision_id)
+                    .limit(1)
+                )
+                is not None
+            )
+
+    else:
+        referenced = is_revision_referenced
     documents = list(
         session.scalars(
             select(Document).where(

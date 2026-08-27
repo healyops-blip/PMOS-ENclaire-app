@@ -9,7 +9,13 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from pomi_backend.db.models import Medication, MedicationDaily, PatientProfile, UserAccount
+from pomi_backend.db.models import (
+    Medication,
+    MedicationDaily,
+    PatientProfile,
+    ReportSnapshot,
+    UserAccount,
+)
 from pomi_backend.schemas.dashboard import DashboardSection, DashboardSectionError
 from pomi_backend.services.medications import MedicationService, daily_data, medication_data
 
@@ -113,6 +119,28 @@ class DashboardService:
             "unrecorded": result["unrecorded_count"],
         }
 
-    def latest_report(self) -> None:
-        # Reports are introduced by the report module; never fabricate one here.
-        return None
+    def latest_report(self) -> dict[str, Any] | None:
+        profile = self._profile()
+        if profile is None:
+            return None
+        report = self.session.scalar(
+            select(ReportSnapshot)
+            .where(
+                ReportSnapshot.patient_id == profile.patient_id,
+                ReportSnapshot.report_status == "succeeded",
+            )
+            .order_by(
+                ReportSnapshot.report_generated_at.desc(),
+                ReportSnapshot.created_at.desc(),
+                ReportSnapshot.id.desc(),
+            )
+            .limit(1)
+        )
+        if report is None:
+            return None
+        return {
+            "report_id": report.id,
+            "status": report.report_status,
+            "generated_at": report.report_generated_at.isoformat(),
+            "snapshot_hash": report.snapshot_hash,
+        }

@@ -29,7 +29,10 @@ def test_initial_migration_is_repeatable_and_safe(tmp_path: Path, monkeypatch: M
         "medication_daily",
         "medication_event",
         "menstrual_cycle",
+        "patient_note",
         "patient_profile",
+        "report_snapshot",
+        "report_source",
         "user_account",
         "user_session",
         "weight_record",
@@ -60,7 +63,7 @@ def test_initial_migration_is_repeatable_and_safe(tmp_path: Path, monkeypatch: M
 
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-            "20260827_0020"
+            "20260827_0027"
         )
     command.downgrade(config, "20260826_0001")
     inspector = inspect(engine)
@@ -69,7 +72,7 @@ def test_initial_migration_is_repeatable_and_safe(tmp_path: Path, monkeypatch: M
     engine.dispose()
 
 
-def test_document_migration_upgrades_the_current_main_schema(
+def test_report_migration_upgrades_the_current_main_schema(
     tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
     monkeypatch.delenv("POMI_DATABASE_URL", raising=False)
@@ -78,14 +81,21 @@ def test_document_migration_upgrades_the_current_main_schema(
     config = Config(backend_root / "alembic.ini")
     config.set_main_option("sqlalchemy.url", database_url)
 
-    command.upgrade(config, "20260827_0015")
+    command.upgrade(config, "20260827_0020")
     engine = create_engine(database_url)
-    assert "document" not in inspect(engine).get_table_names()
+    assert "document" in inspect(engine).get_table_names()
+    assert "report_snapshot" not in inspect(engine).get_table_names()
 
     command.upgrade(config, "head")
-    assert {"document", "document_revision"} <= set(inspect(engine).get_table_names())
+    assert {
+        "document",
+        "document_revision",
+        "patient_note",
+        "report_snapshot",
+        "report_source",
+    } <= set(inspect(engine).get_table_names())
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-            "20260827_0020"
+            "20260827_0027"
         )
     engine.dispose()

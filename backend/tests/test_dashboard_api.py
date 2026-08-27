@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -10,6 +10,7 @@ from pomi_backend.db.models import (
     MedicationDaily,
     MedicationEvent,
     PatientProfile,
+    ReportSnapshot,
     UserAccount,
 )
 from pomi_backend.services.dashboard import DashboardService
@@ -157,6 +158,66 @@ def test_section_failure_returns_200_without_blocking_siblings(
     assert dashboard["today_medications"]["error"]["code"] == ("TODAY_MEDICATIONS_UNAVAILABLE")
     assert dashboard["follow_up"]["status"] == "empty"
     assert dashboard["latest_report"]["status"] == "empty"
+
+
+def test_latest_report_returns_only_the_newest_successful_owned_snapshot(
+    api_client: TestClient,
+) -> None:
+    owner = auth(api_client, "dash-report-owner")
+    stranger = auth(api_client, "dash-report-stranger")
+    data(api_client.get("/api/patient/profile", headers=owner))
+    factory = api_client.app.state.session_factory
+    with factory() as session:
+        account = session.scalar(
+            select(UserAccount).where(UserAccount.account_name == "dash-report-owner")
+        )
+        assert account is not None
+        profile = session.scalar(
+            select(PatientProfile).where(PatientProfile.account_uid == account.uid)
+        )
+        assert profile is not None
+        older = ReportSnapshot(
+            patient_id=profile.patient_id,
+            report_status="succeeded",
+            snapshot_json={"private": "older body"},
+            source_digest="a" * 64,
+            snapshot_hash="b" * 64,
+            generated_by_uid=account.uid,
+            report_generated_at=datetime(2026, 8, 26, 10, tzinfo=UTC),
+        )
+        newer = ReportSnapshot(
+            patient_id=profile.patient_id,
+            report_status="succeeded",
+            snapshot_json={"private": "newer body"},
+            source_digest="c" * 64,
+            snapshot_hash="d" * 64,
+            generated_by_uid=account.uid,
+            report_generated_at=datetime(2026, 8, 27, 10, tzinfo=UTC),
+        )
+        failed = ReportSnapshot(
+            patient_id=profile.patient_id,
+            report_status="failed",
+            source_digest="e" * 64,
+            generated_by_uid=account.uid,
+            failure_reason="generation failed",
+        )
+        session.add_all([older, newer, failed])
+        session.commit()
+        newer_id = newer.id
+
+    latest = data(api_client.get("/api/dashboard", headers=owner))["latest_report"]
+    assert latest["status"] == "ok"
+    assert latest["data"] == {
+        "report_id": newer_id,
+        "status": "succeeded",
+        "generated_at": "2026-08-27T10:00:00+00:00",
+        "snapshot_hash": "d" * 64,
+    }
+    assert "private" not in latest["data"]
+    assert (
+        data(api_client.get("/api/dashboard", headers=stranger))["latest_report"]["status"]
+        == "empty"
+    )
 
 
 def test_dashboard_is_strictly_isolated_by_session_uid(api_client: TestClient) -> None:
