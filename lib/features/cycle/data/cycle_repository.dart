@@ -127,7 +127,9 @@ class DemoCycleRepository implements CycleRepository {
           createdAt: DateTime(2026, 6, 8),
           updatedAt: DateTime(2026, 6, 12),
         ),
-      ];
+      ] {
+    _recomputeCycleLengths();
+  }
 
   final List<MenstrualCycle> _cycles;
 
@@ -151,8 +153,9 @@ class DemoCycleRepository implements CycleRepository {
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
-    _cycles.insert(0, value);
-    return value;
+    _cycles.add(value);
+    _recomputeCycleLengths();
+    return _cycles.singleWhere((cycle) => cycle.id == value.id);
   }
 
   @override
@@ -166,7 +169,6 @@ class DemoCycleRepository implements CycleRepository {
       endDate: draft.endDate,
       flowLevel: draft.flowLevel,
       note: draft.note,
-      cycleLengthDays: existing.cycleLengthDays,
       durationDays: draft.endDate == null
           ? null
           : draft.endDate!.difference(draft.startDate).inDays + 1,
@@ -174,11 +176,36 @@ class DemoCycleRepository implements CycleRepository {
       updatedAt: DateTime.now(),
     );
     _cycles[index] = value;
-    return value;
+    _recomputeCycleLengths();
+    return _cycles.singleWhere((cycle) => cycle.id == value.id);
   }
 
   @override
   Future<void> delete(String id) async {
     _cycles.removeWhere((cycle) => cycle.id == id);
+    _recomputeCycleLengths();
+  }
+
+  void _recomputeCycleLengths() {
+    _cycles.sort((left, right) => left.startDate.compareTo(right.startDate));
+    DateTime? previousStart;
+    for (var index = 0; index < _cycles.length; index++) {
+      final cycle = _cycles[index];
+      _cycles[index] = MenstrualCycle(
+        id: cycle.id,
+        startDate: cycle.startDate,
+        endDate: cycle.endDate,
+        flowLevel: cycle.flowLevel,
+        note: cycle.note,
+        cycleLengthDays: previousStart == null
+            ? null
+            : cycle.startDate.difference(previousStart).inDays,
+        durationDays: cycle.durationDays,
+        createdAt: cycle.createdAt,
+        updatedAt: cycle.updatedAt,
+      );
+      previousStart = cycle.startDate;
+    }
+    _cycles.sort((left, right) => right.startDate.compareTo(left.startDate));
   }
 }

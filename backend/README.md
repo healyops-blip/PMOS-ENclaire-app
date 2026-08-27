@@ -73,6 +73,7 @@ terminal echo unless the corresponding one-shot environment variable is set.
 ```bash
 pomi-admin seed-accounts
 pomi-admin seed-health
+pomi-admin purge-documents
 pomi-admin reset-password ACCOUNT_NAME
 ```
 
@@ -80,6 +81,9 @@ pomi-admin reset-password ACCOUNT_NAME
 `seed-health` keeps the first-time user's health records empty and idempotently
 adds synthetic medications, events, daily statuses, cycles, and weights for the
 returning user. Run it only after `seed-accounts`.
+`purge-documents` removes expired physical files for soft-deleted documents after
+the seven-day retention period; immutable report references must be registered by
+the report module before enabling its scheduled timer.
 `reset-password` changes the hash and revokes every active Session for the
 account. Neither operation is exposed as an HTTP endpoint.
 

@@ -22,8 +22,7 @@ router = APIRouter(prefix="/api/cycles", tags=["cycles"])
 
 
 def request_id(request: Request) -> str:
-    supplied = request.headers.get("X-Request-ID", "").strip()
-    return supplied[:128] if supplied else str(uuid.uuid4())
+    return request.state.request_id
 
 
 async def cycle_error_handler(request: Request, error: CycleError) -> JSONResponse:

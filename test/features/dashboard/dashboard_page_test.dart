@@ -6,6 +6,9 @@ import 'package:pmos_enclaire/features/dashboard/data/dashboard_repository.dart'
 import 'package:pmos_enclaire/features/dashboard/domain/dashboard_snapshot.dart';
 import 'package:pmos_enclaire/features/dashboard/domain/medication.dart';
 import 'package:pmos_enclaire/features/dashboard/presentation/dashboard_page.dart';
+import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
+import 'package:pmos_enclaire/features/records/data/document_repository.dart';
+import 'package:pmos_enclaire/features/weight/data/weight_repository.dart';
 
 void main() {
   testWidgets('shows offline timestamp, partial failure, and disables writes', (
@@ -20,6 +23,9 @@ void main() {
         theme: PomiTheme.light,
         home: DashboardPage(
           account: DemoAccount.existingUser,
+          profileRepository: DemoPatientProfileRepository(),
+          documentRepository: DemoDocumentRepository(),
+          weightRepository: MemoryWeightRepository(),
           dashboardRepository: _OfflineRepository(),
         ),
       ),
@@ -28,6 +34,10 @@ void main() {
 
     expect(find.byKey(const Key('dashboard-offline-banner')), findsOneWidget);
     expect(find.textContaining('离线数据，更新于'), findsOneWidget);
+    expect(find.text('复诊安排暂不可用'), findsOneWidget);
+    expect(find.text('1'), findsWidgets);
+    expect(find.text('0'), findsWidgets);
+    expect(find.text('2'), findsWidgets);
     expect(
       find.byKey(const Key('dashboard-section-error-复诊安排')),
       findsOneWidget,
@@ -39,14 +49,70 @@ void main() {
     await tester.tap(status);
     await tester.pump();
     expect(find.text('离线状态仅支持查看，联网后才能修改用药'), findsOneWidget);
+    final manage = find.text('用药管理 ›');
+    await tester.ensureVisible(manage);
+    final manageButton = tester.widget<TextButton>(
+      find.ancestor(of: manage, matching: find.byType(TextButton)),
+    );
+    expect(manageButton.onPressed, isNull);
 
     await tester.tap(find.byIcon(Icons.calendar_month_rounded));
     await tester.pumpAndSettle();
+    final addCycle = tester.widget<FilledButton>(
+      find.byKey(const Key('add-cycle-button')),
+    );
+    expect(addCycle.onPressed, isNull);
     final record = tester.widget<FilledButton>(
       find.byKey(const Key('record-weight-button')),
     );
     expect(record.onPressed, isNull);
   });
+
+  testWidgets(
+    'failed refresh keeps prior data, marks it stale, and offers retry',
+    (tester) async {
+      final repository = _RefreshFailureRepository();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: PomiTheme.light,
+          home: DashboardPage(
+            account: DemoAccount.existingUser,
+            profileRepository: DemoPatientProfileRepository(),
+            documentRepository: DemoDocumentRepository(),
+            weightRepository: MemoryWeightRepository(),
+            dashboardRepository: repository,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('数据日期 2026-08-27'), findsOneWidget);
+
+      repository.fail = true;
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, 500));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('dashboard-stale-error')), findsOneWidget);
+      expect(find.text('刷新失败，当前为上次数据'), findsOneWidget);
+      expect(find.text('重试'), findsWidgets);
+    },
+  );
+}
+
+class _RefreshFailureRepository implements DashboardRepository {
+  bool fail = false;
+
+  @override
+  Future<void> clear(String uid) async {}
+
+  @override
+  Future<DashboardLoad> load(String uid) async {
+    if (fail) throw StateError('network unavailable');
+    return DashboardLoad(
+      snapshot: DashboardSnapshot.fromJson(_dashboardJson),
+      offline: false,
+      updatedAt: DateTime(2026, 8, 27, 12),
+    );
+  }
 }
 
 class _OfflineRepository implements DashboardRepository {
@@ -89,3 +155,15 @@ class _OfflineRepository implements DashboardRepository {
     );
   }
 }
+
+const _dashboardJson = <String, dynamic>{
+  'business_date': '2026-08-27',
+  'follow_up': {'status': 'empty', 'data': null, 'error': null},
+  'today_medications': {'status': 'empty', 'data': <dynamic>[], 'error': null},
+  'monthly_medication_summary': {
+    'status': 'ok',
+    'data': {'taken': 1, 'missed': 0, 'unrecorded': 2},
+    'error': null,
+  },
+  'latest_report': {'status': 'empty', 'data': null, 'error': null},
+};

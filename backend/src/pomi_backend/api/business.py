@@ -1,4 +1,4 @@
-"""Stable response and error envelopes for authenticated business APIs."""
+"""Shared response and error helpers for authenticated business APIs."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ def success(request: Request, data: Any) -> dict[str, Any]:
     }
 
 
-def error_content(request: Request, error: BusinessError) -> dict[str, Any]:
+def business_error_content(request: Request, error: BusinessError) -> dict[str, Any]:
     return {
         "success": False,
         "data": None,

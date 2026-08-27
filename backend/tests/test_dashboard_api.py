@@ -162,6 +162,7 @@ def test_section_failure_returns_200_without_blocking_siblings(
 def test_dashboard_is_strictly_isolated_by_session_uid(api_client: TestClient) -> None:
     first = auth(api_client, "dash-owner-a")
     second = auth(api_client, "dash-owner-b")
+    api_client.app.state.business_date_provider = lambda: date(2026, 8, 27)
     first_profile = data(api_client.get("/api/patient/profile", headers=first))
     data(
         api_client.put(
@@ -174,6 +175,24 @@ def test_dashboard_is_strictly_isolated_by_session_uid(api_client: TestClient) -
             },
         )
     )
+    created = api_client.post(
+        "/api/medications",
+        headers={**first, "Idempotency-Key": "dashboard-owner-medication"},
+        json={
+            "drug_name": "Private medication",
+            "source_category": "prescribed",
+            "frequency": "daily",
+            "start_date": "2026-08-01",
+            "event_date": "2026-08-01",
+        },
+    )
+    assert created.status_code == 201, created.text
 
-    assert data(api_client.get("/api/dashboard", headers=first))["follow_up"]["status"] == "ok"
-    assert data(api_client.get("/api/dashboard", headers=second))["follow_up"]["status"] == "empty"
+    owner_dashboard = data(api_client.get("/api/dashboard", headers=first))
+    stranger_dashboard = data(
+        api_client.get("/api/dashboard?uid=attacker-controlled", headers=second)
+    )
+    assert owner_dashboard["follow_up"]["status"] == "ok"
+    assert len(owner_dashboard["today_medications"]["data"]) == 1
+    assert stranger_dashboard["follow_up"]["status"] == "empty"
+    assert stranger_dashboard["today_medications"]["data"] == []

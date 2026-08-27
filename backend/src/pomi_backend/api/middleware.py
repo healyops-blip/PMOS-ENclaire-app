@@ -1,4 +1,4 @@
-"""Request-context and security-header middleware for API responses."""
+"""Request context and security headers for JSON API responses."""
 
 from __future__ import annotations
 
@@ -22,9 +22,12 @@ class RequestContextMiddleware:
 
         async def send_with_request_id(message: Message) -> None:
             if message["type"] == "http.response.start":
-                response_headers = list(message.get("headers", []))
-                if not any(key.lower() == b"x-request-id" for key, _ in response_headers):
-                    response_headers.append((b"x-request-id", request_id.encode("ascii")))
+                response_headers = [
+                    (key, value)
+                    for key, value in message.get("headers", [])
+                    if key.lower() != b"x-request-id"
+                ]
+                response_headers.append((b"x-request-id", request_id.encode("ascii")))
                 message["headers"] = response_headers
             await send(message)
 

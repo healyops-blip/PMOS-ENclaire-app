@@ -1,8 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pmos_enclaire/core/network/pomi_api_client.dart';
+import 'package:pmos_enclaire/features/dashboard/application/dashboard_controller.dart';
 import 'package:pmos_enclaire/features/dashboard/data/dashboard_cache_store.dart';
 import 'package:pmos_enclaire/features/dashboard/data/dashboard_repository.dart';
+import 'package:pmos_enclaire/features/dashboard/domain/dashboard_snapshot.dart';
 
 void main() {
   test(
@@ -10,10 +12,18 @@ void main() {
     () async {
       final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api'));
       var offline = false;
+      var unauthorized = false;
       dio.interceptors.add(
         InterceptorsWrapper(
           onRequest: (options, handler) {
-            if (offline) {
+            if (unauthorized) {
+              handler.reject(
+                DioException(
+                  requestOptions: options,
+                  response: Response(requestOptions: options, statusCode: 401),
+                ),
+              );
+            } else if (offline) {
               handler.reject(
                 DioException(
                   requestOptions: options,
@@ -49,8 +59,61 @@ void main() {
 
       await repository.clear('uid-a');
       await expectLater(repository.load('uid-a'), throwsA(isA<DioException>()));
+
+      offline = false;
+      await repository.load('uid-a');
+      unauthorized = true;
+      await expectLater(
+        repository.load('uid-a'),
+        throwsA(isA<DashboardAuthorizationFailure>()),
+      );
+      unauthorized = false;
+      offline = true;
+      await expectLater(repository.load('uid-a'), throwsA(isA<DioException>()));
     },
   );
+
+  test(
+    'revoked authorization clears in-memory medical data and logs out',
+    () async {
+      final repository = _RevokedRepository();
+      var logoutCalls = 0;
+      final controller = DashboardController(
+        repository: repository,
+        uid: 'uid-a',
+        onUnauthorized: () async => logoutCalls++,
+      );
+
+      await controller.load();
+      expect(controller.snapshot, isNotNull);
+      repository.revoked = true;
+
+      await controller.load();
+
+      expect(controller.snapshot, isNull);
+      expect(controller.offline, isFalse);
+      expect(controller.updatedAt, isNull);
+      expect(controller.error, isA<DashboardAuthorizationFailure>());
+      expect(logoutCalls, 1);
+    },
+  );
+}
+
+class _RevokedRepository implements DashboardRepository {
+  bool revoked = false;
+
+  @override
+  Future<void> clear(String uid) async {}
+
+  @override
+  Future<DashboardLoad> load(String uid) async {
+    if (revoked) throw const DashboardAuthorizationFailure();
+    return DashboardLoad(
+      snapshot: DashboardSnapshot.fromJson(_dashboardJson),
+      offline: false,
+      updatedAt: DateTime.utc(2026, 8, 27, 12),
+    );
+  }
 }
 
 class _MemoryDashboardCache implements DashboardCacheStore {

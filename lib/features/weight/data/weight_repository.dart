@@ -115,22 +115,23 @@ class MemoryWeightRepository implements WeightRepository {
   MemoryWeightRepository({Iterable<WeightRecord> records = const []})
     : _records = [...records];
 
-  factory MemoryWeightRepository.seeded() {
-    final now = DateTime(2026, 8, 27, 12);
+  factory MemoryWeightRepository.seeded({DateTime Function()? now}) {
+    final current = (now ?? DateTime.now)();
+    final today = DateTime(current.year, current.month, current.day);
     return MemoryWeightRepository(
       records: [
         for (final item in const [
-          ('demo-weight-1', 3, 70.8),
-          ('demo-weight-2', 10, 70.2),
-          ('demo-weight-3', 17, 69.9),
-          ('demo-weight-4', 24, 69.6),
+          ('demo-weight-1', 24, 70.8),
+          ('demo-weight-2', 17, 70.2),
+          ('demo-weight-3', 10, 69.9),
+          ('demo-weight-4', 3, 69.6),
         ])
           WeightRecord(
             id: item.$1,
-            recordDate: DateTime(2026, 8, item.$2),
+            recordDate: today.subtract(Duration(days: item.$2)),
             weightKg: item.$3,
-            createdAt: now,
-            updatedAt: now,
+            createdAt: current,
+            updatedAt: current,
           ),
       ],
     );

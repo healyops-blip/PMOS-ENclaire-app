@@ -1,6 +1,7 @@
 """ORM models."""
 
 from pomi_backend.db.models.auth import UserAccount, UserSession
+from pomi_backend.db.models.documents import Document, DocumentRevision
 from pomi_backend.db.models.health import (
     Medication,
     MedicationDaily,
@@ -16,6 +17,8 @@ __all__ = [
     "MedicationEvent",
     "MenstrualCycle",
     "PatientProfile",
+    "Document",
+    "DocumentRevision",
     "UserAccount",
     "UserSession",
     "WeightRecord",

@@ -16,6 +16,10 @@ class DashboardLoad {
   final DateTime updatedAt;
 }
 
+class DashboardAuthorizationFailure implements Exception {
+  const DashboardAuthorizationFailure();
+}
+
 abstract interface class DashboardRepository {
   Future<DashboardLoad> load(String uid);
   Future<void> clear(String uid);
@@ -45,7 +49,10 @@ class FastApiDashboardRepository implements DashboardRepository {
         updatedAt: now,
       );
     } on DioException catch (error) {
-      if (error.response?.statusCode == 401) rethrow;
+      if (error.response?.statusCode == 401) {
+        await cache.clear(uid);
+        throw const DashboardAuthorizationFailure();
+      }
       final cached = await cache.read(uid);
       if (cached == null) rethrow;
       return DashboardLoad(
