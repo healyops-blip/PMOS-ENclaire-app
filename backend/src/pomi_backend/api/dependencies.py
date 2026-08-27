@@ -36,13 +36,19 @@ def get_auth_service(request: Request, session: DatabaseSession) -> AuthService:
 AuthServiceDependency = Annotated[AuthService, Depends(get_auth_service)]
 
 
-def get_current_account(
-    service: AuthServiceDependency,
+def get_session_id(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Security(bearer_scheme)],
-) -> UserAccount:
+) -> str:
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise AuthError
-    return service.authenticate(credentials.credentials)
+    return credentials.credentials
+
+
+SessionId = Annotated[str, Depends(get_session_id)]
+
+
+def get_current_account(service: AuthServiceDependency, session_id: SessionId) -> UserAccount:
+    return service.authenticate(session_id)
 
 
 CurrentAccount = Annotated[UserAccount, Depends(get_current_account)]

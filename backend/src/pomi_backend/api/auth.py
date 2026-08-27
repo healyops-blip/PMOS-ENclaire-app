@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Request, status
 
-from pomi_backend.api.dependencies import AuthServiceDependency, CurrentAccount
+from pomi_backend.api.dependencies import (
+    AuthServiceDependency,
+    CurrentAccount,
+    SessionId,
+)
 from pomi_backend.db.models import UserAccount
 from pomi_backend.schemas.auth import (
     AccountResponse,
@@ -93,3 +97,12 @@ def login(
 )
 def get_me(account: CurrentAccount) -> AccountResponse:
     return account_response(account)
+
+
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={status.HTTP_401_UNAUTHORIZED: {"model": ErrorResponse}},
+)
+def logout(session_id: SessionId, service: AuthServiceDependency) -> None:
+    service.logout(session_id)

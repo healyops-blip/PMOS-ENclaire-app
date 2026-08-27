@@ -1,0 +1,40 @@
+[Unit]
+Description=Pomi FastAPI service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pomi
+Group=pomi
+WorkingDirectory=/opt/pomi/current/backend
+EnvironmentFile=/etc/pomi/pomi.env
+ExecStart=/opt/pomi/current/backend/.venv/bin/uvicorn pomi_backend.main:app --host 127.0.0.1 --port 8000 --workers 1 --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+KillSignal=SIGTERM
+UMask=0077
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadWritePaths=/var/lib/pomi /var/log/pomi
+MemoryMax=1G
+TasksMax=256
+
+StandardOutput=append:/var/log/pomi/api.log
+StandardError=append:/var/log/pomi/api-error.log
+
+[Install]
+WantedBy=multi-user.target

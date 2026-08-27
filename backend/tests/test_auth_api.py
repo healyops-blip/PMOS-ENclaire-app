@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 from fastapi.testclient import TestClient
@@ -169,6 +170,17 @@ def test_bearer_session_authentication_and_uid_cannot_override_identity(
     assert missing.headers["www-authenticate"] == "Bearer"
 
 
+def test_logout_is_idempotent_and_invalidates_session(api_client: TestClient) -> None:
+    register_account(api_client)
+    login = login_account(api_client)
+    headers = {"Authorization": f"Bearer {login['session_id']}"}
+
+    assert api_client.post("/api/auth/logout", headers=headers).status_code == 204
+    assert api_client.post("/api/auth/logout", headers=headers).status_code == 204
+    assert api_client.get("/api/auth/me", headers=headers).status_code == 401
+    assert api_client.post("/api/auth/logout").status_code == 401
+
+
 def test_expired_and_revoked_sessions_are_rejected(
     api_client: TestClient, api_engine: Engine
 ) -> None:
@@ -236,11 +248,45 @@ def test_openapi_exposes_contract_and_bearer_security(api_client: TestClient) ->
     assert "/api/auth/register" in schema["paths"]
     assert "/api/auth/login" in schema["paths"]
     assert "/api/auth/me" in schema["paths"]
+    assert "/api/auth/logout" in schema["paths"]
     assert schema["components"]["securitySchemes"]["SessionBearer"] == {
         "type": "http",
         "scheme": "bearer",
     }
     assert schema["paths"]["/api/auth/me"]["get"]["security"] == [{"SessionBearer": []}]
+
+
+def test_health_security_headers_and_production_docs(
+    api_client: TestClient, api_engine: Engine, api_settings: Settings
+) -> None:
+    live = api_client.get("/health/live")
+    ready = api_client.get("/health/ready")
+    assert live.status_code == ready.status_code == 200
+    assert ready.json() == {"status": "ok"}
+    assert ready.headers["x-content-type-options"] == "nosniff"
+    assert ready.headers["x-frame-options"] == "DENY"
+
+    production_settings = replace(
+        api_settings,
+        environment="production",
+        allowed_hosts=("api.healy1012-ops.top",),
+    )
+    with TestClient(create_app(settings=production_settings, engine=api_engine)) as client:
+        assert client.get("/docs", headers={"Host": "api.healy1012-ops.top"}).status_code == 404
+        assert (
+            client.get("/openapi.json", headers={"Host": "api.healy1012-ops.top"}).status_code
+            == 404
+        )
+        assert client.get("/health/live", headers={"Host": "attacker.invalid"}).status_code == 400
+
+
+def test_database_persists_across_app_restart(api_engine: Engine, api_settings: Settings) -> None:
+    with TestClient(create_app(settings=api_settings, engine=api_engine)) as first_client:
+        register_account(first_client, account_name="restart-user")
+
+    with TestClient(create_app(settings=api_settings, engine=api_engine)) as second_client:
+        login = login_account(second_client, account_name="restart-user")
+        assert login["account"]["account_name"] == "restart-user"
 
 
 def test_sensitive_credentials_are_not_logged(

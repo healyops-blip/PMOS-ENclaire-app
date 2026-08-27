@@ -8,6 +8,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
+from pomi_backend.services.security import validate_password_strength
+
 ACCOUNT_NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_.-]{2,63}$")
 PHONE_PATTERN = re.compile(r"^\+?[0-9]{7,20}$")
 
@@ -36,10 +38,7 @@ class RegisterRequest(StrictRequestModel):
     @classmethod
     def validate_password_complexity(cls, value: SecretStr) -> SecretStr:
         password = value.get_secret_value()
-        if not any(character.isalpha() for character in password) or not any(
-            character.isdigit() for character in password
-        ):
-            raise ValueError("password must contain at least one letter and one number")
+        validate_password_strength(password)
         return value
 
     @field_validator("phone_number")

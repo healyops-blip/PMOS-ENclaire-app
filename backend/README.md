@@ -36,6 +36,8 @@ The default database path is `backend/runtime/pomi.db`. Set
 - `POST /api/auth/register` creates an account but does not automatically log in.
 - `POST /api/auth/login` returns an opaque `session_id` once.
 - `GET /api/auth/me` requires `Authorization: Bearer <session_id>`.
+- `POST /api/auth/logout` revokes the supplied Session and is idempotent.
+- `GET /health/live` checks the API process; `GET /health/ready` also checks SQLite.
 
 The server stores only Argon2 password hashes and SHA-256 Session credential
 hashes. Interactive API docs are available locally and disabled when
@@ -49,3 +51,17 @@ Authentication tuning is configured through environment variables:
 - `POMI_ARGON2_PARALLELISM`
 - `POMI_AUTH_RATE_LIMIT_ATTEMPTS`
 - `POMI_AUTH_RATE_LIMIT_WINDOW_SECONDS`
+
+## Server-local account administration
+
+Run migrations before the administrative commands. Passwords are read without
+terminal echo unless the corresponding one-shot environment variable is set.
+
+```bash
+pomi-admin seed-accounts
+pomi-admin reset-password ACCOUNT_NAME
+```
+
+`seed-accounts` idempotently creates `first-time-user` and `returning-user`.
+`reset-password` changes the hash and revokes every active Session for the
+account. Neither operation is exposed as an HTTP endpoint.

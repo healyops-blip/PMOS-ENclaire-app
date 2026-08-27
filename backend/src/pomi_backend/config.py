@@ -12,6 +12,7 @@ DEFAULT_ARGON2_MEMORY_COST_KIB = 65536
 DEFAULT_ARGON2_PARALLELISM = 4
 DEFAULT_AUTH_RATE_LIMIT_ATTEMPTS = 5
 DEFAULT_AUTH_RATE_LIMIT_WINDOW_SECONDS = 60
+DEFAULT_ALLOWED_HOSTS = ("api.healy1012-ops.top", "localhost", "127.0.0.1")
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,6 +27,7 @@ class Settings:
     argon2_parallelism: int = DEFAULT_ARGON2_PARALLELISM
     auth_rate_limit_attempts: int = DEFAULT_AUTH_RATE_LIMIT_ATTEMPTS
     auth_rate_limit_window_seconds: int = DEFAULT_AUTH_RATE_LIMIT_WINDOW_SECONDS
+    allowed_hosts: tuple[str, ...] = DEFAULT_ALLOWED_HOSTS
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -53,5 +55,12 @@ class Settings:
                     "POMI_AUTH_RATE_LIMIT_WINDOW_SECONDS",
                     str(DEFAULT_AUTH_RATE_LIMIT_WINDOW_SECONDS),
                 )
+            ),
+            allowed_hosts=tuple(
+                host.strip()
+                for host in os.getenv("POMI_ALLOWED_HOSTS", ",".join(DEFAULT_ALLOWED_HOSTS)).split(
+                    ","
+                )
+                if host.strip()
             ),
         )

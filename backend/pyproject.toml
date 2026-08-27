@@ -16,6 +16,9 @@ dependencies = [
 ]
 dynamic = ["version"]
 
+[project.scripts]
+pomi-admin = "pomi_backend.admin.__main__:main"
+
 [project.optional-dependencies]
 dev = [
   "httpx>=0.28,<0.29",
