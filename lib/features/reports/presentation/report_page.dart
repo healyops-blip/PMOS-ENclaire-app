@@ -12,14 +12,20 @@ import 'package:pmos_enclaire/features/certification/application/certification_p
 import 'package:pmos_enclaire/features/certification/domain/certification_record.dart';
 import 'package:pmos_enclaire/features/certification/presentation/certification_page.dart';
 import 'package:pmos_enclaire/features/reports/data/patient_note_repository.dart';
+import 'package:pmos_enclaire/features/reports/data/report_repository.dart';
 import 'package:printing/printing.dart';
 
 enum _PdfAction { save, share, print }
 
 class ReportGeneratorPage extends StatefulWidget {
-  const ReportGeneratorPage({required this.repository, super.key});
+  ReportGeneratorPage({
+    required this.repository,
+    ReportRepository? reportRepository,
+    super.key,
+  }) : reportRepository = reportRepository ?? DemoReportRepository();
 
   final PatientNoteRepository repository;
+  final ReportRepository reportRepository;
 
   @override
   State<ReportGeneratorPage> createState() => _ReportGeneratorPageState();
@@ -30,6 +36,7 @@ class _ReportGeneratorPageState extends State<ReportGeneratorPage> {
   PatientNote? _note;
   bool _busy = true;
   String? _error;
+  List<ReportSnapshotItem> _reports = const [];
 
   @override
   void initState() {
@@ -39,10 +46,15 @@ class _ReportGeneratorPageState extends State<ReportGeneratorPage> {
 
   Future<void> _load() async {
     try {
-      final note = await widget.repository.latest();
+      final values = await Future.wait([
+        widget.repository.latest(),
+        widget.reportRepository.list(),
+      ]);
+      final note = values[0] as PatientNote?;
       if (!mounted) return;
       setState(() {
         _note = note;
+        _reports = values[1] as List<ReportSnapshotItem>;
         _noteController.text = note?.originalText ?? '';
         _busy = false;
       });
@@ -103,6 +115,56 @@ class _ReportGeneratorPageState extends State<ReportGeneratorPage> {
     final copied = await widget.repository.copy(_note!.id);
     return copied;
   });
+
+  Future<void> _generate() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final preflight = await widget.reportRepository.preflight(_note?.id);
+      var confirmed = preflight.missingSections.isEmpty;
+      if (!confirmed && mounted) {
+        confirmed =
+            await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('资料尚不完整'),
+                content: Text(
+                  '以下区块将显示固定空状态：${preflight.missingSections.join('、')}。\n仍要继续生成吗？',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('返回补充'),
+                  ),
+                  FilledButton(
+                    key: const Key('confirm-incomplete-report'),
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('确认继续'),
+                  ),
+                ],
+              ),
+            ) ??
+            false;
+      }
+      if (!confirmed) return;
+      final report = await widget.reportRepository.create(
+        _note?.id,
+        confirmIncomplete: preflight.missingSections.isNotEmpty,
+      );
+      final reports = await widget.reportRepository.list();
+      if (!mounted) return;
+      setState(() => _reports = reports);
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(builder: (_) => ReportPage(report: report)),
+      );
+    } on Exception catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -248,16 +310,42 @@ class _ReportGeneratorPageState extends State<ReportGeneratorPage> {
             key: const Key('generate-report-button'),
             onPressed:
                 !_busy &&
-                    (_note?.status == PatientNoteStatus.confirmed ||
+                    ((_note?.status == PatientNoteStatus.confirmed &&
+                            _noteController.text == _note?.originalText) ||
                         _note?.status == PatientNoteStatus.skipped)
-                ? () => Navigator.of(context).pushReplacement(
-                    MaterialPageRoute<void>(builder: (_) => const ReportPage()),
-                  )
+                ? _generate
                 : null,
             icon: const Icon(Icons.auto_awesome_rounded),
             label: const Text('继续查看报告演示'),
           ),
           const SizedBox(height: 10),
+          if (_reports.isNotEmpty) ...[
+            const PomiSectionTitle(title: '历史报告'),
+            const SizedBox(height: 8),
+            for (final report in _reports)
+              Card(
+                key: Key('report-history-${report.reportId}'),
+                child: ListTile(
+                  title: Text('报告 ${report.generatedAt.toLocal()}'),
+                  subtitle: Text(
+                    report.hasUpdates
+                        ? '该报告生成后有新数据，可重新生成'
+                        : report.previousReportId == null
+                        ? '首个成功版本'
+                        : '关联上一成功版本',
+                  ),
+                  trailing: report.hasUpdates
+                      ? const Icon(Icons.update_rounded)
+                      : const Icon(Icons.lock_outline_rounded),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => ReportPage(report: report),
+                    ),
+                  ),
+                ),
+              ),
+            const SizedBox(height: 10),
+          ],
           const Text(
             '报告只使用用户已确认的数据 · 模拟数据不构成诊断',
             textAlign: TextAlign.center,
@@ -278,7 +366,9 @@ String _noteStatusLabel(PatientNoteStatus? status) => switch (status) {
 };
 
 class ReportPage extends StatefulWidget {
-  const ReportPage({super.key});
+  const ReportPage({this.report, super.key});
+
+  final ReportSnapshotItem? report;
 
   @override
   State<ReportPage> createState() => _ReportPageState();

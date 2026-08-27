@@ -1108,6 +1108,30 @@ paths:
                       data:
                         $ref: '#/components/schemas/PatientNote'
 
+  /api/reports/preflight:
+    post:
+      tags: [Reports]
+      operationId: preflightReport
+      summary: Return missing confirmed sections before snapshot generation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportCreate'
+      responses:
+        '200':
+          description: Deterministic report completeness result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReportPreflight'
+
   /api/reports:
     get:
       tags: [Reports]
@@ -2783,14 +2807,34 @@ components:
           format: uuid
         include_sections:
           type: array
+          minItems: 1
           uniqueItems: true
           items:
             type: string
             enum: [profile, patient_note, medications, labs, imaging, outpatient, cycles, weights]
+        confirm_incomplete:
+          type: boolean
+          default: false
+          description: Explicit user acknowledgement that missing sections use fixed empty states.
+
+    ReportPreflight:
+      type: object
+      required: [missing_sections, can_generate, confirmed_source_count]
+      properties:
+        missing_sections:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+        can_generate:
+          type: boolean
+        confirmed_source_count:
+          type: integer
+          minimum: 0
 
     ReportListItem:
       type: object
-      required: [report_id, status, generated_at, snapshot_hash]
+      required: [report_id, status, generated_at, snapshot_hash, source_digest, has_updates, reused, missing_sections]
       properties:
         report_id:
           type: string
@@ -2803,6 +2847,20 @@ components:
         snapshot_hash:
           type: string
           pattern: '^[a-f0-9]{64}$'
+        source_digest:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+        previous_report_id:
+          type: [string, 'null']
+          format: uuid
+        has_updates:
+          type: boolean
+        reused:
+          type: boolean
+        missing_sections:
+          type: array
+          items:
+            type: string
         failure_reason:
           type: [string, 'null']
 

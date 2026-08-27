@@ -16,6 +16,7 @@ import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:pmos_enclaire/features/reports/presentation/report_page.dart';
 import 'package:pmos_enclaire/features/reports/data/patient_note_repository.dart';
+import 'package:pmos_enclaire/features/reports/data/report_repository.dart';
 import 'package:pmos_enclaire/features/weight/application/weight_controller.dart';
 import 'package:pmos_enclaire/features/weight/data/weight_repository.dart';
 
@@ -24,6 +25,7 @@ class DashboardPage extends StatefulWidget {
     required this.account,
     this.profileRepository,
     this.patientNoteRepository,
+    this.reportRepository,
     this.medicationRepository,
     this.weightRepository,
     this.documentRepository,
@@ -34,6 +36,7 @@ class DashboardPage extends StatefulWidget {
   final DemoAccount account;
   final PatientProfileRepository? profileRepository;
   final PatientNoteRepository? patientNoteRepository;
+  final ReportRepository? reportRepository;
   final MedicationRepository? medicationRepository;
   final WeightRepository? weightRepository;
   final DocumentRepository? documentRepository;
@@ -198,6 +201,8 @@ class _DashboardPageState extends State<DashboardPage> {
                     repository:
                         widget.patientNoteRepository ??
                         DemoPatientNoteRepository(),
+                    reportRepository:
+                        widget.reportRepository ?? DemoReportRepository(),
                   ),
                 ),
               ),

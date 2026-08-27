@@ -10,6 +10,7 @@ import 'package:pmos_enclaire/features/dashboard/presentation/dashboard_page.dar
 import 'package:pmos_enclaire/features/onboarding/presentation/onboarding_page.dart';
 import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
 import 'package:pmos_enclaire/features/reports/data/patient_note_repository.dart';
+import 'package:pmos_enclaire/features/reports/data/report_repository.dart';
 import 'package:pmos_enclaire/features/weight/data/weight_repository.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
@@ -25,6 +26,7 @@ class PomiApp extends StatefulWidget {
     this.authRepository,
     this.profileRepository,
     this.patientNoteRepository,
+    this.reportRepository,
     this.weightRepository,
     this.documentRepository,
     this.ocrRepository,
@@ -34,6 +36,7 @@ class PomiApp extends StatefulWidget {
   final AuthRepository? authRepository;
   final PatientProfileRepository? profileRepository;
   final PatientNoteRepository? patientNoteRepository;
+  final ReportRepository? reportRepository;
   final WeightRepository? weightRepository;
   final DocumentRepository? documentRepository;
   final OcrRepository? ocrRepository;
@@ -67,6 +70,11 @@ class _PomiAppState extends State<PomiApp> {
       (widget.authRepository is DemoAuthRepository
           ? DemoOcrRepository()
           : FastApiOcrRepository(_apiClient));
+  late final ReportRepository _reportRepository =
+      widget.reportRepository ??
+      (widget.authRepository is DemoAuthRepository
+          ? DemoReportRepository()
+          : FastApiReportRepository(_apiClient));
 
   late final GoRouter _router = GoRouter(
     initialLocation: PomiRoutes.login,
@@ -122,6 +130,7 @@ class _PomiAppState extends State<PomiApp> {
             account: account,
             profileRepository: _profileRepository,
             patientNoteRepository: _patientNoteRepository,
+            reportRepository: _reportRepository,
             weightRepository: widget.weightRepository,
             documentRepository: _documentRepository,
             ocrRepository: _ocrRepository,
