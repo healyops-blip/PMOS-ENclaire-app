@@ -31,22 +31,21 @@ flutter pub get
 flutter run
 ```
 
-## Web Preview against the production API
+## Local Web Preview with smoke data
 
-Build the web client with the loopback preview URL, then serve it through the
-local same-origin proxy. The proxy forwards only `/api/*` and `/health/*` to
-the HTTPS API; it does not require production CORS changes.
+The local Preview uses an in-memory smoke API. It does not start, proxy to, or
+depend on a backend service. Login, registration, onboarding, and the main app
+can therefore be reviewed without network access.
 
 ```bash
 flutter build web \
-  --dart-define=POMI_API_BASE_URL=http://127.0.0.1:3001
+  --dart-define=POMI_SMOKE_MODE=true
 python3 tools/web_preview_proxy.py --root build/web
 ```
 
-Open `http://127.0.0.1:3001`. Override `--upstream` when testing against a
-different HTTPS API. The button in the upper-right corner switches between the
-server API and the local API at `http://127.0.0.1:8000`; switching resets the
-Preview's browser login state.
+Open `http://127.0.0.1:3001`. Smoke data is reset when the Preview is rebuilt or
+the browser app is reloaded. Omit `POMI_SMOKE_MODE` in Android and production
+builds so they continue to use the configured real API.
 
 ## Quality checks
 

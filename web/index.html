@@ -186,18 +186,8 @@
       background: rgba(255, 255, 255, 0.94);
       box-shadow: 0 6px 20px rgba(74, 46, 107, 0.12);
       font: 600 13px/1 'Noto Sans SC', sans-serif;
-      cursor: pointer;
+      cursor: default;
       z-index: 10;
-    }
-
-    .backend-switch:hover {
-      background: #ffffff;
-      border-color: rgba(74, 46, 107, 0.32);
-    }
-
-    .backend-switch:disabled {
-      cursor: wait;
-      opacity: 0.68;
     }
 
     .backend-status {
@@ -230,11 +220,10 @@
   </style>
 </head>
 <body>
-  <button class="backend-switch" id="backend-switch" type="button"
-    title="点击切换测试后端">
-    <span class="backend-status" id="backend-status" aria-hidden="true"></span>
-    <span id="backend-label">后端：检查中</span>
-  </button>
+  <div class="backend-switch" title="Preview 使用前端内存 smoke 数据">
+    <span class="backend-status online" aria-hidden="true"></span>
+    <span>数据：Smoke</span>
+  </div>
   <main class="device-frame">
     <div class="system-status-bar" aria-label="模拟手机系统状态栏">
       <span class="system-time" id="system-time">9:41</span>
@@ -257,66 +246,6 @@
     <iframe src="app.html?v=2608271235" title="Pomi Flutter mobile preview"></iframe>
   </main>
   <script>
-    const backendSwitch = document.getElementById('backend-switch');
-    const backendStatus = document.getElementById('backend-status');
-    const backendLabel = document.getElementById('backend-label');
-    const appFrame = document.querySelector('.device-frame iframe');
-    let backendMode = 'server';
-
-    const renderBackend = (mode, state = 'checking') => {
-      backendMode = mode;
-      backendStatus.classList.toggle('online', state === 'online');
-      backendStatus.classList.toggle('offline', state === 'offline');
-      backendLabel.textContent = `后端：${mode === 'local' ? '本地' : '服务器'}`;
-      backendSwitch.title = state === 'offline'
-        ? `${mode === 'local' ? '本地服务未启动' : '服务器暂不可用'}，点击切换`
-        : `当前连接${mode === 'local' ? '本地后端' : '线上服务器'}，点击切换`;
-    };
-
-    const checkBackend = async () => {
-      renderBackend(backendMode);
-      try {
-        const response = await fetch('/health/ready', {cache: 'no-store'});
-        renderBackend(backendMode, response.ok ? 'online' : 'offline');
-      } catch (_) {
-        renderBackend(backendMode, 'offline');
-      }
-    };
-
-    const loadBackend = async () => {
-      try {
-        const response = await fetch('/__preview/backend', {cache: 'no-store'});
-        const data = await response.json();
-        backendMode = data.mode;
-        await checkBackend();
-      } catch (_) {
-        renderBackend('server', 'offline');
-      }
-    };
-
-    backendSwitch.addEventListener('click', async () => {
-      backendSwitch.disabled = true;
-      const nextMode = backendMode === 'server' ? 'local' : 'server';
-      try {
-        const response = await fetch('/__preview/backend', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({mode: nextMode}),
-        });
-        if (!response.ok) throw new Error('backend switch failed');
-        const data = await response.json();
-        backendMode = data.mode;
-        localStorage.clear();
-        sessionStorage.clear();
-        appFrame.contentWindow.location.reload();
-        await checkBackend();
-      } catch (_) {
-        renderBackend(backendMode, 'offline');
-      } finally {
-        backendSwitch.disabled = false;
-      }
-    });
-
     const updateSystemTime = () => {
       const now = new Date();
       document.getElementById('system-time').textContent =
@@ -331,7 +260,6 @@
     };
     updateSystemTime();
     updateStatusBarTheme();
-    loadBackend();
     setInterval(updateSystemTime, 30000);
     window.addEventListener('hashchange', updateStatusBarTheme);
   </script>
