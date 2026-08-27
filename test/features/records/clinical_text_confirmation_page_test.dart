@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:pmos_enclaire/features/records/presentation/clinical_text_confirmation_page.dart';
@@ -13,10 +14,12 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       final repository = _ClinicalRepository(failFirst: true);
       await tester.pumpWidget(
-        MaterialApp(
-          home: ClinicalTextConfirmationPage(
-            repository: repository,
-            task: _task('imaging_text_report'),
+        ProviderScope(
+          child: MaterialApp(
+            home: ClinicalTextConfirmationPage(
+              repository: repository,
+              task: _task('imaging_text_report'),
+            ),
           ),
         ),
       );
@@ -76,10 +79,12 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       final repository = _ClinicalRepository();
       await tester.pumpWidget(
-        MaterialApp(
-          home: ClinicalTextConfirmationPage(
-            repository: repository,
-            task: _task('outpatient_record'),
+        ProviderScope(
+          child: MaterialApp(
+            home: ClinicalTextConfirmationPage(
+              repository: repository,
+              task: _task('outpatient_record'),
+            ),
           ),
         ),
       );

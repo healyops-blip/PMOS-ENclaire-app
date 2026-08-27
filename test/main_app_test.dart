@@ -162,21 +162,7 @@ void main() {
     await tester.tap(find.byKey(const Key('nav-我的')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('profile-page')), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('certification-entry')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('certification-page')), findsOneWidget);
-    expect(find.text('医院认证演示'), findsWidgets);
-    expect(find.textContaining('KYC'), findsNothing);
-    expect(find.textContaining('交易哈希'), findsNothing);
-
-    await tester.tap(find.byKey(const Key('advance-certification-button')));
-    await tester.pump();
-    expect(find.text('认证处理中…'), findsOneWidget);
-    await tester.pump(const Duration(milliseconds: 1500));
-    await tester.pumpAndSettle();
-    expect(find.text('演示认证成功'), findsOneWidget);
-    expect(find.text('演示认证'), findsOneWidget);
+    expect(find.byKey(const Key('certification-entry')), findsNothing);
   });
 
   testWidgets(

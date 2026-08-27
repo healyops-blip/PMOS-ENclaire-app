@@ -43,13 +43,15 @@ The current Flutter UI uses local demo data and includes:
 - visit records and source traceability;
 - upload, OCR review, draft confirmation, and medication reconciliation;
 - report generation and three-layer report navigation;
-- doctor KYC, signature, and test-chain certification states;
+- revision-scoped, local-only hospital-certification interaction demo;
 - patient profile and authorization entry points.
 
 The Flutter screens still use local demo data. The FastAPI account-name/password
 authentication API and SQLite persistence are implemented, but the Flutter auth
 screens are not connected to them yet. Patient data APIs, real OCR, identity
-providers, blockchain nodes, and PDF export remain unimplemented.
+providers, blockchain nodes, and PDF export remain unimplemented. The
+certification interaction is explicitly a local UI demo: it does not represent
+a hospital, doctor, signature, credential, or blockchain transaction.
 
 ## Quality checks
 
