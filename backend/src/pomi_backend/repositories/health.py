@@ -23,6 +23,22 @@ Record = TypeVar(
 
 
 class PatientRepository:
+    update_fields = frozenset(
+        {
+            "nickname",
+            "birth_date",
+            "gender",
+            "height_cm",
+            "diagnosis_year",
+            "primary_condition",
+            "next_visit_date",
+            "health_goal",
+            "onboarding_completed",
+            "onboarding_completed_at",
+            "updated_at",
+        }
+    )
+
     def __init__(self, session: Session) -> None:
         self.session = session
 
@@ -43,10 +59,14 @@ class PatientRepository:
         owned = self.get_by_account_uid(profile.account_uid)
         if owned is None or owned.patient_id != profile.patient_id:
             raise ValueError("patient profile is outside repository scope")
+        unsupported = changes.keys() - self.update_fields
+        if unsupported:
+            fields = ", ".join(sorted(unsupported))
+            raise ValueError(f"fields are not updateable: {fields}")
         for field, value in changes.items():
-            setattr(profile, field, value)
+            setattr(owned, field, value)
         self.session.flush()
-        return profile
+        return owned
 
 
 class PatientScopedRepository:
