@@ -1,0 +1,2935 @@
+openapi: 3.1.0
+info:
+  title: Pomi API
+  version: 0.1.0
+  description: |
+    Pomi P0 Flutter/FastAPI contract. All medical data in the hackathon build is
+    simulated. OCR output remains a draft until explicitly confirmed by the user.
+    Hospital certification is a Flutter-only local demo and is intentionally absent.
+servers:
+  - url: https://api.healy1012-ops.top/api
+    description: Demo server
+  - url: http://127.0.0.1:8000/api
+    description: Local development
+security:
+  - SessionId: []
+tags:
+  - name: System
+  - name: Auth
+  - name: Patient
+  - name: Dashboard
+  - name: Medications
+  - name: Cycles
+  - name: Weights
+  - name: Documents
+  - name: OCR
+  - name: Reconciliations
+  - name: Reports
+  - name: Rules
+
+paths:
+  /health:
+    get:
+      tags: [System]
+      operationId: getHealth
+      summary: Service health and contract version
+      security: []
+      responses:
+        '200':
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Health'
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      operationId: register
+      summary: Register an account and create a session
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Account created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AuthSession'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      summary: Sign in with account name and password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Session created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AuthSession'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /auth/session:
+    get:
+      tags: [Auth]
+      operationId: getSession
+      summary: Restore the current session and next route
+      responses:
+        '200':
+          description: Active session
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SessionInfo'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      summary: Revoke the current session
+      responses:
+        '200':
+          description: Session revoked
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [revoked]
+                        properties:
+                          revoked:
+                            type: boolean
+                            const: true
+
+  /patient/profile:
+    get:
+      tags: [Patient]
+      operationId: getPatientProfile
+      summary: Get the current patient's profile
+      responses:
+        '200':
+          description: Patient profile
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PatientProfile'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+    put:
+      tags: [Patient]
+      operationId: updatePatientProfile
+      summary: Partially save onboarding or update profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientProfileUpdate'
+      responses:
+        '200':
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PatientProfile'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /dashboard:
+    get:
+      tags: [Dashboard]
+      operationId: getDashboard
+      summary: Get the patient dashboard aggregate
+      parameters:
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Defaults to the server's current date.
+      responses:
+        '200':
+          description: Dashboard aggregate
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Dashboard'
+
+  /medications:
+    get:
+      tags: [Medications]
+      operationId: listMedications
+      summary: List current or historical medications
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/MedicationStatus'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Medication page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MedicationPage'
+    post:
+      tags: [Medications]
+      operationId: createMedication
+      summary: Add a medication and its first event
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MedicationCreate'
+      responses:
+        '201':
+          description: Medication created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MedicationMutationResult'
+        '422':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /medications/{medication_id}:
+    put:
+      tags: [Medications]
+      operationId: updateMedication
+      summary: Adjust, continue, or stop a medication
+      parameters:
+        - $ref: '#/components/parameters/MedicationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MedicationUpdate'
+      responses:
+        '200':
+          description: Medication and event updated atomically
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MedicationMutationResult'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /medications/{medication_id}/events:
+    get:
+      tags: [Medications]
+      operationId: listMedicationEvents
+      summary: Get the immutable medication event chain
+      parameters:
+        - $ref: '#/components/parameters/MedicationId'
+      responses:
+        '200':
+          description: Medication events in chronological order
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/MedicationEvent'
+
+  /medications/{medication_id}/daily-status:
+    put:
+      tags: [Medications]
+      operationId: setMedicationDailyStatus
+      summary: Set one of taken, missed, or unrecorded for a date
+      parameters:
+        - $ref: '#/components/parameters/MedicationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MedicationDailyUpsert'
+      responses:
+        '200':
+          description: Daily record upserted
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MedicationDaily'
+
+  /medication-daily:
+    get:
+      tags: [Medications]
+      operationId: listMedicationDaily
+      summary: Get daily medication records in a date range
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: medication_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Daily records and three-state totals
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MedicationDailyRange'
+
+  /cycles:
+    get:
+      tags: [Cycles]
+      operationId: listCycles
+      summary: List menstrual cycles
+      parameters:
+        - $ref: '#/components/parameters/FromDate'
+        - $ref: '#/components/parameters/ToDate'
+      responses:
+        '200':
+          description: Menstrual cycles
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/MenstrualCycle'
+    post:
+      tags: [Cycles]
+      operationId: createCycle
+      summary: Create a menstrual cycle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CycleInput'
+      responses:
+        '201':
+          description: Cycle created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MenstrualCycle'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /cycles/{cycle_id}:
+    put:
+      tags: [Cycles]
+      operationId: updateCycle
+      summary: Update a menstrual cycle
+      parameters:
+        - name: cycle_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CycleInput'
+      responses:
+        '200':
+          description: Cycle updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MenstrualCycle'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /weights:
+    get:
+      tags: [Weights]
+      operationId: listWeights
+      summary: List weight records
+      parameters:
+        - $ref: '#/components/parameters/FromDate'
+        - $ref: '#/components/parameters/ToDate'
+      responses:
+        '200':
+          description: Weight records
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/WeightRecord'
+    post:
+      tags: [Weights]
+      operationId: createWeight
+      summary: Create or replace the record for the same local date
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WeightInput'
+      responses:
+        '200':
+          description: Existing same-day record updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/WeightRecord'
+        '201':
+          description: Weight record created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/WeightRecord'
+
+  /weights/{weight_id}:
+    put:
+      tags: [Weights]
+      operationId: updateWeight
+      summary: Update a weight record
+      parameters:
+        - name: weight_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WeightInput'
+      responses:
+        '200':
+          description: Weight record updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/WeightRecord'
+
+  /documents:
+    get:
+      tags: [Documents]
+      operationId: listDocuments
+      summary: List non-deleted medical documents
+      parameters:
+        - name: document_type
+          in: query
+          schema:
+            $ref: '#/components/schemas/DocumentType'
+        - name: encounter_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: upload_status
+          in: query
+          schema:
+            $ref: '#/components/schemas/UploadStatus'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Document page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DocumentPage'
+    post:
+      tags: [Documents]
+      operationId: uploadDocument
+      summary: Upload an original image or single-page PDF
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, document_type]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                document_type:
+                  $ref: '#/components/schemas/DocumentType'
+                encounter_id:
+                  type: [string, 'null']
+                  format: uuid
+                external_processing_consent_version:
+                  type: [string, 'null']
+                  maxLength: 40
+      responses:
+        '201':
+          description: File stored and document created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DocumentDetail'
+        '413':
+          $ref: '#/components/responses/ErrorResponse'
+        '415':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /documents/{document_id}:
+    get:
+      tags: [Documents]
+      operationId: getDocument
+      summary: Get document details and current revision
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '200':
+          description: Document detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DocumentDetail'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+    delete:
+      tags: [Documents]
+      operationId: deleteDocument
+      summary: Soft delete a document
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '200':
+          description: Soft deletion scheduled
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DeleteResult'
+
+  /documents/{document_id}/revisions:
+    get:
+      tags: [Documents]
+      operationId: listDocumentRevisions
+      summary: List all document revisions
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '200':
+          description: Revision chain
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/DocumentRevision'
+    post:
+      tags: [Documents]
+      operationId: replaceDocumentRevision
+      summary: Upload a replacement while preserving the old revision
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, replacement_reason]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                replacement_reason:
+                  type: string
+                  minLength: 1
+                  maxLength: 500
+                expected_current_revision_id:
+                  type: string
+                  format: uuid
+      responses:
+        '201':
+          description: New revision created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DocumentRevision'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /documents/{document_id}/revisions/{revision_id}/file:
+    get:
+      tags: [Documents]
+      operationId: downloadDocumentRevision
+      summary: Stream a private original file after ownership checks
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - name: revision_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Original image or PDF
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+            ETag:
+              schema:
+                type: string
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /ocr/tasks:
+    post:
+      tags: [OCR]
+      operationId: createOcrTask
+      summary: Queue OCR for a specific document revision
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OcrTaskCreate'
+      responses:
+        '202':
+          description: OCR task queued or existing idempotent task returned
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/OcrTask'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /ocr/tasks/{task_id}:
+    get:
+      tags: [OCR]
+      operationId: getOcrTask
+      summary: Poll OCR task status
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: OCR task
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/OcrTask'
+
+  /ocr/tasks/{task_id}/result:
+    get:
+      tags: [OCR]
+      operationId: getOcrResult
+      summary: Get the editable OCR draft and field-level evidence
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: OCR draft
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/OcrDraftResult'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /ocr/tasks/{task_id}/confirm:
+    post:
+      tags: [OCR]
+      operationId: confirmOcrResult
+      summary: Confirm edited OCR fields and create formal data atomically
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OcrConfirmRequest'
+      responses:
+        '200':
+          description: OCR result confirmed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/OcrConfirmResult'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /ocr/tasks/{task_id}/retry:
+    post:
+      tags: [OCR]
+      operationId: retryOcrTask
+      summary: Create a new user-requested OCR attempt
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OcrRetryRequest'
+      responses:
+        '202':
+          description: New OCR attempt queued
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/OcrTask'
+
+  /medication-reconciliations:
+    post:
+      tags: [Reconciliations]
+      operationId: createMedicationReconciliation
+      summary: Generate a deterministic medication reconciliation draft
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReconciliationCreate'
+      responses:
+        '201':
+          description: Reconciliation draft created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MedicationReconciliation'
+
+  /medication-reconciliations/{reconciliation_id}:
+    get:
+      tags: [Reconciliations]
+      operationId: getMedicationReconciliation
+      summary: Get reconciliation draft and item differences
+      parameters:
+        - $ref: '#/components/parameters/ReconciliationId'
+      responses:
+        '200':
+          description: Reconciliation detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MedicationReconciliation'
+    put:
+      tags: [Reconciliations]
+      operationId: confirmMedicationReconciliation
+      summary: Save all user decisions and apply medication events atomically
+      parameters:
+        - $ref: '#/components/parameters/ReconciliationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReconciliationUpdate'
+      responses:
+        '200':
+          description: Reconciliation confirmed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MedicationReconciliation'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /patient-notes:
+    get:
+      tags: [Reports]
+      operationId: getLatestPatientNote
+      summary: Get the latest patient note draft or confirmation
+      responses:
+        '200':
+          description: Latest note or null
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        oneOf:
+                          - $ref: '#/components/schemas/PatientNote'
+                          - type: 'null'
+    post:
+      tags: [Reports]
+      operationId: createPatientNote
+      summary: Create and optionally confirm a patient note
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientNoteInput'
+      responses:
+        '201':
+          description: Patient note created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PatientNote'
+
+  /patient-notes/{note_id}:
+    put:
+      tags: [Reports]
+      operationId: updatePatientNote
+      summary: Update or confirm a patient note without changing old reports
+      parameters:
+        - name: note_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientNoteInput'
+      responses:
+        '200':
+          description: Patient note updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PatientNote'
+
+  /reports:
+    get:
+      tags: [Reports]
+      operationId: listReports
+      summary: List immutable report history, newest first
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Report page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReportPage'
+    post:
+      tags: [Reports]
+      operationId: createReport
+      summary: Generate an immutable report snapshot from confirmed data
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportCreate'
+      responses:
+        '201':
+          description: Report snapshot generated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReportListItem'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /reports/{report_id}:
+    get:
+      tags: [Reports]
+      operationId: getReport
+      summary: Get summary, trends, and source traceability
+      parameters:
+        - $ref: '#/components/parameters/ReportId'
+      responses:
+        '200':
+          description: Three-layer report data
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReportDetail'
+
+  /reports/{report_id}/pdf:
+    post:
+      tags: [Reports]
+      operationId: createReportPdf
+      summary: Queue PDF generation for an immutable report
+      parameters:
+        - $ref: '#/components/parameters/ReportId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          description: PDF generation queued
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReportPdf'
+    get:
+      tags: [Reports]
+      operationId: getReportPdf
+      summary: Get PDF generation status and download metadata
+      parameters:
+        - $ref: '#/components/parameters/ReportId'
+      responses:
+        '200':
+          description: PDF status
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReportPdf'
+
+  /reports/{report_id}/pdf/file:
+    get:
+      tags: [Reports]
+      operationId: downloadReportPdf
+      summary: Stream the generated report PDF
+      parameters:
+        - $ref: '#/components/parameters/ReportId'
+      responses:
+        '200':
+          description: PDF file
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /deterministic-rules:
+    get:
+      tags: [Rules]
+      operationId: listDeterministicRules
+      summary: List enabled deterministic rule configurations
+      responses:
+        '200':
+          description: Rule configurations
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/DeterministicRule'
+
+  /deterministic-rules/{rule_id}:
+    put:
+      tags: [Rules]
+      operationId: updateDeterministicRule
+      summary: Update controlled rule parameters (admin only)
+      parameters:
+        - name: rule_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeterministicRuleUpdate'
+      responses:
+        '200':
+          description: Rule updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DeterministicRule'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /rule-executions/{execution_id}:
+    get:
+      tags: [Rules]
+      operationId: getRuleExecution
+      summary: Trace deterministic rule input and output
+      parameters:
+        - name: execution_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Rule execution trace
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/RuleExecution'
+
+components:
+  securitySchemes:
+    SessionId:
+      type: apiKey
+      in: header
+      name: X-Session-ID
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 128
+    Cursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    FromDate:
+      name: from
+      in: query
+      schema:
+        type: string
+        format: date
+    ToDate:
+      name: to
+      in: query
+      schema:
+        type: string
+        format: date
+    MedicationId:
+      name: medication_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    DocumentId:
+      name: document_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    TaskId:
+      name: task_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ReconciliationId:
+      name: reconciliation_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ReportId:
+      name: report_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    ErrorResponse:
+      description: API error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+
+  schemas:
+    ApiSuccess:
+      type: object
+      required: [success, data, request_id, error]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data: {}
+        request_id:
+          type: string
+        error:
+          type: 'null'
+
+    ApiError:
+      type: object
+      required: [success, data, request_id, error]
+      properties:
+        success:
+          type: boolean
+          const: false
+        data:
+          type: 'null'
+        request_id:
+          type: string
+        error:
+          $ref: '#/components/schemas/ErrorDetail'
+
+    ErrorDetail:
+      type: object
+      required: [code, message, retryable, details]
+      properties:
+        code:
+          $ref: '#/components/schemas/ErrorCode'
+        message:
+          type: string
+        retryable:
+          type: boolean
+        retry_after_seconds:
+          type: [integer, 'null']
+          minimum: 0
+        details:
+          type: object
+          additionalProperties: true
+
+    ErrorCode:
+      type: string
+      enum:
+        - VALIDATION_ERROR
+        - ACCOUNT_NAME_EXISTS
+        - INVALID_CREDENTIALS
+        - SESSION_EXPIRED
+        - FORBIDDEN_RESOURCE
+        - RESOURCE_NOT_FOUND
+        - RESOURCE_VERSION_CONFLICT
+        - RATE_LIMITED
+        - UNSUPPORTED_FORMAT
+        - FILE_TOO_LARGE
+        - IMAGE_TOO_LARGE
+        - MULTI_PAGE_PDF
+        - MODEL_TIMEOUT
+        - INVALID_MODEL_JSON
+        - SCHEMA_VALIDATION_FAILED
+        - CRITICAL_FIELD_MISSING
+        - OCR_RESULT_NOT_READY
+        - OCR_ALREADY_CONFIRMED
+        - RECONCILIATION_REQUIRED
+        - CYCLE_DATE_OVERLAP
+        - REPORT_SOURCE_INCOMPLETE
+        - PDF_GENERATION_FAILED
+
+    Health:
+      type: object
+      required: [status, service, api_version, server_time]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+        service:
+          type: string
+          const: pomi-api
+        api_version:
+          type: string
+        server_time:
+          type: string
+          format: date-time
+        database:
+          type: string
+          enum: [ok, unavailable]
+        worker:
+          type: string
+          enum: [ok, stale, unavailable]
+
+    ClientPlatform:
+      type: string
+      enum: [android, ios, web]
+
+    AccountType:
+      type: string
+      enum: [new_user, returning_user]
+
+    NextRoute:
+      type: string
+      enum: [/onboarding, /dashboard]
+
+    RegisterRequest:
+      type: object
+      required: [account_name, password, client_platform]
+      properties:
+        account_name:
+          type: string
+          minLength: 3
+          maxLength: 32
+          pattern: '^[A-Za-z0-9_.-]+$'
+        password:
+          type: string
+          minLength: 8
+          maxLength: 72
+          format: password
+        phone_number:
+          type: [string, 'null']
+          maxLength: 32
+          description: Optional unverified profile data; never a P0 login credential.
+        client_platform:
+          $ref: '#/components/schemas/ClientPlatform'
+        device_name:
+          type: [string, 'null']
+          maxLength: 100
+
+    LoginRequest:
+      type: object
+      required: [account_name, password, client_platform]
+      properties:
+        account_name:
+          type: string
+          minLength: 1
+          maxLength: 32
+        password:
+          type: string
+          minLength: 1
+          maxLength: 72
+          format: password
+        client_platform:
+          $ref: '#/components/schemas/ClientPlatform'
+        device_name:
+          type: [string, 'null']
+          maxLength: 100
+
+    SessionInfo:
+      type: object
+      required: [uid, account_name, account_type, expires_at, onboarding_required, next_route]
+      properties:
+        uid:
+          type: string
+        account_name:
+          type: string
+        account_type:
+          $ref: '#/components/schemas/AccountType'
+        expires_at:
+          type: string
+          format: date-time
+        onboarding_required:
+          type: boolean
+        next_route:
+          $ref: '#/components/schemas/NextRoute'
+
+    AuthSession:
+      allOf:
+        - $ref: '#/components/schemas/SessionInfo'
+        - type: object
+          required: [session_id]
+          properties:
+            session_id:
+              type: string
+              minLength: 32
+              writeOnly: true
+
+    Gender:
+      type: string
+      enum: [female, male, other, prefer_not_to_say]
+
+    PatientProfileUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        nickname:
+          type: [string, 'null']
+          maxLength: 80
+        birth_date:
+          type: [string, 'null']
+          format: date
+        gender:
+          oneOf:
+            - $ref: '#/components/schemas/Gender'
+            - type: 'null'
+        height_cm:
+          type: [number, 'null']
+          minimum: 80
+          maximum: 250
+        diagnosis_year:
+          type: [integer, 'null']
+          minimum: 1900
+        primary_condition:
+          type: [string, 'null']
+          maxLength: 80
+        usual_cycle_length_days:
+          type: [integer, 'null']
+          minimum: 15
+          maximum: 120
+        last_menstrual_start_date:
+          type: [string, 'null']
+          format: date
+        next_visit_date:
+          type: [string, 'null']
+          format: date
+        health_goal:
+          type: [string, 'null']
+          maxLength: 500
+        accept_external_ocr_notice:
+          type: [boolean, 'null']
+        complete_onboarding:
+          type: [boolean, 'null']
+        updated_at:
+          type: [string, 'null']
+          format: date-time
+
+    PatientProfile:
+      type: object
+      required: [patient_id, account_uid, onboarding_step, onboarding_completed, created_at, updated_at]
+      properties:
+        patient_id:
+          type: string
+          format: uuid
+        account_uid:
+          type: string
+        nickname:
+          type: [string, 'null']
+        birth_date:
+          type: [string, 'null']
+          format: date
+        gender:
+          oneOf:
+            - $ref: '#/components/schemas/Gender'
+            - type: 'null'
+        height_cm:
+          type: [number, 'null']
+        diagnosis_year:
+          type: [integer, 'null']
+        primary_condition:
+          type: [string, 'null']
+        usual_cycle_length_days:
+          type: [integer, 'null']
+        last_menstrual_start_date:
+          type: [string, 'null']
+          format: date
+        next_visit_date:
+          type: [string, 'null']
+          format: date
+        health_goal:
+          type: [string, 'null']
+        onboarding_step:
+          type: integer
+          minimum: 0
+          maximum: 4
+        onboarding_completed:
+          type: boolean
+        external_ocr_notice_accepted_at:
+          type: [string, 'null']
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    IntakeStatus:
+      type: string
+      enum: [taken, missed, unrecorded]
+
+    MedicationStatus:
+      type: string
+      enum: [active, stopped, unknown]
+
+    MedicationEventType:
+      type: string
+      enum: [started, adjusted, continued, stopped]
+
+    MedicationSourceType:
+      type: string
+      enum: [manual, medical_order, outpatient_record, imported]
+
+    StopSource:
+      type: string
+      enum: [written_order, verbal_doctor, patient_self, other]
+
+    MedicationInstruction:
+      type: object
+      properties:
+        drug_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        specification:
+          type: [string, 'null']
+          maxLength: 200
+        dosage_text:
+          type: [string, 'null']
+          maxLength: 300
+        dosage_value:
+          type: [number, 'null']
+          minimum: 0
+        dosage_unit:
+          type: [string, 'null']
+          maxLength: 50
+        frequency:
+          type: [string, 'null']
+          maxLength: 100
+        route:
+          type: [string, 'null']
+          maxLength: 100
+
+    MedicationCreate:
+      allOf:
+        - $ref: '#/components/schemas/MedicationInstruction'
+        - type: object
+          required: [drug_name, start_date, source_type, event_date]
+          properties:
+            start_date:
+              type: string
+              format: date
+            source_type:
+              $ref: '#/components/schemas/MedicationSourceType'
+            source_document_id:
+              type: [string, 'null']
+              format: uuid
+            event_date:
+              type: string
+              format: date
+            note:
+              type: [string, 'null']
+              maxLength: 500
+
+    MedicationUpdate:
+      allOf:
+        - $ref: '#/components/schemas/MedicationInstruction'
+        - type: object
+          required: [event_type, event_date, updated_at]
+          properties:
+            event_type:
+              $ref: '#/components/schemas/MedicationEventType'
+            event_date:
+              type: string
+              format: date
+            end_date:
+              type: [string, 'null']
+              format: date
+            current_status:
+              $ref: '#/components/schemas/MedicationStatus'
+            stop_source:
+              oneOf:
+                - $ref: '#/components/schemas/StopSource'
+                - type: 'null'
+            change_reason:
+              type: [string, 'null']
+              maxLength: 500
+            note:
+              type: [string, 'null']
+              maxLength: 500
+            updated_at:
+              type: string
+              format: date-time
+
+    Medication:
+      allOf:
+        - $ref: '#/components/schemas/MedicationInstruction'
+        - type: object
+          required: [id, patient_id, drug_name, current_status, source_type, created_at, updated_at]
+          properties:
+            id:
+              type: string
+              format: uuid
+            patient_id:
+              type: string
+              format: uuid
+            normalized_drug_name:
+              type: [string, 'null']
+            start_date:
+              type: [string, 'null']
+              format: date
+            end_date:
+              type: [string, 'null']
+              format: date
+            current_status:
+              $ref: '#/components/schemas/MedicationStatus'
+            source_type:
+              $ref: '#/components/schemas/MedicationSourceType'
+            source_document_id:
+              type: [string, 'null']
+              format: uuid
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+
+    MedicationEvent:
+      type: object
+      required: [id, medication_id, event_type, event_date, confirmed_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        medication_id:
+          type: string
+          format: uuid
+        event_type:
+          $ref: '#/components/schemas/MedicationEventType'
+        event_date:
+          type: string
+          format: date
+        old_instruction:
+          type: [object, 'null']
+          additionalProperties: true
+        new_instruction:
+          type: [object, 'null']
+          additionalProperties: true
+        source_document_id:
+          type: [string, 'null']
+          format: uuid
+        stop_source:
+          oneOf:
+            - $ref: '#/components/schemas/StopSource'
+            - type: 'null'
+        note:
+          type: [string, 'null']
+        confirmed_at:
+          type: string
+          format: date-time
+
+    MedicationMutationResult:
+      type: object
+      required: [medication, event]
+      properties:
+        medication:
+          $ref: '#/components/schemas/Medication'
+        event:
+          $ref: '#/components/schemas/MedicationEvent'
+
+    PageMeta:
+      type: object
+      required: [next_cursor, has_more]
+      properties:
+        next_cursor:
+          type: [string, 'null']
+        has_more:
+          type: boolean
+
+    MedicationPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Medication'
+
+    MedicationDailyUpsert:
+      type: object
+      required: [record_date, intake_status]
+      properties:
+        record_date:
+          type: string
+          format: date
+        intake_status:
+          $ref: '#/components/schemas/IntakeStatus'
+        actual_dosage:
+          type: [number, 'null']
+          minimum: 0
+        actual_dosage_unit:
+          type: [string, 'null']
+          maxLength: 50
+        note:
+          type: [string, 'null']
+          maxLength: 500
+
+    MedicationDaily:
+      allOf:
+        - $ref: '#/components/schemas/MedicationDailyUpsert'
+        - type: object
+          required: [id, medication_id, recorded_at]
+          properties:
+            id:
+              type: string
+              format: uuid
+            medication_id:
+              type: string
+              format: uuid
+            recorded_at:
+              type: string
+              format: date-time
+
+    ThreeStateStats:
+      type: object
+      required: [taken_count, missed_count, unrecorded_count]
+      properties:
+        taken_count:
+          type: integer
+          minimum: 0
+        missed_count:
+          type: integer
+          minimum: 0
+        unrecorded_count:
+          type: integer
+          minimum: 0
+
+    MedicationDailyRange:
+      allOf:
+        - $ref: '#/components/schemas/ThreeStateStats'
+        - type: object
+          required: [from, to, items]
+          properties:
+            from:
+              type: string
+              format: date
+            to:
+              type: string
+              format: date
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/MedicationDaily'
+
+    FlowLevel:
+      type: string
+      enum: [light, medium, heavy, unknown]
+
+    CycleInput:
+      type: object
+      required: [start_date]
+      properties:
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: [string, 'null']
+          format: date
+        flow_level:
+          oneOf:
+            - $ref: '#/components/schemas/FlowLevel'
+            - type: 'null'
+        note:
+          type: [string, 'null']
+          maxLength: 500
+        source_type:
+          type: string
+          enum: [manual, imported]
+          default: manual
+        updated_at:
+          type: [string, 'null']
+          format: date-time
+
+    MenstrualCycle:
+      allOf:
+        - $ref: '#/components/schemas/CycleInput'
+        - type: object
+          required: [id, cycle_length_days, duration_days, created_at, updated_at]
+          properties:
+            id:
+              type: string
+              format: uuid
+            cycle_length_days:
+              type: [integer, 'null']
+            duration_days:
+              type: [integer, 'null']
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+
+    WeightInput:
+      type: object
+      required: [measured_at, weight_kg]
+      properties:
+        measured_at:
+          type: string
+          format: date-time
+        weight_kg:
+          type: number
+          minimum: 20
+          maximum: 350
+        source_type:
+          type: string
+          enum: [manual, imported]
+          default: manual
+        note:
+          type: [string, 'null']
+          maxLength: 500
+
+    WeightRecord:
+      allOf:
+        - $ref: '#/components/schemas/WeightInput'
+        - type: object
+          required: [id, created_at]
+          properties:
+            id:
+              type: string
+              format: uuid
+            created_at:
+              type: string
+              format: date-time
+
+    Dashboard:
+      type: object
+      required: [server_date, data_as_of, profile_summary, today_medications, month_medication_stats]
+      properties:
+        server_date:
+          type: string
+          format: date
+        data_as_of:
+          type: string
+          format: date-time
+        profile_summary:
+          type: object
+          required: [patient_id]
+          properties:
+            patient_id:
+              type: string
+              format: uuid
+            nickname:
+              type: [string, 'null']
+            primary_condition:
+              type: [string, 'null']
+        next_visit:
+          type: [object, 'null']
+          properties:
+            date:
+              type: string
+              format: date
+            days_remaining:
+              type: integer
+        today_medications:
+          type: array
+          items:
+            type: object
+            required: [medication_id, drug_name, intake_status]
+            properties:
+              medication_id:
+                type: string
+                format: uuid
+              drug_name:
+                type: string
+              specification:
+                type: [string, 'null']
+              dosage_text:
+                type: [string, 'null']
+              frequency:
+                type: [string, 'null']
+              intake_status:
+                $ref: '#/components/schemas/IntakeStatus'
+              recorded_at:
+                type: [string, 'null']
+                format: date-time
+        month_medication_stats:
+          allOf:
+            - $ref: '#/components/schemas/ThreeStateStats'
+            - type: object
+              required: [month, by_medication]
+              properties:
+                month:
+                  type: string
+                  pattern: '^\d{4}-\d{2}$'
+                by_medication:
+                  type: array
+                  items:
+                    allOf:
+                      - $ref: '#/components/schemas/ThreeStateStats'
+                      - type: object
+                        required: [medication_id, drug_name]
+                        properties:
+                          medication_id:
+                            type: string
+                            format: uuid
+                          drug_name:
+                            type: string
+        latest_report:
+          oneOf:
+            - $ref: '#/components/schemas/ReportListItem'
+            - type: 'null'
+
+    DocumentType:
+      type: string
+      enum: [lab_report, medical_order, imaging_text_report, outpatient_record]
+
+    UploadStatus:
+      type: string
+      enum: [uploaded, processing, ready, failed, deleted]
+
+    Document:
+      type: object
+      required: [id, patient_id, document_type, original_file_name, mime_type, file_size_bytes, file_hash, page_count, upload_status, current_revision_id, uploaded_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        patient_id:
+          type: string
+          format: uuid
+        encounter_id:
+          type: [string, 'null']
+          format: uuid
+        document_type:
+          $ref: '#/components/schemas/DocumentType'
+        original_file_name:
+          type: string
+        mime_type:
+          type: string
+          enum: [image/jpeg, image/png, application/pdf]
+        file_size_bytes:
+          type: integer
+          minimum: 1
+          maximum: 20971520
+        pixel_count:
+          type: [integer, 'null']
+          maximum: 25000000
+        file_hash:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+        page_count:
+          type: integer
+          const: 1
+        upload_status:
+          $ref: '#/components/schemas/UploadStatus'
+        current_revision_id:
+          type: string
+          format: uuid
+        uploaded_at:
+          type: string
+          format: date-time
+        deleted_at:
+          type: [string, 'null']
+          format: date-time
+        purge_after:
+          type: [string, 'null']
+          format: date-time
+
+    DocumentRevision:
+      type: object
+      required: [id, document_id, revision_number, file_hash, file_size_bytes, is_current, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        document_id:
+          type: string
+          format: uuid
+        revision_number:
+          type: integer
+          minimum: 1
+        file_hash:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+        file_size_bytes:
+          type: integer
+        replaced_revision_id:
+          type: [string, 'null']
+          format: uuid
+        replacement_reason:
+          type: [string, 'null']
+        is_current:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    DocumentDetail:
+      allOf:
+        - $ref: '#/components/schemas/Document'
+        - type: object
+          required: [current_revision]
+          properties:
+            current_revision:
+              $ref: '#/components/schemas/DocumentRevision'
+            latest_ocr_task:
+              oneOf:
+                - $ref: '#/components/schemas/OcrTask'
+                - type: 'null'
+
+    DocumentPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Document'
+
+    DeleteResult:
+      type: object
+      required: [document_id, deleted_at, purge_after, retained_revision_ids]
+      properties:
+        document_id:
+          type: string
+          format: uuid
+        deleted_at:
+          type: string
+          format: date-time
+        purge_after:
+          type: [string, 'null']
+          format: date-time
+        retained_revision_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    OcrTaskStatus:
+      type: string
+      enum: [pending, processing, succeeded, failed, timeout, fallback, confirmed]
+
+    OcrResultSource:
+      type: string
+      enum: [qwen_api, fallback]
+
+    OcrTaskCreate:
+      type: object
+      required: [document_id, document_revision_id]
+      properties:
+        document_id:
+          type: string
+          format: uuid
+        document_revision_id:
+          type: string
+          format: uuid
+        force_new_attempt:
+          type: boolean
+          default: false
+
+    OcrTask:
+      type: object
+      required: [id, document_id, document_revision_id, document_type, task_status, attempt_count, max_attempts, queued_at, progress]
+      properties:
+        id:
+          type: string
+          format: uuid
+        document_id:
+          type: string
+          format: uuid
+        document_revision_id:
+          type: string
+          format: uuid
+        document_type:
+          $ref: '#/components/schemas/DocumentType'
+        task_status:
+          $ref: '#/components/schemas/OcrTaskStatus'
+        attempt_count:
+          type: integer
+          minimum: 0
+        max_attempts:
+          type: integer
+          minimum: 1
+        queued_at:
+          type: string
+          format: date-time
+        started_at:
+          type: [string, 'null']
+          format: date-time
+        finished_at:
+          type: [string, 'null']
+          format: date-time
+        processing_ms:
+          type: [integer, 'null']
+        error_code:
+          type: [string, 'null']
+        error_message:
+          type: [string, 'null']
+        result_source:
+          oneOf:
+            - $ref: '#/components/schemas/OcrResultSource'
+            - type: 'null'
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+
+    ValidationStatus:
+      type: string
+      enum: [valid, warnings, invalid]
+
+    FieldConfirmationStatus:
+      type: string
+      enum: [pending, confirmed, edited, rejected]
+
+    OcrFieldResult:
+      type: object
+      required: [field_path, raw_text, parsed_value, confidence, confirmation_status]
+      properties:
+        field_path:
+          type: string
+        raw_text:
+          type: [string, 'null']
+        parsed_value: {}
+        confidence:
+          type: [number, 'null']
+          minimum: 0
+          maximum: 1
+        uncertainty_reason:
+          type: [string, 'null']
+        source_region:
+          type: [object, 'null']
+          additionalProperties: true
+        user_value: {}
+        confirmation_status:
+          $ref: '#/components/schemas/FieldConfirmationStatus'
+
+    LabItemDraft:
+      type: object
+      required: [item_name, raw_value]
+      properties:
+        item_name:
+          type: string
+        item_code:
+          type: [string, 'null']
+        raw_value:
+          type: string
+        numeric_value:
+          type: [number, 'null']
+        raw_unit:
+          type: [string, 'null']
+        normalized_unit:
+          type: [string, 'null']
+        reference_range_text:
+          type: [string, 'null']
+        reference_low:
+          type: [number, 'null']
+        reference_high:
+          type: [number, 'null']
+
+    LabDraft:
+      type: object
+      required: [items]
+      properties:
+        hospital_name:
+          type: [string, 'null']
+        sample_date:
+          type: [string, 'null']
+          format: date
+        report_date:
+          type: [string, 'null']
+          format: date
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/LabItemDraft'
+
+    MedicalOrderItemDraft:
+      type: object
+      required: [source_text, drug_name]
+      properties:
+        source_text:
+          type: string
+        drug_name:
+          type: string
+        normalized_drug_name:
+          type: [string, 'null']
+        specification:
+          type: [string, 'null']
+        dosage_text:
+          type: [string, 'null']
+        dosage_value:
+          type: [number, 'null']
+        dosage_unit:
+          type: [string, 'null']
+        frequency:
+          type: [string, 'null']
+        duration:
+          type: [string, 'null']
+        route:
+          type: [string, 'null']
+        instruction:
+          type: [string, 'null']
+
+    MedicalOrderDraft:
+      type: object
+      required: [orders]
+      properties:
+        hospital_name:
+          type: [string, 'null']
+        department_name:
+          type: [string, 'null']
+        prescribed_at:
+          type: [string, 'null']
+          format: date
+        orders:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/MedicalOrderItemDraft'
+
+    ImagingTextDraft:
+      type: object
+      required: [findings_text, conclusion_text]
+      properties:
+        examination_name:
+          type: [string, 'null']
+        body_part:
+          type: [string, 'null']
+        examination_method:
+          type: [string, 'null']
+        findings_text:
+          type: string
+        conclusion_text:
+          type: string
+        examined_at:
+          type: [string, 'null']
+          format: date
+        reported_at:
+          type: [string, 'null']
+          format: date
+
+    OutpatientRecordDraft:
+      type: object
+      required: [visit_date, diagnosis_summary, treatment_plan]
+      properties:
+        hospital_name:
+          type: [string, 'null']
+        department_name:
+          type: [string, 'null']
+        doctor_name:
+          type: [string, 'null']
+        visit_date:
+          type: string
+          format: date
+        chief_complaint:
+          type: [string, 'null']
+        diagnosis_summary:
+          type: string
+        treatment_plan:
+          type: string
+        medical_advice:
+          type: [string, 'null']
+
+    OcrDraftResult:
+      type: object
+      required: [result_id, task_id, document_type, validation_status, critical_error, result_source, fields, draft]
+      properties:
+        result_id:
+          type: string
+          format: uuid
+        task_id:
+          type: string
+          format: uuid
+        document_type:
+          $ref: '#/components/schemas/DocumentType'
+        validation_status:
+          $ref: '#/components/schemas/ValidationStatus'
+        critical_error:
+          type: boolean
+        result_source:
+          $ref: '#/components/schemas/OcrResultSource'
+        validation_errors:
+          type: array
+          items:
+            type: string
+        fields:
+          type: array
+          items:
+            $ref: '#/components/schemas/OcrFieldResult'
+        draft:
+          oneOf:
+            - $ref: '#/components/schemas/LabDraft'
+            - $ref: '#/components/schemas/MedicalOrderDraft'
+            - $ref: '#/components/schemas/ImagingTextDraft'
+            - $ref: '#/components/schemas/OutpatientRecordDraft'
+
+    FieldConfirmation:
+      type: object
+      required: [field_path, confirmation_status]
+      properties:
+        field_path:
+          type: string
+        user_value: {}
+        confirmation_status:
+          type: string
+          enum: [confirmed, edited, rejected]
+
+    OcrConfirmRequest:
+      type: object
+      required: [result_id, expected_revision_id, document_type, confirmed_data, field_confirmations]
+      properties:
+        result_id:
+          type: string
+          format: uuid
+        expected_revision_id:
+          type: string
+          format: uuid
+        document_type:
+          $ref: '#/components/schemas/DocumentType'
+        confirmed_data:
+          oneOf:
+            - $ref: '#/components/schemas/LabDraft'
+            - $ref: '#/components/schemas/MedicalOrderDraft'
+            - $ref: '#/components/schemas/ImagingTextDraft'
+            - $ref: '#/components/schemas/OutpatientRecordDraft'
+        field_confirmations:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldConfirmation'
+        confirm_all:
+          type: boolean
+          default: false
+          description: Allowed only for lab reports after critical-field validation.
+
+    OcrConfirmResult:
+      type: object
+      required: [task_id, result_id, created_resource_ids, confirmed_at, reconciliation_required]
+      properties:
+        task_id:
+          type: string
+          format: uuid
+        result_id:
+          type: string
+          format: uuid
+        created_resource_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        confirmed_at:
+          type: string
+          format: date-time
+        reconciliation_required:
+          type: boolean
+
+    OcrRetryRequest:
+      type: object
+      properties:
+        reason:
+          type: [string, 'null']
+          maxLength: 500
+        allow_registered_fallback:
+          type: boolean
+          default: true
+
+    ReconciliationStatus:
+      type: string
+      enum: [pending, confirmed, cancelled]
+
+    ComparisonType:
+      type: string
+      enum: [unchanged, adjusted, added, stopped, uncertain, manual_review]
+
+    ReconciliationDecision:
+      type: string
+      enum: [accept, keep_existing, confirm_stopped, needs_review]
+
+    ReconciliationCreate:
+      type: object
+      required: [source_document_id]
+      properties:
+        source_document_id:
+          type: string
+          format: uuid
+        medical_order_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    ReconciliationItem:
+      type: object
+      required: [id, drug_name, comparison_type, differences]
+      properties:
+        id:
+          type: string
+          format: uuid
+        existing_medication_id:
+          type: [string, 'null']
+          format: uuid
+        new_medical_order_id:
+          type: [string, 'null']
+          format: uuid
+        medication_concept_id:
+          type: [string, 'null']
+        drug_name:
+          type: string
+        comparison_type:
+          $ref: '#/components/schemas/ComparisonType'
+        rule_id:
+          type: [string, 'null']
+          format: uuid
+        old_instruction:
+          type: [object, 'null']
+          additionalProperties: true
+        new_instruction:
+          type: [object, 'null']
+          additionalProperties: true
+        differences:
+          type: object
+          additionalProperties: true
+        user_decision:
+          oneOf:
+            - $ref: '#/components/schemas/ReconciliationDecision'
+            - type: 'null'
+        decision_note:
+          type: [string, 'null']
+
+    MedicationReconciliation:
+      type: object
+      required: [id, source_document_id, status, summary, items, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        source_document_id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/ReconciliationStatus'
+        summary:
+          type: object
+          additionalProperties: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReconciliationItem'
+        created_at:
+          type: string
+          format: date-time
+        confirmed_at:
+          type: [string, 'null']
+          format: date-time
+
+    ReconciliationItemDecision:
+      type: object
+      required: [item_id, user_decision]
+      properties:
+        item_id:
+          type: string
+          format: uuid
+        user_decision:
+          $ref: '#/components/schemas/ReconciliationDecision'
+        decision_note:
+          type: [string, 'null']
+          maxLength: 500
+        stop_date:
+          type: [string, 'null']
+          format: date
+        stop_source:
+          oneOf:
+            - $ref: '#/components/schemas/StopSource'
+            - type: 'null'
+
+    ReconciliationUpdate:
+      type: object
+      required: [status, items]
+      properties:
+        status:
+          type: string
+          enum: [confirmed, cancelled]
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ReconciliationItemDecision'
+
+    ConfirmationStatus:
+      type: string
+      enum: [draft, confirmed, cancelled]
+
+    PatientNoteInput:
+      type: object
+      required: [original_text, confirmation_status]
+      properties:
+        original_text:
+          type: string
+          maxLength: 5000
+        confirmed_text:
+          type: [string, 'null']
+          maxLength: 5000
+        confirmation_status:
+          $ref: '#/components/schemas/ConfirmationStatus'
+
+    PatientNote:
+      allOf:
+        - $ref: '#/components/schemas/PatientNoteInput'
+        - type: object
+          required: [id, created_at, updated_at]
+          properties:
+            id:
+              type: string
+              format: uuid
+            confirmed_at:
+              type: [string, 'null']
+              format: date-time
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+
+    ReportStatus:
+      type: string
+      enum: [generating, succeeded, failed]
+
+    ReportCreate:
+      type: object
+      properties:
+        patient_note_id:
+          type: [string, 'null']
+          format: uuid
+        include_sections:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [profile, patient_note, medications, labs, imaging, outpatient, cycles, weights]
+
+    ReportListItem:
+      type: object
+      required: [report_id, status, generated_at, snapshot_hash]
+      properties:
+        report_id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/ReportStatus'
+        generated_at:
+          type: string
+          format: date-time
+        snapshot_hash:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+        failure_reason:
+          type: [string, 'null']
+
+    ReportPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/ReportListItem'
+
+    AbnormalStatus:
+      type: string
+      enum: [low, normal, high, unknown]
+
+    Comparability:
+      type: string
+      enum: [comparable, caution, incomparable]
+
+    TrendPoint:
+      type: object
+      required: [source_id, raw_value, date, date_source, abnormal_status]
+      properties:
+        source_id:
+          type: string
+          format: uuid
+        value:
+          type: [number, 'null']
+        raw_value:
+          type: string
+        unit:
+          type: [string, 'null']
+        date:
+          type: string
+          format: date
+        date_source:
+          type: string
+          enum: [sample_date, report_date, encounter_date, measured_at, record_date]
+        abnormal_status:
+          $ref: '#/components/schemas/AbnormalStatus'
+        exclusion_reason:
+          type: [string, 'null']
+
+    ReportTrend:
+      type: object
+      required: [metric_id, metric_name, comparability, points]
+      properties:
+        metric_id:
+          type: string
+        metric_name:
+          type: string
+        unit:
+          type: [string, 'null']
+        comparability:
+          $ref: '#/components/schemas/Comparability'
+        comparability_reason:
+          type: [string, 'null']
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrendPoint'
+
+    ReportSource:
+      type: object
+      required: [source_number, source_type, source_id, date_source]
+      properties:
+        source_number:
+          type: integer
+          minimum: 1
+        source_type:
+          type: string
+          enum: [lab_observation, medical_order, imaging_report, outpatient_record, menstrual_cycle, weight_record, medication_daily, patient_note]
+        source_id:
+          type: string
+          format: uuid
+        document_id:
+          type: [string, 'null']
+          format: uuid
+        document_revision_id:
+          type: [string, 'null']
+          format: uuid
+        rule_execution_id:
+          type: [string, 'null']
+          format: uuid
+        original_value:
+          type: [string, 'null']
+        original_unit:
+          type: [string, 'null']
+        reference_range_text:
+          type: [string, 'null']
+        material_date:
+          type: [string, 'null']
+          format: date
+        date_source:
+          type: string
+        file_url:
+          type: [string, 'null']
+          format: uri-reference
+
+    ReportSummary:
+      type: object
+      required: [profile, current_medications, latest_observations, disclaimers]
+      properties:
+        profile:
+          type: object
+          additionalProperties: true
+        patient_note_text:
+          type: [string, 'null']
+        current_medications:
+          type: array
+          items:
+            $ref: '#/components/schemas/Medication'
+        latest_observations:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        cycle_summary:
+          type: [object, 'null']
+          additionalProperties: true
+        weight_summary:
+          type: [object, 'null']
+          additionalProperties: true
+        disclaimers:
+          type: array
+          items:
+            type: string
+
+    ReportDetail:
+      allOf:
+        - $ref: '#/components/schemas/ReportListItem'
+        - type: object
+          required: [summary, trends, sources, data_freshness]
+          properties:
+            summary:
+              $ref: '#/components/schemas/ReportSummary'
+            trends:
+              type: array
+              items:
+                $ref: '#/components/schemas/ReportTrend'
+            sources:
+              type: array
+              items:
+                $ref: '#/components/schemas/ReportSource'
+            data_freshness:
+              type: object
+              additionalProperties: true
+
+    PdfGenerationStatus:
+      type: string
+      enum: [pending, processing, succeeded, failed]
+
+    ReportPdf:
+      type: object
+      required: [report_id, generation_status]
+      properties:
+        report_id:
+          type: string
+          format: uuid
+        file_id:
+          type: [string, 'null']
+          format: uuid
+        generation_status:
+          $ref: '#/components/schemas/PdfGenerationStatus'
+        file_name:
+          type: [string, 'null']
+        mime_type:
+          type: [string, 'null']
+          enum: [application/pdf, null]
+        file_size_bytes:
+          type: [integer, 'null']
+        file_hash:
+          type: [string, 'null']
+        generated_at:
+          type: [string, 'null']
+          format: date-time
+        download_url:
+          type: [string, 'null']
+          format: uri-reference
+        download_expires_at:
+          type: [string, 'null']
+          format: date-time
+        failure_reason:
+          type: [string, 'null']
+
+    DeterministicRule:
+      type: object
+      required: [id, rule_key, rule_type, rule_name, parameters, priority, enabled, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        rule_key:
+          type: string
+        rule_type:
+          type: string
+          enum: [reference_range, date_source, freshness, unit_conversion, comparability, reconciliation]
+        rule_name:
+          type: string
+        parameters:
+          type: object
+          additionalProperties: true
+        priority:
+          type: integer
+        enabled:
+          type: boolean
+        updated_at:
+          type: string
+          format: date-time
+
+    DeterministicRuleUpdate:
+      type: object
+      required: [parameters, priority, enabled, updated_at]
+      properties:
+        parameters:
+          type: object
+          additionalProperties: true
+        priority:
+          type: integer
+        enabled:
+          type: boolean
+        updated_at:
+          type: string
+          format: date-time
+
+    RuleExecution:
+      type: object
+      required: [id, rule_id, source_type, source_id, input_digest, input, output, explanation, executed_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        rule_id:
+          type: string
+          format: uuid
+        source_type:
+          type: string
+        source_id:
+          type: string
+        input_digest:
+          type: string
+        input:
+          type: object
+          additionalProperties: true
+        output:
+          type: object
+          additionalProperties: true
+        explanation:
+          type: string
+        executed_at:
+          type: string
+          format: date-time

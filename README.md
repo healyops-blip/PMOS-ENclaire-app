@@ -59,4 +59,11 @@ flutter analyze --fatal-infos
 flutter test
 ```
 
+## Frontend/backend integration
+
+- Human-readable task and field guide:
+  [`docs/frontend-backend-integration.md`](docs/frontend-backend-integration.md)
+- Machine-readable API contract:
+  [`contracts/openapi/pomi-api-v1.yaml`](contracts/openapi/pomi-api-v1.yaml)
+
 See `THIRD_PARTY_NOTICES.md` for UI dependency licenses.
