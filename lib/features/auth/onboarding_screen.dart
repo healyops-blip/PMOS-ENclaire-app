@@ -371,8 +371,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     showFrame: false,
     padding: _onboardingContentPadding,
     children: [
-      const Text('最近经期', style: TextStyle(fontWeight: FontWeight.w700)),
-      const SizedBox(height: _onboardingLabelGap),
       _validationSlot(
         TextFormField(
           controller: _nickname,
@@ -504,6 +502,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     showFrame: false,
     padding: _onboardingContentPadding,
     children: [
+      const Text('最近经期', style: TextStyle(fontWeight: FontWeight.w700)),
+      const SizedBox(height: _onboardingLabelGap),
       _validationSlot(
         TextFormField(
           controller: _lastPeriod,
