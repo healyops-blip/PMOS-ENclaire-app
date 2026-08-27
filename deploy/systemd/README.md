@@ -1,6 +1,6 @@
 # systemd deployment
 
-- `pomi-api.service` starts one Uvicorn worker on loopback and restarts it after
+- `pomi-api.service` starts one Uvicorn worker on `127.0.0.1:8010` and restarts it after
   failures. One worker is intentional while authentication rate limits are kept
   in process memory.
 - `pomi-backup.service` creates a consistent SQLite backup.

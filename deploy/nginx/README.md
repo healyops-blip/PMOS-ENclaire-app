@@ -1,7 +1,8 @@
 # Nginx deployment
 
 `pomi-api.conf` terminates TLS for `api.healy1012-ops.top` and proxies only to
-FastAPI on `127.0.0.1:8000`. It also provides edge authentication throttling,
+FastAPI on `127.0.0.1:8010`. Port 8010 avoids the existing service on port 8000.
+It also provides edge authentication throttling,
 security headers, request-size limits, and bounded proxy timeouts.
 
 Install and validate:

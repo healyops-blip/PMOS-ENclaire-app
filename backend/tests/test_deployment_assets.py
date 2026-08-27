@@ -13,6 +13,7 @@ def read(relative_path: str) -> str:
 def test_systemd_service_is_loopback_only_and_hardened() -> None:
     service = read("deploy/systemd/pomi-api.service")
     assert "--host 127.0.0.1" in service
+    assert "--port 8010" in service
     assert "--workers 1" in service
     assert "--reload" not in service
     assert "--forwarded-allow-ips=127.0.0.1" in service
@@ -24,7 +25,7 @@ def test_systemd_service_is_loopback_only_and_hardened() -> None:
 
 def test_nginx_has_tls_limits_and_local_upstream() -> None:
     nginx = read("deploy/nginx/pomi-api.conf")
-    assert "server 127.0.0.1:8000" in nginx
+    assert "server 127.0.0.1:8010" in nginx
     assert "api.healy1012-ops.top" in nginx
     assert "ssl_certificate /etc/letsencrypt/" in nginx
     assert "ssl_protocols TLSv1.2 TLSv1.3" in nginx

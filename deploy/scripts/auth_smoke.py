@@ -41,17 +41,19 @@ def request(
         status = error.code
         content = error.read()
     if status != expected_status:
-        raise RuntimeError(f"{method} {path}: expected {expected_status}, received {status}")
+        raise RuntimeError(
+            f"{method} {path}: expected {expected_status}, received {status}"
+        )
     return json.loads(content) if content else None
 
 
 def main() -> int:
-    first_time_password = os.getenv("POMI_FIRST_TIME_ACCOUNT_PASSWORD") or getpass.getpass(
-        "First-time account password: "
-    )
-    returning_password = os.getenv("POMI_RETURNING_ACCOUNT_PASSWORD") or getpass.getpass(
-        "Returning account password: "
-    )
+    first_time_password = os.getenv(
+        "POMI_FIRST_TIME_ACCOUNT_PASSWORD"
+    ) or getpass.getpass("First-time account password: ")
+    returning_password = os.getenv(
+        "POMI_RETURNING_ACCOUNT_PASSWORD"
+    ) or getpass.getpass("Returning account password: ")
     account_name = f"smoke-{int(time.time())}-{secrets.token_hex(3)}"
     password = f"Smoke{secrets.token_urlsafe(18)}7"
     reset_password = f"Reset{secrets.token_urlsafe(18)}7"
@@ -105,8 +107,12 @@ def main() -> int:
     )
     assert reset_login is not None
     reset_session_id = str(reset_login["session_id"])
-    request("POST", "/api/auth/logout", session_id=reset_session_id, expected_status=204)
-    request("POST", "/api/auth/logout", session_id=reset_session_id, expected_status=204)
+    request(
+        "POST", "/api/auth/logout", session_id=reset_session_id, expected_status=204
+    )
+    request(
+        "POST", "/api/auth/logout", session_id=reset_session_id, expected_status=204
+    )
     request("GET", "/api/auth/me", session_id=reset_session_id, expected_status=401)
 
     initial_accounts = (
@@ -130,13 +136,17 @@ def main() -> int:
         )
         assert initial_login is not None
         account = initial_login["account"]
-        if not isinstance(account, dict) or account.get(
-            "onboarding_completed"
-        ) is not expected_onboarding:
+        if (
+            not isinstance(account, dict)
+            or account.get("onboarding_completed") is not expected_onboarding
+        ):
             raise RuntimeError(f"unexpected onboarding state for {initial_name}")
         initial_session_id = str(initial_login["session_id"])
         request(
-            "POST", "/api/auth/logout", session_id=initial_session_id, expected_status=204
+            "POST",
+            "/api/auth/logout",
+            session_id=initial_session_id,
+            expected_status=204,
         )
 
     print(f"Authentication smoke test passed for temporary account {account_name}")

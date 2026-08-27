@@ -9,7 +9,7 @@ User=pomi
 Group=pomi
 WorkingDirectory=/opt/pomi/current/backend
 EnvironmentFile=/etc/pomi/pomi.env
-ExecStart=/opt/pomi/current/backend/.venv/bin/uvicorn pomi_backend.main:app --host 127.0.0.1 --port 8000 --workers 1 --proxy-headers --forwarded-allow-ips=127.0.0.1
+ExecStart=/opt/pomi/current/backend/.venv/bin/uvicorn pomi_backend.main:app --host 127.0.0.1 --port 8010 --workers 1 --proxy-headers --forwarded-allow-ips=127.0.0.1
 Restart=on-failure
 RestartSec=5s
 TimeoutStopSec=30s
