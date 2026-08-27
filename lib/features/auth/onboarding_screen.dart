@@ -469,7 +469,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         ),
       ),
       const SizedBox(height: 18),
-      const Text('通常周期长度', style: TextStyle(fontWeight: FontWeight.w700)),
+      const Text('月经周期', style: TextStyle(fontWeight: FontWeight.w700)),
       const SizedBox(height: 10),
       Wrap(
         spacing: 8,
@@ -480,6 +480,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   (value) => ChoiceChip(
                     label: Text(value),
                     selected: _cycleRange == value,
+                    showCheckmark: false,
+                    backgroundColor: Colors.white,
+                    selectedColor: pomiLavender,
+                    shape: const StadiumBorder(),
+                    side: const BorderSide(color: pomiLine),
                     onSelected: (_) => setState(() => _cycleRange = value),
                   ),
                 )
