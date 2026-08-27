@@ -7,6 +7,7 @@ __pycache__/
 
 # Generated outputs
 /result/
+.ssh/
 
 # Logs and temp
 *.log
