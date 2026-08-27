@@ -12,8 +12,11 @@ from pomi_backend.db.models.health import (
 )
 from pomi_backend.db.models.labs import LabObservation
 from pomi_backend.db.models.ocr import OCRFieldResult, OCRResult, OCRTask
+from pomi_backend.db.models.reports import PatientNote, ReportSnapshot, ReportSource
 
 __all__ = [
+    "Document",
+    "DocumentRevision",
     "Medication",
     "LabObservation",
     "MedicationDaily",
@@ -22,9 +25,10 @@ __all__ = [
     "OCRFieldResult",
     "OCRResult",
     "OCRTask",
+    "PatientNote",
     "PatientProfile",
-    "Document",
-    "DocumentRevision",
+    "ReportSnapshot",
+    "ReportSource",
     "UserAccount",
     "UserSession",
     "WeightRecord",

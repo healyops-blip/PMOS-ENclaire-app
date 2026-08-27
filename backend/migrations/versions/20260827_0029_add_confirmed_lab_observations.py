@@ -1,7 +1,7 @@
 """add confirmed lab observations
 
-Revision ID: 20260827_0022
-Revises: 20260827_0021
+Revision ID: 20260827_0029
+Revises: 20260827_0028
 Create Date: 2026-08-27 21:15:00.322585
 """
 
@@ -12,8 +12,8 @@ from alembic import op
 
 import pomi_backend.db.types
 
-revision: str = "20260827_0022"
-down_revision: str | None = "20260827_0021"
+revision: str = "20260827_0029"
+down_revision: str | None = "20260827_0028"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

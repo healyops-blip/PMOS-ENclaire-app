@@ -113,12 +113,12 @@ class _OcrTaskPageState extends State<OcrTaskPage> with WidgetsBindingObserver {
       final task = await widget.repository.retry(_task!.id);
       if (!mounted) return;
       setState(() => _task = task);
-      _schedule();
     } on Object catch (error) {
       if (mounted) setState(() => _requestError = error);
     } finally {
       if (mounted) setState(() => _requesting = false);
     }
+    if (mounted) _schedule();
   }
 
   void _openConfirmation() {

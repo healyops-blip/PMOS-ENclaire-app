@@ -12,6 +12,11 @@ from pomi_backend.repositories.health import (
 )
 from pomi_backend.repositories.labs import LabObservationRepository
 from pomi_backend.repositories.ocr import OCRRepository
+from pomi_backend.repositories.reports import (
+    PatientNoteRepository,
+    ReportSnapshotRepository,
+    ReportSourceRepository,
+)
 
 __all__ = [
     "AuthRepository",
@@ -23,5 +28,8 @@ __all__ = [
     "MenstrualCycleRepository",
     "OCRRepository",
     "PatientRepository",
+    "PatientNoteRepository",
+    "ReportSnapshotRepository",
+    "ReportSourceRepository",
     "WeightRepository",
 ]

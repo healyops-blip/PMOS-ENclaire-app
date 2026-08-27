@@ -395,6 +395,10 @@ class OCRTaskService:
         original = self.owned(task_id)
         if original.status not in {"failed", "timed_out"}:
             raise BusinessError("OCR_TASK_NOT_RETRYABLE", "OCR task cannot be retried.", 409)
+        document = self.documents.get(original.document_id)
+        revision = self.documents.revision(original.document_id, original.document_revision_id)
+        if document is None or revision is None:
+            raise BusinessError("RESOURCE_NOT_FOUND", "OCR source revision was not found.", 404)
         existing = self.repository.retry_for(original.id)
         if existing is not None:
             return existing, False

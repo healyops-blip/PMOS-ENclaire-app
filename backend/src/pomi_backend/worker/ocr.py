@@ -8,11 +8,11 @@ import logging
 import socket
 import time
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from jsonschema import ValidationError, validate
+from jsonschema import FormatChecker, ValidationError, validate
 from sqlalchemy.orm import Session, sessionmaker
 
 from pomi_backend.config import Settings
@@ -82,6 +82,7 @@ class OCRWorker:
                 or revision is None
                 or revision.document_id != task.document_id
                 or document.patient_id != task.patient_id
+                or document.deleted_at is not None
             ):
                 self._finish_error(
                     session,
@@ -104,6 +105,7 @@ class OCRWorker:
                 return
             task.provider_attempts += 1
             task.provider_call_started_at = utc_now()
+            provider_call_started_at = task.provider_call_started_at
             task.attempt_history = [
                 *task.attempt_history,
                 {
@@ -124,13 +126,19 @@ class OCRWorker:
             )
             try:
                 response = self.provider.recognize(request)
-                validate(instance=response.payload, schema=schema_for(task.material_type))
+                validate(
+                    instance=response.payload,
+                    schema=schema_for(task.material_type),
+                    format_checker=FormatChecker(),
+                )
                 cleaned = _clean(response.payload)
                 fields = cleaned["fields"]
-                paths = [field["path"] for field in fields]
-                if len(paths) != len(set(paths)):
-                    raise ValidationError("field paths must be unique")
+                _validate_field_evidence(cleaned["draft"], fields)
             except OCRProviderError as error:
+                if not self._guard_provider_completion(
+                    session, repository, task, provider_call_started_at
+                ):
+                    return
                 self._handle_error(
                     session,
                     task,
@@ -141,6 +149,10 @@ class OCRWorker:
                 )
                 return
             except ValidationError:
+                if not self._guard_provider_completion(
+                    session, repository, task, provider_call_started_at
+                ):
+                    return
                 self._handle_error(
                     session,
                     task,
@@ -151,6 +163,10 @@ class OCRWorker:
                 )
                 return
             except (OSError, ValueError):
+                if not self._guard_provider_completion(
+                    session, repository, task, provider_call_started_at
+                ):
+                    return
                 self._finish_error(
                     session,
                     task,
@@ -158,6 +174,10 @@ class OCRWorker:
                     code="OCR_FILE_INVALID",
                     message="The document file could not be processed.",
                 )
+                return
+            if not self._guard_provider_completion(
+                session, repository, task, provider_call_started_at
+            ):
                 return
             result = OCRResult(
                 id=new_uuid(),
@@ -197,6 +217,28 @@ class OCRWorker:
             task.updated_at = now
             session.commit()
             self._log(task, "pending_confirmation")
+
+    def _guard_provider_completion(
+        self,
+        session: Session,
+        repository: OCRRepository,
+        task: OCRTask,
+        provider_call_started_at: datetime,
+    ) -> bool:
+        if repository.guard_completion(
+            task_id=task.id,
+            worker_id=self.worker_id,
+            provider_call_started_at=provider_call_started_at,
+            now=utc_now(),
+        ):
+            return True
+        session.rollback()
+        logger.warning(
+            "request_id=%s task_id=%s status=discarded_stale_provider_response",
+            task.id,
+            task.id,
+        )
+        return False
 
     def _handle_error(
         self,
@@ -318,8 +360,71 @@ def _clean(value: Any) -> Any:
     return value
 
 
+def _validate_field_evidence(draft: dict[str, Any], fields: list[dict[str, Any]]) -> None:
+    paths: set[tuple[str, ...]] = set()
+    for field in fields:
+        try:
+            parts = _draft_path_parts(field["path"])
+            if parts in paths:
+                raise ValidationError("field paths must be unique")
+            paths.add(parts)
+            resolved = _resolve_draft_path(draft, parts)
+        except (KeyError, IndexError, TypeError, ValueError) as exc:
+            raise ValidationError("field path does not exist in draft") from exc
+        if resolved != field.get("value"):
+            raise ValidationError("field evidence value does not match draft")
+    if paths != _draft_leaf_paths(draft):
+        raise ValidationError("field evidence must cover every draft leaf")
+
+
+def _draft_path_parts(path: str) -> tuple[str, ...]:
+    normalized = path.strip()
+    if normalized.startswith("$"):
+        normalized = normalized[1:]
+    normalized = normalized.lstrip(".")
+    if not normalized:
+        raise ValueError("empty draft path")
+    normalized = normalized.replace("[", ".").replace("]", "")
+    parts = normalized.split(".")
+    if any(not part for part in parts):
+        raise ValueError("invalid draft path")
+    return tuple(parts)
+
+
+def _resolve_draft_path(draft: dict[str, Any], parts: tuple[str, ...]) -> Any:
+    current: Any = draft
+    for part in parts:
+        if isinstance(current, dict):
+            current = current[part]
+        elif isinstance(current, list):
+            current = current[int(part)]
+        else:
+            raise TypeError("path continues beyond a leaf")
+    return current
+
+
+def _draft_leaf_paths(value: Any, prefix: tuple[str, ...] = ()) -> set[tuple[str, ...]]:
+    if isinstance(value, dict):
+        return {
+            path
+            for key, child in value.items()
+            for path in _draft_leaf_paths(child, (*prefix, key))
+        }
+    if isinstance(value, list):
+        return {
+            path
+            for index, child in enumerate(value)
+            for path in _draft_leaf_paths(child, (*prefix, str(index)))
+        }
+    return {prefix}
+
+
 def build_worker(settings: Settings | None = None) -> OCRWorker:
     active = settings or Settings.from_env()
+    if active.ocr_lease_seconds < active.ocr_request_timeout_seconds + 30:
+        raise ValueError("POMI_OCR_LEASE_SECONDS must be at least timeout + 30 seconds")
+    if not active.ocr_api_key:
+        raise ValueError("POMI_OCR_API_KEY is required to start the OCR worker")
     engine = build_engine(active.database_url)
     provider = Qwen3VLOCRProvider(
         api_base_url=active.ocr_api_base_url,

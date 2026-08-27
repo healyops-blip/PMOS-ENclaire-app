@@ -275,6 +275,7 @@ class _UploadProgressDialog extends StatefulWidget {
 }
 
 class _UploadProgressDialogState extends State<_UploadProgressDialog> {
+  late final String _idempotencyKey = newDocumentIdempotencyKey();
   double _progress = 0;
   String? _error;
   bool _busy = true;
@@ -296,6 +297,7 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
         file: widget.file,
         documentType: widget.type.apiValue,
         consentVersion: documentProcessingNoticeVersion,
+        idempotencyKey: _idempotencyKey,
         onProgress: (sent, total) {
           if (mounted && total > 0) setState(() => _progress = sent / total);
         },
