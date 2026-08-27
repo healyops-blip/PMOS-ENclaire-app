@@ -7,6 +7,8 @@ import 'package:pmos_enclaire/features/auth/data/session_store.dart';
 import 'package:pmos_enclaire/features/auth/domain/demo_account.dart';
 import 'package:pmos_enclaire/features/auth/presentation/login_page.dart';
 import 'package:pmos_enclaire/features/dashboard/presentation/dashboard_page.dart';
+import 'package:pmos_enclaire/features/dashboard/data/dashboard_cache_store.dart';
+import 'package:pmos_enclaire/features/dashboard/data/dashboard_repository.dart';
 import 'package:pmos_enclaire/features/onboarding/presentation/onboarding_page.dart';
 import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
 import 'package:pmos_enclaire/features/weight/data/weight_repository.dart';
@@ -21,12 +23,14 @@ class PomiApp extends StatefulWidget {
   const PomiApp({
     this.authRepository,
     this.profileRepository,
+    this.dashboardRepository,
     this.weightRepository,
     super.key,
   });
 
   final AuthRepository? authRepository;
   final PatientProfileRepository? profileRepository;
+  final DashboardRepository? dashboardRepository;
   final WeightRepository? weightRepository;
 
   @override
@@ -37,12 +41,39 @@ class _PomiAppState extends State<PomiApp> {
   late final PomiApiClient _apiClient = PomiApiClient();
   late final AuthRepository _authRepository =
       widget.authRepository ??
-      FastApiAuthRepository(_apiClient, SecureSessionStore());
+      FastApiAuthRepository(
+        _apiClient,
+        SecureSessionStore(),
+        onLogout: _clearActiveDashboardCache,
+      );
   late final PatientProfileRepository _profileRepository =
       widget.profileRepository ??
       (widget.authRepository is DemoAuthRepository
           ? DemoPatientProfileRepository()
           : FastApiPatientProfileRepository(_apiClient));
+  late final DashboardRepository _dashboardRepository =
+      widget.dashboardRepository ??
+      (widget.authRepository is DemoAuthRepository
+          ? const DemoDashboardRepository()
+          : FastApiDashboardRepository(
+              _apiClient,
+              SecureDashboardCacheStore(),
+            ));
+  String? _activeUid;
+
+  Future<void> _clearActiveDashboardCache() async {
+    final uid = _activeUid;
+    if (uid != null) await _dashboardRepository.clear(uid);
+    _activeUid = null;
+  }
+
+  Future<void> _activateUid(String uid) async {
+    final previous = _activeUid;
+    if (previous != null && previous != uid) {
+      await _dashboardRepository.clear(previous);
+    }
+    _activeUid = uid;
+  }
 
   late final GoRouter _router = GoRouter(
     initialLocation: PomiRoutes.login,
@@ -63,6 +94,8 @@ class _PomiAppState extends State<PomiApp> {
                   );
             if (!context.mounted) return;
             final account = session.account.toPresentationAccount();
+            await _activateUid(account.uid);
+            if (!context.mounted) return;
             final route = account.onboardingRequired
                 ? PomiRoutes.onboarding
                 : PomiRoutes.dashboard;
@@ -97,6 +130,11 @@ class _PomiAppState extends State<PomiApp> {
           return DashboardPage(
             account: account,
             profileRepository: _profileRepository,
+            dashboardRepository: _dashboardRepository,
+            onLogout: () async {
+              await _authRepository.logout();
+              if (context.mounted) context.go(PomiRoutes.login);
+            },
             weightRepository: widget.weightRepository,
           );
         },
@@ -115,6 +153,8 @@ class _PomiAppState extends State<PomiApp> {
       final account = await _authRepository.restore();
       if (!mounted || account == null) return;
       final presentation = account.toPresentationAccount();
+      await _activateUid(presentation.uid);
+      if (!mounted) return;
       _router.go(
         presentation.onboardingRequired
             ? PomiRoutes.onboarding

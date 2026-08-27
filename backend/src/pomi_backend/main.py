@@ -14,6 +14,7 @@ from pomi_backend.api.auth import router as auth_router
 from pomi_backend.api.business import BusinessError
 from pomi_backend.api.cycles import cycle_error_handler
 from pomi_backend.api.cycles import router as cycles_router
+from pomi_backend.api.dashboard import router as dashboard_router
 from pomi_backend.api.errors import (
     auth_error_handler,
     business_error_handler,
@@ -71,6 +72,7 @@ def create_app(*, settings: Settings | None = None, engine: Engine | None = None
     app.add_exception_handler(BusinessError, business_error_handler)
     app.include_router(auth_router)
     app.include_router(cycles_router)
+    app.include_router(dashboard_router)
     app.include_router(health_router)
     app.include_router(medications_router)
     app.include_router(patient_router)

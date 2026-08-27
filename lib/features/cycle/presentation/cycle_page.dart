@@ -12,10 +12,16 @@ import 'package:pmos_enclaire/features/weight/domain/weight_record.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 class CyclePage extends StatefulWidget {
-  const CyclePage({this.weightController, this.repository, super.key});
+  const CyclePage({
+    this.weightController,
+    this.repository,
+    this.writesEnabled = true,
+    super.key,
+  });
 
   final WeightController? weightController;
   final CycleRepository? repository;
+  final bool writesEnabled;
 
   @override
   State<CyclePage> createState() => _CyclePageState();
@@ -32,7 +38,7 @@ class _WeightSection extends StatelessWidget {
   final WeightController controller;
   final DateTime selectedDate;
   final WeightRecord? existing;
-  final VoidCallback onRecord;
+  final VoidCallback? onRecord;
 
   @override
   Widget build(BuildContext context) {
@@ -350,7 +356,9 @@ class _CyclePageState extends State<CyclePage> {
               subtitle: '记录真实发生的经期，回顾周期变化',
               trailing: FilledButton.icon(
                 key: const Key('add-cycle-button'),
-                onPressed: _saving ? null : () => _openEditor(),
+                onPressed: _saving || !widget.writesEnabled
+                    ? null
+                    : () => _openEditor(),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size(0, 40),
                   padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -371,7 +379,7 @@ class _CyclePageState extends State<CyclePage> {
                     controller: _weightController,
                     selectedDate: _selectedDay,
                     existing: _weightFor(_selectedDay),
-                    onRecord: _recordWeight,
+                    onRecord: widget.writesEnabled ? _recordWeight : null,
                   ),
                 ],
               ),
@@ -431,7 +439,7 @@ class _CyclePageState extends State<CyclePage> {
             ),
             FilledButton.icon(
               key: const Key('empty-add-cycle-button'),
-              onPressed: () => _openEditor(),
+              onPressed: widget.writesEnabled ? () => _openEditor() : null,
               icon: const Icon(Icons.add_rounded),
               label: const Text('添加第一条记录'),
             ),
@@ -466,7 +474,9 @@ class _CyclePageState extends State<CyclePage> {
                 ),
                 TextButton(
                   key: const Key('complete-cycle-button'),
-                  onPressed: () => _openEditor(ongoing),
+                  onPressed: widget.writesEnabled
+                      ? () => _openEditor(ongoing)
+                      : null,
                   child: const Text('补录'),
                 ),
               ],
@@ -618,13 +628,17 @@ class _CyclePageState extends State<CyclePage> {
           IconButton(
             key: Key('edit-cycle-${cycle.id}'),
             tooltip: '编辑',
-            onPressed: _saving ? null : () => _openEditor(cycle),
+            onPressed: _saving || !widget.writesEnabled
+                ? null
+                : () => _openEditor(cycle),
             icon: const Icon(Icons.edit_outlined),
           ),
           IconButton(
             key: Key('delete-cycle-${cycle.id}'),
             tooltip: '删除',
-            onPressed: _saving ? null : () => _delete(cycle),
+            onPressed: _saving || !widget.writesEnabled
+                ? null
+                : () => _delete(cycle),
             icon: const Icon(Icons.delete_outline_rounded),
           ),
         ],

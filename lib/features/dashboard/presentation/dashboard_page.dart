@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:pmos_enclaire/core/theme/pomi_theme.dart';
 import 'package:pmos_enclaire/core/widgets/demo_badge.dart';
 import 'package:pmos_enclaire/core/widgets/frosted_panel.dart';
+import 'package:pmos_enclaire/core/widgets/pomi_surfaces.dart';
 import 'package:pmos_enclaire/features/auth/domain/demo_account.dart';
 import 'package:pmos_enclaire/features/cycle/presentation/cycle_page.dart';
 import 'package:pmos_enclaire/features/dashboard/domain/medication.dart';
+import 'package:pmos_enclaire/features/dashboard/application/dashboard_controller.dart';
+import 'package:pmos_enclaire/features/dashboard/data/dashboard_repository.dart';
+import 'package:pmos_enclaire/features/dashboard/domain/dashboard_snapshot.dart';
 import 'package:pmos_enclaire/features/medications/application/medication_status_controller.dart';
 import 'package:pmos_enclaire/features/medications/data/medication_repository.dart';
 import 'package:pmos_enclaire/features/medications/presentation/medication_page.dart';
@@ -21,6 +25,8 @@ class DashboardPage extends StatefulWidget {
     required this.account,
     this.profileRepository,
     this.medicationRepository,
+    this.dashboardRepository,
+    this.onLogout,
     this.weightRepository,
     super.key,
   });
@@ -28,6 +34,8 @@ class DashboardPage extends StatefulWidget {
   final DemoAccount account;
   final PatientProfileRepository? profileRepository;
   final MedicationRepository? medicationRepository;
+  final DashboardRepository? dashboardRepository;
+  final Future<void> Function()? onLogout;
   final WeightRepository? weightRepository;
 
   @override
@@ -37,6 +45,7 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   int _selectedTab = 0;
   late final WeightController _weightController;
+  late final DashboardController _dashboardController;
   late List<Medication> _medications = const [
     Medication(
       id: 'demo-metformin',
@@ -72,6 +81,11 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void initState() {
     super.initState();
+    _dashboardController = DashboardController(
+      repository: widget.dashboardRepository ?? const DemoDashboardRepository(),
+      uid: widget.account.uid,
+    )..addListener(_syncDashboard);
+    _dashboardController.load();
     _weightController = WeightController(
       widget.weightRepository ?? MemoryWeightRepository.seeded(),
     )..addListener(_onWeightChanged);
@@ -89,11 +103,27 @@ class _DashboardPageState extends State<DashboardPage> {
     setState(() => _medications = _medicationStatusController.medications);
   }
 
+  void _syncDashboard() {
+    if (!mounted) return;
+    final remote = _dashboardController.snapshot?.todayMedications;
+    setState(() {
+      if (remote?.status != DashboardSectionStatus.error &&
+          remote?.data != null) {
+        _medications = remote!.data!;
+      }
+    });
+  }
+
   void _onWeightChanged() {
     if (mounted) setState(() {});
   }
 
   Future<void> _setMedicationStatus(int index, MedicationStatus status) async {
+    if (_dashboardController.offline) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('离线状态仅支持查看，联网后才能修改用药')));
+      return;
+    }
     try {
       await _medicationStatusController.setStatus(index, status);
     } catch (error) {
@@ -145,6 +175,9 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   void dispose() {
+    _dashboardController
+      ..removeListener(_syncDashboard)
+      ..dispose();
     _weightController
       ..removeListener(_onWeightChanged)
       ..dispose();
@@ -167,29 +200,42 @@ class _DashboardPageState extends State<DashboardPage> {
             _DashboardBody(
               account: widget.account,
               medications: _medications,
+              controller: _dashboardController,
               weightController: _weightController,
               onStatusTap: _toggleTaken,
               onStatusLongPress: _showStatusActions,
-              onMedicationManage: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => MedicationPage(
-                    initialMedications: _medications,
-                    repository: _medicationRepository,
+              onMedicationManage: () {
+                if (_dashboardController.offline) {
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text('离线状态不能修改用药')));
+                  return;
+                }
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => MedicationPage(
+                      initialMedications: _medications,
+                      repository: _medicationRepository,
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
               onReport: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (_) => const ReportGeneratorPage(),
                 ),
               ),
             ),
-            CyclePage(weightController: _weightController),
+            CyclePage(
+              weightController: _weightController,
+              writesEnabled: !_dashboardController.offline,
+            ),
             const RecordsPage(),
             ProfilePage(
               account: widget.account,
               repository:
                   widget.profileRepository ?? DemoPatientProfileRepository(),
+              onLogout: widget.onLogout,
             ),
           ],
         ),
@@ -215,6 +261,7 @@ class _DashboardBody extends StatelessWidget {
   const _DashboardBody({
     required this.account,
     required this.medications,
+    required this.controller,
     required this.weightController,
     required this.onStatusTap,
     required this.onStatusLongPress,
@@ -224,6 +271,7 @@ class _DashboardBody extends StatelessWidget {
 
   final DemoAccount account;
   final List<Medication> medications;
+  final DashboardController controller;
   final WeightController weightController;
   final ValueChanged<int> onStatusTap;
   final ValueChanged<int> onStatusLongPress;
@@ -232,55 +280,197 @@ class _DashboardBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomScrollView(
-      slivers: [
-        SliverToBoxAdapter(child: _Hero(account: account)),
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 18, 16, 126),
-          sliver: SliverList.list(
-            children: [
-              _SectionHeader(
-                title: '今日用药',
-                action: '用药管理 ›',
-                onTap: onMedicationManage,
-              ),
-              const SizedBox(height: 8),
-              _PomiCard(
-                child: Column(
-                  children: [
-                    for (var index = 0; index < medications.length; index++)
-                      _MedicationRow(
-                        medication: medications[index],
-                        index: index,
-                        last: index == medications.length - 1,
-                        onTap: () => onStatusTap(index),
-                        onLongPress: () => onStatusLongPress(index),
+    final snapshot = controller.snapshot;
+    return RefreshIndicator(
+      onRefresh: controller.load,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverToBoxAdapter(child: _Hero(account: account)),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 18, 16, 126),
+            sliver: SliverList.list(
+              children: [
+                if (controller.offline)
+                  _DashboardNotice(
+                    key: const Key('dashboard-offline-banner'),
+                    icon: Icons.cloud_off_rounded,
+                    message:
+                        '离线数据，更新于 ${controller.updatedAt?.toLocal().toString().substring(0, 16) ?? '--'}',
+                  ),
+                if (controller.error != null && snapshot == null)
+                  _DashboardNotice(
+                    key: const Key('dashboard-load-error'),
+                    icon: Icons.error_outline_rounded,
+                    message: '首页加载失败，请重试',
+                    onRetry: controller.load,
+                  ),
+                if (snapshot != null)
+                  for (final entry in <String, DashboardSection<Object?>>{
+                    '复诊安排': snapshot.followUp,
+                    '今日用药': snapshot.todayMedications,
+                    '本月统计': snapshot.monthSummary,
+                    '复诊报告': snapshot.latestReport,
+                  }.entries)
+                    if (entry.value.status == DashboardSectionStatus.error)
+                      _DashboardNotice(
+                        key: Key('dashboard-section-error-${entry.key}'),
+                        icon: Icons.sync_problem_rounded,
+                        message: '${entry.key}暂时不可用',
+                        onRetry: controller.load,
                       ),
-                  ],
+                _FollowUpPanel(section: snapshot?.followUp),
+                _SectionHeader(
+                  title: '今日用药',
+                  action: '用药管理 ›',
+                  onTap: onMedicationManage,
                 ),
-              ),
-              const SizedBox(height: 20),
-              const _SectionHeader(
-                title: '本月用药统计',
-                trailing: DemoBadge(label: '三状态统计'),
-              ),
-              const SizedBox(height: 8),
-              _PomiCard(child: _MedicationSummary(medications: medications)),
-              const SizedBox(height: 16),
-              _ReportCallToAction(onTap: onReport),
-              const SizedBox(height: 20),
-              const _SectionHeader(title: '最新体重'),
-              const SizedBox(height: 8),
-              _DashboardWeightSummary(controller: weightController),
-              const SizedBox(height: 12),
-              const Text(
-                '患者自述 · 仅供参考 · 不构成诊断 · 不进入正式病历 · 模拟数据',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Color(0xFF8B7B6B), fontSize: 9),
-              ),
-            ],
+                const SizedBox(height: 8),
+                if (medications.isEmpty)
+                  const _PomiCard(
+                    child: PomiEmptyState(
+                      icon: Icons.medication_outlined,
+                      title: '今天没有待记录用药',
+                      description: '已暂停、停用或尚未开始的用药不会显示在这里。',
+                    ),
+                  )
+                else
+                  _PomiCard(
+                    child: Column(
+                      children: [
+                        for (var index = 0; index < medications.length; index++)
+                          _MedicationRow(
+                            medication: medications[index],
+                            index: index,
+                            last: index == medications.length - 1,
+                            onTap: () => onStatusTap(index),
+                            onLongPress: () => onStatusLongPress(index),
+                          ),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 20),
+                const _SectionHeader(
+                  title: '本月用药统计',
+                  trailing: DemoBadge(label: '三状态统计'),
+                ),
+                const SizedBox(height: 8),
+                _PomiCard(
+                  child: _MedicationSummary(
+                    medications: medications,
+                    summary: snapshot?.monthSummary.data,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                if (snapshot?.latestReport.status != DashboardSectionStatus.ok)
+                  const _DashboardNotice(
+                    key: Key('dashboard-report-empty'),
+                    icon: Icons.description_outlined,
+                    message: '暂无复诊报告 · 准备复诊材料',
+                  )
+                else
+                  const SizedBox.shrink(),
+                _ReportCallToAction(onTap: onReport),
+                const SizedBox(height: 20),
+                const _SectionHeader(title: '最新体重'),
+                const SizedBox(height: 8),
+                _DashboardWeightSummary(controller: weightController),
+                const SizedBox(height: 12),
+                const Text(
+                  '患者自述 · 仅供参考 · 不构成诊断 · 不进入正式病历 · 模拟数据',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Color(0xFF8B7B6B), fontSize: 9),
+                ),
+              ],
+            ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DashboardNotice extends StatelessWidget {
+  const _DashboardNotice({
+    required this.icon,
+    required this.message,
+    this.onRetry,
+    super.key,
+  });
+
+  final IconData icon;
+  final String message;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: _PomiCard(
+        child: Row(
+          children: [
+            Icon(icon, color: PomiColors.primary),
+            const SizedBox(width: 10),
+            Expanded(child: Text(message)),
+            if (onRetry != null)
+              TextButton(onPressed: onRetry, child: const Text('重试')),
+          ],
         ),
+      ),
+    );
+  }
+}
+
+class _FollowUpPanel extends StatelessWidget {
+  const _FollowUpPanel({required this.section});
+
+  final DashboardSection<FollowUpSummary>? section;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = section?.data;
+    final title = switch (value?.state) {
+      'due' => '今天是复诊日',
+      'overdue' => '复诊日期已到',
+      'upcoming' => '距下次复诊 ${value!.daysRemaining} 天',
+      _ => '尚未设置复诊日期',
+    };
+    final subtitle = value == null
+        ? '可在个人资料中设置复诊安排'
+        : '${value.nextVisitDate.year}-${value.nextVisitDate.month.toString().padLeft(2, '0')}-${value.nextVisitDate.day.toString().padLeft(2, '0')}';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: _PomiCard(
+        child: ListTile(
+          key: const Key('dashboard-follow-up'),
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(
+            Icons.event_available_outlined,
+            color: PomiColors.primary,
+          ),
+          title: Text(title),
+          subtitle: Text(subtitle),
+        ),
+      ),
+    );
+  }
+}
+
+class _SummaryCount extends StatelessWidget {
+  const _SummaryCount({required this.label, required this.value});
+
+  final String label;
+  final int value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          '$value',
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+        ),
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
       ],
     );
   }
@@ -640,9 +830,10 @@ class _StatusPill extends StatelessWidget {
 }
 
 class _MedicationSummary extends StatelessWidget {
-  const _MedicationSummary({required this.medications});
+  const _MedicationSummary({required this.medications, this.summary});
 
   final List<Medication> medications;
+  final MedicationMonthSummary? summary;
 
   @override
   Widget build(BuildContext context) {
@@ -650,6 +841,18 @@ class _MedicationSummary extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         children: [
+          if (summary != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _SummaryCount(label: '已服用', value: summary!.taken),
+                  _SummaryCount(label: '主动漏服', value: summary!.missed),
+                  _SummaryCount(label: '未记录', value: summary!.unrecorded),
+                ],
+              ),
+            ),
           for (final medication in medications)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 7),

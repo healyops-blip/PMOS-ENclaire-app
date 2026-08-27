@@ -187,14 +187,7 @@ paths:
     get:
       tags: [Dashboard]
       operationId: getDashboard
-      summary: Get the patient dashboard aggregate
-      parameters:
-        - name: date
-          in: query
-          schema:
-            type: string
-            format: date
-          description: Defaults to the server's current date.
+      summary: Get the fault-isolated patient dashboard aggregate
       responses:
         '200':
           description: Dashboard aggregate
@@ -1985,81 +1978,37 @@ components:
 
     Dashboard:
       type: object
-      required: [server_date, data_as_of, profile_summary, today_medications, month_medication_stats]
+      required: [business_date, follow_up, today_medications, monthly_medication_summary, latest_report]
       properties:
-        server_date:
+        business_date:
           type: string
           format: date
-        data_as_of:
+        follow_up:
+          $ref: '#/components/schemas/DashboardSection'
+        today_medications:
+          $ref: '#/components/schemas/DashboardSection'
+        monthly_medication_summary:
+          $ref: '#/components/schemas/DashboardSection'
+        latest_report:
+          $ref: '#/components/schemas/DashboardSection'
+
+    DashboardSection:
+      type: object
+      required: [status, data, error]
+      properties:
+        status:
           type: string
-          format: date-time
-        profile_summary:
-          type: object
-          required: [patient_id]
-          properties:
-            patient_id:
-              type: string
-              format: uuid
-            nickname:
-              type: [string, 'null']
-            primary_condition:
-              type: [string, 'null']
-        next_visit:
+          enum: [ok, empty, error]
+        data: {}
+        error:
           type: [object, 'null']
           properties:
-            date:
+            code:
               type: string
-              format: date
-            days_remaining:
-              type: integer
-        today_medications:
-          type: array
-          items:
-            type: object
-            required: [medication_id, drug_name, intake_status]
-            properties:
-              medication_id:
-                type: string
-                format: uuid
-              drug_name:
-                type: string
-              specification:
-                type: [string, 'null']
-              dosage_text:
-                type: [string, 'null']
-              frequency:
-                type: [string, 'null']
-              intake_status:
-                $ref: '#/components/schemas/IntakeStatus'
-              recorded_at:
-                type: [string, 'null']
-                format: date-time
-        month_medication_stats:
-          allOf:
-            - $ref: '#/components/schemas/ThreeStateStats'
-            - type: object
-              required: [month, by_medication]
-              properties:
-                month:
-                  type: string
-                  pattern: '^\d{4}-\d{2}$'
-                by_medication:
-                  type: array
-                  items:
-                    allOf:
-                      - $ref: '#/components/schemas/ThreeStateStats'
-                      - type: object
-                        required: [medication_id, drug_name]
-                        properties:
-                          medication_id:
-                            type: string
-                            format: uuid
-                          drug_name:
-                            type: string
-        latest_report:
-          oneOf:
-            - $ref: '#/components/schemas/ReportListItem'
-            - type: 'null'
+            message:
+              type: string
+            retryable:
+              type: boolean
 
     DocumentType:
       type: string
