@@ -8,6 +8,7 @@
 - `pomi-ocr-worker.service` runs exactly one independently restartable lease-based OCR worker.
 - `pomi.env.example` documents shared non-secret production settings.
 - `pomi-ocr.env.example` documents the Worker-only secret file.
+- `pomi-report-pdf-worker.service` runs the recoverable, network-isolated static PDF worker.
 
 Install units after creating the directories and environment file described in
 `deploy/README.md`:
@@ -17,10 +18,12 @@ sudo cp /opt/pomi/current/deploy/systemd/pomi-api.service /etc/systemd/system/
 sudo cp /opt/pomi/current/deploy/systemd/pomi-backup.service /etc/systemd/system/
 sudo cp /opt/pomi/current/deploy/systemd/pomi-backup.timer /etc/systemd/system/
 sudo cp /opt/pomi/current/deploy/systemd/pomi-ocr-worker.service /etc/systemd/system/
+sudo cp /opt/pomi/current/deploy/systemd/pomi-report-pdf-worker.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now pomi-api.service pomi-backup.timer
 # Run this only after /etc/pomi/pomi-ocr.env contains the real API key.
 sudo systemctl enable --now pomi-ocr-worker.service
+sudo systemctl enable --now pomi-report-pdf-worker.service
 ```
 
 The real `/etc/pomi/pomi.env` and `/etc/pomi/pomi-ocr.env` must be owned by root

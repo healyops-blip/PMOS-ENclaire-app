@@ -24,6 +24,7 @@ sudo apt-get install nginx python3-venv sqlite3 util-linux logrotate certbot pyt
 | `/var/lib/pomi/storage` | private document storage root | `pomi:pomi`, `0700` |
 | `/var/lib/pomi/uploads` | private uploaded files | `pomi:pomi`, `0700` |
 | `/var/lib/pomi/reports` | generated reports | `pomi:pomi`, `0700` |
+| `/var/lib/pomi/storage/report-pdfs` | private generated report PDFs | `pomi:pomi`, `0700` |
 | `/var/log/pomi` | FastAPI logs | `pomi:pomi`, `0750` |
 | `/var/backups/pomi` | SQLite backups | `pomi:pomi`, `0700` |
 
@@ -69,10 +70,10 @@ sudo cp /opt/pomi/current/deploy/logrotate/pomi /etc/logrotate.d/pomi
 sudo chown root:root /etc/logrotate.d/pomi
 sudo chmod 0644 /etc/logrotate.d/pomi
 sudo nginx -t
-sudo systemd-analyze verify /etc/systemd/system/pomi-api.service /etc/systemd/system/pomi-backup.service /etc/systemd/system/pomi-backup.timer
+sudo systemd-analyze verify /etc/systemd/system/pomi-api.service /etc/systemd/system/pomi-ocr-worker.service /etc/systemd/system/pomi-report-pdf-worker.service /etc/systemd/system/pomi-backup.service /etc/systemd/system/pomi-backup.timer
 sudo logrotate --debug /etc/logrotate.d/pomi
 sudo systemctl daemon-reload
-sudo systemctl enable --now pomi-api.service pomi-backup.timer
+sudo systemctl enable --now pomi-api.service pomi-ocr-worker.service pomi-report-pdf-worker.service pomi-backup.timer
 curl --fail --silent https://api.healy1012-ops.top/health/ready
 ```
 
@@ -113,10 +114,10 @@ committed together.
 1. Put the reviewed commit in a new `/opt/pomi/releases/<commit>` directory.
 2. Create its virtual environment and install the backend.
 3. Run `sudo systemctl start pomi-backup.service` and verify success.
-4. Stop `pomi-ocr-worker.service` before migrating if it is installed.
+4. Stop `pomi-ocr-worker.service` and `pomi-report-pdf-worker.service` before migrating if installed.
 5. Run Alembic from the new release against `/var/lib/pomi/pomi.db`.
 6. Atomically update `/opt/pomi/current` to the new release.
-7. Run `sudo systemctl restart pomi-api.service pomi-ocr-worker.service`.
+7. Run `sudo systemctl restart pomi-api.service pomi-ocr-worker.service pomi-report-pdf-worker.service`.
 8. Verify `/health/ready`, then run the smoke test as the service user. It asks
    for both initial-account passwords without terminal echo:
 
@@ -158,8 +159,8 @@ After reconnecting, verify that both units were enabled and recovered without a
 manual start:
 
 ```bash
-systemctl is-enabled pomi-api.service pomi-backup.timer
-systemctl is-active pomi-api.service pomi-backup.timer
+systemctl is-enabled pomi-api.service pomi-ocr-worker.service pomi-report-pdf-worker.service pomi-backup.timer
+systemctl is-active pomi-api.service pomi-ocr-worker.service pomi-report-pdf-worker.service pomi-backup.timer
 curl --fail --silent https://api.healy1012-ops.top/health/ready
 sudo -u pomi /opt/pomi/current/backend/.venv/bin/python /opt/pomi/current/deploy/scripts/auth_smoke.py
 ```

@@ -14,6 +14,7 @@ import 'package:pmos_enclaire/features/medications/data/medication_repository.da
 import 'package:pmos_enclaire/features/onboarding/presentation/onboarding_page.dart';
 import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
 import 'package:pmos_enclaire/features/reports/data/patient_note_repository.dart';
+import 'package:pmos_enclaire/features/reports/data/report_pdf_repository.dart';
 import 'package:pmos_enclaire/features/reports/data/report_repository.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
@@ -32,6 +33,7 @@ class PomiApp extends StatefulWidget {
     this.dashboardRepository,
     this.patientNoteRepository,
     this.reportRepository,
+    this.reportPdfRepository,
     this.documentRepository,
     this.ocrRepository,
     this.weightRepository,
@@ -47,6 +49,7 @@ class PomiApp extends StatefulWidget {
   final DashboardRepository? dashboardRepository;
   final PatientNoteRepository? patientNoteRepository;
   final ReportRepository? reportRepository;
+  final ReportPdfRepository? reportPdfRepository;
   final DocumentRepository? documentRepository;
   final OcrRepository? ocrRepository;
   final WeightRepository? weightRepository;
@@ -132,6 +135,12 @@ class _PomiAppState extends State<PomiApp> {
     _activeUid = uid;
   }
 
+  late final ReportPdfRepository _reportPdfRepository =
+      widget.reportPdfRepository ??
+      (widget.authRepository is DemoAuthRepository
+          ? DemoReportPdfRepository()
+          : FastApiReportPdfRepository(_apiClient));
+
   late final GoRouter _router = GoRouter(
     initialLocation: PomiRoutes.login,
     routes: [
@@ -197,6 +206,7 @@ class _PomiAppState extends State<PomiApp> {
             },
             patientNoteRepository: _patientNoteRepository,
             reportRepository: _reportRepository,
+            reportPdfRepository: _reportPdfRepository,
             documentRepository: _documentRepository,
             ocrRepository: _ocrRepository,
             weightRepository: _weightRepository,
