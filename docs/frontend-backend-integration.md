@@ -144,8 +144,8 @@ Authorization: Bearer <session_id>
 | 用药列表 | `GET/POST /api/medications` | 用药管理 | 当前/历史用药 |
 | 用药更新 | `PUT /api/medications/{medication_id}` | 用药编辑 | 新事件和当前状态 |
 | 用药历史 | `GET /api/medications/{medication_id}/events` | 时间线 | 不可覆盖的事件链 |
-| 每日状态 | `PUT /api/medications/{medication_id}/daily-status` | 首页、用药月历 | taken/missed/unrecorded |
-| 每日状态范围 | `GET /api/medication-daily` | 月统计 | 日期范围内三状态记录 |
+| 每日状态 | `PUT /api/medications/{medication_id}/daily-status` | 首页、用药月历 | 最近 7 个业务自然日的 taken/missed/unrecorded；同时返回实时 `month_summary` |
+| 每日状态范围 | `GET /api/medication-daily` | 月统计、历史补录 | 日期范围内三状态、`editable`、`business_date`、`editable_from` |
 | 经期 | `GET/POST /api/cycles`、`PUT /api/cycles/{cycle_id}` | 经期页 | 周期和趋势 |
 | 体重 | `GET/POST /api/weights`、`PUT /api/weights/{weight_id}` | 经期/体重页 | 体重趋势 |
 | 材料 | `GET/POST /api/documents` | 记录页、上传页 | 材料及当前修订 |
@@ -163,6 +163,20 @@ Authorization: Bearer <session_id>
 | 报告 | `GET/POST /api/reports` | 报告入口/历史 | 不可变快照 |
 | 报告详情 | `GET /api/reports/{report_id}` | 三层报告 | 摘要、趋势、来源 |
 | PDF | `POST/GET /api/reports/{report_id}/pdf` | 报告操作 | PDF 任务和元数据 |
+
+### 4.1 每日用药补录边界
+
+- 可写窗口由后端业务时区计算：`editable_from <= record_date <= business_date`，
+  一共 7 个自然日。Flutter 必须按响应中的 `editable` 展示编辑入口，不自行按
+  手机时区推断。
+- 第 8 天及更早写入返回 `409 HISTORICAL_DAILY_STATUS_READ_ONLY`；未来日期返回
+  `409 FUTURE_DAILY_STATUS_NOT_ALLOWED`。
+- `unrecorded` 是动态状态：写入该值会删除当天明确状态行，数据库不保存
+  “未记录”行。
+- 响应中的 `record_date` 是服药归属日期，`recorded_at` 是实际操作 UTC 时间，
+  `recorded_by_uid` 是操作账号；三者不可混用。
+- 相同状态重复写入不会改变记录 ID、操作时间或操作 UID。前端修改失败时必须
+  回滚乐观更新，成功后刷新历史列表、用药列表和 Dashboard 月汇总。
 | PDF 文件 | `GET /api/reports/{report_id}/pdf/file` | 下载/分享/打印 | PDF 文件流 |
 | 规则管理 | `GET /api/deterministic-rules`、`PUT /api/deterministic-rules/{rule_id}` | 无普通用户页面 | 管理端规则参数 |
 | 规则追溯 | `GET /api/rule-executions/{execution_id}` | 报告来源调试 | 规则输入/输出说明 |

@@ -16,6 +16,11 @@ class MedicationStatusController extends ChangeNotifier {
 
   List<Medication> get medications => List.unmodifiable(_medications);
 
+  void replaceMedications(List<Medication> medications) {
+    _medications = [...medications];
+    notifyListeners();
+  }
+
   Future<void> setStatus(int index, MedicationStatus status) async {
     final previous = _medications[index];
     _medications = [..._medications]

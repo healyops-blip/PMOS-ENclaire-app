@@ -127,6 +127,25 @@ class _DashboardPageState extends State<DashboardPage> {
     if (selected != null) await _setMedicationStatus(index, selected);
   }
 
+  Future<void> _openMedicationManager() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => MedicationPage(
+          initialMedications: _medications,
+          repository: _medicationRepository,
+        ),
+      ),
+    );
+    try {
+      final refreshed = await _medicationRepository.listMedications();
+      _medicationStatusController.replaceMedications(refreshed);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('用药历史已保存，但首页刷新失败：$error')));
+    }
+  }
+
   @override
   void dispose() {
     _medicationStatusController
@@ -150,14 +169,7 @@ class _DashboardPageState extends State<DashboardPage> {
               medications: _medications,
               onStatusTap: _toggleTaken,
               onStatusLongPress: _showStatusActions,
-              onMedicationManage: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => MedicationPage(
-                    initialMedications: _medications,
-                    repository: _medicationRepository,
-                  ),
-                ),
-              ),
+              onMedicationManage: _openMedicationManager,
               onReport: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (_) => const ReportGeneratorPage(),

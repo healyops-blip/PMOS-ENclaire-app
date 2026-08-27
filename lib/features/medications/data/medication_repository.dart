@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:pmos_enclaire/core/network/pomi_api_client.dart';
 import 'package:pmos_enclaire/features/dashboard/domain/medication.dart';
+import 'package:pmos_enclaire/features/medications/domain/medication_daily_history.dart';
 
 abstract interface class MedicationDailyGateway {
   Future<void> setDailyStatus(
@@ -33,6 +34,11 @@ abstract interface class MedicationRepository
   });
 
   Future<List<MedicationEvent>> listEvents(String medicationId);
+
+  Future<MedicationDailyHistory> listDailyHistory(
+    String medicationId, {
+    int days = 30,
+  });
 }
 
 class MedicationFailure implements Exception {
@@ -188,6 +194,42 @@ class FastApiMedicationRepository implements MedicationRepository {
   }
 
   @override
+  Future<MedicationDailyHistory> listDailyHistory(
+    String medicationId, {
+    int days = 30,
+  }) async {
+    final today = DateTime.now();
+    final from = today.subtract(Duration(days: days - 1));
+    try {
+      final response = await _client.dio.get<Map<String, dynamic>>(
+        '/medication-daily',
+        queryParameters: {
+          'from': _date(from),
+          'to': _date(today),
+          'medication_id': medicationId,
+        },
+      );
+      final data = _data(response.data);
+      final items = (data['items'] as List<dynamic>)
+          .cast<Map<String, dynamic>>()
+          .map(MedicationDailyRecord.fromJson)
+          .toList(growable: false)
+          .reversed
+          .toList(growable: false);
+      return MedicationDailyHistory(
+        businessDate: DateTime.parse(data['business_date'] as String),
+        editableFrom: DateTime.parse(data['editable_from'] as String),
+        items: items,
+        takenCount: data['taken_count'] as int,
+        missedCount: data['missed_count'] as int,
+        unrecordedCount: data['unrecorded_count'] as int,
+      );
+    } on DioException catch (error) {
+      throw MedicationFailure(_message(error));
+    }
+  }
+
+  @override
   Future<void> setDailyStatus(
     String medicationId,
     DateTime date,
@@ -233,6 +275,7 @@ class DemoMedicationRepository implements MedicationRepository {
     : _medications = [...initial];
 
   final List<Medication> _medications;
+  final Map<String, MedicationStatus> _dailyStates = {};
 
   @override
   Future<List<Medication>> listMedications() async =>
@@ -294,9 +337,50 @@ class DemoMedicationRepository implements MedicationRepository {
   ];
 
   @override
+  Future<MedicationDailyHistory> listDailyHistory(
+    String medicationId, {
+    int days = 30,
+  }) async {
+    final today = DateTime.now();
+    final editableFrom = today.subtract(const Duration(days: 6));
+    final items = [
+      for (var offset = 0; offset < days; offset++)
+        MedicationDailyRecord(
+          medicationId: medicationId,
+          date: DateTime(
+            today.year,
+            today.month,
+            today.day,
+          ).subtract(Duration(days: offset)),
+          status:
+              _dailyStates['$medicationId-${FastApiMedicationRepository._date(today.subtract(Duration(days: offset)))}'] ??
+              MedicationStatus.unrecorded,
+          editable: offset < 7,
+        ),
+    ];
+    return MedicationDailyHistory(
+      businessDate: today,
+      editableFrom: editableFrom,
+      items: items,
+      takenCount: items
+          .where((item) => item.status == MedicationStatus.taken)
+          .length,
+      missedCount: items
+          .where((item) => item.status == MedicationStatus.missed)
+          .length,
+      unrecordedCount: items
+          .where((item) => item.status == MedicationStatus.unrecorded)
+          .length,
+    );
+  }
+
+  @override
   Future<void> setDailyStatus(
     String medicationId,
     DateTime date,
     MedicationStatus status,
-  ) async {}
+  ) async {
+    _dailyStates['$medicationId-${FastApiMedicationRepository._date(date)}'] =
+        status;
+  }
 }
