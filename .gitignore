@@ -28,3 +28,8 @@ _tmp_out_mr/
 tmp/
 temp/
 ~$*
+tmp_check/*
+tmp_check_mono/*
+tmp_demo/*
+tmp_demo_mono/*
+tmp_demo/化验_检测报告/case_00001.jpg

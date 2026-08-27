@@ -14,6 +14,21 @@
 - 医生建议/话术多样化（影像报告/门诊病历）。
 - 门诊病历体温严格限制在 37.3–37.8，jitter 范围同步限制。
 
+修复说明（“备注：备注：”重复问题）
+- 背景：部分报告出现“备注：备注：”重复标签。
+- 处理：
+  - 数据侧（report_types/lab.py）：advice 存储为“原始内容”，不再包含“备注：”。
+  - 模板/渲染侧：
+    - 单体生成（case_generalize.py 与 report_types/lab.py 模板）只在模板中添加一次“备注：”。
+    - 解耦引擎（layout_engine/engine.py）在绘制前会移除传入内容开头的一个或多个“备注：/建议：”前缀，再统一加一次“备注：”。
+  - 自检工具：新增 tools/check_remarks_dup.py 校验若组合输出存在“备注：备注：”则报错。
+
+当前示例输出位置
+- 解耦引擎渲染（仅支持化验_检测报告）：
+  - 图片与 sidecar JSON：d:\\hackathon_26\\tmp_check\\化验_检测报告
+- 单体生成：
+  - 图片与 truth JSON：d:\\hackathon_26\\tmp_check_mono\\化验_检测报告
+
 运行环境
 - Python 3.10+
 - 依赖见 requirements.txt：
@@ -28,6 +43,19 @@
 
 3) 输出目录：
    d:\hackathon_26\result\<时间戳>
+
+单体生成（指定类型）
+- 例：生成 1 份化验_检测报告（图片+truth JSON）：
+  python d:\\hackathon_26\\case_generalize.py --type 化验_检测报告 --output d:\\hackathon_26\\tmp_check_mono --num 1
+
+解耦引擎渲染（仅化验_检测报告）
+- 可用布局：运行查看 list_available_layouts()
+- 例：
+  python d:\\hackathon_26\\render_decoupled.py --type 化验_检测报告 --layout hospital_lab_01 --output d:\\hackathon_26\\tmp_check --num 2
+
+去重校验（防“备注：备注：”）
+- 运行：python d:\\hackathon_26\\tools\\check_remarks_dup.py
+- 通过时输出：Prefix normalization tests passed.
 
 注意
 - 字体默认使用 Windows 楷体：C:\\Windows\\Fonts\\simkai.ttf，可通过 --font-path 指定。

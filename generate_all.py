@@ -151,7 +151,7 @@ def main():
     # 鏁板€煎熀绾跨紦瀛橈細姣忎釜绫诲瀷浠呭湪棣栨鏍锋湰鏃惰褰?
     baselines = {}
 
-    for idx, report_type in enumerate(REPORT_TYPES):
+    for report_type in REPORT_TYPES:
         print(f"\n{'='*60}")
         print(f"鐢熸垚绫诲瀷 [{idx+1}/{total_types}]: {report_type}")
         print(f"{'='*60}")
@@ -199,7 +199,9 @@ def main():
         # doc_id 浠嶇劧浣跨敤 global_counter锛屼繚璇佽法绫诲瀷鍞竴銆?
         for i in range(args.num_per_type):
             local_counter = i + 1
-            filename = f"case_{local_counter:05d}.jpg"
+            # 文件名中直接带上类型，便于人工快速区分（仍按类型分目录存放）
+            # 文件名中直接带上类型，便于人工快速区分（仍按类型分目录存放）
+            filename = f"{report_type}__case_{global_counter:05d}.jpg"
             output_path = os.path.join(report_dir, filename)
 
             # 闅忔満閫夋嫨鍖婚櫌

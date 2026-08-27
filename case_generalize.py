@@ -1,4 +1,14 @@
 """
+回退说明（门诊病历_就诊记录）
+日期: 2026-08-28
+背景: 解耦后对“门诊病历_就诊记录”曾引入整块铺底/不清底直写的渲染策略，导致整体底色与观感偏离原模板（出现面板/带状底色感）。
+本次回退: 仅对“门诊病历_就诊记录”恢复到解耦前的保守渲染路径：逐字段清底+（邻域采样色/白底）覆盖后再写字，不再统一铺设浅灰面板；其他三类保持现状。
+范围: 不影响 影像文字报告/化验_检测报告/医嘱_处方。plain_horizontal 布局保持纯白底直写（method='none'）。
+定位: 见下方替换字段循环内的 draw_method 分支，以及 clean_base.py 中的按类型清理策略。
+备注: 若需进一步对比“完全旧版”，可在 clean_base.py 关闭顶部页眉带清理（当前仍保留白底清理以统一贴 Logo/标题）。
+"""
+
+"""
 病例数据泛化工具
 
 支持多种报告类型：
@@ -664,13 +674,11 @@ def generate_case(
         template = field["template"]
         value = render_value(template, data)
 
-        # 针对“门诊病历_就诊记录”减少色块拼接感：
-        # 在需要的行先绘制统一宽度的浅灰面板，再直接在上面写字（method='none'），避免多次采样清底造成的色差边界。
+        # 门诊病历_就诊记录：按旧版策略渲染（不额外铺面板，使用默认采样/白底覆盖策略）
         if layout_mode == "plain_horizontal":
             draw_method = "none"
         elif report_type == "门诊病历_就诊记录":
-            # 门诊病历在 clean_base 中已经统一铺好了浅灰底，这里直接写字避免再次清底造成色块拼接
-            draw_method = "none"
+            draw_method = field.get("method", "sample")
         elif report_type == "影像文字报告":
             # 影像报告改为白底重绘报告壳，所有文字直接写在空白/表单区域上，不再做原图采样覆盖。
             draw_method = "none"
@@ -812,6 +820,7 @@ def build_plain_horizontal_fields(report_type, data):
             fields.append(row(f"lab_{no}_row", f"{no:>2}    {item:<36}  {method:<10}  {val:>6}    {unit:<8}  {ref}", size=20))
         y += 12
         # 备注/说明区（2-4行）
+        # 统一在模板侧添加一次“备注：”，而数据源 report_types.lab.generate_data 中的 advice 已改为不含前缀的“原始内容”。
         fields.append(row("note1", "备注：{advice}", size=18))
         # 底部签名/时间
         fields.append(row("footer1", "检验时间：{exam_date}      报告时间：{exam_date}", size=18))
@@ -943,6 +952,7 @@ def main():
     parser.add_argument("--type", required=True, choices=list_report_types(),
                         help="报告类型")
     parser.add_argument("--output", default="./result", help="输出目录")
+    parser.add_argument("--no-clean-output", action="store_true", help="若目标目录已存在则不清空（便于多类型顺序写入同一根目录）")
     parser.add_argument("--num", type=int, default=20, help="生成数量")
     parser.add_argument("--font-path", help="字体路径")
     parser.add_argument("--logo-bbox", default="50,20,200,100",
@@ -954,8 +964,8 @@ def main():
 
     args = parser.parse_args()
 
-    # 清空输出目录
-    if os.path.exists(args.output):
+    # 输出目录：默认清空；如显式指定 --no-clean-output 则保留
+    if os.path.exists(args.output) and not args.no_clean_output:
         shutil.rmtree(args.output)
     os.makedirs(args.output, exist_ok=True)
 
@@ -1013,7 +1023,9 @@ def main():
             return name
 
     for i in range(start_index, end_index + 1):
-        filename = f"case_{i:05d}.jpg"
+        # 文件名中直接体现类型，避免事后查找；仍保存在类型子目录内
+        safe_type = args.type
+        filename = f"{safe_type}__case_{i:05d}.jpg"
         output_path = os.path.join(report_dir, filename)
 
         # 随机选择医院

@@ -330,8 +330,15 @@ def _draw_notes_and_footer(draw: ImageDraw.ImageDraw, page: Dict[str, Any], y: i
     left, top, right, bottom = page["margins"]
     # Notes
     f_note = fonts["small"]
-    note_text = content.get("advice", "备注：报告结果仅供临床参考。")
-    _text(draw, (left, y + 16, W - right, y + 40), f"备注：{note_text}", f_note, align="left")
+    # 不在默认值里带“备注：”，并统一移除传入内容中可能已经包含的“备注：/建议：”等前缀（可能重复多次），避免出现“备注：备注：”
+    note_text = content.get("advice") or "报告结果仅供临床参考。"
+    try:
+        import re
+        # 去除开头可能出现的多个“备注：/建议：”前缀，只保留正文
+        note_text_clean = re.sub(r"^((备注|建议)[:：]\s*)+", "", str(note_text))
+    except Exception:
+        note_text_clean = str(note_text)
+    _text(draw, (left, y + 16, W - right, y + 40), f"备注：{note_text_clean}", f_note, align="left")
     y += 64
     # Footer variants
     f_foot = fonts["small"]

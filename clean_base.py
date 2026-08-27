@@ -1,3 +1,12 @@
+"""
+回退说明（门诊病历_就诊记录 清理策略）
+日期: 2026-08-28
+背景: 先前为统一风格，曾在 EMR（门诊病历_就诊记录）上铺设统一浅灰面板并减少逐字段清底，带来版面“带状/面板”观感问题。
+本次回退: 取消 EMR 的整块浅灰面板处理，按旧版保守策略：仅字段级清理+顶部页眉带清理（白底），其余保持原模板底色。
+范围: 仅影响 EMR；化验/影像/处方仍按现有策略执行。
+扩展: 若业务需要，还可进一步关闭 EMR 的顶部页眉带清理，以更贴近“完全旧版”。
+"""
+
 import os
 import cv2
 import numpy as np
@@ -110,14 +119,9 @@ def build_clean_base_image(input_path, report_type, logo_bbox, fill_mode="sample
             (max(0, int(W*0.68)), 230, min(W, int(W*0.99)), min(H, 300)),
         ]
     elif report_type == "门诊病历_就诊记录":
-        # 为门诊病历提供统一的中性面板底色，避免后续逐条清底导致的色差拼接感。
-        # 这里将主体文本区域统一铺设为浅灰底，字段渲染时使用 method='none' 直接写字。
-        # 范围：从就诊日期到备注区域整体覆盖，保留页面左右留白。
-        left_margin = max(0, int(W * 0.04))
-        right_margin = max(0, int(W * 0.04))
-        extra_boxes = [
-            (left_margin, 150, W - right_margin, min(H, 1450)),
-        ]
+        # 回退到“解耦前”的保守清理策略：不再铺设整块浅灰面板，避免整体底色变化。
+        # 仅按字段 bbox 与顶部页眉带进行清理（由下方通用逻辑与 header 带统一处理）。
+        extra_boxes = []
     elif report_type == "医嘱_处方":
         # 处方模板来自手机端病历页面。清理时保留蓝色分区和白色卡片骨架，
         # 仅额外抹掉原截图右下角“下载”悬浮按钮，避免与审核人/处方内容混在一起。
@@ -132,8 +136,8 @@ def build_clean_base_image(input_path, report_type, logo_bbox, fill_mode="sample
         if report_type == "化验_检测报告":
             ImageDraw.Draw(image).rectangle(bx, fill=(255, 255, 255))
         elif report_type == "门诊病历_就诊记录":
-            # 门诊病历统一浅灰底色，减少拼接感
-            ImageDraw.Draw(image).rectangle(bx, fill=(234, 234, 234))
+            # 门诊病历不做整块底色覆盖，保持模板原貌（字段区域已在前面逐一清理）。
+            ImageDraw.Draw(image).rectangle(bx, fill=(255, 255, 255)) if fill_mode == "white" else _fill_rect_with_sampled_color(image, bx)
         else:
             if fill_mode == "white":
                 ImageDraw.Draw(image).rectangle(bx, fill=(255, 255, 255))

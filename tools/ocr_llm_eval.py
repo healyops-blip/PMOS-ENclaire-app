@@ -59,22 +59,23 @@ MED_FIELDS = ["drug_name", "dosage", "frequency", "duration", "instruction", "so
 
 OCR_PROMPT = r'''你是一个医疗票据/报告 OCR 信息抽取模型。请从输入图片中识别文字，并严格按照指定 JSON 结构输出结果，用于和标准 truth JSON 对齐。
 
-重要规则：
-1. 只输出 JSON，不要输出解释、Markdown、代码块或多余文本。
-2. 字段名必须完全一致，不要新增字段，不要删除字段。
-3. 所有数值统一输出为字符串，例如 "37.5"、"31*18*33"、"134/96"。
-4. 如果图片中没有对应内容，字符串字段输出 ""，数组字段输出 []。
-5. 不要编造图片中不存在的信息；但本数据集若未显示科室且无法判断，department 默认填 "生殖科"。
-6. original_file_name 如果无法从输入获得，填 ""。
-7. abnormal 字段输出布尔值 true 或 false。
-8. 日期按图片中的格式输出，通常为 "YYYY-MM-DD"。
-9. 医院名称尽量完整保留中文和英文，例如 "长沙连心医院Lianxin Hospital Changsha"。
-10. 对影像报告中的卵巢测量和基础卵泡，source_text 必须保留完整原句。
-11. 对处方中的每个药品，source_text 必须包含“药品、用法、用量、疗程、总量”等信息。
+重要规则（务必遵守）：
+1) 只输出 JSON，不要输出解释、Markdown、代码块或多余文本。
+2) 字段名必须完全一致，不要新增字段，不要删除字段。
+3) 所有数值统一输出为字符串，例如 "37.5"、"31*18*33"、"134/96"。
+4) 如果图片中没有对应内容，字符串字段输出 ""，数组字段输出 []。
+5) 不要编造图片中不存在的信息；科室 department 必须优先按图片中的科室全称抽取，只有在确实无法判断时才默认填 "生殖科"。
+6) original_file_name 若无法从图片中获得，可留空（调用方将自动补全文件名）。
+7) abnormal 必须输出为布尔值 true/false，并按参考范围与结果判断：在范围内为 false，超出为 true；无法判断时填 false。
+8) 日期按图片中的格式输出，通常为 "YYYY-MM-DD"。
+9) 医院名称必须与抬头完全一致，包含城市/机构前缀等完整中文，例如“广州润心医疗中心”。如有英文行，则紧随中文直接拼接（不要添加空格或额外符号），例如“广州润心医疗中心Runxin Healthcare Guangzhou”。不要缩写、不要省略中文中的任何前缀或后缀。
+10) doc_id 从图片里的“病历号/就诊号/编号/No.”提取，不能留空；若存在类似 "P00001"、"LA12345"、"PR00012"、"MR00009" 等样式，直接使用。
+11) 处方/医嘱中的药品项：drug_name 仅输出通用名（不包含品牌/商品名、剂型、规格），例如“来曲唑”“地屈孕酮”；规格与剂量写入 dosage（如“2.5mg”“10mg 每次1片”等），品牌/剂型等信息保留在 source_text。不要将规格拼接进 drug_name。
+12) visit_date 不能留空；若出现多个日期，优先顺序：报告日期/检查日期/处方日期/就诊日期，并按图片显示格式输出（通常 YYYY-MM-DD）。
 
-请先判断报告类型：影像文字报告、化验_检测报告、医嘱_处方、门诊病历_就诊记录。
+报告类型识别：影像文字报告、化验_检测报告、医嘱_处方、门诊病历_就诊记录。
 
-按以下 JSON schema 输出：
+统一 JSON 结构：
 {
   "doc_id": "",
   "hospital": "",
@@ -87,10 +88,27 @@ OCR_PROMPT = r'''你是一个医疗票据/报告 OCR 信息抽取模型。请从
   "original_file_name": ""
 }
 
-影像文字报告：examinations 尽量包含右卵巢、右侧基础卵泡、左卵巢、左侧基础卵泡、盆腔积液。卵巢 value 为 "长*宽*高"，unit="mm"；基础卵泡 value 只保留数字，unit="个"；source_text 保留完整原句。
-化验_检测报告：按表格逐行抽取 item_name、value、unit、reference_range、abnormal，通常 13 项。
-医嘱_处方：examinations=[]；药品放入 medication_suggestions，每个药品包含 drug_name、dosage、frequency、duration、instruction、source_text。
-门诊病历_就诊记录：examinations 只包含体温、心率、血压；medication_suggestions=[]。
+各类型的额外要求：
+一、影像文字报告：
+  - examinations 尽量包含以下 5 项：右卵巢、右侧基础卵泡、左卵巢、左侧基础卵泡、盆腔积液。
+  - 右卵巢/左卵巢：value 为大小测量值（如 "31*18*33"），unit="mm"，reference_range 固定为 "25-40*15-25*20-35"。
+  - 右侧基础卵泡/左侧基础卵泡：value 只保留数字（去掉">"），unit="个"，reference_range 为空字符串。
+  - 盆腔积液：value 输出 "无"/"少量"/"中等量"/"大量"，unit=""，reference_range="无"。
+  - 所有 examinations 的 source_text 必须保留完整原句。
+
+二、化验_检测报告：
+  - 按表格逐行抽取，每行包含 item_name、value、unit、reference_range、abnormal。
+  - abnormal 按参考范围与结果判断（在范围内=false；超出=true），无法判断时=false。
+  - 单位与参考范围保留原始格式（如 "×10^9/L"、"μmol/L"、"0.5-2.5"）。
+
+三、医嘱_处方：
+  - examinations=[]；药品放入 medication_suggestions。
+  - 每个药品包含 drug_name、dosage、frequency、duration、instruction、source_text。
+  - source_text 至少覆盖“药品、用法、用量、疗程、总量”等信息；drug_name 仅为通用名，规格放在 dosage。
+
+四、门诊病历_就诊记录：
+  - examinations 只包含体温、心率、血压（value 分别为 "℃"、"次/分"、"mmHg" 对应的字符串）。
+  - medication_suggestions=[]。
 
 现在请根据输入图片输出严格 JSON。'''
 
