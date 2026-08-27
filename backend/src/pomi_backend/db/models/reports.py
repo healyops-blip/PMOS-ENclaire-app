@@ -5,7 +5,16 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, CheckConstraint, ForeignKey, Index, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    CheckConstraint,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from pomi_backend.db.base import Base
@@ -113,3 +122,43 @@ class ReportSource(Base):
     document_revision_id: Mapped[str | None] = mapped_column(String(36))
     rule_execution_id: Mapped[str | None] = mapped_column(String(36))
     included_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, default=utc_now)
+
+
+class ReportFile(Base):
+    """Private, recoverable artifact generated from one immutable report snapshot."""
+
+    __tablename__ = "report_file"
+    __table_args__ = (
+        CheckConstraint("file_type IN ('pdf')", name="report_file_type"),
+        CheckConstraint(
+            "generation_status IN ('queued', 'processing', 'succeeded', 'failed')",
+            name="report_file_generation_status",
+        ),
+        UniqueConstraint("idempotency_key", name="uq_report_file_idempotency_key"),
+        Index("ix_report_file_claim", "generation_status", "available_at", "lease_expires_at"),
+        Index("ix_report_file_report_created", "report_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    report_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("report_snapshot.id", ondelete="RESTRICT"), nullable=False
+    )
+    file_type: Mapped[str] = mapped_column(String(16), nullable=False, default="pdf")
+    template_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    snapshot_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    storage_path: Mapped[str | None] = mapped_column(String(500))
+    file_hash: Mapped[str | None] = mapped_column(String(64))
+    file_size_bytes: Mapped[int | None] = mapped_column(Integer)
+    generation_status: Mapped[str] = mapped_column(String(16), nullable=False, default="queued")
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    available_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, default=utc_now)
+    lease_owner: Mapped[str | None] = mapped_column(String(100))
+    lease_expires_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    started_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    generated_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    failure_reason: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime, nullable=False, default=utc_now, onupdate=utc_now
+    )

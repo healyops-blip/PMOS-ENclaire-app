@@ -5,6 +5,7 @@ import 'package:pmos_enclaire/features/auth/data/auth_repository.dart';
 import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
 import 'package:pmos_enclaire/features/reports/data/patient_note_repository.dart';
 import 'package:pmos_enclaire/features/reports/data/report_repository.dart';
+import 'package:pmos_enclaire/features/reports/data/report_pdf_repository.dart';
 import 'package:pmos_enclaire/features/weight/data/weight_repository.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 
@@ -18,6 +19,7 @@ class MainApp extends StatelessWidget {
     this.profileRepository,
     this.patientNoteRepository,
     this.reportRepository,
+    this.reportPdfRepository,
     this.weightRepository,
     this.documentRepository,
     super.key,
@@ -27,6 +29,7 @@ class MainApp extends StatelessWidget {
   final PatientProfileRepository? profileRepository;
   final PatientNoteRepository? patientNoteRepository;
   final ReportRepository? reportRepository;
+  final ReportPdfRepository? reportPdfRepository;
   final WeightRepository? weightRepository;
   final DocumentRepository? documentRepository;
 
@@ -38,6 +41,7 @@ class MainApp extends StatelessWidget {
         profileRepository: profileRepository,
         patientNoteRepository: patientNoteRepository,
         reportRepository: reportRepository,
+        reportPdfRepository: reportPdfRepository,
         weightRepository: weightRepository,
         documentRepository: documentRepository,
       ),

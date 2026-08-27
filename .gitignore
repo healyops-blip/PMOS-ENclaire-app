@@ -2,6 +2,7 @@
 *.class
 *.log
 *.pyc
+*.whl
 *.swp
 .DS_Store
 .atom/
@@ -63,3 +64,4 @@ app.*.map.json
 /backend/uploads/
 /backend/logs/
 /backend/backups/
+/backend/.tmp-wheel/

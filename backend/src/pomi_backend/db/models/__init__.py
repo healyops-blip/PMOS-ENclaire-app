@@ -18,7 +18,7 @@ from pomi_backend.db.models.orders import (
     MedicationReconciliation,
     MedicationReconciliationItem,
 )
-from pomi_backend.db.models.reports import PatientNote, ReportSnapshot, ReportSource
+from pomi_backend.db.models.reports import PatientNote, ReportFile, ReportSnapshot, ReportSource
 
 __all__ = [
     "Medication",
@@ -31,6 +31,7 @@ __all__ = [
     "MedicationReconciliationItem",
     "MenstrualCycle",
     "PatientNote",
+    "ReportFile",
     "PatientProfile",
     "ReportSnapshot",
     "ReportSource",

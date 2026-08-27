@@ -7,6 +7,7 @@ from pomi_backend.services.medications import MedicationService
 from pomi_backend.services.ocr import OCRTaskService
 from pomi_backend.services.patient import PatientProfileService
 from pomi_backend.services.patient_notes import PatientNoteService
+from pomi_backend.services.report_files import ReportFileService
 from pomi_backend.services.reports import ReportSnapshotService
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "PatientNoteService",
     "PatientProfileService",
     "ReportSnapshotService",
+    "ReportFileService",
 ]

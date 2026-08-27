@@ -3106,20 +3106,25 @@ components:
 
     PdfGenerationStatus:
       type: string
-      enum: [pending, processing, succeeded, failed]
+      enum: [queued, processing, succeeded, failed]
 
     ReportPdf:
       type: object
-      required: [report_id, generation_status]
+      required: [report_id, file_id, generation_status, template_version, attempt_count]
       properties:
         report_id:
           type: string
           format: uuid
         file_id:
-          type: [string, 'null']
+          type: string
           format: uuid
         generation_status:
           $ref: '#/components/schemas/PdfGenerationStatus'
+        template_version:
+          type: string
+        attempt_count:
+          type: integer
+          minimum: 0
         file_name:
           type: [string, 'null']
         mime_type:
@@ -3129,12 +3134,14 @@ components:
           type: [integer, 'null']
         file_hash:
           type: [string, 'null']
+          pattern: '^[0-9a-f]{64}$'
         generated_at:
           type: [string, 'null']
           format: date-time
         download_url:
           type: [string, 'null']
           format: uri-reference
+          description: Always null; clients use the authenticated fixed file endpoint.
         download_expires_at:
           type: [string, 'null']
           format: date-time

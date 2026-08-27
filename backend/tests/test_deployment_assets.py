@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import re
+from importlib.resources import files
 from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -28,6 +30,15 @@ def test_systemd_service_is_loopback_only_and_hardened() -> None:
     assert "ProtectSystem=strict" in worker
     assert "EnvironmentFile=/etc/pomi/pomi.env" in worker
     assert "--workers" not in worker
+
+    pdf_worker = read("deploy/systemd/pomi-report-pdf-worker.service")
+    assert "pomi-report-pdf-worker --poll-seconds 1" in pdf_worker
+    assert "NoNewPrivileges=true" in pdf_worker
+    assert "ProtectSystem=strict" in pdf_worker
+    assert "EnvironmentFile=/etc/pomi/pomi.env" in pdf_worker
+    assert "RestrictAddressFamilies=AF_UNIX" in pdf_worker
+    systemd_readme = read("deploy/systemd/README.md")
+    assert systemd_readme.count("pomi-report-pdf-worker.service") >= 3
 
 
 def test_nginx_has_tls_limits_and_local_upstream() -> None:
@@ -63,6 +74,25 @@ def test_environment_example_and_repository_contain_no_seed_passwords() -> None:
     )
     assert not re.search(r"POMI_(FIRST_TIME|RETURNING)_ACCOUNT_PASSWORD=\S+", tracked_text)
     assert not re.search(r"POMI_RESET_PASSWORD=\S+", tracked_text)
+
+
+def test_report_pdf_font_and_license_are_packaged_deployment_assets() -> None:
+    package = files("pomi_backend")
+    font = package.joinpath("assets/fonts/wqy-microhei.ttc")
+    license_file = package.joinpath("assets/fonts/LICENSE_Apache2.txt")
+    origin = package.joinpath("assets/fonts/FONT_ORIGIN.md")
+    assert font.is_file()
+    assert 4_000_000 < font.stat().st_size < 10_000_000
+    font_hash = hashlib.sha256(font.read_bytes()).hexdigest()
+    assert "Apache License" in license_file.read_text(encoding="utf-8")
+    origin_text = origin.read_text(encoding="utf-8")
+    assert "WenQuanYi Micro Hei" in origin_text
+    assert font_hash == "e4bca8df123ce01b104780f576ea1a58b9a5ff1662a91124b6d3180cb6c88212"
+    assert font_hash in origin_text
+
+    project = read("backend/pyproject.toml")
+    for name in ("wqy-microhei.ttc", "LICENSE_Apache2.txt", "FONT_ORIGIN.md"):
+        assert project.count(name) >= 2
 
 
 def test_backup_logrotate_and_runbook_are_present() -> None:

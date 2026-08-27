@@ -8,6 +8,7 @@ import 'package:pmos_enclaire/core/widgets/demo_badge.dart';
 import 'package:pmos_enclaire/core/widgets/pomi_line_chart.dart';
 import 'package:pmos_enclaire/core/widgets/pomi_surfaces.dart';
 import 'package:pmos_enclaire/features/reports/data/patient_note_repository.dart';
+import 'package:pmos_enclaire/features/reports/data/report_pdf_repository.dart';
 import 'package:pmos_enclaire/features/reports/data/report_repository.dart';
 import 'package:pmos_enclaire/features/reports/presentation/report_viewer_page.dart';
 import 'package:pmos_enclaire/features/certification/data/certification_repository.dart';
@@ -20,16 +21,19 @@ class ReportGeneratorPage extends StatefulWidget {
   ReportGeneratorPage({
     required this.repository,
     ReportRepository? reportRepository,
+    ReportPdfRepository? reportPdfRepository,
     DocumentRepository? documentRepository,
     CertificationRepository? certificationRepository,
     super.key,
   }) : reportRepository = reportRepository ?? DemoReportRepository(),
+       reportPdfRepository = reportPdfRepository ?? DemoReportPdfRepository(),
        documentRepository = documentRepository ?? DemoDocumentRepository(),
        certificationRepository =
            certificationRepository ?? LocalCertificationRepository();
 
   final PatientNoteRepository repository;
   final ReportRepository reportRepository;
+  final ReportPdfRepository reportPdfRepository;
   final DocumentRepository documentRepository;
   final CertificationRepository certificationRepository;
 
@@ -169,6 +173,7 @@ class _ReportGeneratorPageState extends State<ReportGeneratorPage> {
             repository: widget.reportRepository,
             documentRepository: widget.documentRepository,
             certificationRepository: widget.certificationRepository,
+            pdfRepository: widget.reportPdfRepository,
           ),
         ),
       );
@@ -357,6 +362,7 @@ class _ReportGeneratorPageState extends State<ReportGeneratorPage> {
                         repository: widget.reportRepository,
                         documentRepository: widget.documentRepository,
                         certificationRepository: widget.certificationRepository,
+                        pdfRepository: widget.reportPdfRepository,
                       ),
                     ),
                   ),
