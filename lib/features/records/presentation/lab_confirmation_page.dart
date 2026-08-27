@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:pmos_enclaire/features/certification/presentation/certification_page.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:printing/printing.dart';
@@ -417,6 +418,13 @@ class _LabConfirmationPageState extends State<LabConfirmationPage> {
               ),
               trailing: Text('${item.value} ${item.unit}'),
             ),
+          const SizedBox(height: 12),
+          CertificationEntryCard(
+            documentId: widget.task.documentId,
+            revisionId: widget.task.documentRevisionId,
+            materialLabel: '化验／检测报告',
+            ocrConfirmed: true,
+          ),
         ],
       );
 }

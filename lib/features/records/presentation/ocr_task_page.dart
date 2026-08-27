@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:pmos_enclaire/features/certification/presentation/certification_page.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:pmos_enclaire/features/records/data/order_reconciliation_repository.dart';
@@ -124,8 +125,8 @@ class _OcrTaskPageState extends State<OcrTaskPage> with WidgetsBindingObserver {
     if (mounted) _schedule();
   }
 
-  void _openConfirmation() {
-    Navigator.of(context).push<void>(
+  Future<void> _openConfirmation() async {
+    await Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (_) => _task!.materialType == 'lab_report'
             ? LabConfirmationPage(
@@ -141,6 +142,7 @@ class _OcrTaskPageState extends State<OcrTaskPage> with WidgetsBindingObserver {
               ),
       ),
     );
+    if (mounted && _task != null) await _poll();
   }
 
   @override
@@ -192,6 +194,18 @@ class _OcrTaskPageState extends State<OcrTaskPage> with WidgetsBindingObserver {
                   onPressed: _openConfirmation,
                   child: Text('进入${_materialLabel(task!.materialType)}确认'),
                 ),
+              if (task?.status == OcrTaskStatus.confirmed) ...[
+                const SizedBox(height: 18),
+                CertificationEntryCard(
+                  documentId: task!.documentId,
+                  revisionId: task.documentRevisionId,
+                  materialLabel: _materialLabel(task.materialType),
+                  ocrConfirmed: true,
+                  currentRevisionAvailable:
+                      widget.document.currentRevisionId ==
+                      task.documentRevisionId,
+                ),
+              ],
             ],
           ),
         ),

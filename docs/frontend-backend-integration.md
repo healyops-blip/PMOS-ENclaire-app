@@ -30,6 +30,9 @@
 
 当前 FastAPI **不得**增加医生 KYC、医院 KYB、电子签字、真实区块链交易、交易哈希或跨院互认接口。未来真实认证服务必须另立数据模型和 OpenAPI 版本。
 
+认证演示的实现与验收细节见
+[`issue-26-local-certification-demo.md`](issue-26-local-certification-demo.md)。入口只允许出现在 OCR 已确认且同时具有当前可用 `document_id + document_revision_id` 的四类材料详情中；状态使用这两个标识共同持久化。该本地状态不得触发任何 FastAPI 请求，也不得改变材料、OCR、用药、对账或报告数据。
+
 ### 1.3 明确排除
 
 - 短信验证码、短信/邮件找回密码和真实推送。
