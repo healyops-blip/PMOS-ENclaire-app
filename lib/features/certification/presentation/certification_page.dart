@@ -4,163 +4,143 @@ import 'package:intl/intl.dart';
 import 'package:pmos_enclaire/core/theme/pomi_theme.dart';
 import 'package:pmos_enclaire/core/widgets/demo_badge.dart';
 import 'package:pmos_enclaire/core/widgets/pomi_surfaces.dart';
+import 'package:pmos_enclaire/features/certification/application/certification_flow_controller.dart';
 import 'package:pmos_enclaire/features/certification/application/certification_providers.dart';
+import 'package:pmos_enclaire/features/certification/domain/certification_copy.dart';
 import 'package:pmos_enclaire/features/certification/domain/certification_record.dart';
 
 class CertificationPage extends ConsumerStatefulWidget {
   const CertificationPage({
-    this.documentId = 'document-lab-006',
-    this.revisionId = 'revision-v2',
+    required this.documentId,
+    required this.revisionId,
+    required this.materialLabel,
+    this.transitionDuration = const Duration(milliseconds: 1400),
+    this.demoPlan = const CertificationDemoPlan(),
     super.key,
   });
 
   final String documentId;
   final String revisionId;
+  final String materialLabel;
+  final Duration transitionDuration;
+
+  /// Injectable for automated/demo builds. Production callers use the default
+  /// golden path and do not expose a failure switch to users.
+  final CertificationDemoPlan demoPlan;
 
   @override
   ConsumerState<CertificationPage> createState() => _CertificationPageState();
 }
 
 class _CertificationPageState extends ConsumerState<CertificationPage> {
-  CertificationRecord? _record;
+  late final CertificationFlowController _controller;
 
   @override
   void initState() {
     super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    final record = await ref
-        .read(certificationRepositoryProvider)
-        .read(widget.documentId, widget.revisionId);
-    if (mounted) setState(() => _record = record);
-  }
-
-  Future<void> _save(
-    CertificationStatus status, {
-    String? failureReason,
-  }) async {
-    final record = CertificationRecord(
+    _controller = CertificationFlowController(
+      repository: ref.read(certificationRepositoryProvider),
       documentId: widget.documentId,
       revisionId: widget.revisionId,
-      status: status,
-      updatedAt: DateTime.now(),
-      failureReason: failureReason,
-    );
-    setState(() => _record = record);
-    await ref.read(certificationRepositoryProvider).write(record);
+      transitionDuration: widget.transitionDuration,
+      plan: widget.demoPlan,
+    )..addListener(_changed);
+    _controller.load();
   }
 
-  Future<void> _startCertification() async {
-    await _save(CertificationStatus.processing);
-    await Future<void>.delayed(const Duration(milliseconds: 1400));
-    if (!mounted || _record?.status != CertificationStatus.processing) return;
-    await _save(CertificationStatus.succeeded);
+  void _changed() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _controller
+      ..removeListener(_changed)
+      ..dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final record = _record;
-    final status = record?.status ?? CertificationStatus.notStarted;
+    final record = _controller.record;
+    final status = record.status;
     final processing = status == CertificationStatus.processing;
     final succeeded = status == CertificationStatus.succeeded;
     return Scaffold(
       key: const Key('certification-page'),
-      appBar: AppBar(title: const Text('医院认证演示')),
+      appBar: AppBar(title: const Text(CertificationCopy.pageTitle)),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
         children: [
           const Row(
             children: [
-              DemoBadge(label: '仅限前端演示'),
+              DemoBadge(label: '仅限本地交互演示'),
               Spacer(),
               Text(
-                '模拟数据',
+                '不代表真实认证',
                 style: TextStyle(color: PomiColors.textMuted, fontSize: 10),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          _MaterialPreview(succeeded: succeeded),
+          const SizedBox(height: 14),
+          _RevisionPreview(
+            materialLabel: widget.materialLabel,
+            documentId: widget.documentId,
+            revisionId: widget.revisionId,
+            showWatermark: succeeded,
+          ),
           const SizedBox(height: 18),
-          const PomiSectionTitle(title: '认证状态'),
+          const PomiSectionTitle(title: '本地演示状态'),
           const SizedBox(height: 8),
           PomiSectionCard(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 220),
-              child: _StatusContent(key: ValueKey(status), record: record),
+              child: _controller.loading
+                  ? const Center(
+                      key: Key('certification-loading'),
+                      child: CircularProgressIndicator(),
+                    )
+                  : _StatusContent(key: ValueKey(status), record: record),
             ),
           ),
           const SizedBox(height: 16),
-          PomiSectionCard(
-            color: PomiColors.primaryPale,
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '这项演示代表什么？',
-                  style: TextStyle(fontWeight: FontWeight.w800),
-                ),
-                SizedBox(height: 7),
-                Text(
-                  '认证状态仅保存在本机，并绑定当前材料版本。替换原文件后，新版本需要重新认证。',
-                  style: TextStyle(
-                    color: PomiColors.textMuted,
-                    height: 1.55,
-                    fontSize: 11,
-                  ),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  '不连接医院、医生身份系统或真实区块链，不产生具有法律效力的签章或凭证。',
-                  style: TextStyle(
-                    color: Color(0xFF8B5D3F),
-                    height: 1.55,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          const _BoundaryCard(),
           const SizedBox(height: 18),
-          FilledButton.icon(
-            key: const Key('advance-certification-button'),
-            onPressed: processing
-                ? null
-                : status == CertificationStatus.succeeded
-                ? null
-                : _startCertification,
-            icon: processing
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.verified_outlined),
-            label: Text(
-              processing
-                  ? '认证处理中…'
-                  : status == CertificationStatus.failed
-                  ? '重新认证'
-                  : succeeded
-                  ? '演示认证已完成'
-                  : '开始医院认证演示',
+          if (!succeeded)
+            FilledButton.icon(
+              key: const Key('advance-certification-button'),
+              onPressed: processing || _controller.loading
+                  ? null
+                  : _controller.start,
+              icon: processing
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.verified_user_outlined),
+              label: Text(
+                processing
+                    ? '认证演示处理中…'
+                    : status == CertificationStatus.failed
+                    ? '重试本地认证演示'
+                    : '开始医院认证演示',
+              ),
+            )
+          else
+            FilledButton.icon(
+              key: const Key('finish-certification-button'),
+              onPressed: () => Navigator.maybePop(context, record),
+              icon: const Icon(Icons.arrow_back_rounded),
+              label: const Text('完成并返回材料详情'),
             ),
-          ),
-          if (!processing && !succeeded) ...[
-            const SizedBox(height: 8),
-            TextButton(
-              key: const Key('simulate-certification-failure'),
-              onPressed: () =>
-                  _save(CertificationStatus.failed, failureReason: '演示网络中断'),
-              child: const Text('模拟失败分支'),
-            ),
-          ],
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           const Center(
             child: Text(
-              '提供区块链技术支持 · 当前未连接真实区块链服务',
+              '${CertificationCopy.technologySupport} · 当前未连接真实区块链服务',
+              textAlign: TextAlign.center,
               style: TextStyle(color: PomiColors.textMuted, fontSize: 9),
             ),
           ),
@@ -170,80 +150,147 @@ class _CertificationPageState extends ConsumerState<CertificationPage> {
   }
 }
 
-class _MaterialPreview extends StatelessWidget {
-  const _MaterialPreview({required this.succeeded});
+class CertificationEntryCard extends ConsumerStatefulWidget {
+  const CertificationEntryCard({
+    required this.documentId,
+    required this.revisionId,
+    required this.materialLabel,
+    required this.ocrConfirmed,
+    this.currentRevisionAvailable = true,
+    this.demoPlan = const CertificationDemoPlan(),
+    this.transitionDuration = const Duration(milliseconds: 1400),
+    super.key,
+  });
 
-  final bool succeeded;
+  final String documentId;
+  final String revisionId;
+  final String materialLabel;
+  final bool ocrConfirmed;
+  final bool currentRevisionAvailable;
+  final CertificationDemoPlan demoPlan;
+  final Duration transitionDuration;
+
+  bool get eligible =>
+      ocrConfirmed &&
+      currentRevisionAvailable &&
+      documentId.trim().isNotEmpty &&
+      revisionId.trim().isNotEmpty;
+
+  @override
+  ConsumerState<CertificationEntryCard> createState() =>
+      _CertificationEntryCardState();
+}
+
+class _CertificationEntryCardState
+    extends ConsumerState<CertificationEntryCard> {
+  CertificationRecord? _record;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.eligible) _load();
+  }
+
+  @override
+  void didUpdateWidget(CertificationEntryCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.eligible &&
+        (!oldWidget.eligible ||
+            oldWidget.documentId != widget.documentId ||
+            oldWidget.revisionId != widget.revisionId)) {
+      _load();
+    }
+  }
+
+  Future<void> _load() async {
+    final record = await ref
+        .read(certificationRepositoryProvider)
+        .read(widget.documentId, widget.revisionId);
+    if (mounted) setState(() => _record = record);
+  }
+
+  Future<void> _open() async {
+    await Navigator.of(context).push<CertificationRecord>(
+      MaterialPageRoute(
+        builder: (_) => CertificationPage(
+          documentId: widget.documentId,
+          revisionId: widget.revisionId,
+          materialLabel: widget.materialLabel,
+          transitionDuration: widget.transitionDuration,
+          demoPlan: widget.demoPlan,
+        ),
+      ),
+    );
+    await _load();
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.eligible) return const SizedBox.shrink();
+    final status = _record?.status ?? CertificationStatus.notStarted;
+    final succeeded = status == CertificationStatus.succeeded;
     return PomiSectionCard(
+      key: const Key('certification-entry-card'),
+      onTap: _open,
+      color: succeeded ? const Color(0xFFF1F8F3) : Colors.white,
       child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
             children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: PomiColors.primaryPale,
-                    foregroundColor: PomiColors.primary,
-                    child: Icon(Icons.science_outlined),
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '检测单 6 · 模拟医院 B',
-                          style: TextStyle(fontWeight: FontWeight.w800),
-                        ),
-                        SizedBox(height: 3),
-                        Text(
-                          '文件版本 V2 · 已完成用户确认',
-                          style: TextStyle(
-                            color: PomiColors.textMuted,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: (succeeded ? PomiColors.success : PomiColors.primary)
+                      .withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  succeeded
+                      ? Icons.verified_rounded
+                      : Icons.verified_user_outlined,
+                  color: succeeded ? PomiColors.success : PomiColors.primary,
+                ),
               ),
-              SizedBox(height: 14),
-              _InfoRow(label: '材料编号', value: 'document-lab-006'),
-              _InfoRow(label: '修订编号', value: 'revision-v2'),
-              _InfoRow(label: '文件哈希', value: '8c3d…f1a9', last: true),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _entryTitle(status),
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      succeeded
+                          ? '仅绑定修订 ${widget.revisionId}，新修订需重新演示'
+                          : '演示功能 · 不连接医院或真实区块链',
+                      style: const TextStyle(
+                        color: PomiColors.textMuted,
+                        fontSize: 10,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    const Text(
+                      CertificationCopy.technologySupport,
+                      style: TextStyle(
+                        color: PomiColors.textMuted,
+                        fontSize: 9,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded),
             ],
           ),
           if (succeeded)
-            Positioned(
-              right: 2,
-              bottom: 0,
-              child: Transform.rotate(
-                angle: -0.08,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: PomiColors.primary, width: 2),
-                    borderRadius: BorderRadius.circular(8),
-                    color: Colors.white.withValues(alpha: 0.88),
-                  ),
-                  child: const Text(
-                    '演示认证',
-                    style: TextStyle(
-                      color: PomiColors.primary,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ),
+            const Positioned(
+              right: 24,
+              top: -10,
+              child: CertificationWatermark(),
             ),
         ],
       ),
@@ -251,38 +298,158 @@ class _MaterialPreview extends StatelessWidget {
   }
 }
 
+class CertificationWatermark extends StatelessWidget {
+  const CertificationWatermark({super.key});
+
+  @override
+  Widget build(BuildContext context) => Transform.rotate(
+    angle: -0.04,
+    child: Container(
+      key: const Key('certification-watermark'),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F8F3).withValues(alpha: 0.94),
+        border: Border.all(color: PomiColors.success, width: 1.4),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: const Text(
+        CertificationCopy.watermark,
+        style: TextStyle(
+          color: PomiColors.success,
+          fontSize: 9,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.4,
+        ),
+      ),
+    ),
+  );
+}
+
+class _RevisionPreview extends StatelessWidget {
+  const _RevisionPreview({
+    required this.materialLabel,
+    required this.documentId,
+    required this.revisionId,
+    required this.showWatermark,
+  });
+
+  final String materialLabel;
+  final String documentId;
+  final String revisionId;
+  final bool showWatermark;
+
+  @override
+  Widget build(BuildContext context) => PomiSectionCard(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const CircleAvatar(
+              backgroundColor: PomiColors.primaryPale,
+              foregroundColor: PomiColors.primary,
+              child: Icon(Icons.description_outlined),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    materialLabel,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 3),
+                  const Text(
+                    'OCR 已由用户确认 · 本地演示对象',
+                    style: TextStyle(color: PomiColors.textMuted, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        _InfoRow(label: '材料 ID', value: documentId),
+        _InfoRow(label: '当前修订 ID', value: revisionId, last: true),
+        if (showWatermark) ...[
+          const SizedBox(height: 10),
+          const Align(
+            alignment: Alignment.centerRight,
+            child: CertificationWatermark(),
+          ),
+        ],
+      ],
+    ),
+  );
+}
+
+class _BoundaryCard extends StatelessWidget {
+  const _BoundaryCard();
+
+  @override
+  Widget build(BuildContext context) => PomiSectionCard(
+    color: const Color(0xFFFFF8EE),
+    child: const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.info_outline_rounded, color: Color(0xFF8B5D3F)),
+            SizedBox(width: 8),
+            Text('演示边界', style: TextStyle(fontWeight: FontWeight.w800)),
+          ],
+        ),
+        SizedBox(height: 9),
+        Text(
+          CertificationCopy.boundary,
+          style: TextStyle(height: 1.55, fontSize: 11),
+        ),
+        SizedBox(height: 8),
+        Text(
+          CertificationCopy.dataSafety,
+          style: TextStyle(
+            color: PomiColors.textMuted,
+            height: 1.55,
+            fontSize: 11,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 class _StatusContent extends StatelessWidget {
   const _StatusContent({required this.record, super.key});
 
-  final CertificationRecord? record;
+  final CertificationRecord record;
 
   @override
   Widget build(BuildContext context) {
-    final status = record?.status ?? CertificationStatus.notStarted;
-    final (icon, color, title, body) = switch (status) {
+    final (icon, color, title, body) = switch (record.status) {
       CertificationStatus.notStarted => (
         Icons.radio_button_unchecked,
         PomiColors.textMuted,
         '尚未开始',
-        '已确认的材料可以发起本地认证演示。',
+        '当前已确认材料可以发起本地认证交互演示。',
       ),
       CertificationStatus.processing => (
         Icons.autorenew_rounded,
         PomiColors.primary,
         '处理中',
-        '正在模拟认证流程，通常需要 1–2 秒。',
+        '正在模拟认证流程，通常需要 1–2 秒。请勿重复点击。',
       ),
       CertificationStatus.succeeded => (
         Icons.check_circle_rounded,
         PomiColors.success,
-        '演示认证成功',
-        '本机已保存当前材料版本的演示状态。',
+        '本地演示成功',
+        '成功水印只适用于页面上显示的材料修订，不代表真实医院认证。',
       ),
       CertificationStatus.failed => (
         Icons.error_outline_rounded,
         PomiColors.warning,
-        '认证失败',
-        record?.failureReason ?? '可以重新尝试，不影响已确认材料。',
+        '本地演示失败',
+        record.failureReason ?? '可以重试；失败不会影响材料和医疗数据。',
       ),
     };
     return Row(
@@ -297,10 +464,10 @@ class _StatusContent extends StatelessWidget {
               Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
               const SizedBox(height: 4),
               Text(body, style: Theme.of(context).textTheme.bodySmall),
-              if (record?.updatedAt != null) ...[
+              if (record.updatedAt != null) ...[
                 const SizedBox(height: 5),
                 Text(
-                  '更新时间 ${DateFormat('yyyy-MM-dd HH:mm').format(record!.updatedAt!)}',
+                  '本地更新时间 ${DateFormat('yyyy-MM-dd HH:mm').format(record.updatedAt!.toLocal())}',
                   style: const TextStyle(
                     color: PomiColors.textMuted,
                     fontSize: 9,
@@ -323,24 +490,33 @@ class _InfoRow extends StatelessWidget {
   final bool last;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 9),
-      decoration: BoxDecoration(
-        border: last
-            ? null
-            : const Border(bottom: BorderSide(color: Color(0x126A4C93))),
-      ),
-      child: Row(
-        children: [
-          Text(label, style: Theme.of(context).textTheme.bodySmall),
-          const Spacer(),
-          Text(
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(vertical: 9),
+    decoration: BoxDecoration(
+      border: last
+          ? null
+          : const Border(bottom: BorderSide(color: Color(0x126A4C93))),
+    ),
+    child: Row(
+      children: [
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
             value,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.end,
             style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
 }
+
+String _entryTitle(CertificationStatus status) => switch (status) {
+  CertificationStatus.notStarted => '医院认证 · 本地演示',
+  CertificationStatus.processing => '本地认证演示处理中',
+  CertificationStatus.succeeded => '本地认证演示已完成',
+  CertificationStatus.failed => '本地认证演示失败，可重试',
+};
