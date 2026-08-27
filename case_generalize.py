@@ -196,6 +196,9 @@ def replace_text(
             draw = ImageDraw.Draw(image)
         except Exception:
             draw.rectangle([x1, y1, x2, y2], fill=(255, 255, 255))
+    elif method == "none":
+        # 不进行任何清底，直接在当前背景上绘制（用于先铺背景面板后写字，避免再次覆盖造成色块拼接）
+        pass
 
     max_width = x2 - x1
     max_height = y2 - y1
@@ -215,7 +218,7 @@ def replace_text(
     return image
 
 
-def replace_logo(image, logo_path, logo_bbox=None, clean_mode="none", clean_pad=0):
+def replace_logo(image, logo_path, logo_bbox=None, clean_mode="safe", clean_pad=6):
     """
     将 logo 粘贴到指定区域，要求100%覆盖原有医院名/标识：
     - 自动检测右上角旧院名区域，取与目标框的并集作为清理框
@@ -306,22 +309,55 @@ def replace_logo(image, logo_path, logo_bbox=None, clean_mode="none", clean_pad=
     offset_x = x1 + (target_w - new_w) // 2
     offset_y = y1 + (target_h - new_h) // 2
 
-    # 3) 在粘贴区域铺一层不透明的“背板”（同色），防止半透明 logo 下透出旧文字
+    # 3) 在粘贴区域铺一层不透明的“背板”（纯白），防止半透明 logo 下透出旧文字；
+    #    同时在目标框四周各扩 1px 再覆盖一层，减少边缘拼接痕迹。
     draw = ImageDraw.Draw(image)
-    # 采用上缘窄带的均值色作为背板颜色（偏白）
-    sample = image.crop((x1, max(0, y1 - 4), x2, y1))
-    if sample.size[0] and sample.size[1]:
-        avg = tuple(int(v) for v in np.array(sample).reshape(-1, 3).mean(axis=0))
-    else:
-        avg = (255, 255, 255)
+    # 直接使用纯白背板，避免采样色与背景不一致产生边框
+    avg = (255, 255, 255)
     back_x1 = max(0, offset_x - 2)
     back_y1 = max(0, offset_y - 2)
     back_x2 = min(image.size[0], offset_x + new_w + 2)
     back_y2 = min(image.size[1], offset_y + new_h + 2)
     draw.rectangle([back_x1, back_y1, back_x2, back_y2], fill=avg)
+    # 额外一层轻微扩展覆盖，压暗线性插值造成的边缘锯齿
+    pad2 = 1
+    draw.rectangle([
+        max(0, back_x1 - pad2), max(0, back_y1 - pad2),
+        min(image.size[0], back_x2 + pad2), min(image.size[1], back_y2 + pad2)
+    ], fill=avg)
 
-    # 4) 直接粘贴（不做任何模糊）
-    image.paste(logo, (offset_x, offset_y), logo)
+    # 4) 将 logo 转换为完全不透明（去alpha），避免半透明区透出底色；再直接粘贴
+    if logo.mode in ("RGBA", "LA"):
+        bg = Image.new("RGBA", logo.size, (255, 255, 255, 255))
+        bg.alpha_composite(logo)
+        logo_opaque = bg.convert("RGB")
+    else:
+        logo_opaque = logo.convert("RGB")
+    image.paste(logo_opaque, (offset_x, offset_y))
+
+    # 5) 细边缘羽化：对背板边缘做一次极轻微的周边采样填充，进一步减轻拼接感
+    try:
+        bleed = 1
+        _fill_rect_with_sampled_color = None  # 占位避免未引用警告
+        band_top = (back_x1, max(0, back_y1 - bleed), back_x2, back_y1)
+        band_bottom = (back_x1, back_y2, back_x2, min(image.size[1], back_y2 + bleed))
+        band_left = (max(0, back_x1 - bleed), back_y1, back_x1, back_y2)
+        band_right = (back_x2, back_y1, min(image.size[0], back_x2 + bleed), back_y2)
+        # 取相邻带的均值涂抹到背板外一圈像素
+        def _avg(crop_box):
+            c = image.crop(crop_box)
+            import numpy as _np
+            arr = _np.array(c)
+            return tuple(int(v) for v in arr.reshape(-1, 3).mean(axis=0)) if arr.size else avg
+        edge_color = _avg((back_x1, max(0, back_y1 - 2), back_x2, back_y1))
+        from PIL import ImageDraw as _ImageDraw
+        d2 = _ImageDraw.Draw(image)
+        d2.rectangle([max(0, back_x1-1), max(0, back_y1-1), back_x2+1, back_y1], fill=edge_color)
+        d2.rectangle([max(0, back_x1-1), back_y2, back_x2+1, min(image.size[1], back_y2+1)], fill=edge_color)
+        d2.rectangle([max(0, back_x1-1), back_y1, back_x1, back_y2], fill=edge_color)
+        d2.rectangle([back_x2, back_y1, min(image.size[0], back_x2+1), back_y2], fill=edge_color)
+    except Exception:
+        pass
 
     return image
 
@@ -372,6 +408,80 @@ def save_with_compression(image, output_path, quality=95):
     image.save(output_path, format="JPEG", quality=quality, optimize=True)
 
 
+def draw_prescription_mobile_shell(image):
+    """绘制医嘱_处方的移动端病历页骨架。
+
+    sample_input 是手机小程序样式：顶部导航 + tab + 蓝色分区标题 + 白色处方卡。
+    如果只做文字替换，会显得像空白处方笺；这里用固定 UI 骨架保证信息层级和布局稳定。
+    """
+    W, H = image.size
+    draw = ImageDraw.Draw(image)
+
+    bg = (247, 248, 248)
+    white = (255, 255, 255)
+    cyan = (211, 246, 250)
+    card_border = (224, 224, 224)
+    divider = (232, 232, 232)
+    label_divider = (226, 226, 226)
+
+    # 页面基础：顶部白色，主体浅灰，模拟手机截屏。
+    draw.rectangle([0, 0, W, H], fill=bg)
+    draw.rectangle([0, 0, W, 280], fill=white)
+    draw.rectangle([0, 280, W, 455], fill=white)
+
+    # 顶部右侧小程序胶囊按钮。
+    draw.rounded_rectangle([895, 145, 1230, 255], radius=55, fill=(248, 248, 248), outline=(232, 232, 232), width=1)
+    draw.line([1063, 168, 1063, 232], fill=(225, 225, 225), width=1)
+
+    # Tab 底部淡蓝选中条。
+    draw.rectangle([258, 378, 370, 408], fill=(203, 245, 250))
+    draw.line([50, 454, W - 50, 454], fill=(238, 238, 238), width=2)
+
+    # 治疗计划 section：蓝色圆角标题 + 白色圆角内容卡。
+    draw.rounded_rectangle([50, 480, W - 50, 790], radius=42, fill=cyan)
+    draw.rounded_rectangle([50, 610, W - 50, 790], radius=38, fill=white, outline=card_border, width=2)
+    draw.line([92, 640, W - 92, 640], fill=(242, 242, 242), width=2)
+
+    # 处方 section：一个蓝色处方区域内放三张完整白色药品卡。
+    # 这样既保留原图“处方卡片”的层级，也能满足三个药槽全部可读。
+    draw.rounded_rectangle([50, 827, W - 50, 2715], radius=42, fill=cyan)
+
+    # 患者/诊断信息栏：和药品明细分开，视觉上更像病例信息区。
+    draw.rounded_rectangle([82, 905, W - 82, 1002], radius=24, fill=white, outline=card_border, width=2)
+    draw.line([106, 955, W - 106, 955], fill=divider, width=2)
+
+    # 药品卡片及内部表格分割线。
+    cards = [
+        [50, 1010, W - 50, 1515],
+        [50, 1548, W - 50, 2106],
+        [50, 2139, W - 50, 2697],
+    ]
+    row_lines = [
+        [1122, 1222, 1308, 1394],
+        [1712, 1812, 1898, 1984],
+        [2302, 2402, 2488],
+    ]
+    for card, lines in zip(cards, row_lines):
+        x1, y1, x2, y2 = card
+        draw.rounded_rectangle(card, radius=34, fill=white, outline=card_border, width=3)
+        # 标题行下方分割线 + 明细行分割线。
+        for y in lines:
+            draw.line([x1 + 38, y, x2 - 38, y], fill=divider, width=2)
+        # 左侧标签列分割线，形成“字段名 / 内容”的病例表单感。
+        draw.line([250, y1 + 118, 250, y2 - 36], fill=label_divider, width=2)
+        # 标题行左侧小色条，增强处方条目的层级。
+        draw.rounded_rectangle([86, y1 + 40, 94, y1 + 96], radius=4, fill=(123, 218, 228))
+
+    # 底部医生/审核区域分割线。
+    draw.line([90, 2588, W - 190, 2588], fill=divider, width=2)
+
+    # 右下角审核悬浮按钮，保留原图“浮层”感，但改成固定审核人文案。
+    draw.ellipse([1085, 2590, 1222, 2727], fill=white, outline=(235, 235, 235), width=1)
+    draw.rectangle([1122, 2628, 1188, 2690], fill=(229, 247, 249))
+
+    return image
+
+
 # ============================================================
 # 根据模板生成最终文字
 # ============================================================
@@ -387,6 +497,121 @@ def render_value(template, data):
     except Exception as e:
         print(f"[WARNING] 模板渲染失败: {e}, template={template[:50]}")
         return template
+
+
+def draw_imaging_report_shell(image):
+    """重绘影像文字报告基础版式：白底报告壳 + 逻辑分区，避免原模板覆盖痕迹。"""
+    draw = ImageDraw.Draw(image)
+    W, H = image.size
+    white = (255, 255, 255)
+    title_blue = (28, 88, 145)
+    text_blue = (45, 88, 130)
+    line = (150, 162, 174)
+    light_line = (214, 220, 226)
+    pale_fill = (247, 250, 253)
+    section_fill = (238, 245, 252)
+
+    draw.rectangle([0, 0, W, H], fill=white)
+
+    # 顶部留出右上角 logo 区域，左侧由字段写医院/报告标题。
+    draw.line([56, 132, W - 56, 132], fill=title_blue, width=3)
+    draw.line([56, 185, W - 56, 185], fill=light_line, width=1)
+
+    # 患者/检查信息栏。
+    info_box = [56, 210, W - 56, 350]
+    draw.rounded_rectangle(info_box, radius=8, fill=pale_fill, outline=light_line, width=1)
+    draw.line([76, 280, W - 76, 280], fill=light_line, width=1)
+
+    # 超声所见正文区域。
+    body_box = [56, 405, W - 56, 1105]
+    draw.rectangle([body_box[0], body_box[1], body_box[2], body_box[3]], fill=white, outline=line, width=2)
+    draw.rectangle([body_box[0], body_box[1], body_box[2], body_box[1] + 54], fill=section_fill)
+    draw.line([body_box[0], body_box[1] + 54, body_box[2], body_box[1] + 54], fill=line, width=2)
+    # 从原始样本裁一块超声暗图区作为固定示意图，贴到白底报告壳内。
+    # 注意：不是覆盖旧文字，而是把原图中的影像区域当作图片素材复用。
+    try:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        src_path = os.path.join(script_dir, "sample_input", "影像文字报告.jpg")
+        with Image.open(src_path).convert("RGB") as src:
+            ultrasound = src.crop((40, 460, 1180, 740))
+        target_box = [76, 480, W - 76, 746]
+        target_w = target_box[2] - target_box[0]
+        target_h = target_box[3] - target_box[1]
+        ultrasound = ultrasound.resize((target_w, target_h), Image.Resampling.LANCZOS)
+        image.paste(ultrasound, (target_box[0], target_box[1]))
+        draw.rectangle(target_box, outline=(120, 130, 140), width=2)
+    except Exception:
+        # 如果素材读取失败，保留一块灰框，生成流程不中断。
+        target_box = [76, 480, W - 76, 746]
+        draw.rectangle(target_box, fill=(28, 32, 36), outline=(120, 130, 140), width=2)
+
+    # 内容区只画少量逻辑分隔，不按每个字段涂背景。
+    for y in [770, 870, 970]:
+        draw.line([body_box[0] + 20, y, body_box[2] - 20, y], fill=light_line, width=1)
+
+    # 超声提示/建议区域。
+    result_box = [56, 1140, W - 56, 1345]
+    draw.rectangle(result_box, fill=white, outline=line, width=2)
+    draw.rectangle([result_box[0], result_box[1], result_box[2], result_box[1] + 54], fill=section_fill)
+    draw.line([result_box[0], result_box[1] + 54, result_box[2], result_box[1] + 54], fill=line, width=2)
+    draw.line([result_box[0] + 20, 1242, result_box[2] - 20, 1242], fill=light_line, width=1)
+
+    # 底部签名栏。
+    footer_y = 1395
+    draw.line([56, footer_y, W - 56, footer_y], fill=light_line, width=1)
+    draw.line([56, footer_y + 92, W - 56, footer_y + 92], fill=light_line, width=1)
+
+    return image
+
+
+def draw_lab_report_shell(image):
+    """重绘化验单基础版式：真实检验报告常见的页眉、患者信息栏和规整项目表。"""
+    draw = ImageDraw.Draw(image)
+    W, H = image.size
+    white = (255, 255, 255)
+    title_blue = (30, 96, 150)
+    line = (160, 170, 180)
+    light_line = (215, 220, 225)
+    header_fill = (242, 247, 252)
+    info_fill = (248, 251, 253)
+
+    draw.rectangle([0, 0, W, H], fill=white)
+
+    # 页眉区域：标题下只保留一条主线，避免无意义横线。
+    draw.line([56, 104, W - 56, 104], fill=title_blue, width=3)
+    draw.line([56, 182, W - 56, 182], fill=light_line, width=1)
+
+    # 患者信息栏：两行信息，边框明确但不切碎内容。
+    info_box = [56, 205, W - 56, 335]
+    draw.rounded_rectangle(info_box, radius=8, fill=info_fill, outline=light_line, width=1)
+    draw.line([76, 270, W - 76, 270], fill=light_line, width=1)
+
+    # 检验项目表：固定列、固定行高，线条只服务表格结构。
+    left, right = 56, W - 56
+    top = 388
+    header_h = 48
+    row_h = 60
+    rows = 13
+    bottom = top + header_h + rows * row_h
+
+    draw.rectangle([left, top, right, top + header_h], fill=header_fill)
+    draw.rectangle([left, top, right, bottom], outline=line, width=2)
+
+    # 列：序号、项目、缩写、结果、单位、参考范围
+    cols = [left, 120, 430, 590, 745, 930, right]
+    for x in cols[1:-1]:
+        draw.line([x, top, x, bottom], fill=light_line, width=1)
+    draw.line([left, top + header_h, right, top + header_h], fill=line, width=2)
+    for i in range(1, rows + 1):
+        y = top + header_h + i * row_h
+        draw.line([left, y, right, y], fill=light_line, width=1)
+
+    # 底部备注和签名区域。
+    note_top = bottom + 30
+    draw.rounded_rectangle([56, note_top, W - 56, note_top + 92], radius=8, fill=white, outline=light_line, width=1)
+    draw.line([56, note_top + 120, W - 56, note_top + 120], fill=light_line, width=1)
+
+    return image
 
 
 # ============================================================
@@ -406,6 +631,13 @@ def generate_case(
 ):
     image = Image.open(input_path).convert("RGB")
 
+    if report_type == "医嘱_处方":
+        image = draw_prescription_mobile_shell(image)
+    elif report_type == "影像文字报告":
+        image = draw_imaging_report_shell(image)
+    elif report_type == "化验_检测报告":
+        image = draw_lab_report_shell(image)
+
     # 使用传入的数据（不再重新生成，确保与 truth 一致）
     module = get_report_type(report_type)
     fields = module.get_fields()
@@ -416,6 +648,20 @@ def generate_case(
         template = field["template"]
         value = render_value(template, data)
 
+        # 针对“门诊病历_就诊记录”减少色块拼接感：
+        # 在需要的行先绘制统一宽度的浅灰面板，再直接在上面写字（method='none'），避免多次采样清底造成的色差边界。
+        if report_type == "门诊病历_就诊记录":
+            # 门诊病历在 clean_base 中已经统一铺好了浅灰底，这里直接写字避免再次清底造成色块拼接
+            draw_method = "none"
+        elif report_type == "影像文字报告":
+            # 影像报告改为白底重绘报告壳，所有文字直接写在空白/表单区域上，不再做原图采样覆盖。
+            draw_method = "none"
+        elif report_type == "化验_检测报告":
+            # 化验单版式已整体重绘，字段直接落在表格单元格内，避免二次清底制造怪异色块/断线。
+            draw_method = "none"
+        else:
+            draw_method = field.get("method", "sample")
+
         image = replace_text(
             image=image,
             bbox=bbox,
@@ -423,7 +669,7 @@ def generate_case(
             font_path=config["font_path"],
             font_size=field.get("font_size", 24),
             color=tuple(field.get("color", [0, 0, 0])),
-            method=field.get("method", "sample")
+            method=draw_method
         )
 
     # Logo 替换 - 使用脚本所在目录
@@ -446,8 +692,12 @@ def generate_case(
             logo_path = p
             break
 
-    if logo_path:
+    if logo_path and report_type != "医嘱_处方":
         image = replace_logo(image, logo_path, logo_bbox)
+    elif report_type == "医嘱_处方":
+        # 医嘱_处方样本是移动端病历/处方页面，右上角应保留小程序菜单胶囊，
+        # 不贴医院 logo，否则会变成传统纸质处方笺，布局与 sample_input 不一致。
+        pass
     else:
         print(f"[WARNING] 未找到匹配的 Logo 文件，已跳过。尝试过: {', '.join(candidate_paths)}")
 
@@ -505,17 +755,24 @@ def build_truth_data(report_type, hospital_info, data, filename):
         ]
 
     elif report_type == "医嘱_处方":
+        truth["medical_advice"] = data.get("treatment_plan", "")
         meds = []
         for i in range(1, 4):
             name = data.get(f"med{i}_name", "")
             if name:
+                source_text = (
+                    f"药品 {data.get(f'med{i}_display', name + ' ' + data.get(f'med{i}_spec', ''))} "
+                    f"用法 {data.get(f'med{i}_usage', data.get('usage', ''))} {data.get(f'med{i}_form', '')} "
+                    f"用量 {data.get(f'med{i}_dose', '')}，{data.get(f'med{i}_freq', '')} "
+                    f"疗程 {data.get(f'med{i}_days', '')} 总量 {data.get(f'med{i}_total', '')}"
+                ).strip()
                 meds.append({
                     "drug_name": name,
                     "dosage": data.get(f"med{i}_spec", ""),
                     "frequency": data.get(f"med{i}_freq", ""),
                     "duration": data.get(f"med{i}_days", ""),
-                    "instruction": data.get(f"med{i}_freq", ""),
-                    "source_text": f"{name} {data.get(f'med{i}_spec', '')} {data.get(f'med{i}_freq', '')} {data.get(f'med{i}_days', '')}"
+                    "instruction": data.get(f"med{i}_instruction", ""),
+                    "source_text": source_text
                 })
         truth["medication_suggestions"] = meds
 
@@ -528,10 +785,16 @@ def build_truth_data(report_type, hospital_info, data, filename):
         truth["medical_advice"] = data.get("advice", "")
 
     elif report_type == "影像文字报告":
+        # 影像文字报告必须按完整字段行/完整句覆盖：涉及测量值的句子整体重写，
+        # 句内数字由本次 data 统一生成，避免“旧句残留 + 新数字贴片”的错位问题。
+        truth["diagnosis_summary"] = data.get("impression_line", data.get("impression", ""))
+        truth["medical_advice"] = data.get("recommendation_line", data.get("recommendation", ""))
         truth["examinations"] = [
-            {"item_name": "右卵巢大小", "value": f"{data.get('right_ovary_length', '')}*{data.get('right_ovary_width', '')}*{data.get('right_ovary_height', '')}", "unit": "mm", "reference_range": "25-40*15-25*20-35", "abnormal": False},
-            {"item_name": "左卵巢大小", "value": f"{data.get('left_ovary_length', '')}*{data.get('left_ovary_width', '')}*{data.get('left_ovary_height', '')}", "unit": "mm", "reference_range": "25-40*15-25*20-35", "abnormal": False},
-            {"item_name": "盆腔积液", "value": data.get("pelvic_effusion", ""), "unit": "", "reference_range": "无", "abnormal": data.get("pelvic_effusion", "无") != "无"},
+            {"item_name": "右卵巢", "value": f"{data.get('right_ovary_length', '')}*{data.get('right_ovary_width', '')}*{data.get('right_ovary_height', '')}", "unit": "mm", "reference_range": "25-40*15-25*20-35", "abnormal": False, "source_text": data.get("right_ovary_line", "")},
+            {"item_name": "右侧基础卵泡", "value": str(data.get("follicle_count_right", "")), "unit": "个", "reference_range": "", "abnormal": False, "source_text": data.get("right_ovary_line", "")},
+            {"item_name": "左卵巢", "value": f"{data.get('left_ovary_length', '')}*{data.get('left_ovary_width', '')}*{data.get('left_ovary_height', '')}", "unit": "mm", "reference_range": "25-40*15-25*20-35", "abnormal": False, "source_text": data.get("left_ovary_line", "")},
+            {"item_name": "左侧基础卵泡", "value": str(data.get("follicle_count_left", "")), "unit": "个", "reference_range": "", "abnormal": False, "source_text": data.get("left_ovary_line", "")},
+            {"item_name": "盆腔积液", "value": data.get("pelvic_effusion", ""), "unit": "", "reference_range": "无", "abnormal": data.get("pelvic_effusion", "无") != "无", "source_text": data.get("pelvic_effusion_line", "")},
         ]
 
     return truth
@@ -616,6 +879,7 @@ def main():
         module = get_report_type(args.type)
         data = module.generate_data()
         data["department"] = random.choice(DEPARTMENTS)
+        data["hospital"] = hospital_info["name"]
 
         # 构建 truth
         truth = build_truth_data(args.type, hospital_info, data, filename)

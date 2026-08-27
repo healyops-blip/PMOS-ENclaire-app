@@ -91,26 +91,67 @@ def build_clean_base_image(input_path, report_type, logo_bbox, fill_mode="sample
     # 3) 针对部分模板的额外静态文字/Logo 区域清理（保守坐标，不影响字段）
     W, H = image.size
     if report_type == "化验_检测报告":
-        # 清理右上表头/参考范围可能残留的小字区域（例如“男…”）
+        # 额外清理（更激进）：
+        # - 表头右上区域（医生行与首个检验行之间），常见“参考范围/性别 男/女”残留
+        # - 结果表右侧参考范围整列，从表格开始到结尾
+        # - 过曝一列更靠左的安全带，防止模板变体导致遗漏（不会影响我们随后渲染的整行文本）
+        # 注意：我们先清空，再整行渲染自己的文本，因此即使略微覆盖到行右侧也无副作用。
         extra_boxes = [
-            # 表头右上区域（医生行与首个检验行之间）
-            (max(0, int(W*0.75)), max(0, 360), min(W, int(W*0.98)), min(H, 450)),
+            (max(0, int(W*0.60)), 280, min(W, int(W*0.995)), min(H, 540)),   # 表头右上较大清理（更宽更高）
+            (max(0, int(W*0.60)), 500, min(W, int(W*0.995)), min(H, 1820)),  # 右侧参考范围列（向左扩展）
+            (max(0, int(W*0.78)), 360, min(W, int(W*0.995)), min(H, 1820)),  # 冗余安全带（确保彻底）
         ]
     elif report_type == "影像文字报告":
         # 部分模板原始院名/Logo 位于左上角，右上角仅用于新 Logo；
         # 保守清理左上头部区域，不触碰任何字段（字段从 y≈240 开始）。
+        # 同时增加右上角标题带（常见项目栏）清理，以避免模板上“性别/男/女”之类遗留
         extra_boxes = [
             (0, 0, min(W, int(W * 0.48)), min(H, 220)),
+            (max(0, int(W*0.68)), 230, min(W, int(W*0.99)), min(H, 300)),
+        ]
+    elif report_type == "门诊病历_就诊记录":
+        # 为门诊病历提供统一的中性面板底色，避免后续逐条清底导致的色差拼接感。
+        # 这里将主体文本区域统一铺设为浅灰底，字段渲染时使用 method='none' 直接写字。
+        # 范围：从就诊日期到备注区域整体覆盖，保留页面左右留白。
+        left_margin = max(0, int(W * 0.04))
+        right_margin = max(0, int(W * 0.04))
+        extra_boxes = [
+            (left_margin, 150, W - right_margin, min(H, 1450)),
+        ]
+    elif report_type == "医嘱_处方":
+        # 处方模板来自手机端病历页面。清理时保留蓝色分区和白色卡片骨架，
+        # 仅额外抹掉原截图右下角“下载”悬浮按钮，避免与审核人/处方内容混在一起。
+        extra_boxes = [
+            (1040, 2050, min(W, 1240), min(H, 2280)),
         ]
     else:
         extra_boxes = []
 
     for bx in extra_boxes:
-        if fill_mode == "white":
+        # 对化验单的额外清理区域一律用纯白填充，确保去除“男/女/参考范围”等静态字样
+        if report_type == "化验_检测报告":
             ImageDraw.Draw(image).rectangle(bx, fill=(255, 255, 255))
-        elif fill_mode == "gray":
-            ImageDraw.Draw(image).rectangle(bx, fill=(245, 245, 245))
+        elif report_type == "门诊病历_就诊记录":
+            # 门诊病历统一浅灰底色，减少拼接感
+            ImageDraw.Draw(image).rectangle(bx, fill=(234, 234, 234))
         else:
-            _fill_rect_with_sampled_color(image, bx)
+            if fill_mode == "white":
+                ImageDraw.Draw(image).rectangle(bx, fill=(255, 255, 255))
+            elif fill_mode == "gray":
+                ImageDraw.Draw(image).rectangle(bx, fill=(245, 245, 245))
+            else:
+                _fill_rect_with_sampled_color(image, bx)
+
+    # 4) 统一清理顶端整条“页眉带”（防止模板差异在顶部残留旧Logo/英文名/性别列等）
+    #    这里直接用纯白填充，再由后续渲染完整覆盖字段内容，避免任何残影。
+    header_band_by_type = {
+        "影像文字报告": 320,
+        "化验_检测报告": 360,
+        "医嘱_处方": 260,
+        "门诊病历_就诊记录": 260,
+    }
+    hb = header_band_by_type.get(report_type, 300)
+    header_box = (0, 0, W, min(H, hb))
+    ImageDraw.Draw(image).rectangle(header_box, fill=(255, 255, 255))
 
     return image

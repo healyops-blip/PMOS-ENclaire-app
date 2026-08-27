@@ -4,9 +4,16 @@ __pycache__/
 *.DS_Store
 .idea/
 .vscode/
+.env
+.env.*
+!.env.example
 
 # Generated outputs
 /result/
+result*/
+_debug*/
+_regen*/
+_imaging_crop_probe/
 .ssh/
 
 # Logs and temp

@@ -1,6 +1,7 @@
 """化验_检测报告 - 数据生成器"""
 import random
 from datetime import datetime, timedelta
+from .names import get_patient_name
 
 
 def generate_data():
@@ -11,13 +12,8 @@ def generate_data():
         # 患者信息
         "exam_date": (now - timedelta(days=random.randint(1, 30))).strftime("%Y-%m-%d"),
         "patient_id": f"LA{random.randint(10000, 99999)}",
-        # 中性、好听的名字，避免“女”字旁及过度男性化字
-        "name": random.choice([
-            "张子涵", "王语晨", "李亦然", "刘晨曦", "陈星辰", "杨景澄", "赵之远", "周清和",
-            "吴清岚", "郑清扬", "孙清越", "胡清澄", "郭若溪", "何若林", "高若寒", "林子衿",
-            "罗子期", "马景宁", "姜柏言", "许栩然", "傅栩宁", "曹知行", "邓知远", "崔知新",
-            "冯承安", "宋承宁", "唐明安", "韩明川", "彭明溪", "蒋明远", "于明诚", "谢晨安"
-        ]),
+        # 姓名统一由 report_types.names 生成
+        "name": get_patient_name(gender="女"),
         "age": random.randint(20, 55),
         "gender": "女",
         "doctor": random.choice([
@@ -48,112 +44,91 @@ def generate_data():
         "tsh": round(random.uniform(0.2, 5.0), 2),        # 促甲状腺激素
         "ft3": round(random.uniform(2.0, 5.0), 1),        # 游离T3
         "ft4": round(random.uniform(10, 25), 1),          # 游离T4
+
+        # 备注/建议（PCOS 相关文本，便于下游 truth 的 medical_advice 使用）
+        "advice": random.choice([
+            "备注：建议结合PCOS（多囊卵巢综合征）相关评估，按需随访",
+            "备注：建议结合临床，评估PCOS相关代谢与激素水平，定期复查",
+            "备注：如为PCOS管理阶段，建议记录月经周期并按医嘱复诊",
+            "备注：建议生活方式干预（饮食+运动），必要时与内分泌科联合随访",
+        ]),
     }
 
 
 def get_fields():
     """返回字段定义列表"""
-    return [
+    left = 56
+    top = 388
+    header_h = 48
+    row_h = 60
+    cols = [left, 120, 430, 590, 745, 930, 1200]
+
+    lab_items = [
+        ("wbc", "白细胞计数", "WBC", "{wbc}", "×10^9/L", "4-12"),
+        ("rbc", "红细胞计数", "RBC", "{rbc}", "×10^12/L", "4-6"),
+        ("hgb", "血红蛋白", "HGB", "{hgb}", "g/L", "110-180"),
+        ("plt", "血小板计数", "PLT", "{plt}", "×10^9/L", "100-350"),
+        ("alt", "谷丙转氨酶", "ALT", "{alt}", "U/L", "5-45"),
+        ("ast", "谷草转氨酶", "AST", "{ast}", "U/L", "5-45"),
+        ("tbil", "总胆红素", "TBIL", "{tbil}", "μmol/L", "3-25"),
+        ("crea", "肌酐", "CREA", "{crea}", "μmol/L", "40-120"),
+        ("glu", "空腹血糖", "GLU", "{glu}", "mmol/L", "3-8"),
+        ("cho", "总胆固醇", "CHO", "{cho}", "mmol/L", "3-6"),
+        ("tg", "甘油三酯", "TG", "{tg}", "mmol/L", "0.5-2.5"),
+        ("hdl", "高密度脂蛋白", "HDL", "{hdl}", "mmol/L", "0.8-2.0"),
+        ("ldl", "低密度脂蛋白", "LDL", "{ldl}", "mmol/L", "2-4"),
+    ]
+
+    fields = [
         {
             "name": "title",
-            "bbox": [30, 0, 1120, 99],
+            "bbox": [56, 28, 720, 92],
             "template": "检验报告单",
-            "font_size": 32
+            "font_size": 34,
+            "color": [30, 96, 150]
         },
         {
             "name": "exam_date",
-            "bbox": [464, 119, 1151, 180],
+            "bbox": [780, 118, 1195, 160],
             "template": "报告日期：{exam_date}",
-            "font_size": 22
+            "font_size": 20
         },
         {
             "name": "patient_info",
-            "bbox": [38, 205, 959, 338],
-            "template": "姓名：{name}    性别：{gender}    年龄：{age}岁    病历号：{patient_id}",
+            "bbox": [76, 218, 1180, 260],
+            "template": "姓名：{name}        性别：{gender}        年龄：{age}岁        病历号：{patient_id}",
             "font_size": 20
         },
         {
             "name": "doctor",
-            "bbox": [133, 377, 1079, 416],
-            "template": "医生：{doctor}",
+            "bbox": [76, 283, 1180, 322],
+            "template": "申请医生：{doctor}        标本类型：血液        检验科室：生化/内分泌实验室",
             "font_size": 20
         },
+        {"name": "table_header_no", "bbox": [cols[0] + 10, top + 7, cols[1] - 8, top + header_h - 7], "template": "序号", "font_size": 18},
+        {"name": "table_header_item", "bbox": [cols[1] + 16, top + 7, cols[2] - 8, top + header_h - 7], "template": "项目名称", "font_size": 18},
+        {"name": "table_header_code", "bbox": [cols[2] + 16, top + 7, cols[3] - 8, top + header_h - 7], "template": "英文缩写", "font_size": 18},
+        {"name": "table_header_result", "bbox": [cols[3] + 16, top + 7, cols[4] - 8, top + header_h - 7], "template": "结果", "font_size": 18},
+        {"name": "table_header_unit", "bbox": [cols[4] + 16, top + 7, cols[5] - 8, top + header_h - 7], "template": "单位", "font_size": 18},
+        {"name": "table_header_ref", "bbox": [cols[5] + 16, top + 7, cols[6] - 8, top + header_h - 7], "template": "参考范围", "font_size": 18},
         {
-            "name": "wbc",
-            "bbox": [28, 442, 1201, 555],
-            "template": "白细胞计数(WBC): {wbc} × 10^9/L",
-            "font_size": 18
-        },
-        {
-            "name": "rbc",
-            "bbox": [28, 585, 1194, 675],
-            "template": "红细胞计数(RBC): {rbc} × 10^12/L",
-            "font_size": 18
-        },
-        {
-            "name": "hgb",
-            "bbox": [29, 683, 1178, 796],
-            "template": "血红蛋白(HGB): {hgb} g/L",
-            "font_size": 18
-        },
-        {
-            "name": "plt",
-            "bbox": [28, 804, 1191, 960],
-            "template": "血小板计数(PLT): {plt} × 10^9/L",
-            "font_size": 18
-        },
-        {
-            "name": "alt",
-            "bbox": [29, 968, 993, 1014],
-            "template": "谷丙转氨酶(ALT): {alt} U/L",
-            "font_size": 18
-        },
-        {
-            "name": "ast",
-            "bbox": [28, 1023, 1196, 1092],
-            "template": "谷草转氨酶(AST): {ast} U/L",
-            "font_size": 18
-        },
-        {
-            "name": "tbil",
-            "bbox": [31, 1463, 241, 1491],
-            "template": "总胆红素(TBIL): {tbil} μmol/L",
-            "font_size": 18
-        },
-        {
-            "name": "crea",
-            "bbox": [31, 1495, 681, 1524],
-            "template": "肌酐(CREA): {crea} μmol/L",
-            "font_size": 18
-        },
-        {
-            "name": "glu",
-            "bbox": [492, 1532, 695, 1560],
-            "template": "血糖(GLU): {glu} mmol/L",
-            "font_size": 18
-        },
-        {
-            "name": "cho",
-            "bbox": [33, 1569, 450, 1596],
-            "template": "总胆固醇(CHO): {cho} mmol/L",
-            "font_size": 18
-        },
-        {
-            "name": "tg",
-            "bbox": [32, 1604, 1066, 1632],
-            "template": "甘油三酯(TG): {tg} mmol/L",
-            "font_size": 18
-        },
-        {
-            "name": "hdl",
-            "bbox": [32, 1639, 1008, 1674],
-            "template": "高密度脂蛋白(HDL): {hdl} mmol/L",
-            "font_size": 18
-        },
-        {
-            "name": "ldl",
-            "bbox": [31, 1689, 1196, 1733],
-            "template": "低密度脂蛋白(LDL): {ldl} mmol/L",
+            "name": "advice",
+            "bbox": [76, 1255, 1180, 1328],
+            "template": "{advice}",
             "font_size": 18
         }
     ]
+
+    for idx, (key, item_name, code, value_template, unit, ref) in enumerate(lab_items, 1):
+        y1 = top + header_h + (idx - 1) * row_h + 10
+        y2 = y1 + 38
+        fields.extend([
+            {"name": f"{key}_no", "bbox": [cols[0] + 18, y1, cols[1] - 8, y2], "template": f"{idx}", "font_size": 18},
+            {"name": f"{key}_name", "bbox": [cols[1] + 16, y1, cols[2] - 8, y2], "template": item_name, "font_size": 18},
+            {"name": f"{key}_code", "bbox": [cols[2] + 16, y1, cols[3] - 8, y2], "template": code, "font_size": 18},
+            {"name": key, "bbox": [cols[3] + 16, y1, cols[4] - 8, y2], "template": value_template, "font_size": 18},
+            {"name": f"{key}_unit", "bbox": [cols[4] + 16, y1, cols[5] - 8, y2], "template": unit, "font_size": 18},
+            {"name": f"{key}_ref", "bbox": [cols[5] + 16, y1, cols[6] - 8, y2], "template": ref, "font_size": 18},
+        ])
+
+    return fields
