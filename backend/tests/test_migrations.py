@@ -23,8 +23,14 @@ def test_initial_migration_is_repeatable_and_safe(tmp_path: Path, monkeypatch: M
     inspector = inspect(engine)
     assert set(inspector.get_table_names()) >= {
         "alembic_version",
+        "medication",
+        "medication_daily",
+        "medication_event",
+        "menstrual_cycle",
+        "patient_profile",
         "user_account",
         "user_session",
+        "weight_record",
     }
 
     account_columns = {column["name"] for column in inspector.get_columns("user_account")}
@@ -48,6 +54,10 @@ def test_initial_migration_is_repeatable_and_safe(tmp_path: Path, monkeypatch: M
 
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-            "20260826_0001"
+            "20260827_0012"
         )
+    command.downgrade(config, "20260826_0001")
+    inspector = inspect(engine)
+    assert "medication" not in inspector.get_table_names()
+    assert "user_account" in inspector.get_table_names()
     engine.dispose()
