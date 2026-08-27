@@ -9,10 +9,12 @@ from typing import Any
 
 from sqlalchemy import (
     JSON,
+    Boolean,
     CheckConstraint,
     Date,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     String,
     Text,
@@ -30,9 +32,15 @@ def new_uuid() -> str:
 
 
 class PatientProfile(Base):
-    """Minimal patient owner row; profile fields are added by Issue #13."""
+    """One patient profile owned by one authenticated account."""
 
     __tablename__ = "patient_profile"
+    __table_args__ = (
+        CheckConstraint(
+            "gender IS NULL OR gender IN ('female', 'male', 'other', 'prefer_not_to_say')",
+            name="patient_profile_gender",
+        ),
+    )
 
     patient_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
     account_uid: Mapped[str] = mapped_column(
@@ -41,6 +49,16 @@ class PatientProfile(Base):
         nullable=False,
         unique=True,
     )
+    nickname: Mapped[str | None] = mapped_column(String(80))
+    birth_date: Mapped[date | None] = mapped_column(Date)
+    gender: Mapped[str | None] = mapped_column(String(24))
+    height_cm: Mapped[Decimal | None] = mapped_column(Numeric(4, 1))
+    diagnosis_year: Mapped[int | None] = mapped_column(Integer)
+    primary_condition: Mapped[str | None] = mapped_column(String(80))
+    next_visit_date: Mapped[date | None] = mapped_column(Date)
+    health_goal: Mapped[str | None] = mapped_column(String(500))
+    onboarding_completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    onboarding_completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         UTCDateTime, nullable=False, default=utc_now, onupdate=utc_now

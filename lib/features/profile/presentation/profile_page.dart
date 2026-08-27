@@ -4,11 +4,24 @@ import 'package:pmos_enclaire/core/widgets/demo_badge.dart';
 import 'package:pmos_enclaire/core/widgets/pomi_surfaces.dart';
 import 'package:pmos_enclaire/features/auth/domain/demo_account.dart';
 import 'package:pmos_enclaire/features/certification/presentation/certification_page.dart';
+import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
 
-class ProfilePage extends StatelessWidget {
-  const ProfilePage({required this.account, super.key});
+class ProfilePage extends StatefulWidget {
+  const ProfilePage({
+    required this.account,
+    required this.repository,
+    super.key,
+  });
 
   final DemoAccount account;
+  final PatientProfileRepository repository;
+
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  late Future<PatientProfile> _profile = widget.repository.get();
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +58,7 @@ class ProfilePage extends StatelessWidget {
                         ),
                         child: Center(
                           child: Text(
-                            account.displayName.characters.first,
+                            widget.account.displayName.characters.first,
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 24,
@@ -60,7 +73,7 @@ class ProfilePage extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              account.displayName,
+                              widget.account.displayName,
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 20,
@@ -81,7 +94,15 @@ class ProfilePage extends StatelessWidget {
                         ),
                       ),
                       IconButton(
-                        onPressed: () => _showEditProfile(context),
+                        onPressed: () async {
+                          final saved = await _showEditProfile(
+                            context,
+                            widget.repository,
+                          );
+                          if (saved && mounted) {
+                            setState(() => _profile = widget.repository.get());
+                          }
+                        },
                         icon: const Icon(
                           Icons.edit_outlined,
                           color: Colors.white,
@@ -109,19 +130,31 @@ class ProfilePage extends StatelessWidget {
                 const SizedBox(height: 20),
                 const PomiSectionTitle(title: '复诊安排'),
                 const SizedBox(height: 8),
-                const PomiSectionCard(
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(
-                      Icons.event_available_outlined,
-                      color: PomiColors.primary,
-                    ),
-                    title: Text(
-                      '2026-09-10',
-                      style: TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                    subtitle: Text('距下次复诊 15 天 · 模拟医院 B'),
-                    trailing: Icon(Icons.chevron_right_rounded),
+                PomiSectionCard(
+                  child: FutureBuilder<PatientProfile>(
+                    future: _profile,
+                    builder: (context, snapshot) {
+                      final visit = snapshot.data?.nextVisitDate;
+                      final label = visit == null
+                          ? '尚未设置复诊日期'
+                          : '${visit.year.toString().padLeft(4, '0')}-'
+                                '${visit.month.toString().padLeft(2, '0')}-'
+                                '${visit.day.toString().padLeft(2, '0')}';
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(
+                          Icons.event_available_outlined,
+                          color: PomiColors.primary,
+                        ),
+                        title: Text(
+                          label,
+                          key: const Key('profile-next-visit'),
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        subtitle: const Text('复诊日期由你手动维护'),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                      );
+                    },
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -195,8 +228,25 @@ class ProfilePage extends StatelessWidget {
         .showSnackBar(const SnackBar(content: Text('该设置将在后端接入阶段启用')));
   }
 
-  static Future<void> _showEditProfile(BuildContext context) {
-    return showModalBottomSheet<void>(
+  static Future<bool> _showEditProfile(
+    BuildContext context,
+    PatientProfileRepository repository,
+  ) async {
+    final profile = await repository.get();
+    if (!context.mounted) return false;
+    final nickname = TextEditingController(text: profile.nickname ?? '');
+    final height = TextEditingController(
+      text: profile.heightCm?.toString() ?? '',
+    );
+    final nextVisit = TextEditingController(
+      text: profile.nextVisitDate == null
+          ? ''
+          : '${profile.nextVisitDate!.year.toString().padLeft(4, '0')}-'
+                '${profile.nextVisitDate!.month.toString().padLeft(2, '0')}-'
+                '${profile.nextVisitDate!.day.toString().padLeft(2, '0')}',
+    );
+    var saved = false;
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -214,28 +264,54 @@ class ProfilePage extends StatelessWidget {
             Text('编辑患者画像', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 14),
             TextFormField(
-              initialValue: '林晓晴',
+              controller: nickname,
               decoration: const InputDecoration(labelText: '昵称'),
             ),
             const SizedBox(height: 10),
             TextFormField(
-              initialValue: '162',
+              controller: height,
               decoration: const InputDecoration(labelText: '身高（cm）'),
             ),
             const SizedBox(height: 10),
             TextFormField(
-              initialValue: '2026-09-10',
+              controller: nextVisit,
               decoration: const InputDecoration(labelText: '下次复诊日期'),
             ),
             const SizedBox(height: 16),
             FilledButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () async {
+                try {
+                  await repository.update(
+                    PatientProfileInput(
+                      nickname: nickname.text.trim(),
+                      birthDate: profile.birthDate,
+                      gender: profile.gender,
+                      heightCm: double.tryParse(height.text.trim()),
+                      diagnosisYear: profile.diagnosisYear,
+                      primaryCondition: profile.primaryCondition,
+                      nextVisitDate: DateTime.tryParse(nextVisit.text.trim()),
+                      healthGoal: profile.healthGoal,
+                      completeOnboarding: profile.onboardingCompleted,
+                    ),
+                  );
+                  saved = true;
+                  if (context.mounted) Navigator.pop(context);
+                } catch (error) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context)
+                      .showSnackBar(SnackBar(content: Text(error.toString())));
+                }
+              },
               child: const Text('保存修改'),
             ),
           ],
         ),
       ),
     );
+    nickname.dispose();
+    height.dispose();
+    nextVisit.dispose();
+    return saved;
   }
 }
 

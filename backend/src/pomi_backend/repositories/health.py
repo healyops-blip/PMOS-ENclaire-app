@@ -39,6 +39,15 @@ class PatientRepository:
             self.session.flush()
         return profile
 
+    def update(self, profile: PatientProfile, **changes: Any) -> PatientProfile:
+        owned = self.get_by_account_uid(profile.account_uid)
+        if owned is None or owned.patient_id != profile.patient_id:
+            raise ValueError("patient profile is outside repository scope")
+        for field, value in changes.items():
+            setattr(profile, field, value)
+        self.session.flush()
+        return profile
+
 
 class PatientScopedRepository:
     model: type[Any]
