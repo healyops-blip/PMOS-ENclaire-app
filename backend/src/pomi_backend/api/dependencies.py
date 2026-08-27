@@ -19,6 +19,7 @@ from pomi_backend.services.ocr import OCRTaskService
 from pomi_backend.services.orders import MedicalOrderService, ReconciliationService
 from pomi_backend.services.patient import PatientProfileService
 from pomi_backend.services.patient_notes import PatientNoteService
+from pomi_backend.services.reports import ReportSnapshotService
 
 bearer_scheme = HTTPBearer(auto_error=False, scheme_name="SessionBearer")
 
@@ -148,4 +149,21 @@ def get_clinical_text_confirmation_service(
 
 ClinicalTextConfirmationServiceDependency = Annotated[
     ClinicalTextConfirmationService, Depends(get_clinical_text_confirmation_service)
+]
+
+
+def get_report_snapshot_service(
+    request: Request,
+    session: DatabaseSession,
+    account: CurrentAccount,
+) -> ReportSnapshotService:
+    return ReportSnapshotService(
+        session,
+        account,
+        request.app.state.business_date_provider(),
+    )
+
+
+ReportSnapshotServiceDependency = Annotated[
+    ReportSnapshotService, Depends(get_report_snapshot_service)
 ]

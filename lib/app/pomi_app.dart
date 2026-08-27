@@ -14,6 +14,7 @@ import 'package:pmos_enclaire/features/medications/data/medication_repository.da
 import 'package:pmos_enclaire/features/onboarding/presentation/onboarding_page.dart';
 import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
 import 'package:pmos_enclaire/features/reports/data/patient_note_repository.dart';
+import 'package:pmos_enclaire/features/reports/data/report_repository.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:pmos_enclaire/features/weight/data/weight_repository.dart';
@@ -30,6 +31,7 @@ class PomiApp extends StatefulWidget {
     this.profileRepository,
     this.dashboardRepository,
     this.patientNoteRepository,
+    this.reportRepository,
     this.documentRepository,
     this.ocrRepository,
     this.weightRepository,
@@ -44,6 +46,7 @@ class PomiApp extends StatefulWidget {
   final PatientProfileRepository? profileRepository;
   final DashboardRepository? dashboardRepository;
   final PatientNoteRepository? patientNoteRepository;
+  final ReportRepository? reportRepository;
   final DocumentRepository? documentRepository;
   final OcrRepository? ocrRepository;
   final WeightRepository? weightRepository;
@@ -93,6 +96,11 @@ class _PomiAppState extends State<PomiApp> {
       (widget.authRepository is DemoAuthRepository
           ? DemoOcrRepository()
           : FastApiOcrRepository(_apiClient));
+  late final ReportRepository _reportRepository =
+      widget.reportRepository ??
+      (widget.authRepository is DemoAuthRepository
+          ? DemoReportRepository()
+          : FastApiReportRepository(_apiClient));
   late final WeightRepository _weightRepository =
       widget.weightRepository ??
       (widget.authRepository is DemoAuthRepository
@@ -188,6 +196,7 @@ class _PomiAppState extends State<PomiApp> {
               }
             },
             patientNoteRepository: _patientNoteRepository,
+            reportRepository: _reportRepository,
             documentRepository: _documentRepository,
             ocrRepository: _ocrRepository,
             weightRepository: _weightRepository,

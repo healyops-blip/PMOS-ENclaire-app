@@ -30,6 +30,7 @@ from pomi_backend.api.ocr import router as ocr_router
 from pomi_backend.api.patient import router as patient_router
 from pomi_backend.api.patient_notes import router as patient_notes_router
 from pomi_backend.api.reconciliations import router as reconciliations_router
+from pomi_backend.api.reports import router as reports_router
 from pomi_backend.api.weights import router as weights_router
 from pomi_backend.config import Settings
 from pomi_backend.db import build_engine, build_session_factory
@@ -84,6 +85,7 @@ def create_app(*, settings: Settings | None = None, engine: Engine | None = None
     app.include_router(medications_router)
     app.include_router(patient_router)
     app.include_router(patient_notes_router)
+    app.include_router(reports_router)
     app.include_router(documents_router)
     app.include_router(ocr_router)
     app.include_router(reconciliations_router)

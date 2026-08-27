@@ -21,6 +21,7 @@ import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:pmos_enclaire/features/reports/presentation/report_page.dart';
 import 'package:pmos_enclaire/features/reports/data/patient_note_repository.dart';
+import 'package:pmos_enclaire/features/reports/data/report_repository.dart';
 import 'package:pmos_enclaire/features/weight/application/weight_controller.dart';
 import 'package:pmos_enclaire/features/weight/data/weight_repository.dart';
 
@@ -31,6 +32,7 @@ class DashboardPage extends StatefulWidget {
     required this.patientNoteRepository,
     required this.documentRepository,
     required this.weightRepository,
+    this.reportRepository,
     this.ocrRepository,
     this.dashboardRepository,
     this.onLogout,
@@ -44,6 +46,7 @@ class DashboardPage extends StatefulWidget {
   final PatientProfileRepository profileRepository;
   final PatientNoteRepository patientNoteRepository;
   final DocumentRepository documentRepository;
+  final ReportRepository? reportRepository;
   final OcrRepository? ocrRepository;
   final WeightRepository weightRepository;
   final DashboardRepository? dashboardRepository;
@@ -215,6 +218,8 @@ class _DashboardPageState extends State<DashboardPage> {
                 MaterialPageRoute<void>(
                   builder: (_) => ReportGeneratorPage(
                     repository: widget.patientNoteRepository,
+                    reportRepository:
+                        widget.reportRepository ?? DemoReportRepository(),
                   ),
                 ),
               ),
