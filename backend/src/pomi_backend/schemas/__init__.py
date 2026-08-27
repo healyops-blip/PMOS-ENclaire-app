@@ -6,5 +6,12 @@ from pomi_backend.schemas.auth import (
     LoginResponse,
     RegisterRequest,
 )
+from pomi_backend.schemas.patient import PatientProfileUpdate
 
-__all__ = ["AccountResponse", "LoginRequest", "LoginResponse", "RegisterRequest"]
+__all__ = [
+    "AccountResponse",
+    "LoginRequest",
+    "LoginResponse",
+    "PatientProfileUpdate",
+    "RegisterRequest",
+]

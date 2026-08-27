@@ -88,6 +88,13 @@ def test_repository_updates_reject_identity_and_ownership_fields(db_session: Ses
     assert medication.patient_id == first_patient.patient_id
     assert medication.id != "replacement-id"
 
+    with pytest.raises(ValueError, match="account_uid"):
+        patients.update(first_patient, account_uid=second.uid)
+    with pytest.raises(ValueError, match="patient_id"):
+        patients.update(first_patient, patient_id=second_patient.patient_id)
+    assert first_patient.account_uid == first.uid
+    assert first_patient.patient_id != second_patient.patient_id
+
 
 def test_medication_associations_must_remain_in_patient_scope(db_session: Session) -> None:
     first = account(db_session, "health-association-first")

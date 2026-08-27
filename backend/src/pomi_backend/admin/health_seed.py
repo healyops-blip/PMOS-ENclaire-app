@@ -16,6 +16,7 @@ from pomi_backend.db.models import (
     MenstrualCycle,
     WeightRecord,
 )
+from pomi_backend.db.models.auth import utc_now
 from pomi_backend.repositories import PatientRepository
 
 SEED_NAMESPACE = uuid.UUID("7880114f-6cf2-429a-8acb-29af45220f15")
@@ -45,6 +46,9 @@ def seed_health_data(
     patient_repository = PatientRepository(session)
     new_patient = patient_repository.get_or_create(new_account_uid)
     returning_patient = patient_repository.get_or_create(returning_account_uid)
+    if not returning_patient.onboarding_completed:
+        returning_patient.onboarding_completed = True
+        returning_patient.onboarding_completed_at = utc_now()
     created_rows = 0
 
     medication_id = _id(returning_account_uid, "medication-metformin")

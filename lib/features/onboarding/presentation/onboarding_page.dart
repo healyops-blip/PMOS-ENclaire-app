@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pmos_enclaire/core/theme/pomi_theme.dart';
 import 'package:pmos_enclaire/core/widgets/demo_badge.dart';
 import 'package:pmos_enclaire/features/auth/domain/demo_account.dart';
+import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
 
 class OnboardingPage extends StatefulWidget {
   const OnboardingPage({
@@ -11,7 +12,7 @@ class OnboardingPage extends StatefulWidget {
   });
 
   final DemoAccount account;
-  final ValueChanged<String> onCompleted;
+  final Future<void> Function(PatientProfileInput) onCompleted;
 
   @override
   State<OnboardingPage> createState() => _OnboardingPageState();
@@ -27,6 +28,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
   final _nextVisitController = TextEditingController(text: '2026-09-10');
 
   int _step = 0;
+  bool _saving = false;
+  String? _errorMessage;
   String _gender = '女性';
   String _cycleLength = '35-45 天';
   String _periodLength = '4-5 天';
@@ -44,13 +47,43 @@ class _OnboardingPageState extends State<OnboardingPage> {
     super.dispose();
   }
 
-  void _next() {
+  Future<void> _next() async {
     if (_step == 0 && !_basicFormKey.currentState!.validate()) return;
     if (_step < 3) {
       setState(() => _step += 1);
       return;
     }
-    widget.onCompleted(_nameController.text.trim());
+    setState(() {
+      _saving = true;
+      _errorMessage = null;
+    });
+    try {
+      final birthYear = int.parse(_birthController.text.trim());
+      await widget.onCompleted(
+        PatientProfileInput(
+          nickname: _nameController.text.trim(),
+          birthDate: DateTime(birthYear),
+          gender: switch (_gender) {
+            '女性' => 'female',
+            '男性' => 'male',
+            '其他' => 'other',
+            _ => 'prefer_not_to_say',
+          },
+          heightCm: double.parse(_heightController.text.trim()),
+          diagnosisYear: int.parse(_diagnosisController.text.trim()),
+          primaryCondition: 'PCOS',
+          nextVisitDate: DateTime.tryParse(_nextVisitController.text.trim()),
+          healthGoal: _managementGoal,
+          completeOnboarding: true,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = error.toString();
+        _saving = false;
+      });
+    }
   }
 
   @override
@@ -171,10 +204,25 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       const SizedBox(height: 12),
                       const _PrivacyNote(),
                       const SizedBox(height: 18),
+                      if (_errorMessage != null) ...[
+                        Text(
+                          _errorMessage!,
+                          key: const Key('onboarding-error'),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: PomiColors.warning),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
                       FilledButton(
                         key: const Key('onboarding-next'),
-                        onPressed: _next,
-                        child: Text(_step == 3 ? '完成，进入首页' : '下一步'),
+                        onPressed: _saving ? null : _next,
+                        child: Text(
+                          _saving
+                              ? '正在保存…'
+                              : _step == 3
+                              ? '完成，进入首页'
+                              : '下一步',
+                        ),
                       ),
                       if (_step > 0)
                         TextButton(
