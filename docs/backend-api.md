@@ -1,6 +1,6 @@
 # Pomi 后端接口文档
 
-本文档描述当前已经实现并可供 Flutter 客户端联调的 FastAPI 接口。接口以实际代码、Schema 和自动化测试为准；尚未实现的患者画像、OCR、报告和区块链接口不在本文档中。
+本文档描述当前已经实现并可供 Flutter 客户端联调的 FastAPI 接口。接口以实际代码、Schema 和自动化测试为准。OCR 任务、结果、重试和 Worker 契约见 [`ocr-pipeline.md`](ocr-pipeline.md)；OCR 正式确认、对账和其他后续接口仍不得提前调用。
 
 ## 1. 公共约定
 
@@ -358,6 +358,89 @@ curl --request POST 'https://api.healy1012-ops.top/api/auth/logout' \
 1. 携带当前 Session 调用 `/api/auth/logout`。
 2. 无论本地是否重复触发退出，都只执行一次页面跳转。
 3. 收到 `204` 后删除本地 Session，返回登录页。
+
+## 11. 化验 OCR 核对与正式数据
+
+所有接口都必须携带当前 Bearer Session。任务、材料修订和正式化验数据均按 Session
+对应的 `patient_id` 隔离；访问其他 UID 的资源统一返回 `404 RESOURCE_NOT_FOUND`。
+
+### 11.1 获取核对草稿
+
+```http
+GET /api/ocr/tasks/{task_id}/result
+Authorization: Bearer <session_id>
+```
+
+化验任务响应除 `validated_draft` 和 `fields[]` 外，包含 `source_document`：
+`document_id`、`document_revision_id`、`original_file_name`、`mime_type`、
+`revision_number` 和私有 `file_endpoint`。Flutter 必须携带 Session 从该修订读取原件，
+不能使用公开静态 URL。`fields[]` 包含 `path`、`source_text`、`parsed_value`、
+`confidence`、`uncertainty_reason`、`source_region`、`user_value` 和
+`confirmation_status`。
+
+### 11.2 批量确认化验
+
+```http
+POST /api/ocr/tasks/{task_id}/confirm
+Authorization: Bearer <session_id>
+Content-Type: application/json
+```
+
+```json
+{
+  "result_id": "ocr-result-uuid",
+  "expected_revision_id": "document-revision-uuid",
+  "visit_id": null,
+  "sample_date": null,
+  "exam_date": null,
+  "report_date": "2026-08-20",
+  "visit_date": null,
+  "items": [
+    {
+      "source_index": 0,
+      "name": "空腹血糖",
+      "value": "90",
+      "unit": "mg/dL",
+      "reference_range": "70-100",
+      "sample_date": "2026-08-18",
+      "exam_date": null,
+      "report_date": null,
+      "visit_date": null,
+      "note": null
+    }
+  ]
+}
+```
+
+P0 字段为 `name/value/unit`。后端会重新执行数值解析、单位白名单与换算、日期解析、
+参考范围解析和异常状态计算，不采信模型给出的异常结论。日期优先级固定为
+`sample_date > exam_date > report_date > visit_date`；所有日期均为空时正式记录明确保存
+`trend_date=null` 和 `trend_date_source=null`，不编造日期。无法命中受控指标别名时保留
+原名，返回 `standard_metric_id=null`、`mapping_status=needs_manual_review`，不会近似绑定。
+
+成功响应包含 `created_resource_ids[]`、`confirmed_at`、`observations[]` 和可供最终 OCR
+评测汇总的 `p0_evaluation`；其中同时包含 P0 合法率、OCR 与用户终值的逐字段精确匹配数、
+用户纠正数和精确匹配率。原草稿项目必须保留 `source_index`；新增项目使用 null，删除
+项目会把原字段状态记为 `rejected`，防止删项后错绑来源。相同请求（包括并发请求）重复确认
+返回同一组正式记录且 `reused=true`；已经
+确认后提交不同内容返回 `409 OCR_ALREADY_CONFIRMED`。
+
+字段错误返回 `422 LAB_CONFIRMATION_INVALID`，稳定结构为
+`error.details.fields[] = {path, code, message}`，同时返回 `p0_evaluation`。常见错误码：
+`LAB_NAME_REQUIRED`、`LAB_VALUE_REQUIRED`、`LAB_VALUE_INVALID`、`LAB_UNIT_REQUIRED`、
+`LAB_UNIT_UNSUPPORTED`、`LAB_UNIT_INCOMPATIBLE`、`LAB_REFERENCE_RANGE_INVALID`、
+`LAB_DATE_INVALID`。失败请求不会写入 `lab_observation`，Flutter 应保留编辑内容并允许重试。
+
+### 11.3 读取正式化验数据
+
+```http
+GET /api/lab-observations
+GET /api/lab-observations/{observation_id}
+```
+
+正式记录含患者/就诊标识、明确 `document_id`、`document_revision_id`、`ocr_result_id`、
+原项目名、标准指标 ID、原始值、数值、原始/标准单位、参考上下界、确定性异常状态、
+四类日期、实际趋势日期来源、确认人和确认时间。只有成功执行确认事务后才会出现记录。
 4. 如果网络不可用，客户端可以先清除本地 Session；恢复联网后无需依赖退出响应才能显示登录页。
 
 ## 11. 非 HTTP 管理能力

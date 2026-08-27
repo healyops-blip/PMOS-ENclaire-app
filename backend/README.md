@@ -35,7 +35,6 @@ python -m alembic upgrade head
 pytest
 ruff check .
 uvicorn pomi_backend.main:app --reload
-pomi-ocr-worker --once
 ```
 
 The default database path is `backend/runtime/pomi.db`. Set
@@ -51,7 +50,11 @@ call. If a worker stops while a provider request is in flight, the task becomes
 
 Qwen3-VL configuration is server-only: `POMI_OCR_API_KEY`, `POMI_OCR_API_BASE_URL`,
 `POMI_OCR_MODEL`, `POMI_OCR_TIMEOUT_SECONDS`, and `POMI_OCR_LEASE_SECONDS`. Never put
-the key in Flutter, a database row, logs, or source control.
+the key in Flutter, a database row, logs, or source control. The Worker refuses to
+start until the API key is set and the lease is at least 30 seconds longer than the
+provider timeout.
+After loading the key from a local secret source (without placing it in shell history),
+run `pomi-ocr-worker --once` for one local claim or omit `--once` for the polling loop.
 
 ## Current authentication persistence
 
@@ -102,6 +105,26 @@ the seven-day retention period; immutable report references must be registered b
 the report module before enabling its scheduled timer.
 `reset-password` changes the hash and revokes every active Session for the
 account. Neither operation is exposed as an HTTP endpoint.
+
+## Medication API
+
+- `GET/POST /api/medications` reads grouped current medications or creates one.
+- `PUT /api/medications/{id}` adjusts, pauses, resumes, or stops a medication.
+- Dose/frequency adjustments create a new row linked by `replaces_medication_id`.
+- `GET /api/medications/{id}/events` returns the immutable cross-version timeline.
+- `PUT /api/medications/{id}/daily-status` accepts the server business date and
+  the preceding six natural days. Earlier history is read-only and future dates
+  are rejected with stable business error codes.
+- Repeating an identical daily-state `PUT` preserves its operation timestamp;
+  changing it records the latest UTC operation time and acting account UID.
+- `GET /api/medication-daily` dynamically returns `unrecorded` without storing it
+  and marks every item with the server-derived `editable` flag.
+- Daily writes return `month_summary`, `business_date`, and `editable_from` so the
+  app can refresh Dashboard totals without inferring the server timezone.
+
+The server business date uses `POMI_BUSINESS_TIMEZONE` (`Asia/Singapore` by
+default). Daily totals exclude future dates and derive expected days from every
+start, pause, resume, adjustment, and stop boundary.
 
 ## Remaining P0 backend rules
 

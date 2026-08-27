@@ -8,7 +8,8 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import UploadFile
-from sqlalchemy import select
+from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from pomi_backend.api.business import BusinessError
@@ -132,6 +133,13 @@ class DocumentService:
             self.session.commit()
             self.session.refresh(document)
             return document
+        except IntegrityError:
+            self.session.rollback()
+            stored.path.unlink(missing_ok=True)
+            existing = self.repository.find_upload(self.account.uid, idempotency_key)
+            if existing is not None:
+                return existing
+            raise
         except Exception:
             self.session.rollback()
             stored.path.unlink(missing_ok=True)
@@ -169,32 +177,60 @@ class DocumentService:
             document_id=document.id,
             revision_id=revision_id,
         )
-        revision = DocumentRevision(
-            id=revision_id,
-            document_id=document.id,
-            revision_number=self.repository.next_revision_number(document.id),
-            storage_path=stored.relative_path,
-            file_hash=stored.sha256,
-            file_size_bytes=stored.size,
-            mime_type=stored.mime_type,
-            pixel_count=stored.pixel_count,
-            page_count=stored.page_count,
-            replaced_revision_id=previous.id,
-            replacement_reason=reason,
-            idempotency_key=idempotency_key,
-            created_by_uid=self.account.uid,
-        )
         try:
-            previous.is_current = False
+            claimed = self.session.execute(
+                update(Document)
+                .where(
+                    Document.id == document.id,
+                    Document.patient_id == self.patient.patient_id,
+                    Document.current_revision_id == expected_revision_id,
+                    Document.deleted_at.is_(None),
+                )
+                .values(
+                    original_file_name=safe_file_name(upload.filename),
+                    mime_type=stored.mime_type,
+                    file_size_bytes=stored.size,
+                    pixel_count=stored.pixel_count,
+                    page_count=stored.page_count,
+                    file_hash=stored.sha256,
+                    current_revision_id=revision_id,
+                    updated_at=utc_now(),
+                )
+            )
+            if claimed.rowcount != 1:
+                self.session.rollback()
+                stored.path.unlink(missing_ok=True)
+                repeated = self.repository.find_revision_request(document.id, idempotency_key)
+                if repeated is not None:
+                    return repeated
+                raise BusinessError(
+                    "RESOURCE_VERSION_CONFLICT", "The document revision has changed.", 409
+                )
+            revision = DocumentRevision(
+                id=revision_id,
+                document_id=document.id,
+                revision_number=self.repository.next_revision_number(document.id),
+                storage_path=stored.relative_path,
+                file_hash=stored.sha256,
+                file_size_bytes=stored.size,
+                mime_type=stored.mime_type,
+                pixel_count=stored.pixel_count,
+                page_count=stored.page_count,
+                replaced_revision_id=previous.id,
+                replacement_reason=reason,
+                idempotency_key=idempotency_key,
+                created_by_uid=self.account.uid,
+            )
+            self.session.execute(
+                update(DocumentRevision)
+                .where(
+                    DocumentRevision.id == previous.id,
+                    DocumentRevision.document_id == document.id,
+                    DocumentRevision.is_current.is_(True),
+                )
+                .values(is_current=False)
+            )
             self.session.add(revision)
-            document.original_file_name = safe_file_name(upload.filename)
-            document.mime_type = stored.mime_type
-            document.file_size_bytes = stored.size
-            document.pixel_count = stored.pixel_count
-            document.page_count = stored.page_count
-            document.file_hash = stored.sha256
-            document.current_revision_id = revision.id
-            document.updated_at = utc_now()
             self.session.commit()
             self.session.refresh(revision)
             return revision
@@ -230,7 +266,21 @@ def purge_deleted_documents(
 ) -> int:
     """Remove expired, unreferenced files while keeping audit metadata."""
 
-    referenced = is_revision_referenced or (lambda _: False)
+    if is_revision_referenced is None:
+        from pomi_backend.db.models import ReportSource
+
+        def referenced(revision_id: str) -> bool:
+            return (
+                session.scalar(
+                    select(ReportSource.id)
+                    .where(ReportSource.document_revision_id == revision_id)
+                    .limit(1)
+                )
+                is not None
+            )
+
+    else:
+        referenced = is_revision_referenced
     documents = list(
         session.scalars(
             select(Document).where(
@@ -246,9 +296,9 @@ def purge_deleted_documents(
                 select(DocumentRevision).where(DocumentRevision.document_id == document.id)
             )
         )
-        if any(referenced(revision.id) for revision in revisions):
-            continue
         for revision in revisions:
+            if referenced(revision.id):
+                continue
             path = (storage_root / revision.storage_path).resolve()
             if storage_root.resolve() in path.parents and path.is_file():
                 path.unlink()

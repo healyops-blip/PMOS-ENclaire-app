@@ -1,7 +1,7 @@
 """create private document revisions
 
 Revision ID: 20260827_0020
-Revises: 20260827_0013
+Revises: 20260827_0015
 Create Date: 2026-08-27 20:15:10.710614
 """
 
@@ -13,7 +13,7 @@ from alembic import op
 import pomi_backend.db.types
 
 revision: str = "20260827_0020"
-down_revision: str | None = "20260827_0013"
+down_revision: str | None = "20260827_0015"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

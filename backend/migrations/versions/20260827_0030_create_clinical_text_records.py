@@ -1,7 +1,7 @@
 """create clinical text records
 
-Revision ID: 20260827_0024
-Revises: 20260827_0021
+Revision ID: 20260827_0030
+Revises: 20260827_0029
 Create Date: 2026-08-27 21:14:54.772143
 """
 
@@ -12,8 +12,8 @@ from alembic import op
 
 import pomi_backend.db.types
 
-revision: str = "20260827_0024"
-down_revision: str | None = "20260827_0021"
+revision: str = "20260827_0030"
+down_revision: str | None = "20260827_0029"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

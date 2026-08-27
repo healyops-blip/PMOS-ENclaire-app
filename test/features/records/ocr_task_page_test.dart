@@ -64,6 +64,64 @@ void main() {
     await tester.pump();
     expect(repository.retryCalls, 1);
   });
+
+  testWidgets('manual retry schedules polling only after request completes', (
+    tester,
+  ) async {
+    final repository = _SequenceRepository([
+      _task(OcrTaskStatus.pendingConfirmation),
+    ]);
+    repository.createValue = _task(
+      OcrTaskStatus.failed,
+      category: 'provider_unavailable',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OcrTaskPage(
+          repository: repository,
+          document: _document,
+          pollInterval: Duration.zero,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('ocr-retry-button')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 1));
+
+    expect(repository.retryCalls, 1);
+    expect(repository.getCalls, 1);
+    expect(find.byKey(const Key('ocr-confirmation-entry')), findsOneWidget);
+  });
+
+  testWidgets('poll error preserves task and automatically retries', (
+    tester,
+  ) async {
+    final repository = _SequenceRepository([
+      const OcrException('NETWORK_ERROR', 'temporary poll failure'),
+      _task(OcrTaskStatus.pendingConfirmation),
+    ]);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OcrTaskPage(
+          repository: repository,
+          document: _document,
+          pollInterval: const Duration(milliseconds: 10),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 10));
+    await tester.pump();
+    expect(find.text('temporary poll failure'), findsOneWidget);
+    expect(find.byKey(const Key('ocr-polling-indicator')), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 10));
+    await tester.pump();
+    expect(repository.getCalls, 2);
+    expect(find.byKey(const Key('ocr-confirmation-entry')), findsOneWidget);
+  });
 }
 
 OcrTask _task(OcrTaskStatus status, {String? category}) => OcrTask(
@@ -95,7 +153,7 @@ final _document = MedicalDocument(
 
 class _SequenceRepository implements OcrRepository {
   _SequenceRepository(this.values);
-  final List<OcrTask> values;
+  final List<Object> values;
   OcrTask? createValue;
   int getCalls = 0;
   int retryCalls = 0;
@@ -107,10 +165,15 @@ class _SequenceRepository implements OcrRepository {
   }) async => createValue ?? _task(OcrTaskStatus.queued);
 
   @override
-  Future<OcrTask> get(String taskId) async => values[getCalls++];
+  Future<OcrTask> get(String taskId) async {
+    final value = values[getCalls++];
+    if (value is OcrTask) return value;
+    throw value;
+  }
 
   @override
   Future<OcrTaskResult> result(String taskId) async => OcrTaskResult(
+    resultId: 'result-1',
     taskId: taskId,
     draft: const {'items': []},
     fields: const [
@@ -140,4 +203,16 @@ class _SequenceRepository implements OcrRepository {
     summary: confirmedData,
     reused: false,
   );
+
+  @override
+  Future<LabConfirmationResult> confirmLab({
+    required String taskId,
+    required String resultId,
+    required String expectedRevisionId,
+    required List<LabConfirmationItem> items,
+    String? sampleDate,
+    String? examDate,
+    String? reportDate,
+    String? visitDate,
+  }) => throw UnimplementedError();
 }

@@ -118,7 +118,7 @@ Authorization: Bearer <session_id>
 
 ### 3.4 幂等和并发
 
-- 下列创建请求必须携带 `Idempotency-Key`：文件上传、OCR 创建/重试、对账创建、报告生成、PDF 生成。当前注册接口不要求该 Header。
+- 下列创建请求必须携带 `Idempotency-Key`：文件上传、对账创建、报告生成、PDF 生成。当前 OCR 创建/重试按服务端 UID、文件哈希、材料类型和 Prompt 配置幂等，不接收该 Header；注册接口也不要求。
 - 服务端对同一会话和幂等键返回同一资源，不重复写入。
 - 更新接口携带 `updated_at` 或 `expected_revision_id`；版本不一致返回 `409 RESOURCE_VERSION_CONFLICT`。
 - Flutter 按钮提交期间禁用；每日用药可乐观更新，失败必须回滚。
@@ -142,11 +142,11 @@ Authorization: Bearer <session_id>
 | 画像 | `GET/PUT /api/patient/profile` | 四步引导、我的 | 患者画像和完成状态 |
 | Dashboard | `GET /api/dashboard` | 首页 | 倒计时、今日药物、月统计、报告入口 |
 | 用药列表 | `GET/POST /api/medications` | 用药管理 | 当前/历史用药 |
-| 用药更新 | `PUT /api/medications/{medication_id}` | 用药编辑 | 新事件和当前状态 |
+| 用药更新 | `PUT /api/medications/{medication_id}` | 用药编辑 | 新事件、暂停/恢复状态或新版本 |
 | 用药历史 | `GET /api/medications/{medication_id}/events` | 时间线 | 不可覆盖的事件链 |
-| 每日状态 | `PUT /api/medications/{medication_id}/daily-status` | 首页、用药月历 | taken/missed/unrecorded |
-| 每日状态范围 | `GET /api/medication-daily` | 月统计 | 日期范围内三状态记录 |
-| 经期 | `GET/POST /api/cycles`、`PUT /api/cycles/{cycle_id}` | 经期页 | 周期和趋势 |
+| 每日状态 | `PUT /api/medications/{medication_id}/daily-status` | 首页、用药月历 | 最近 7 个业务自然日的 taken/missed/unrecorded；同时返回实时 `month_summary` |
+| 每日状态范围 | `GET /api/medication-daily` | 月统计、历史补录 | 日期范围内三状态、`editable`、`business_date`、`editable_from` |
+| 经期 | `GET/POST /api/cycles`、`PUT/DELETE /api/cycles/{cycle_id}` | 经期页 | 周期、趋势和逻辑删除 |
 | 体重 | `GET/POST /api/weights`、`PUT /api/weights/{weight_id}` | 经期/体重页 | 体重趋势 |
 | 材料 | `GET/POST /api/documents` | 记录页、上传页 | 材料及当前修订 |
 | 材料详情 | `GET/DELETE /api/documents/{document_id}` | 材料详情 | 详情或软删除结果 |
@@ -155,14 +155,29 @@ Authorization: Bearer <session_id>
 | OCR 创建 | `POST /api/ocr/tasks` | 上传完成后 | 异步任务 |
 | OCR 状态 | `GET /api/ocr/tasks/{task_id}` | 2 秒轮询 | 状态、错误、进度 |
 | OCR 草稿 | `GET /api/ocr/tasks/{task_id}/result` | 四类确认页 | 字段级草稿 |
-| OCR 确认 | `POST /api/ocr/tasks/{task_id}/confirm` | 四类确认页 | 正式数据 ID |
+| 化验 OCR 确认 | `POST /api/ocr/tasks/{task_id}/confirm` | 化验确认页 | 已实现；其他三类材料尚不可复用该 payload |
+| 正式化验数据 | `GET /api/lab-observations`、`GET /api/lab-observations/{id}` | 化验历史/详情 | 仅返回当前 UID 已确认且可追溯的数据 |
 | OCR 重试 | `POST /api/ocr/tasks/{task_id}/retry` | 失败页 | 新任务 |
 | 用药对账 | `POST /api/medication-reconciliations` | 医嘱确认后 | 对账草稿 |
 | 对账详情 | `GET/PUT /api/medication-reconciliations/{reconciliation_id}` | 对账页 | 差异和用户决策 |
-| 患者自述 | `GET/POST /api/patient-notes`、`PUT /api/patient-notes/{note_id}` | 报告生成页 | 确认原文 |
+| 患者自述 | `POST /api/patient-notes`、`GET /api/patient-notes/latest`、`PUT /api/patient-notes/{note_id}`、`POST /api/patient-notes/{note_id}/{confirm\|skip\|copy}` | 报告生成页 | 草稿、确认、跳过和历史复制 |
 | 报告 | `GET/POST /api/reports` | 报告入口/历史 | 不可变快照 |
 | 报告详情 | `GET /api/reports/{report_id}` | 三层报告 | 摘要、趋势、来源 |
 | PDF | `POST/GET /api/reports/{report_id}/pdf` | 报告操作 | PDF 任务和元数据 |
+
+### 4.1 每日用药补录边界
+
+- 可写窗口由后端业务时区计算：`editable_from <= record_date <= business_date`，
+  一共 7 个自然日。Flutter 必须按响应中的 `editable` 展示编辑入口，不自行按
+  手机时区推断。
+- 第 8 天及更早写入返回 `409 HISTORICAL_DAILY_STATUS_READ_ONLY`；未来日期返回
+  `409 FUTURE_DAILY_STATUS_NOT_ALLOWED`。
+- `unrecorded` 是动态状态：写入该值会删除当天明确状态行，数据库不保存
+  “未记录”行。
+- 响应中的 `record_date` 是服药归属日期，`recorded_at` 是实际操作 UTC 时间，
+  `recorded_by_uid` 是操作账号；三者不可混用。
+- 相同状态重复写入不会改变记录 ID、操作时间或操作 UID。前端修改失败时必须
+  回滚乐观更新，成功后刷新历史列表、用药列表和 Dashboard 月汇总。
 | PDF 文件 | `GET /api/reports/{report_id}/pdf/file` | 下载/分享/打印 | PDF 文件流 |
 | 规则管理 | `GET /api/deterministic-rules`、`PUT /api/deterministic-rules/{rule_id}` | 无普通用户页面 | 管理端规则参数 |
 | 规则追溯 | `GET /api/rule-executions/{execution_id}` | 报告来源调试 | 规则输入/输出说明 |
@@ -226,14 +241,19 @@ PUT 允许分步部分更新。请求中的 `complete_onboarding=true` 只有在
 
 ### 5.3 Dashboard
 
-`GET /api/dashboard?date=YYYY-MM-DD` 返回：
+`GET /api/dashboard?date=YYYY-MM-DD` 返回 `server_date`、`data_as_of`，以及四个相互独立的区块：
 
-- `server_date`、`data_as_of`。
-- `profile_summary`：`patient_id`、`nickname`、`primary_condition`。
-- `next_visit`：`date`、`days_remaining`；无日期时为 `null`。
-- `today_medications[]`：`medication_id`、`drug_name`、`specification`、`dosage_text`、`frequency`、`intake_status`、`recorded_at`。
-- `month_medication_stats`：`month`、`taken_count`、`missed_count`、`unrecorded_count`、`by_medication[]`。
-- `latest_report`：`report_id`、`status`、`generated_at`；无报告时为 `null`。
+- `follow_up`
+- `today_medications`
+- `monthly_medication_summary`
+- `latest_report`
+
+每个区块固定返回 `status`、`data`、`error_code`。`status` 为 `ok/empty/error`；空数据使用 `empty` 和 `data: null`（今日用药也可返回空数组）；局部查询失败使用 `error` 和稳定错误码。单一区块失败时聚合接口仍返回 HTTP 200，其他区块继续返回自身结果；认证等全局错误仍使用对应 HTTP 状态。
+
+- `follow_up.data`：`date`、`timing`、`days`。`timing` 为 `upcoming/due/overdue`，`days` 始终非负。
+- `today_medications.data[]`：`medication_id`、`drug_name`、`specification`、`dosage_text`、`frequency`、`intake_status`、`recorded_at`。
+- `monthly_medication_summary.data`：`month`、`taken_count`、`missed_count`、`unrecorded_count`、`by_medication[]`。
+- `latest_report.data`：`report_id`、`status`、`generated_at`；无报告时该区块为 `empty`。
 
 禁止返回“完成率”或把 `unrecorded` 计入 `missed`。
 
@@ -241,12 +261,14 @@ PUT 允许分步部分更新。请求中的 `complete_onboarding=true` 只有在
 
 用药对象字段：
 
-`id`、`drug_name`、`normalized_drug_name`、`specification`、`dosage_text`、`dosage_value`、`dosage_unit`、`frequency`、`route`、`start_date`、`end_date`、`current_status`、`source_type`、`source_document_id`、`created_at`、`updated_at`。
+`id`、`drug_name`、`normalized_drug_name`、`specification`、`dosage_text`、`dosage_value`、`dosage_unit`、`frequency`、`route`、`start_date`、`end_date`、`current_status`、`source_type`、`source_document_id`、`replaces_medication_id`、`created_at`、`updated_at`。
 
-- `current_status`：`active/stopped/unknown`。
+- `current_status`：`active/paused/stopped`。
 - 新增/编辑请求还包含 `change_reason`、`event_date`、`note`。
 - 停药必须附带 `stop_source`：`written_order/verbal_doctor/patient_self/other`。
-- 后端每次修改生成 `medication_event`，事件类型：`started/adjusted/continued/stopped`。
+- 后端每次修改生成不可变 `medication_event`，事件类型：`created/adjusted/paused/resumed/stopped`。
+- 剂量或频率调整不得覆盖原记录：旧版本结束生效，新增版本通过 `replaces_medication_id` 关联。
+- `GET /api/medications` 同时返回 `server_date`；Flutter 必须用该业务日期读取月度状态并提交当天状态，不使用设备本地日期判定“今天”。
 
 每日状态请求：
 
@@ -254,11 +276,7 @@ PUT 允许分步部分更新。请求中的 `complete_onboarding=true` 只有在
 |---|---|---:|---|
 | `record_date` | date | 是 | 设备选择日期，后端校验 |
 | `intake_status` | enum | 是 | `taken/missed/unrecorded` |
-| `actual_dosage` | number/null | 否 | 实际剂量 |
-| `actual_dosage_unit` | string/null | 否 | 实际剂量单位 |
-| `note` | string/null | 否 | 最长 500 字 |
-
-唯一键为 `patient_id + medication_id + record_date`，重复 PUT 覆盖当日状态但不创建重复行。
+唯一键为 `patient_id + medication_id + record_date`，重复 PUT 覆盖当日状态但不创建重复行。仅业务当天允许写入；`unrecorded` 删除明确状态行，并按药物生效、暂停、恢复、调整和停用区间动态计算。
 
 ### 5.5 经期与体重
 
@@ -268,11 +286,13 @@ PUT 允许分步部分更新。请求中的 `complete_onboarding=true` 只有在
 - `end_date` 可空；不能早于开始日期。
 - `cycle_length_days` 和 `duration_days` 由后端计算。
 - 周期重叠返回 `CYCLE_DATE_OVERLAP`。
+- `DELETE /api/cycles/{cycle_id}` 采用逻辑删除；默认查询不返回已删除记录。
 
-体重字段：`id`、`measured_at`、`weight_kg`、`source_type`、`note`、`created_at`。
+体重字段：`id`、`record_date`、`weight_kg`、`created_at`、`updated_at`。
 
-- 只保存 kg，合理范围 20–350 kg。
+- 只保存 kg，合理范围 20.0–300.0 kg，最多一位小数。
 - 同一患者同一自然日 POST 视为更新并返回现有 ID。
+- GET 按 `record_date` 升序返回；可使用 `from`、`to` 做日期过滤。
 
 ### 5.6 材料与修订
 
@@ -295,24 +315,28 @@ PUT 允许分步部分更新。请求中的 `complete_onboarding=true` 只有在
 
 ### 5.7 OCR 任务与四类草稿
 
-创建请求：`document_id`、`document_revision_id`、可选 `force_new_attempt=false`。材料类型、Prompt 和模型由后端根据修订确定。
+当前已实现的创建请求为 `document_id`、`document_revision_id`。材料类型、Prompt 和模型由后端根据材料与明确修订确定；同一 UID、文件哈希、材料类型、模型、Prompt 和 Schema 自动复用任务，不接受客户端强制绕过幂等。
 
-任务字段：`id`、`document_id`、`document_revision_id`、`document_type`、`task_status`、`attempt_count`、`max_attempts`、`queued_at`、`started_at`、`finished_at`、`processing_ms`、`error_code`、`error_message`、`result_source`、`progress`。
+任务字段：`id`、`document_id`、`document_revision_id`、`material_type`、`status`、`model`、`prompt_version`、`schema_version`、`attempt_number`、`parent_task_id`、`provider_attempts`、`attempt_history`、`duration_ms`、`error`、`result_source`、`created_at`、`updated_at`；创建和主动重试响应还包含 `reused`。
 
-- `task_status`：`pending/processing/succeeded/failed/timeout/fallback/confirmed`。
-- `result_source`：`qwen_api/fallback/null`。
-- Flutter 在 `pending/processing` 时每 2 秒轮询，进入后台后暂停高频轮询。
+- `status`：`queued/processing/pending_confirmation/confirmed/failed/timed_out`。
+- `result_source`：`qwen3-vl/null`。
+- Flutter 在 `queued/processing` 时每 2 秒轮询，进入后台后暂停，恢复前台时立即继续。
 
-草稿公共字段：`result_id`、`task_id`、`document_type`、`validation_status`、`critical_error`、`result_source`、`fields[]`、`draft`。
+草稿响应字段：`id`（即 result ID）、`task_id`、`raw_response`、`validated_draft`、`user_modified_data`、`confirmed_data`、`fields[]`、`source_document`、`created_at`。`source_document` 明确给出 `document_id`、`document_revision_id`、文件名、MIME、修订号和私有文件接口；原始响应只通过当前 Session 的所属患者鉴权接口返回，不进入普通日志。
 
-字段级 `fields[]`：`field_path`、`raw_text`、`parsed_value`、`confidence`、`uncertainty_reason`、`source_region`、`user_value`、`confirmation_status`。
+字段级 `fields[]`：`id`、`path`、`source_text`、`parsed_value`、`confidence`、`uncertainty_reason`、`source_region`、`user_value`、`confirmation_status`。每个 `path` 必须解析到 `validated_draft` 的实际叶字段，且值一致、路径唯一并完整覆盖草稿叶字段。
 
-四类 `draft`：
+四类 `validated_draft`：
 
-- 化验：`hospital_name`、`sample_date`、`report_date`、`items[]`；item 含 `item_name/item_code/raw_value/numeric_value/raw_unit/normalized_unit/reference_range_text/reference_low/reference_high`。
+- 化验 OCR 草稿：`hospital_name`、`sample_date`、`report_date`、`items[]`；item 使用 `item_name/item_code/raw_value/numeric_value/raw_unit/normalized_unit/reference_range_text/reference_low/reference_high`。化验确认请求中的 item 使用 `source_index/name/value/unit/reference_range/sample_date/exam_date/report_date/visit_date/note`；模型字段只是初值，正式规范化字段由后端重算。
 - 医嘱：`hospital_name`、`department_name`、`prescribed_at`、`orders[]`；order 含 `source_text/drug_name/normalized_drug_name/specification/dosage_text/dosage_value/dosage_unit/frequency/duration/route/instruction`。
 - 影像文字：`examination_name`、`body_part`、`examination_method`、`findings_text`、`conclusion_text`、`examined_at`、`reported_at`。
 - 门诊：`hospital_name`、`department_name`、`doctor_name`、`visit_date`、`chief_complaint`、`diagnosis_summary`、`treatment_plan`、`medical_advice`。
+
+已实现的化验确认使用 `POST /api/ocr/tasks/{task_id}/confirm`，请求必须携带 `result_id`、`expected_revision_id` 和修改后的 `items[]`，报告级四类日期可为空。原草稿项目携带稳定的 `source_index`，删除项目会把其字段标记为 `rejected`，新增项目使用 `source_index=null`，避免列表删项后错误关联原字段。响应返回 `created_resource_ids[]`、`confirmed_at`、`observations[]`、`p0_evaluation` 和 `reused`。P0 `name/value/unit` 错误时返回 `error.details.fields[]`，Flutter 必须按 `path` 高亮并保留表单。
+
+`lab_observation` 只保存用户确认成功的数据，并强制关联明确材料、修订和 OCR 结果。指标别名未命中时 `mapping_status=needs_manual_review`；异常状态由材料参考范围确定性计算；趋势日期优先级为采样、检查、报告、就诊。正式数据读取接口为 `GET /api/lab-observations` 和 `GET /api/lab-observations/{id}`，均按当前 UID 隔离。
 
 影像与门诊确认由 #24 落到独立正式表：
 
@@ -321,7 +345,7 @@ PUT 允许分步部分更新。请求中的 `complete_onboarding=true` 只有在
 - Flutter 共用原件图片/单页 PDF 对照和长文本编辑组件；低置信度、缺失及日期异常会高亮。失败保留编辑值与滚动位置。
 - 确认请求必须携带 `result_id`、`expected_revision_id`、材料类型和字段决定；后端重新校验并在单一事务中写 OCR 最终值、字段状态和正式记录。重复确认返回同一正式记录。
 
-确认请求必须携带 `result_id`、`expected_revision_id`、`confirmed_data` 和 `field_confirmations[]`。医嘱每个 order 都必须确认，只有化验允许批量确认。响应返回 `created_resource_ids[]`、`confirmed_at`、`reconciliation_required`。
+失败或超时任务通过 `POST /api/ocr/tasks/{task_id}/retry` 创建唯一关联的新尝试；重复点击返回同一个子任务。
 
 ### 5.8 用药对账
 
@@ -338,7 +362,17 @@ item 字段：`id`、`existing_medication_id`、`new_medical_order_id`、`medica
 
 ### 5.9 患者自述、报告与 PDF
 
-患者自述字段：`id`、`original_text`、`confirmed_text`、`confirmation_status`、`confirmed_at`、`created_at`、`updated_at`。状态为 `draft/confirmed/cancelled`，确认文本不调用模型改写。
+患者自述字段：`id`、`patient_id`、`visit_context`、`original_text`、`confirmed_text`、`status`、`source_note_id`、`confirmed_at`、`consumed_at`、`created_at`、`updated_at`。状态为 `draft/confirmed/skipped/consumed`，确认文本不调用模型改写。Flutter 分别调用创建、更新、`/confirm`、`/skip` 和 `/copy`；已消费自述只能复制为新草稿，不能原地修改。
+
+`report_snapshot` 基础字段为：`id`、`patient_id`、`patient_note_id`、`previous_report_id`、`report_status`、`snapshot_json`、`date_source_json`、`freshness_result_json`、`source_digest`、`snapshot_hash`、`generated_by_uid`、`report_generated_at`、`failure_reason`。相同患者和 `source_digest` 唯一；状态为 `pending/succeeded/failed`，成功快照在 Repository 层不可更新。
+
+`report_source` 逐点保存 `report_id`、`source_type`、`source_record_id`、`origin_kind`、`document_id`、`document_revision_id`、`rule_execution_id`、`included_at`。`origin_kind` 明确区分 `medical_document/patient_manual/system_record/rule_execution`；医疗材料来源必须同时指定材料和修订，患者手工记录不得伪装成医院材料。
+
+- `POST /api/patient-notes` 创建草稿；`PUT /api/patient-notes/{note_id}` 只修改未消费的草稿。
+- `GET /api/patient-notes/latest` 获取当前患者最近一次自述。
+- `POST /api/patient-notes/{note_id}/confirm` 与 `/skip` 为幂等状态操作。
+- `POST /api/patient-notes/{note_id}/copy` 从历史自述创建新的独立草稿，并通过 `source_note_id` 追溯来源；复制结果必须重新确认。
+- `consumed` 自述只读，不能原地修改或影响既有报告。
 
 创建报告请求：`patient_note_id`（可空）、`include_sections[]`（可空，默认全部）。响应：`report_id`、`status`、`generated_at`、`snapshot_hash`。
 

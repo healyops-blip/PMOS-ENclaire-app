@@ -225,18 +225,33 @@ class _DocumentDetailPageState extends State<DocumentDetailPage> {
   void _reload() => setState(() => _content = _load());
 
   Future<void> _replace(MedicalDocument document) async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['jpg', 'jpeg', 'png', 'pdf'],
-      withData: true,
-    );
-    final picked = result?.files.single;
-    if (picked == null || !mounted) return;
-    final file = SelectedDocumentFile(
-      name: picked.name,
-      bytes: picked.bytes ?? await picked.xFile.readAsBytes(),
-    );
-    await validateSelectedDocument(file);
+    late final SelectedDocumentFile file;
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['jpg', 'jpeg', 'png', 'pdf'],
+        withData: true,
+      );
+      final picked = result?.files.single;
+      if (picked == null || !mounted) return;
+      file = SelectedDocumentFile(
+        name: picked.name,
+        bytes: picked.bytes ?? await picked.xFile.readAsBytes(),
+      );
+      await validateSelectedDocument(file);
+    } on DocumentFailure catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.message)));
+      }
+      return;
+    } on Exception {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('无法读取所选文件，请重新选择。')));
+      }
+      return;
+    }
     if (!mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -256,15 +271,17 @@ class _DocumentDetailPageState extends State<DocumentDetailPage> {
         ],
       ),
     );
-    if (confirmed != true) return;
-    await widget.repository.replace(
-      documentId: document.id,
-      expectedRevisionId: document.currentRevisionId,
-      reason: '用户确认替换为更清晰的原始材料',
-      file: file,
-      onProgress: (_, _) {},
+    if (confirmed != true || !mounted) return;
+    final replaced = await showDialog<DocumentRevision>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _ReplacementProgressDialog(
+        repository: widget.repository,
+        document: document,
+        file: file,
+      ),
     );
-    _reload();
+    if (replaced != null && mounted) _reload();
   }
 
   Future<void> _delete() async {
@@ -368,6 +385,7 @@ class _DocumentDetailPageState extends State<DocumentDetailPage> {
                   builder: (_) => OcrTaskPage(
                     repository: widget.ocrRepository,
                     document: document,
+                    documentRepository: widget.repository,
                   ),
                 ),
               ),
@@ -390,6 +408,91 @@ class _DocumentDetailPageState extends State<DocumentDetailPage> {
         );
       },
     ),
+  );
+}
+
+class _ReplacementProgressDialog extends StatefulWidget {
+  const _ReplacementProgressDialog({
+    required this.repository,
+    required this.document,
+    required this.file,
+  });
+
+  final DocumentRepository repository;
+  final MedicalDocument document;
+  final SelectedDocumentFile file;
+
+  @override
+  State<_ReplacementProgressDialog> createState() =>
+      _ReplacementProgressDialogState();
+}
+
+class _ReplacementProgressDialogState
+    extends State<_ReplacementProgressDialog> {
+  late final String _idempotencyKey = newDocumentIdempotencyKey();
+  double _progress = 0;
+  String? _error;
+  bool _busy = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _replace();
+  }
+
+  Future<void> _replace() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+      _progress = 0;
+    });
+    try {
+      final revision = await widget.repository.replace(
+        documentId: widget.document.id,
+        expectedRevisionId: widget.document.currentRevisionId,
+        reason: '用户确认替换为更清晰的原始材料',
+        file: widget.file,
+        idempotencyKey: _idempotencyKey,
+        onProgress: (sent, total) {
+          if (mounted && total > 0) setState(() => _progress = sent / total);
+        },
+      );
+      if (mounted) Navigator.pop(context, revision);
+    } on Exception catch (error) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _error = error.toString();
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    key: const Key('document-replacement-progress'),
+    title: Text(_error == null ? '正在创建新修订' : '替换未完成'),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        LinearProgressIndicator(value: _busy ? _progress : null),
+        const SizedBox(height: 14),
+        Text(_error ?? '${(_progress * 100).round()}% · 原修订会保持可追溯'),
+      ],
+    ),
+    actions: [
+      if (!_busy) ...[
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          key: const Key('retry-document-replacement'),
+          onPressed: _replace,
+          child: const Text('安全重试'),
+        ),
+      ],
+    ],
   );
 }
 

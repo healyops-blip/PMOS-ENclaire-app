@@ -14,8 +14,10 @@ from pomi_backend.services import AuthService
 from pomi_backend.services.auth import AuthError
 from pomi_backend.services.clinical_text import ClinicalTextConfirmationService
 from pomi_backend.services.documents import DocumentService
+from pomi_backend.services.medications import MedicationService
 from pomi_backend.services.ocr import OCRTaskService
 from pomi_backend.services.patient import PatientProfileService
+from pomi_backend.services.patient_notes import PatientNoteService
 
 bearer_scheme = HTTPBearer(auto_error=False, scheme_name="SessionBearer")
 
@@ -58,6 +60,21 @@ def get_current_account(service: AuthServiceDependency, session_id: SessionId) -
 CurrentAccount = Annotated[UserAccount, Depends(get_current_account)]
 
 
+def get_medication_service(
+    request: Request,
+    session: DatabaseSession,
+    account: CurrentAccount,
+) -> MedicationService:
+    return MedicationService(
+        session,
+        account,
+        request.app.state.business_date_provider(),
+    )
+
+
+MedicationServiceDependency = Annotated[MedicationService, Depends(get_medication_service)]
+
+
 def get_patient_profile_service(
     session: DatabaseSession, account: CurrentAccount
 ) -> PatientProfileService:
@@ -67,6 +84,15 @@ def get_patient_profile_service(
 PatientProfileServiceDependency = Annotated[
     PatientProfileService, Depends(get_patient_profile_service)
 ]
+
+
+def get_patient_note_service(
+    session: DatabaseSession, account: CurrentAccount
+) -> PatientNoteService:
+    return PatientNoteService(session, account)
+
+
+PatientNoteServiceDependency = Annotated[PatientNoteService, Depends(get_patient_note_service)]
 
 
 def get_document_service(
