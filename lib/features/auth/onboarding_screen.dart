@@ -313,12 +313,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         textAlign: TextAlign.center,
         decoration: const InputDecoration(
           labelText: '昵称',
+          helperText: ' ',
+          helperStyle: TextStyle(fontSize: 12, height: 1),
+          errorStyle: TextStyle(fontSize: 12, height: 1),
           floatingLabelAlignment: FloatingLabelAlignment.start,
         ),
         validator:
             (value) => value == null || value.trim().isEmpty ? '请输入昵称' : null,
       ),
-      const SizedBox(height: 12),
       Row(
         children: [
           Expanded(
@@ -329,6 +331,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               textAlign: TextAlign.left,
               decoration: const InputDecoration(
                 labelText: '出生年份',
+                helperText: ' ',
+                helperStyle: TextStyle(fontSize: 12, height: 1),
+                errorStyle: TextStyle(fontSize: 12, height: 1),
                 floatingLabelAlignment: FloatingLabelAlignment.start,
               ),
               validator: _yearValidator,
@@ -343,6 +348,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               textAlign: TextAlign.left,
               decoration: const InputDecoration(
                 labelText: '确诊年份',
+                helperText: ' ',
+                helperStyle: TextStyle(fontSize: 12, height: 1),
+                errorStyle: TextStyle(fontSize: 12, height: 1),
                 floatingLabelAlignment: FloatingLabelAlignment.start,
               ),
               validator: _yearValidator,
@@ -350,7 +358,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           ),
         ],
       ),
-      const SizedBox(height: 12),
       Row(
         children: [
           Expanded(
@@ -361,6 +368,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               decoration: const InputDecoration(
                 labelText: '身高',
                 suffixText: 'cm',
+                helperText: ' ',
+                helperStyle: TextStyle(fontSize: 12, height: 1),
+                errorStyle: TextStyle(fontSize: 12, height: 1),
                 floatingLabelAlignment: FloatingLabelAlignment.start,
               ),
               validator: (value) {
@@ -382,6 +392,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               decoration: const InputDecoration(
                 labelText: '体重',
                 suffixText: 'kg',
+                helperText: ' ',
+                helperStyle: TextStyle(fontSize: 12, height: 1),
+                errorStyle: TextStyle(fontSize: 12, height: 1),
                 floatingLabelAlignment: FloatingLabelAlignment.start,
               ),
               validator: _weightValidator,
