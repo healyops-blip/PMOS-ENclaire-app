@@ -211,6 +211,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   Widget _basicStep() => _StepCard(
+    showFrame: false,
     children: [
       TextFormField(
         controller: _nickname,
@@ -414,16 +415,19 @@ class _OnboardingHeader extends StatelessWidget {
 }
 
 class _StepCard extends StatelessWidget {
-  const _StepCard({required this.children});
+  const _StepCard({required this.children, this.showFrame = true});
   final List<Widget> children;
+  final bool showFrame;
+
   @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
+  Widget build(BuildContext context) {
+    final content = Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: children,
       ),
-    ),
-  );
+    );
+    return showFrame ? Card(child: content) : content;
+  }
 }
