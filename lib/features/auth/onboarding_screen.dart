@@ -61,7 +61,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final maximumDate =
         future ? DateTime(now.year + 3, now.month, now.day) : today;
     final parsedDate = DateTime.tryParse(controller.text);
-    var selectedDate =
+    final selectedDate =
         parsedDate != null &&
                 !parsedDate.isBefore(minimumDate) &&
                 !parsedDate.isAfter(maximumDate)
@@ -73,75 +73,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final picked = await showDialog<DateTime>(
       context: context,
       builder:
-          (context) => Dialog(
-            backgroundColor: Colors.white,
-            surfaceTintColor: Colors.transparent,
-            insetPadding: const EdgeInsets.symmetric(horizontal: 40),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 300),
-              child: SizedBox(
-                height: 350,
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('取消'),
-                          ),
-                          Text(
-                            future ? '选择就诊日期' : '选择经期日期',
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          TextButton(
-                            onPressed:
-                                () => Navigator.pop(context, selectedDate),
-                            child: const Text('确定'),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Divider(height: 1),
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(18, 12, 18, 0),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text('年', textAlign: TextAlign.center),
-                          ),
-                          Expanded(
-                            child: Text('月', textAlign: TextAlign.center),
-                          ),
-                          Expanded(
-                            child: Text('日', textAlign: TextAlign.center),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: CupertinoDatePicker(
-                        mode: CupertinoDatePickerMode.date,
-                        dateOrder: DatePickerDateOrder.ymd,
-                        initialDateTime: selectedDate,
-                        minimumDate: minimumDate,
-                        maximumDate: maximumDate,
-                        minimumYear: minimumDate.year,
-                        maximumYear: maximumDate.year,
-                        backgroundColor: Colors.white,
-                        onDateTimeChanged: (value) => selectedDate = value,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          (context) => _DatePickerCard(
+            title: future ? '选择就诊日期' : '选择经期日期',
+            initialDate: selectedDate,
+            minimumDate: minimumDate,
+            maximumDate: maximumDate,
           ),
     );
     if (picked != null) {
@@ -599,6 +535,240 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       ),
     ],
   );
+}
+
+class _DatePickerCard extends StatefulWidget {
+  const _DatePickerCard({
+    required this.title,
+    required this.initialDate,
+    required this.minimumDate,
+    required this.maximumDate,
+  });
+
+  final String title;
+  final DateTime initialDate;
+  final DateTime minimumDate;
+  final DateTime maximumDate;
+
+  @override
+  State<_DatePickerCard> createState() => _DatePickerCardState();
+}
+
+class _DatePickerCardState extends State<_DatePickerCard> {
+  late int _year;
+  late int _month;
+  late int _day;
+  late final FixedExtentScrollController _yearController;
+  late final FixedExtentScrollController _monthController;
+  late final FixedExtentScrollController _dayController;
+
+  List<int> get _years => [
+    for (
+      var year = widget.minimumDate.year;
+      year <= widget.maximumDate.year;
+      year++
+    )
+      year,
+  ];
+
+  List<int> get _months {
+    final firstMonth =
+        _year == widget.minimumDate.year ? widget.minimumDate.month : 1;
+    final lastMonth =
+        _year == widget.maximumDate.year ? widget.maximumDate.month : 12;
+    return [for (var month = firstMonth; month <= lastMonth; month++) month];
+  }
+
+  List<int> get _days {
+    final daysInMonth = DateTime(_year, _month + 1, 0).day;
+    final firstDay =
+        _year == widget.minimumDate.year && _month == widget.minimumDate.month
+            ? widget.minimumDate.day
+            : 1;
+    final lastDay =
+        _year == widget.maximumDate.year && _month == widget.maximumDate.month
+            ? widget.maximumDate.day
+            : daysInMonth;
+    return [for (var day = firstDay; day <= lastDay; day++) day];
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _year = widget.initialDate.year;
+    _month = widget.initialDate.month;
+    _day = widget.initialDate.day;
+    _yearController = FixedExtentScrollController(
+      initialItem: _years.indexOf(_year),
+    );
+    _monthController = FixedExtentScrollController(
+      initialItem: _months.indexOf(_month),
+    );
+    _dayController = FixedExtentScrollController(
+      initialItem: _days.indexOf(_day),
+    );
+  }
+
+  @override
+  void dispose() {
+    _yearController.dispose();
+    _monthController.dispose();
+    _dayController.dispose();
+    super.dispose();
+  }
+
+  void _syncMonthAndDay() {
+    final months = _months;
+    _month = _month.clamp(months.first, months.last).toInt();
+    final days = _days;
+    _day = _day.clamp(days.first, days.last).toInt();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_monthController.hasClients) {
+        _monthController.jumpToItem(_months.indexOf(_month));
+      }
+      if (_dayController.hasClients) {
+        _dayController.jumpToItem(_days.indexOf(_day));
+      }
+    });
+  }
+
+  void _selectYear(int index) {
+    setState(() {
+      _year = _years[index];
+      _syncMonthAndDay();
+    });
+  }
+
+  void _selectMonth(int index) {
+    setState(() {
+      _month = _months[index];
+      final days = _days;
+      _day = _day.clamp(days.first, days.last).toInt();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _dayController.hasClients) {
+          _dayController.jumpToItem(_days.indexOf(_day));
+        }
+      });
+    });
+  }
+
+  Widget _picker({
+    required List<int> values,
+    required FixedExtentScrollController controller,
+    required ValueChanged<int> onSelectedItemChanged,
+  }) => CupertinoPicker(
+    scrollController: controller,
+    itemExtent: 44,
+    useMagnifier: true,
+    magnification: 1.06,
+    backgroundColor: Colors.transparent,
+    selectionOverlay: null,
+    onSelectedItemChanged: onSelectedItemChanged,
+    children: [
+      for (final value in values)
+        Center(child: Text('$value', textAlign: TextAlign.center)),
+    ],
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 40),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 300),
+        child: SizedBox(
+          height: 350,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('取消'),
+                    ),
+                    Text(
+                      widget.title,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    TextButton(
+                      onPressed:
+                          () => Navigator.pop(
+                            context,
+                            DateTime(_year, _month, _day),
+                          ),
+                      child: const Text('确定'),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(18, 12, 18, 0),
+                child: Row(
+                  children: [
+                    Expanded(child: Text('年', textAlign: TextAlign.center)),
+                    Expanded(child: Text('月', textAlign: TextAlign.center)),
+                    Expanded(child: Text('日', textAlign: TextAlign.center)),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      height: 44,
+                      margin: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: pomiLavender.withValues(alpha: 0.55),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: pomiLine),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _picker(
+                            values: _years,
+                            controller: _yearController,
+                            onSelectedItemChanged: _selectYear,
+                          ),
+                        ),
+                        Expanded(
+                          child: _picker(
+                            values: _months,
+                            controller: _monthController,
+                            onSelectedItemChanged: _selectMonth,
+                          ),
+                        ),
+                        Expanded(
+                          child: _picker(
+                            values: _days,
+                            controller: _dayController,
+                            onSelectedItemChanged: (index) {
+                              setState(() => _day = _days[index]);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _OnboardingHeader extends StatelessWidget {
