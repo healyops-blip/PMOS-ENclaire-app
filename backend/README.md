@@ -33,6 +33,9 @@ The default database path is `backend/runtime/pomi.db`. Set
 
 ## Authentication API
 
+完整的中文请求字段、响应示例、错误码和 Flutter 联调说明见
+[`docs/backend-api.md`](../docs/backend-api.md)。
+
 - `POST /api/auth/register` creates an account but does not automatically log in.
 - `POST /api/auth/login` returns an opaque `session_id` once.
 - `GET /api/auth/me` requires `Authorization: Bearer <session_id>`.
