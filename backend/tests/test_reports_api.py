@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from uuid import uuid4
 
@@ -466,3 +466,68 @@ def test_report_uses_only_confirmed_ocr_records_with_revision_level_sources(
             "lab_observation",
             "rule_execution",
         }
+
+
+def test_report_detail_is_snapshot_only_traceable_and_patient_scoped(
+    api_client: TestClient,
+    api_engine: Engine,
+) -> None:
+    owner = _auth(api_client, "report-viewer-owner")
+    stranger = _auth(api_client, "report-viewer-stranger")
+    note_id = _confirmed_note(api_client, owner)
+    _seed_confirmed_health_data(api_engine, "report-viewer-owner")
+    _seed_confirmed_ocr_data(api_engine, "report-viewer-owner")
+    created = api_client.post(
+        "/api/reports",
+        headers=owner,
+        json={"patient_note_id": note_id, "confirm_incomplete": True},
+    )
+    assert created.status_code == 201, created.text
+    report_id = created.json()["data"]["report_id"]
+
+    detail = api_client.get(f"/api/reports/{report_id}", headers=owner)
+    assert detail.status_code == 200, detail.text
+    data = detail.json()["data"]
+    assert data["report_id"] == report_id
+    assert data["summary"]["patient_note_text"].startswith("Discuss the original")
+    assert set(data["trends"]) == {"weights", "cycles", "medication_daily", "labs"}
+    glucose = next(item for item in data["trends"]["labs"] if item["metric_id"] == "glucose")
+    assert glucose["display_mode"] == "trend"
+    point = next(item for item in glucose["points"] if item["raw_value"] == "126")
+    source = next(item for item in data["sources"] if item["node_id"] == point["node_id"])
+    assert source["source_number"] == point["source_number"]
+    assert source["original_value"] == "126"
+    assert source["normalized_value"] == 126
+    assert source["original_unit"] == "mg/dL"
+    assert source["date_source"] == "sample_date"
+    assert source["origin_kind"] == "medical_document"
+    assert source["file"]["status"] == "available"
+    assert source["file"]["url"].endswith(f"/{source['document_revision_id']}/file")
+
+    manual = next(item for item in data["sources"] if item["source_type"] == "weight_record")
+    assert manual["origin_kind"] == "patient_manual"
+    assert manual["file"] is None
+
+    session_factory = build_session_factory(api_engine)
+    with session_factory() as session:
+        observation = session.get(LabObservation, source["source_record_id"])
+        document = session.get(Document, source["document_id"])
+        assert observation is not None and document is not None
+        observation.raw_value = "999"
+        observation.numeric_value = Decimal("999")
+        document.upload_status = "deleted"
+        document.deleted_at = datetime.now(UTC)
+        session.commit()
+
+    frozen = api_client.get(f"/api/reports/{report_id}", headers=owner).json()["data"]
+    frozen_source = next(item for item in frozen["sources"] if item["node_id"] == point["node_id"])
+    assert frozen_source["original_value"] == "126"
+    assert frozen_source["normalized_value"] == 126
+    assert frozen_source["file"]["status"] == "unavailable"
+    assert frozen_source["file"]["url"] is None
+    assert "结构化原值" in frozen_source["file"]["error_message"]
+
+    denied = api_client.get(f"/api/reports/{report_id}", headers=stranger)
+    assert denied.status_code == 404
+    file_denied = api_client.get(source["file"]["url"], headers=stranger)
+    assert file_denied.status_code == 404

@@ -175,6 +175,7 @@ Authorization: Bearer <session_id>
 - 聚合完全由版本化确定性代码完成，不调用 LLM。`source_digest` 覆盖所选区块、全部已确认历史、患者自述、规则版本和模板版本。
 - 相同 `source_digest` 复用同一成功快照；数据变化创建新快照并写入 `previous_report_id`。成功快照及其 `report_source` 不可覆盖。
 - `GET /api/reports` 按最新成功版本排序，并用当前确认数据重新计算摘要以返回 `has_updates`；旧快照内容始终保持生成时状态。
+- `GET /api/reports/{report_id}` 返回指定不可变快照的 `summary`、映射结构 `trends`（`labs/weights/cycles/medication_daily`）、`records` 与增强 `sources`。逐点原值来自快照，不回读当前业务行；来源原件只返回需要当前 Session 的明确 `document_id + document_revision_id` 文件入口。原件不可用时返回稳定错误状态，结构化原值仍保留。Flutter 三层查看、滚动/指标恢复和本地认证水印边界见 [`issue-29-report-viewer.md`](issue-29-report-viewer.md)。
 - 日期、新鲜度、参考范围、点数与单位换算均保存于快照。超过 12 个月的点保留并标记 `default_collapsed=true`；不可安全比较的点保留为独立散点并给出 `exclusion_reason`。
 - 医疗材料来源必须同时携带 `document_id` 和 `document_revision_id`；患者手工经期、体重和每日用药不得标记成医院材料；规则结果关联版本化 `rule_execution` 来源。
 | 规则管理 | `GET /api/deterministic-rules`、`PUT /api/deterministic-rules/{rule_id}` | 无普通用户页面 | 管理端规则参数 |
