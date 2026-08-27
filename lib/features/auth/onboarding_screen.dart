@@ -568,7 +568,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           readOnly: true,
           onTap: () => _chooseDate(_nextVisit, future: true),
           decoration: const InputDecoration(
-            labelText: '就诊日期（选填）',
             suffixIcon: Icon(Icons.event_available_outlined),
             helperText: '\u00A0',
             helperStyle: TextStyle(fontSize: 12, height: 1),
