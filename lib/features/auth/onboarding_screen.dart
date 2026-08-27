@@ -82,52 +82,71 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       initialItem: initialYear - firstYear,
     );
 
-    final picked = await showModalBottomSheet<int>(
+    final picked = await showDialog<int>(
       context: context,
-      showDragHandle: true,
       builder:
-          (context) => SafeArea(
-            top: false,
-            child: SizedBox(
-              height: 330,
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('取消'),
-                        ),
-                        const Text(
-                          '选择年份',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, selectedYear),
-                          child: const Text('确定'),
-                        ),
-                      ],
+          (context) => Dialog(
+            insetPadding: const EdgeInsets.symmetric(horizontal: 36),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 320),
+              child: SizedBox(
+                height: 330,
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('取消'),
+                          ),
+                          const Text(
+                            '选择年份',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          TextButton(
+                            onPressed:
+                                () => Navigator.pop(context, selectedYear),
+                            child: const Text('确定'),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const Divider(height: 1),
-                  Expanded(
-                    child: CupertinoPicker(
-                      scrollController: scrollController,
-                      itemExtent: 44,
-                      useMagnifier: true,
-                      magnification: 1.08,
-                      onSelectedItemChanged:
-                          (index) => selectedYear = firstYear + index,
-                      children: [
-                        for (var year = firstYear; year <= currentYear; year++)
-                          Center(child: Text('$year 年')),
-                      ],
+                    const Divider(height: 1),
+                    Expanded(
+                      child: CupertinoPicker(
+                        scrollController: scrollController,
+                        itemExtent: 44,
+                        useMagnifier: true,
+                        magnification: 1.08,
+                        selectionOverlay: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 24),
+                          decoration: BoxDecoration(
+                            color: pomiLavender.withValues(alpha: 0.55),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: pomiLine),
+                          ),
+                        ),
+                        onSelectedItemChanged:
+                            (index) => selectedYear = firstYear + index,
+                        children: [
+                          for (
+                            var year = firstYear;
+                            year <= currentYear;
+                            year++
+                          )
+                            Center(child: Text('$year 年')),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
