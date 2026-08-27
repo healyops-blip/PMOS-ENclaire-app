@@ -212,12 +212,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   Widget _basicStep() => _StepCard(
     showFrame: false,
+    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
     children: [
       TextFormField(
         controller: _nickname,
-        decoration: const InputDecoration(labelText: '昵称'),
+        textAlign: TextAlign.center,
+        decoration: const InputDecoration(
+          labelText: '昵称',
+          floatingLabelAlignment: FloatingLabelAlignment.center,
+        ),
         validator:
-            (value) => value == null || value.trim().isEmpty ? '请输入称呼' : null,
+            (value) => value == null || value.trim().isEmpty ? '请输入昵称' : null,
       ),
       const SizedBox(height: 12),
       Row(
@@ -226,7 +231,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             child: TextFormField(
               controller: _birthYear,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: '出生年份'),
+              textAlign: TextAlign.center,
+              decoration: const InputDecoration(
+                labelText: '出生年份',
+                floatingLabelAlignment: FloatingLabelAlignment.center,
+              ),
               validator: _yearValidator,
             ),
           ),
@@ -235,7 +244,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             child: TextFormField(
               controller: _diagnosisYear,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: '确诊年份'),
+              textAlign: TextAlign.center,
+              decoration: const InputDecoration(
+                labelText: '确诊年份',
+                floatingLabelAlignment: FloatingLabelAlignment.center,
+              ),
               validator: _yearValidator,
             ),
           ),
@@ -248,9 +261,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             child: TextFormField(
               controller: _height,
               keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
               decoration: const InputDecoration(
                 labelText: '身高',
                 suffixText: 'cm',
+                floatingLabelAlignment: FloatingLabelAlignment.center,
               ),
               validator: (value) {
                 final height = double.tryParse(value ?? '');
@@ -267,9 +282,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
+              textAlign: TextAlign.center,
               decoration: const InputDecoration(
                 labelText: '体重',
                 suffixText: 'kg',
+                floatingLabelAlignment: FloatingLabelAlignment.center,
               ),
               validator: _weightValidator,
             ),
@@ -380,7 +397,7 @@ class _OnboardingHeader extends StatelessWidget {
     const titles = ['基本信息', '经期情况', '当前用药'];
     const subtitles = ['', '帮助整理周期和就诊倒计时', '帮助定制日常用药管理'];
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 18),
+      padding: EdgeInsets.fromLTRB(24, 24, 24, step == 0 ? 4 : 18),
       child: Column(
         children: [
           Row(
@@ -415,14 +432,19 @@ class _OnboardingHeader extends StatelessWidget {
 }
 
 class _StepCard extends StatelessWidget {
-  const _StepCard({required this.children, this.showFrame = true});
+  const _StepCard({
+    required this.children,
+    this.showFrame = true,
+    this.padding = const EdgeInsets.all(16),
+  });
   final List<Widget> children;
   final bool showFrame;
+  final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
     final content = Padding(
-      padding: const EdgeInsets.all(16),
+      padding: padding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: children,
