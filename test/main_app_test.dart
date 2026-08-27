@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pmos_enclaire/features/auth/data/auth_repository.dart';
+import 'package:pmos_enclaire/features/reports/data/patient_note_repository.dart';
 import 'package:pmos_enclaire/main.dart';
 
 void main() {
@@ -218,8 +219,15 @@ void main() {
     await tester.tap(reportEntry);
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('report-generator-page')), findsOneWidget);
+    expect(find.byKey(const Key('patient-note-field')), findsOneWidget);
+    expect(find.text('原文已确认'), findsOneWidget);
 
     final generate = find.byKey(const Key('generate-report-button'));
+    await tester.drag(
+      find.byKey(const Key('report-generator-scroll')),
+      const Offset(0, -500),
+    );
+    await tester.pumpAndSettle();
     await tester.ensureVisible(generate);
     await tester.tap(generate);
     await tester.pumpAndSettle();
@@ -245,6 +253,51 @@ void main() {
     await tester.tap(sourceButton);
     await tester.pumpAndSettle();
     expect(find.text('原始化验单预览 · 模拟材料'), findsOneWidget);
+  });
+
+  testWidgets('patient statement confirms, copies and explicitly skips', (
+    tester,
+  ) async {
+    _setPhoneViewport(tester);
+    final now = DateTime(2026, 8, 27);
+    final repository = DemoPatientNoteRepository(
+      initial: PatientNote(
+        id: 'draft-note',
+        originalText: '希望讨论睡眠问题',
+        status: PatientNoteStatus.draft,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    await tester.pumpWidget(
+      MainApp(
+        authRepository: const DemoAuthRepository(),
+        patientNoteRepository: repository,
+      ),
+    );
+    await tester.tap(find.byKey(const Key('demo-login-button')));
+    await tester.pumpAndSettle();
+    final reportEntry = find.byKey(const Key('report-cta'));
+    await tester.ensureVisible(reportEntry);
+    await tester.tap(reportEntry);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('patient-note-field')),
+      '希望讨论睡眠与疲劳问题',
+    );
+    await tester.tap(find.byKey(const Key('confirm-patient-note')));
+    await tester.pumpAndSettle();
+    expect(find.text('原文已确认'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('copy-patient-note')));
+    await tester.pumpAndSettle();
+    expect(find.text('草稿 · 待确认'), findsOneWidget);
+    expect(find.text('希望讨论睡眠与疲劳问题'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('skip-patient-note')));
+    await tester.pumpAndSettle();
+    expect(find.text('本次已明确跳过'), findsOneWidget);
   });
 }
 

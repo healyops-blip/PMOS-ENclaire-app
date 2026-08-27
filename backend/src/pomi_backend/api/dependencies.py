@@ -13,6 +13,7 @@ from pomi_backend.db.models import UserAccount
 from pomi_backend.services import AuthService
 from pomi_backend.services.auth import AuthError
 from pomi_backend.services.patient import PatientProfileService
+from pomi_backend.services.patient_notes import PatientNoteService
 
 bearer_scheme = HTTPBearer(auto_error=False, scheme_name="SessionBearer")
 
@@ -64,3 +65,12 @@ def get_patient_profile_service(
 PatientProfileServiceDependency = Annotated[
     PatientProfileService, Depends(get_patient_profile_service)
 ]
+
+
+def get_patient_note_service(
+    session: DatabaseSession, account: CurrentAccount
+) -> PatientNoteService:
+    return PatientNoteService(session, account)
+
+
+PatientNoteServiceDependency = Annotated[PatientNoteService, Depends(get_patient_note_service)]

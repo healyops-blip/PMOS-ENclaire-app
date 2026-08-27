@@ -11,16 +11,19 @@ import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.d
 import 'package:pmos_enclaire/features/records/presentation/records_page.dart';
 import 'package:pmos_enclaire/features/records/presentation/upload_flow.dart';
 import 'package:pmos_enclaire/features/reports/presentation/report_page.dart';
+import 'package:pmos_enclaire/features/reports/data/patient_note_repository.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({
     required this.account,
     required this.profileRepository,
+    required this.patientNoteRepository,
     super.key,
   });
 
   final DemoAccount account;
   final PatientProfileRepository profileRepository;
+  final PatientNoteRepository patientNoteRepository;
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -90,7 +93,9 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
               onReport: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) => const ReportGeneratorPage(),
+                  builder: (_) => ReportGeneratorPage(
+                    repository: widget.patientNoteRepository,
+                  ),
                 ),
               ),
             ),

@@ -329,7 +329,11 @@ item 字段：`id`、`existing_medication_id`、`new_medical_order_id`、`medica
 
 ### 5.9 患者自述、报告与 PDF
 
-患者自述字段：`id`、`original_text`、`confirmed_text`、`confirmation_status`、`confirmed_at`、`created_at`、`updated_at`。状态为 `draft/confirmed/cancelled`，确认文本不调用模型改写。
+患者自述字段：`id`、`patient_id`、`visit_context`、`original_text`、`confirmed_text`、`status`、`source_note_id`、`confirmed_at`、`consumed_at`、`created_at`、`updated_at`。状态为 `draft/confirmed/skipped/consumed`，确认文本不调用模型改写。Flutter 分别调用创建、更新、`/confirm`、`/skip` 和 `/copy`；已消费自述只能复制为新草稿，不能原地修改。
+
+`report_snapshot` 基础字段为：`id`、`patient_id`、`patient_note_id`、`previous_report_id`、`report_status`、`snapshot_json`、`date_source_json`、`freshness_result_json`、`source_digest`、`snapshot_hash`、`generated_by_uid`、`report_generated_at`、`failure_reason`。相同患者和 `source_digest` 唯一；状态为 `pending/succeeded/failed`，成功快照在 Repository 层不可更新。
+
+`report_source` 逐点保存 `report_id`、`source_type`、`source_record_id`、`origin_kind`、`document_id`、`document_revision_id`、`rule_execution_id`、`included_at`。`origin_kind` 明确区分 `medical_document/patient_manual/system_record/rule_execution`；医疗材料来源必须同时指定材料和修订，患者手工记录不得伪装成医院材料。
 
 创建报告请求：`patient_note_id`（可空）、`include_sections[]`（可空，默认全部）。响应：`report_id`、`status`、`generated_at`、`snapshot_hash`。
 

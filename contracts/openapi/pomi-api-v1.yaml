@@ -964,24 +964,6 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
 
   /api/patient-notes:
-    get:
-      tags: [Reports]
-      operationId: getLatestPatientNote
-      summary: Get the latest patient note draft or confirmation
-      responses:
-        '200':
-          description: Latest note or null
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiSuccess'
-                  - type: object
-                    properties:
-                      data:
-                        oneOf:
-                          - $ref: '#/components/schemas/PatientNote'
-                          - type: 'null'
     post:
       tags: [Reports]
       operationId: createPatientNote
@@ -1005,6 +987,26 @@ paths:
                       data:
                         $ref: '#/components/schemas/PatientNote'
 
+  /api/patient-notes/latest:
+    get:
+      tags: [Reports]
+      operationId: getLatestPatientNote
+      summary: Get the latest patient note draft, confirmation, skip or consumed record
+      responses:
+        '200':
+          description: Latest note or null
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        oneOf:
+                          - $ref: '#/components/schemas/PatientNote'
+                          - type: 'null'
+
   /api/patient-notes/{note_id}:
     put:
       tags: [Reports]
@@ -1026,6 +1028,72 @@ paths:
       responses:
         '200':
           description: Patient note updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PatientNote'
+
+  /api/patient-notes/{note_id}/confirm:
+    post:
+      tags: [Reports]
+      operationId: confirmPatientNote
+      summary: Idempotently confirm the exact patient statement text
+      parameters:
+        - $ref: '#/components/parameters/PatientNoteId'
+      responses:
+        '200':
+          description: Patient note confirmed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PatientNote'
+
+  /api/patient-notes/{note_id}/skip:
+    post:
+      tags: [Reports]
+      operationId: skipPatientNote
+      summary: Idempotently record an explicit empty-statement decision
+      parameters:
+        - $ref: '#/components/parameters/PatientNoteId'
+      responses:
+        '200':
+          description: Patient note skipped
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PatientNote'
+
+  /api/patient-notes/{note_id}/copy:
+    post:
+      tags: [Reports]
+      operationId: copyPatientNote
+      summary: Copy confirmed history into a new editable draft
+      parameters:
+        - $ref: '#/components/parameters/PatientNoteId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientNoteCopy'
+      responses:
+        '201':
+          description: Independent draft created
           content:
             application/json:
               schema:
@@ -1288,6 +1356,13 @@ components:
         format: uuid
     DocumentId:
       name: document_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PatientNoteId:
+      name: note_id
       in: path
       required: true
       schema:
@@ -2618,39 +2693,63 @@ components:
 
     PatientNoteInput:
       type: object
-      required: [original_text, confirmation_status]
+      required: [original_text]
       properties:
         original_text:
           type: string
           maxLength: 5000
-        confirmed_text:
+        visit_context:
           type: [string, 'null']
-          maxLength: 5000
-        confirmation_status:
-          $ref: '#/components/schemas/ConfirmationStatus'
+          maxLength: 200
+
+    PatientNoteCopy:
+      type: object
+      properties:
+        visit_context:
+          type: [string, 'null']
+          maxLength: 200
+
+    PatientNoteStatus:
+      type: string
+      enum: [draft, confirmed, skipped, consumed]
 
     PatientNote:
-      allOf:
-        - $ref: '#/components/schemas/PatientNoteInput'
-        - type: object
-          required: [id, created_at, updated_at]
-          properties:
-            id:
-              type: string
-              format: uuid
-            confirmed_at:
-              type: [string, 'null']
-              format: date-time
-            created_at:
-              type: string
-              format: date-time
-            updated_at:
-              type: string
-              format: date-time
+      type: object
+      required: [id, patient_id, original_text, status, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        patient_id:
+          type: string
+          format: uuid
+        visit_context:
+          type: [string, 'null']
+        original_text:
+          type: string
+        confirmed_text:
+          type: [string, 'null']
+        status:
+          $ref: '#/components/schemas/PatientNoteStatus'
+        source_note_id:
+          type: [string, 'null']
+          format: uuid
+        confirmed_at:
+          type: [string, 'null']
+          format: date-time
+        consumed_at:
+          type: [string, 'null']
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
 
     ReportStatus:
       type: string
-      enum: [generating, succeeded, failed]
+      enum: [pending, succeeded, failed]
 
     ReportCreate:
       type: object
