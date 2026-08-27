@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pmos_enclaire/core/network/pomi_api_client.dart';
@@ -118,6 +120,54 @@ void main() {
     expect(report?.generatedAt, DateTime.utc(2026, 8, 27, 10));
     expect(report?.snapshotHash, List.filled(64, 'd').join());
   });
+
+  test(
+    'a slower earlier refresh cannot overwrite the newest dashboard',
+    () async {
+      final repository = _ConcurrentRepository();
+      final controller = DashboardController(
+        repository: repository,
+        uid: 'uid-a',
+      );
+
+      final first = controller.load();
+      final second = controller.load();
+      repository.complete(1, '2026-08-28');
+      await second;
+      repository.complete(0, '2026-08-27');
+      await first;
+
+      expect(controller.snapshot?.businessDate, DateTime(2026, 8, 28));
+      expect(controller.loading, isFalse);
+      expect(controller.error, isNull);
+    },
+  );
+}
+
+class _ConcurrentRepository implements DashboardRepository {
+  final requests = <Completer<DashboardLoad>>[];
+
+  @override
+  Future<void> clear(String uid) async {}
+
+  @override
+  Future<DashboardLoad> load(String uid) {
+    final completer = Completer<DashboardLoad>();
+    requests.add(completer);
+    return completer.future;
+  }
+
+  void complete(int index, String businessDate) {
+    final json = Map<String, dynamic>.from(_dashboardJson)
+      ..['business_date'] = businessDate;
+    requests[index].complete(
+      DashboardLoad(
+        snapshot: DashboardSnapshot.fromJson(json),
+        offline: false,
+        updatedAt: DateTime.parse(businessDate),
+      ),
+    );
+  }
 }
 
 class _RevokedRepository implements DashboardRepository {

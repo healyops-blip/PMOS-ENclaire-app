@@ -17,27 +17,34 @@ class DashboardController extends ChangeNotifier {
   bool offline = false;
   DateTime? updatedAt;
   Object? error;
+  int _loadGeneration = 0;
 
   Future<void> load() async {
+    final generation = ++_loadGeneration;
     loading = true;
     error = null;
     notifyListeners();
     try {
       final result = await repository.load(uid);
+      if (generation != _loadGeneration) return;
       snapshot = result.snapshot;
       offline = result.offline;
       updatedAt = result.updatedAt;
     } on DashboardAuthorizationFailure catch (caught) {
+      if (generation != _loadGeneration) return;
       snapshot = null;
       offline = false;
       updatedAt = null;
       error = caught;
       await onUnauthorized?.call();
     } catch (caught) {
+      if (generation != _loadGeneration) return;
       error = caught;
     } finally {
-      loading = false;
-      notifyListeners();
+      if (generation == _loadGeneration) {
+        loading = false;
+        notifyListeners();
+      }
     }
   }
 }
