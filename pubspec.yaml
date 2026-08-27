@@ -33,6 +33,7 @@ flutter:
   assets:
     - assets/brand/POMI-logo.svg
     - assets/brand/POMI-logo-mark.svg
+    - assets/data/pomi_medications_v2.json
   fonts:
     - family: Noto Sans SC
       fonts:

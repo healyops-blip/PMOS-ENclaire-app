@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
+import '../medications/medication_catalog.dart';
 
 const _onboardingContentPadding = EdgeInsets.all(16);
 const _onboardingFieldSlotHeight = 76.0;
@@ -76,7 +77,23 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           ),
     );
     if (value == null) return;
-    final normalized = value.trim();
+    var normalized = value.trim();
+    try {
+      final catalog = await MedicationCatalogCache.load();
+      final query = normalized.toLowerCase();
+      for (final entry in catalog.entries) {
+        final exactMatch =
+            entry.name.toLowerCase() == query ||
+            entry.aliases.any((alias) => alias.toLowerCase() == query);
+        if (exactMatch) {
+          normalized = entry.name;
+          break;
+        }
+      }
+    } catch (_) {
+      // The user can still add a custom item if the bundled cache is unavailable.
+    }
+    if (!mounted) return;
     if (!_medicationOptions.containsKey(normalized) &&
         !_customMedicationOptions.contains(normalized)) {
       _customMedicationOptions.add(normalized);
