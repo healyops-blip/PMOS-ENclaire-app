@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pomi-backend"
+requires-python = ">=3.12"
+dependencies = [
+  "alembic>=1.14,<2",
+  "sqlalchemy>=2.0,<3",
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3,<10",
+  "ruff>=0.9,<1",
+]
+
+[tool.hatch.version]
+path = "src/pomi_backend/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pomi_backend"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

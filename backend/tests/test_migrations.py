@@ -1,0 +1,51 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import create_engine, inspect, text
+
+
+def test_initial_migration_is_repeatable_and_safe(tmp_path: Path) -> None:
+    database_path = tmp_path / "migrated.db"
+    database_url = f"sqlite:///{database_path}"
+    backend_root = Path(__file__).resolve().parents[1]
+    config = Config(backend_root / "alembic.ini")
+    config.set_main_option("sqlalchemy.url", database_url)
+
+    command.upgrade(config, "head")
+    command.upgrade(config, "head")
+
+    engine = create_engine(database_url)
+    inspector = inspect(engine)
+    assert set(inspector.get_table_names()) >= {
+        "alembic_version",
+        "user_account",
+        "user_session",
+    }
+
+    account_columns = {column["name"] for column in inspector.get_columns("user_account")}
+    session_columns = {column["name"] for column in inspector.get_columns("user_session")}
+    assert "password_hash" in account_columns
+    assert "password" not in account_columns
+    assert "session_hash" in session_columns
+    assert "session_id" not in session_columns
+
+    unique_account_columns = {
+        tuple(constraint["column_names"])
+        for constraint in inspector.get_unique_constraints("user_account")
+    }
+    unique_session_columns = {
+        tuple(constraint["column_names"])
+        for constraint in inspector.get_unique_constraints("user_session")
+    }
+    assert ("uid",) in unique_account_columns
+    assert ("account_name",) in unique_account_columns
+    assert ("session_hash",) in unique_session_columns
+
+    with engine.connect() as connection:
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
+            "20260826_0001"
+        )
+    engine.dispose()
