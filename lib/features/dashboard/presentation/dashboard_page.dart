@@ -7,14 +7,20 @@ import 'package:pmos_enclaire/features/cycle/presentation/cycle_page.dart';
 import 'package:pmos_enclaire/features/dashboard/domain/medication.dart';
 import 'package:pmos_enclaire/features/medications/presentation/medication_page.dart';
 import 'package:pmos_enclaire/features/profile/presentation/profile_page.dart';
+import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
 import 'package:pmos_enclaire/features/records/presentation/records_page.dart';
 import 'package:pmos_enclaire/features/records/presentation/upload_flow.dart';
 import 'package:pmos_enclaire/features/reports/presentation/report_page.dart';
 
 class DashboardPage extends StatefulWidget {
-  const DashboardPage({required this.account, super.key});
+  const DashboardPage({
+    required this.account,
+    required this.profileRepository,
+    super.key,
+  });
 
   final DemoAccount account;
+  final PatientProfileRepository profileRepository;
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -90,7 +96,10 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
             const CyclePage(),
             const RecordsPage(),
-            ProfilePage(account: widget.account),
+            ProfilePage(
+              account: widget.account,
+              repository: widget.profileRepository,
+            ),
           ],
         ),
       ),
