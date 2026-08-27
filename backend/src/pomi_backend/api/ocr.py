@@ -2,16 +2,27 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request, Response, status
+from typing import Annotated
+
+from fastapi import APIRouter, Header, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from pomi_backend.api.business import BusinessError, success
-from pomi_backend.api.dependencies import MedicalOrderServiceDependency, OCRTaskServiceDependency
+from pomi_backend.api.dependencies import (
+    ClinicalTextConfirmationServiceDependency,
+    MedicalOrderServiceDependency,
+    OCRTaskServiceDependency,
+)
+from pomi_backend.schemas.clinical_text import ClinicalTextConfirmRequest
 from pomi_backend.schemas.orders import MedicalOrderConfirmation
 from pomi_backend.services.ocr import task_data
 from pomi_backend.services.orders import medical_order_data
 
 router = APIRouter(prefix="/api/ocr/tasks", tags=["ocr"])
+IdempotencyKey = Annotated[
+    str | None,
+    Header(alias="Idempotency-Key", min_length=8, max_length=128),
+]
 
 
 class CreateOCRTaskRequest(BaseModel):
@@ -71,11 +82,13 @@ def get_ocr_result(task_id: str, request: Request, service: OCRTaskServiceDepend
 @router.post("/{task_id}/confirm")
 def confirm_ocr_result(
     task_id: str,
-    payload: ConfirmLabRequest | MedicalOrderConfirmation,
+    payload: ConfirmLabRequest | MedicalOrderConfirmation | ClinicalTextConfirmRequest,
     request: Request,
     response: Response,
     ocr_service: OCRTaskServiceDependency,
     order_service: MedicalOrderServiceDependency,
+    clinical_service: ClinicalTextConfirmationServiceDependency,
+    idempotency_key: IdempotencyKey = None,
 ) -> dict:
     task = ocr_service.owned(task_id)
     if task.material_type == "lab_report" and isinstance(payload, ConfirmLabRequest):
@@ -93,6 +106,16 @@ def confirm_ocr_result(
                 "reused": not created,
             },
         )
+    if task.material_type in {"imaging_text_report", "outpatient_record"} and isinstance(
+        payload, ClinicalTextConfirmRequest
+    ):
+        if idempotency_key is None:
+            raise BusinessError(
+                "IDEMPOTENCY_KEY_REQUIRED",
+                "Idempotency-Key is required for clinical text confirmation.",
+                422,
+            )
+        return success(request, clinical_service.confirm(task_id, payload))
     raise BusinessError(
         "OCR_CONFIRM_TYPE_MISMATCH",
         "Confirmation payload does not match the OCR material type.",

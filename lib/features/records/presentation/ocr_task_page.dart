@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:pmos_enclaire/features/records/data/order_reconciliation_repository.dart';
+import 'package:pmos_enclaire/features/records/presentation/clinical_text_confirmation_page.dart';
 import 'package:pmos_enclaire/features/records/presentation/lab_confirmation_page.dart';
 import 'package:pmos_enclaire/features/records/presentation/medical_order_review_page.dart';
 
@@ -213,28 +214,38 @@ class OcrPendingConfirmationPage extends StatelessWidget {
   final DocumentRepository? documentRepository;
 
   @override
-  Widget build(BuildContext context) => FutureBuilder<OcrTaskResult>(
-    future: repository.result(task.id),
-    builder: (context, snapshot) {
-      if (!snapshot.hasData) {
-        if (snapshot.hasError) {
-          return Scaffold(body: Center(child: Text(snapshot.error.toString())));
+  Widget build(BuildContext context) {
+    if (task.materialType == 'imaging_text_report' ||
+        task.materialType == 'outpatient_record') {
+      return ClinicalTextConfirmationPage(repository: repository, task: task);
+    }
+    return FutureBuilder<OcrTaskResult>(
+      future: repository.result(task.id),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          if (snapshot.hasError) {
+            return Scaffold(
+              body: Center(child: Text(snapshot.error.toString())),
+            );
+          }
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
-        return const Scaffold(body: Center(child: CircularProgressIndicator()));
-      }
-      if (task.materialType == 'medical_order' &&
-          repository is MedicalOrderGateway) {
-        return MedicalOrderReviewPage(
-          gateway: repository as MedicalOrderGateway,
-          task: task,
-          result: snapshot.data!,
-          document: document,
-          documentRepository: documentRepository,
-        );
-      }
-      return _genericPage(snapshot.data!);
-    },
-  );
+        if (task.materialType == 'medical_order' &&
+            repository is MedicalOrderGateway) {
+          return MedicalOrderReviewPage(
+            gateway: repository as MedicalOrderGateway,
+            task: task,
+            result: snapshot.data!,
+            document: document,
+            documentRepository: documentRepository,
+          );
+        }
+        return _genericPage(snapshot.data!);
+      },
+    );
+  }
 
   Widget _genericPage(OcrTaskResult result) => Scaffold(
     key: Key('ocr-confirmation-${task.materialType}'),

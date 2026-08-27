@@ -201,4 +201,15 @@ class _Gateway implements OcrRepository, MedicalOrderGateway {
     String? reportDate,
     String? visitDate,
   }) => throw UnimplementedError();
+
+  @override
+  Future<List<int>> sourceFile(OcrTask task) async => const [];
+
+  @override
+  Future<ClinicalConfirmationResult> confirmClinical({
+    required OcrTask task,
+    required String resultId,
+    required Map<String, dynamic> confirmedData,
+    required List<Map<String, dynamic>> fieldConfirmations,
+  }) => throw UnimplementedError();
 }

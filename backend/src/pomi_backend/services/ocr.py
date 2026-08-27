@@ -207,11 +207,19 @@ class OCRTaskService:
                 "revision_number": revision.revision_number,
                 "file_endpoint": (f"/documents/{document.id}/revisions/{revision.id}/file"),
             }
-        return result_data(
+        data = result_data(
             result,
             self.repository.fields(result.id),
             source_document=source,
         )
+        data["source"] = {
+            "document_id": task.document_id,
+            "document_revision_id": task.document_revision_id,
+            "file_url": (
+                f"/api/documents/{task.document_id}/revisions/{task.document_revision_id}/file"
+            ),
+        }
+        return data
 
     def confirm_lab(self, task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         task = self.owned(task_id)

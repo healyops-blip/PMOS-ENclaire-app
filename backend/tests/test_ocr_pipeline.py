@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from PIL import Image
 from sqlalchemy.orm import Session, sessionmaker
 
-from pomi_backend.db.models import OCRResult, OCRTask
+from pomi_backend.db.models import ImagingReport, OCRResult, OCRTask, OutpatientRecord
 from pomi_backend.db.models.auth import utc_now
 from pomi_backend.services.ocr_provider import (
     OCRProviderError,
@@ -77,18 +77,23 @@ def _payload(kind: str) -> dict[str, Any]:
         },
         "imaging_text_report": {
             "facility": None,
-            "report_date": None,
+            "examination_name": "Pelvic ultrasound",
+            "body_part": "Pelvis",
+            "examination_date": "2026-08-20",
+            "report_date": "2026-08-21",
             "modality": "US",
             "findings": " visible text ",
-            "impression": None,
+            "impression": " visible conclusion ",
         },
         "outpatient_record": {
             "facility": None,
             "department": None,
-            "visit_date": None,
+            "doctor_name": None,
+            "visit_date": "2026-08-20",
             "chief_complaint": None,
-            "diagnoses": [],
-            "plan": None,
+            "diagnosis_summary": "verbatim diagnosis",
+            "treatment_plan": None,
+            "medical_advice": "verbatim advice",
         },
     }
     return {
@@ -165,6 +170,7 @@ def test_four_materials_are_idempotent_traceable_and_uid_scoped(api_client: Test
         assert result["raw_response"]["provider_request"] == 1
         assert result["fields"][0]["confidence"] == 0.91
         assert result["fields"][0]["source_region"]["page"] == 1
+        assert result["source"]["document_revision_id"] == document["current_revision_id"]
         assert api_client.get(f"/api/ocr/tasks/{task['id']}", headers=outsider).status_code == 404
         assert (
             api_client.get(f"/api/ocr/tasks/{task['id']}/result", headers=outsider).status_code
@@ -275,3 +281,119 @@ def test_ocr_requires_consent_and_explicit_owned_revision(api_client: TestClient
         "/api/ocr/tasks/{task_id}/result",
         "/api/ocr/tasks/{task_id}/retry",
     }
+
+
+def test_imaging_and_outpatient_confirmation_is_idempotent_and_traceable(
+    api_client: TestClient,
+) -> None:
+    owner = _headers(api_client, "clinical-owner")
+    outsider = _headers(api_client, "clinical-outsider")
+    cases = {
+        "imaging_text_report": {
+            "facility": "Synthetic Hospital",
+            "examination_name": "Pelvic ultrasound",
+            "body_part": "Pelvis",
+            "modality": "US",
+            "examination_date": "2026-08-20",
+            "report_date": "2026-08-21",
+            "findings": "Verbatim imaging findings.",
+            "impression": "Verbatim imaging conclusion.",
+        },
+        "outpatient_record": {
+            "facility": "Synthetic Hospital",
+            "department": "Endocrinology",
+            "doctor_name": None,
+            "visit_date": "2026-08-20",
+            "chief_complaint": "Irregular cycles.",
+            "diagnosis_summary": "Verbatim diagnosis summary.",
+            "treatment_plan": "Medication words remain text only.",
+            "medical_advice": "Verbatim follow-up advice.",
+        },
+    }
+    record_ids = []
+    for index, (kind, confirmed_data) in enumerate(cases.items()):
+        document = _upload(api_client, owner, kind, index + 20)
+        task = _create(api_client, owner, document)
+        assert _worker(api_client, FakeProvider()).run_once() is True
+        result = _data(api_client.get(f"/api/ocr/tasks/{task['id']}/result", headers=owner))
+        payload = {
+            "result_id": result["id"],
+            "expected_revision_id": document["current_revision_id"],
+            "document_type": kind,
+            "confirmed_data": confirmed_data,
+            "field_confirmations": [
+                {
+                    "field_path": "facility",
+                    "user_value": "Synthetic Hospital",
+                    "confirmation_status": "edited",
+                }
+            ],
+        }
+        confirmed = _data(
+            api_client.post(
+                f"/api/ocr/tasks/{task['id']}/confirm",
+                headers={**owner, "Idempotency-Key": f"clinical-confirm-{index}"},
+                json=payload,
+            )
+        )
+        repeated = _data(
+            api_client.post(
+                f"/api/ocr/tasks/{task['id']}/confirm",
+                headers={**owner, "Idempotency-Key": f"clinical-confirm-{index}"},
+                json=payload,
+            )
+        )
+        assert repeated["record_id"] == confirmed["record_id"]
+        assert repeated["reused"] is True
+        assert confirmed["document_id"] == document["id"]
+        assert confirmed["document_revision_id"] == document["current_revision_id"]
+        record_ids.append(confirmed["record_id"])
+        assert (
+            api_client.post(
+                f"/api/ocr/tasks/{task['id']}/confirm",
+                headers={**outsider, "Idempotency-Key": f"clinical-outsider-{index}"},
+                json=payload,
+            ).status_code
+            == 404
+        )
+
+    with api_client.app.state.session_factory() as session:
+        assert session.query(ImagingReport).count() == 1
+        assert session.query(OutpatientRecord).count() == 1
+
+
+def test_clinical_confirmation_rejects_blank_text_and_future_date(
+    api_client: TestClient,
+) -> None:
+    headers = _headers(api_client, "clinical-invalid")
+    document = _upload(api_client, headers, "outpatient_record", 41)
+    task = _create(api_client, headers, document)
+    assert _worker(api_client, FakeProvider()).run_once() is True
+    result = _data(api_client.get(f"/api/ocr/tasks/{task['id']}/result", headers=headers))
+    response = api_client.post(
+        f"/api/ocr/tasks/{task['id']}/confirm",
+        headers={**headers, "Idempotency-Key": "clinical-invalid-confirm"},
+        json={
+            "result_id": result["id"],
+            "expected_revision_id": document["current_revision_id"],
+            "document_type": "outpatient_record",
+            "confirmed_data": {
+                "facility": None,
+                "department": None,
+                "doctor_name": None,
+                "visit_date": "2099-01-01",
+                "chief_complaint": None,
+                "diagnosis_summary": " ",
+                "treatment_plan": None,
+                "medical_advice": " ",
+            },
+            "field_confirmations": [],
+        },
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] in {
+        "OCR_CONFIRMATION_INVALID",
+        "OCR_CONFIRMATION_INVALID_DATE",
+    }
+    with api_client.app.state.session_factory() as session:
+        assert session.query(OutpatientRecord).count() == 0
