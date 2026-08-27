@@ -154,17 +154,20 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   Expanded(
                     child: Form(
                       key: _formKey,
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 220),
-                        child: SingleChildScrollView(
-                          key: ValueKey(_step),
-                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-                          child:
-                              [
-                                _basicStep(),
-                                _cycleStep(),
-                                _medicationStep(),
-                              ][_step],
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 220),
+                          child: SingleChildScrollView(
+                            key: ValueKey(_step),
+                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+                            child:
+                                [
+                                  _basicStep(),
+                                  _cycleStep(),
+                                  _medicationStep(),
+                                ][_step],
+                          ),
                         ),
                       ),
                     ),
