@@ -44,6 +44,17 @@ class LabObservation(Base):
             "trend_date_source IN ('sample_date', 'exam_date', 'report_date', 'visit_date')",
             name="lab_observation_trend_date_source",
         ),
+        CheckConstraint("item_index >= 0", name="lab_observation_item_index"),
+        CheckConstraint(
+            "(mapping_status = 'mapped' AND standard_metric_id IS NOT NULL) OR "
+            "(mapping_status = 'needs_manual_review' AND standard_metric_id IS NULL)",
+            name="lab_observation_metric_mapping",
+        ),
+        CheckConstraint(
+            "(trend_date IS NULL AND trend_date_source IS NULL) OR "
+            "(trend_date IS NOT NULL AND trend_date_source IS NOT NULL)",
+            name="lab_observation_trend_date_pair",
+        ),
         UniqueConstraint("ocr_result_id", "item_index", name="uq_lab_observation_result_item"),
         Index(
             "ix_lab_observation_patient_metric_date",

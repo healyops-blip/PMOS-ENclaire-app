@@ -203,3 +203,36 @@ def test_ocr_contract_matches_worker_status_and_material_schemas() -> None:
         "items",
     }
     assert "drug_name" in schemas["MedicalOrderItemDraft"]["properties"]
+
+
+def test_lab_confirmation_contract_matches_runtime_and_traceability() -> None:
+    contract = load_contract()
+    paths = contract["paths"]
+    schemas = contract["components"]["schemas"]
+
+    confirmation = paths["/api/ocr/tasks/{task_id}/confirm"]["post"]
+    request_ref = confirmation["requestBody"]["content"]["application/json"]["schema"]["$ref"]
+    assert request_ref.endswith("/LabConfirmRequest")
+    assert {"401", "404", "409", "422"} <= set(confirmation["responses"])
+    assert "Idempotency-Key" not in str(confirmation.get("parameters", []))
+
+    item = schemas["LabConfirmationItem"]
+    assert item["additionalProperties"] is False
+    assert {"source_index", "name", "value", "unit", "reference_range"} <= set(item["properties"])
+    assert schemas["FieldConfirmationStatus"]["enum"] == [
+        "pending",
+        "confirmed",
+        "edited",
+        "rejected",
+    ]
+    assert "source_document" in schemas["OcrDraftResult"]["properties"]
+    assert "get" in paths["/api/lab-observations"]
+    assert "get" in paths["/api/lab-observations/{observation_id}"]
+    observation = schemas["LabObservation"]
+    assert {
+        "document_revision_id",
+        "ocr_result_id",
+        "original_item_data",
+        "confirmed_item_data",
+        "confirmed_by_uid",
+    } <= set(observation["required"])

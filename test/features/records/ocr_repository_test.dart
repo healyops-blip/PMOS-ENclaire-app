@@ -47,7 +47,12 @@ void main() {
         resultId: 'result-1',
         expectedRevisionId: 'rev-1',
         items: const [
-          LabConfirmationItem(name: '血糖', value: '5.2', unit: 'mmol/L'),
+          LabConfirmationItem(
+            sourceIndex: 0,
+            name: '血糖',
+            value: '5.2',
+            unit: 'mmol/L',
+          ),
         ],
       );
 
@@ -66,6 +71,20 @@ void main() {
         '/ocr/tasks/task-1/result',
         '/ocr/tasks/task-1/retry',
         '/ocr/tasks/task-1/confirm',
+      ]);
+      expect((requests.last.data as Map)['items'], [
+        {
+          'source_index': 0,
+          'name': '血糖',
+          'value': '5.2',
+          'unit': 'mmol/L',
+          'reference_range': null,
+          'sample_date': null,
+          'exam_date': null,
+          'report_date': null,
+          'visit_date': null,
+          'note': null,
+        },
       ]);
     },
   );

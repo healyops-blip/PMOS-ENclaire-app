@@ -397,6 +397,7 @@ Content-Type: application/json
   "visit_date": null,
   "items": [
     {
+      "source_index": 0,
       "name": "空腹血糖",
       "value": "90",
       "unit": "mg/dL",
@@ -419,7 +420,9 @@ P0 字段为 `name/value/unit`。后端会重新执行数值解析、单位白�
 
 成功响应包含 `created_resource_ids[]`、`confirmed_at`、`observations[]` 和可供最终 OCR
 评测汇总的 `p0_evaluation`；其中同时包含 P0 合法率、OCR 与用户终值的逐字段精确匹配数、
-用户纠正数和精确匹配率。相同请求重复确认返回同一组正式记录且 `reused=true`；已经
+用户纠正数和精确匹配率。原草稿项目必须保留 `source_index`；新增项目使用 null，删除
+项目会把原字段状态记为 `rejected`，防止删项后错绑来源。相同请求（包括并发请求）重复确认
+返回同一组正式记录且 `reused=true`；已经
 确认后提交不同内容返回 `409 OCR_ALREADY_CONFIRMED`。
 
 字段错误返回 `422 LAB_CONFIRMATION_INVALID`，稳定结构为

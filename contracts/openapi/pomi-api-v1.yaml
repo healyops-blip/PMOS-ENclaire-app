@@ -843,17 +843,16 @@ paths:
   /api/ocr/tasks/{task_id}/confirm:
     post:
       tags: [OCR]
-      operationId: confirmOcrResult
-      summary: Confirm edited OCR fields and create formal data atomically
+      operationId: confirmLabOcrResult
+      summary: Confirm an edited laboratory OCR draft and create formal observations atomically
       parameters:
         - $ref: '#/components/parameters/TaskId'
-        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/OcrConfirmRequest'
+              $ref: '#/components/schemas/LabConfirmRequest'
       responses:
         '200':
           description: OCR result confirmed
@@ -865,7 +864,11 @@ paths:
                   - type: object
                     properties:
                       data:
-                        $ref: '#/components/schemas/OcrConfirmResult'
+                        $ref: '#/components/schemas/LabConfirmResult'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
         '409':
           $ref: '#/components/responses/ErrorResponse'
         '422':
@@ -901,6 +904,61 @@ paths:
         '404':
           $ref: '#/components/responses/ErrorResponse'
         '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/lab-observations:
+    get:
+      tags: [Laboratory]
+      operationId: listLabObservations
+      summary: List confirmed laboratory observations for the current patient
+      responses:
+        '200':
+          description: Patient-scoped confirmed observations
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [items]
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/LabObservation'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/lab-observations/{observation_id}:
+    get:
+      tags: [Laboratory]
+      operationId: getLabObservation
+      summary: Get one patient-scoped confirmed laboratory observation
+      parameters:
+        - name: observation_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Confirmed observation
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LabObservation'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
           $ref: '#/components/responses/ErrorResponse'
 
   /api/medication-reconciliations:
@@ -2648,24 +2706,70 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OcrFieldResult'
+        source_document:
+          $ref: '#/components/schemas/OcrSourceDocument'
         created_at:
           type: string
           format: date-time
 
-    FieldConfirmation:
+    OcrSourceDocument:
       type: object
-      required: [field_path, confirmation_status]
+      additionalProperties: false
+      required: [document_id, document_revision_id, original_file_name, mime_type, revision_number, file_endpoint]
       properties:
-        field_path:
+        document_id:
           type: string
-        user_value: {}
-        confirmation_status:
+          format: uuid
+        document_revision_id:
           type: string
-          enum: [confirmed, edited, rejected]
+          format: uuid
+        original_file_name:
+          type: string
+        mime_type:
+          type: string
+          enum: [image/jpeg, image/png, application/pdf]
+        revision_number:
+          type: integer
+          minimum: 1
+        file_endpoint:
+          type: string
+          pattern: '^/api/documents/.+/revisions/.+/file$'
 
-    OcrConfirmRequest:
+    LabConfirmationItem:
       type: object
-      required: [result_id, expected_revision_id, document_type, confirmed_data, field_confirmations]
+      additionalProperties: false
+      required: [name, value, unit]
+      properties:
+        source_index:
+          type: [integer, 'null']
+          minimum: 0
+        name:
+          type: [string, 'null']
+          maxLength: 200
+        value:
+          type: [string, number, 'null']
+        unit:
+          type: [string, 'null']
+          maxLength: 40
+        reference_range:
+          type: [string, 'null']
+          maxLength: 120
+        sample_date:
+          type: [string, 'null']
+        exam_date:
+          type: [string, 'null']
+        report_date:
+          type: [string, 'null']
+        visit_date:
+          type: [string, 'null']
+        note:
+          type: [string, 'null']
+          maxLength: 1000
+
+    LabConfirmRequest:
+      type: object
+      additionalProperties: false
+      required: [result_id, expected_revision_id, items]
       properties:
         result_id:
           type: string
@@ -2673,26 +2777,135 @@ components:
         expected_revision_id:
           type: string
           format: uuid
-        document_type:
-          $ref: '#/components/schemas/DocumentType'
-        confirmed_data:
-          oneOf:
-            - $ref: '#/components/schemas/LabDraft'
-            - $ref: '#/components/schemas/MedicalOrderDraft'
-            - $ref: '#/components/schemas/ImagingTextDraft'
-            - $ref: '#/components/schemas/OutpatientRecordDraft'
-        field_confirmations:
+        visit_id:
+          type: [string, 'null']
+          maxLength: 100
+        sample_date:
+          type: [string, 'null']
+        exam_date:
+          type: [string, 'null']
+        report_date:
+          type: [string, 'null']
+        visit_date:
+          type: [string, 'null']
+        items:
           type: array
+          maxItems: 200
           items:
-            $ref: '#/components/schemas/FieldConfirmation'
-        confirm_all:
-          type: boolean
-          default: false
-          description: Allowed only for lab reports after critical-field validation.
+            $ref: '#/components/schemas/LabConfirmationItem'
 
-    OcrConfirmResult:
+    LabP0Evaluation:
       type: object
-      required: [task_id, result_id, created_resource_ids, confirmed_at, reconciliation_required]
+      required: [total_fields, valid_fields, invalid_fields, valid_rate]
+      properties:
+        total_fields:
+          type: integer
+          minimum: 0
+        valid_fields:
+          type: integer
+          minimum: 0
+        invalid_fields:
+          type: integer
+          minimum: 0
+        valid_rate:
+          type: number
+          minimum: 0
+          maximum: 1
+        ocr_exact_match_fields:
+          type: integer
+          minimum: 0
+        user_corrected_fields:
+          type: integer
+          minimum: 0
+        ocr_exact_match_rate:
+          type: number
+          minimum: 0
+          maximum: 1
+
+    LabObservation:
+      type: object
+      required: [id, patient_id, document_id, document_revision_id, ocr_result_id, item_index, original_item_name, mapping_status, raw_value, numeric_value, original_unit, standard_unit, abnormal_status, original_item_data, confirmed_item_data, confirmed_by_uid, confirmed_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        patient_id:
+          type: string
+          format: uuid
+        visit_id:
+          type: [string, 'null']
+        document_id:
+          type: string
+          format: uuid
+        document_revision_id:
+          type: string
+          format: uuid
+        ocr_result_id:
+          type: string
+          format: uuid
+        item_index:
+          type: integer
+          minimum: 0
+        original_item_name:
+          type: string
+        standard_metric_id:
+          type: [string, 'null']
+        mapping_status:
+          type: string
+          enum: [mapped, needs_manual_review]
+        raw_value:
+          type: string
+        numeric_value:
+          type: string
+        original_unit:
+          type: string
+        standard_unit:
+          type: string
+        reference_range_raw:
+          type: [string, 'null']
+        reference_lower:
+          type: [string, 'null']
+        reference_upper:
+          type: [string, 'null']
+        abnormal_status:
+          type: string
+          enum: [low, normal, high, unknown]
+        sample_date:
+          type: [string, 'null']
+          format: date
+        exam_date:
+          type: [string, 'null']
+          format: date
+        report_date:
+          type: [string, 'null']
+          format: date
+        visit_date:
+          type: [string, 'null']
+          format: date
+        trend_date:
+          type: [string, 'null']
+          format: date
+        trend_date_source:
+          type: [string, 'null']
+          enum: [sample_date, exam_date, report_date, visit_date, null]
+        original_item_data:
+          type: object
+          additionalProperties: true
+        confirmed_item_data:
+          type: object
+          additionalProperties: true
+        confirmed_by_uid:
+          type: string
+          format: uuid
+        confirmed_at:
+          type: string
+          format: date-time
+        note:
+          type: [string, 'null']
+
+    LabConfirmResult:
+      type: object
+      required: [task_id, result_id, status, reused, created_resource_ids, confirmed_at, observations, p0_evaluation]
       properties:
         task_id:
           type: string
@@ -2700,6 +2913,11 @@ components:
         result_id:
           type: string
           format: uuid
+        status:
+          type: string
+          const: confirmed
+        reused:
+          type: boolean
         created_resource_ids:
           type: array
           items:
@@ -2708,8 +2926,12 @@ components:
         confirmed_at:
           type: string
           format: date-time
-        reconciliation_required:
-          type: boolean
+        observations:
+          type: array
+          items:
+            $ref: '#/components/schemas/LabObservation'
+        p0_evaluation:
+          $ref: '#/components/schemas/LabP0Evaluation'
 
     OcrRetryRequest:
       type: object
@@ -2885,6 +3107,8 @@ components:
         status:
           $ref: '#/components/schemas/PatientNoteStatus'
         source_note_id:
+          type: [string, 'null']
+          format: uuid
         confirmed_by_uid:
           type: [string, 'null']
           format: uuid

@@ -19,6 +19,13 @@ void main() {
 
       expect(find.byKey(const Key('lab-source-document')), findsOneWidget);
       expect(find.textContaining('需重点核对'), findsOneWidget);
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const Key('lab-name-0')))
+            .controller
+            ?.text,
+        '血糖',
+      );
       await tester.ensureVisible(
         find.byKey(const Key('confirm-all-lab-items')),
       );
@@ -92,20 +99,26 @@ class _LabRepository implements OcrRepository {
     resultId: 'result-1',
     taskId: 'task-1',
     draft: {
+      'hospital_name': 'Pomi Hospital',
+      'sample_date': '2026-08-18',
       'report_date': '2026-08-20',
       'items': [
         {
-          'name': '血糖',
-          'value': 'bad',
-          'unit': 'banana',
-          'reference_range': '',
-          'sample_date': 'bad-date',
+          'item_name': '血糖',
+          'item_code': 'GLU',
+          'raw_value': 'bad',
+          'numeric_value': null,
+          'raw_unit': 'banana',
+          'normalized_unit': null,
+          'reference_range_text': '',
+          'reference_low': null,
+          'reference_high': null,
         },
       ],
     },
     fields: [
       OcrFieldDraft(
-        path: 'items.0.value',
+        path: 'items.0.raw_value',
         value: 'bad',
         confidence: 0.45,
         sourceText: 'S.2',
@@ -147,7 +160,9 @@ class _LabRepository implements OcrRepository {
       );
     }
     expect(items.single.value, '5.2');
+    expect(items.single.sourceIndex, 0);
     expect(items.single.referenceRange, '3.9-6.1');
+    expect(sampleDate, '2026-08-18');
     return LabConfirmationResult(
       taskId: taskId,
       reused: false,

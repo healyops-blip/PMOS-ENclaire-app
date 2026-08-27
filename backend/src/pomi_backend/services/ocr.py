@@ -19,7 +19,12 @@ from pomi_backend.repositories import (
     OCRRepository,
     PatientRepository,
 )
-from pomi_backend.services.lab_rules import FieldIssue, normalize_lab_item, p0_evaluation
+from pomi_backend.services.lab_rules import (
+    FieldIssue,
+    normalize_lab_item,
+    p0_evaluation,
+    parse_number,
+)
 from pomi_backend.services.ocr_prompts import PROMPT_VERSION, SCHEMA_VERSION
 
 
@@ -122,8 +127,11 @@ def lab_observation_data(observation: LabObservation) -> dict[str, Any]:
         if observation.trend_date is None
         else observation.trend_date.isoformat(),
         "trend_date_source": observation.trend_date_source,
+        "original_item_data": observation.original_item_data,
+        "confirmed_item_data": observation.confirmed_item_data,
         "confirmed_by_uid": observation.confirmed_by_uid,
         "confirmed_at": observation.confirmed_at.isoformat(),
+        "note": observation.note,
     }
 
 
@@ -195,7 +203,7 @@ class OCRTaskService:
         result = self.repository.result(task.id)
         if result is None:
             raise BusinessError("OCR_RESULT_NOT_READY", "OCR result is not ready.", 409)
-        document = self.documents.get(task.document_id, include_deleted=True)
+        document = self.documents.get(task.document_id)
         revision = self.documents.revision(task.document_id, task.document_revision_id)
         source = None
         if document is not None and revision is not None:
@@ -205,7 +213,7 @@ class OCRTaskService:
                 "original_file_name": document.original_file_name,
                 "mime_type": revision.mime_type,
                 "revision_number": revision.revision_number,
-                "file_endpoint": (f"/documents/{document.id}/revisions/{revision.id}/file"),
+                "file_endpoint": (f"/api/documents/{document.id}/revisions/{revision.id}/file"),
             }
         return result_data(
             result,
@@ -235,18 +243,16 @@ class OCRTaskService:
 
         canonical_payload = json.loads(json.dumps(payload, ensure_ascii=False, sort_keys=True))
         if task.status == "confirmed":
-            if result.confirmed_data != canonical_payload:
-                raise BusinessError(
-                    "OCR_ALREADY_CONFIRMED",
-                    "The task was already confirmed with different data.",
-                    409,
-                )
-            existing = self.labs.for_result(result.id)
-            return self._confirmation_response(task, result, existing, reused=True)
+            return self._replay_confirmation(task, result, canonical_payload)
         if task.status != "pending_confirmation":
             raise BusinessError(
                 "OCR_TASK_NOT_CONFIRMABLE", "OCR task is not ready for confirmation.", 409
             )
+
+        document = self.documents.get(task.document_id)
+        revision = self.documents.revision(task.document_id, task.document_revision_id)
+        if document is None or revision is None:
+            raise BusinessError("RESOURCE_NOT_FOUND", "OCR source revision was not found.", 404)
 
         items: list[dict[str, Any]] = payload["items"]
         if not items:
@@ -267,13 +273,39 @@ class OCRTaskService:
             key: payload.get(key)
             for key in ("sample_date", "exam_date", "report_date", "visit_date")
         }
+        original_items = result.validated_draft.get("items", [])
+        if not isinstance(original_items, list):
+            original_items = []
         normalized = []
         issues: list[FieldIssue] = []
+        used_source_indices: set[int] = set()
+        next_added_index = len(original_items)
         for index, item in enumerate(items):
             parsed, item_issues = normalize_lab_item(item, index, report_dates)
             issues.extend(item_issues)
+            source_index = item.get("source_index")
+            if source_index is None:
+                source_index = next_added_index
+                next_added_index += 1
+            elif source_index >= len(original_items):
+                issues.append(
+                    FieldIssue(
+                        f"items.{index}.source_index",
+                        "LAB_SOURCE_INDEX_INVALID",
+                        "来源项目不存在，请重新加载识别草稿。",
+                    )
+                )
+            if source_index in used_source_indices:
+                issues.append(
+                    FieldIssue(
+                        f"items.{index}.source_index",
+                        "LAB_SOURCE_INDEX_DUPLICATE",
+                        "同一个来源项目不能重复确认。",
+                    )
+                )
+            used_source_indices.add(source_index)
             if parsed is not None:
-                normalized.append((index, item, parsed))
+                normalized.append((source_index, item, parsed))
         if issues:
             raise BusinessError(
                 "LAB_CONFIRMATION_INVALID",
@@ -285,11 +317,25 @@ class OCRTaskService:
                 },
             )
 
-        original_items = result.validated_draft.get("items", [])
+        confirmation_started_at = utc_now()
+        if not self.repository.claim_confirmation(task.id, now=confirmation_started_at):
+            self.session.rollback()
+            current_task = self.owned(task_id)
+            current_result = self.repository.result(current_task.id)
+            if current_result is None:
+                raise BusinessError("OCR_RESULT_NOT_READY", "OCR result is not ready.", 409)
+            if current_task.status == "confirmed":
+                return self._replay_confirmation(current_task, current_result, canonical_payload)
+            raise BusinessError(
+                "OCR_CONFIRMATION_IN_PROGRESS",
+                "Another confirmation request is currently being processed.",
+                409,
+            )
+
         confirmed_at = utc_now()
         observations: list[LabObservation] = []
-        for index, item, parsed in normalized:
-            original = original_items[index] if index < len(original_items) else {}
+        for source_index, item, parsed in normalized:
+            original = original_items[source_index] if source_index < len(original_items) else {}
             observation = LabObservation(
                 id=new_uuid(),
                 patient_id=task.patient_id,
@@ -297,7 +343,7 @@ class OCRTaskService:
                 document_id=task.document_id,
                 document_revision_id=task.document_revision_id,
                 ocr_result_id=result.id,
-                item_index=index,
+                item_index=source_index,
                 original_item_name=parsed.original_item_name,
                 standard_metric_id=parsed.standard_metric_id,
                 mapping_status=parsed.mapping_status,
@@ -324,7 +370,12 @@ class OCRTaskService:
             self.labs.add(observation)
             observations.append(observation)
 
-        self._confirm_fields(result.id, items, payload)
+        self._confirm_fields(
+            result.id,
+            normalized,
+            payload,
+            original_item_count=len(original_items),
+        )
         result.user_modified_data = canonical_payload
         result.confirmed_data = canonical_payload
         task.status = "confirmed"
@@ -335,23 +386,52 @@ class OCRTaskService:
             self.session.refresh(observation)
         return self._confirmation_response(task, result, observations, reused=False)
 
-    def _confirm_fields(
-        self, result_id: str, items: list[dict[str, Any]], payload: dict[str, Any]
-    ) -> None:
-        values = {
-            f"items.{index}.{field}": item.get(field)
-            for index, item in enumerate(items)
-            for field in (
-                "name",
-                "value",
-                "unit",
-                "reference_range",
-                "sample_date",
-                "exam_date",
-                "report_date",
-                "visit_date",
+    def _replay_confirmation(
+        self,
+        task: OCRTask,
+        result: OCRResult,
+        canonical_payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        if result.confirmed_data != canonical_payload:
+            raise BusinessError(
+                "OCR_ALREADY_CONFIRMED",
+                "The task was already confirmed with different data.",
+                409,
             )
-        }
+        existing = self.labs.for_result(result.id)
+        return self._confirmation_response(task, result, existing, reused=True)
+
+    def _confirm_fields(
+        self,
+        result_id: str,
+        normalized: list[tuple[int, dict[str, Any], Any]],
+        payload: dict[str, Any],
+        *,
+        original_item_count: int,
+    ) -> None:
+        values: dict[str, Any] = {}
+        confirmed_source_indices: set[int] = set()
+        for source_index, item, parsed in normalized:
+            confirmed_source_indices.add(source_index)
+            raw_numeric = parse_number(item.get("value"))
+            values.update(
+                {
+                    f"items.{source_index}.item_name": item.get("name"),
+                    f"items.{source_index}.raw_value": item.get("value"),
+                    f"items.{source_index}.numeric_value": (
+                        None if raw_numeric is None else float(raw_numeric)
+                    ),
+                    f"items.{source_index}.raw_unit": item.get("unit"),
+                    f"items.{source_index}.normalized_unit": parsed.standard_unit,
+                    f"items.{source_index}.reference_range_text": item.get("reference_range"),
+                    f"items.{source_index}.reference_low": (
+                        None if parsed.reference_lower is None else float(parsed.reference_lower)
+                    ),
+                    f"items.{source_index}.reference_high": (
+                        None if parsed.reference_upper is None else float(parsed.reference_upper)
+                    ),
+                }
+            )
         values.update(
             {
                 field: payload.get(field)
@@ -359,13 +439,20 @@ class OCRTaskService:
             }
         )
         for field in self.repository.fields(result_id):
-            if field.field_path not in values:
+            item_path = field.field_path.split(".", 2)
+            if (
+                len(item_path) == 3
+                and item_path[0] == "items"
+                and item_path[1].isdigit()
+                and int(item_path[1]) < original_item_count
+                and int(item_path[1]) not in confirmed_source_indices
+            ):
+                field.user_value = None
+                field.confirmation_status = "rejected"
                 continue
-            submitted = values[field.field_path]
+            submitted = values.get(field.field_path, field.parsed_value)
             field.user_value = submitted
-            field.confirmation_status = (
-                "accepted" if field.parsed_value == submitted else "corrected"
-            )
+            field.confirmation_status = "confirmed" if field.parsed_value == submitted else "edited"
 
     def _confirmation_response(
         self,
@@ -387,9 +474,29 @@ class OCRTaskService:
             "observations": [lab_observation_data(item) for item in observations],
             "p0_evaluation": p0_evaluation(
                 result.confirmed_data.get("items", []),
-                result.validated_draft.get("items", []),
+                self._lab_draft_items(result.validated_draft),
             ),
         }
+
+    @staticmethod
+    def _lab_draft_items(draft: dict[str, Any]) -> list[dict[str, Any]]:
+        raw_items = draft.get("items", [])
+        if not isinstance(raw_items, list):
+            return []
+        return [
+            {
+                "source_index": index,
+                "name": item.get("item_name") or item.get("name"),
+                "value": (
+                    item.get("raw_value")
+                    if item.get("raw_value") is not None
+                    else item.get("numeric_value", item.get("value"))
+                ),
+                "unit": item.get("raw_unit") or item.get("normalized_unit") or item.get("unit"),
+            }
+            for index, item in enumerate(raw_items)
+            if isinstance(item, dict)
+        ]
 
     def retry(self, task_id: str) -> tuple[OCRTask, bool]:
         original = self.owned(task_id)

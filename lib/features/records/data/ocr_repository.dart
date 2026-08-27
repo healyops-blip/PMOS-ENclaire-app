@@ -176,6 +176,7 @@ class OcrTaskResult {
 
 class LabConfirmationItem {
   const LabConfirmationItem({
+    this.sourceIndex,
     required this.name,
     required this.value,
     required this.unit,
@@ -187,6 +188,7 @@ class LabConfirmationItem {
     this.note,
   });
 
+  final int? sourceIndex;
   final String name;
   final String value;
   final String unit;
@@ -198,6 +200,7 @@ class LabConfirmationItem {
   final String? note;
 
   Map<String, dynamic> toJson() => {
+    'source_index': sourceIndex,
     'name': name,
     'value': value,
     'unit': unit,
@@ -478,19 +481,26 @@ class DemoOcrRepository implements OcrRepository {
     resultId: 'demo-result-1',
     taskId: taskId,
     draft: const {
+      'hospital_name': 'Pomi Hospital',
+      'sample_date': '2026-08-19',
       'report_date': '2026-08-20',
       'items': [
         {
-          'name': '空腹血糖',
-          'value': '5.2',
-          'unit': 'mmol/L',
-          'reference_range': '3.9-6.1',
+          'item_name': '空腹血糖',
+          'item_code': 'GLU',
+          'raw_value': '5.2',
+          'numeric_value': 5.2,
+          'raw_unit': 'mmol/L',
+          'normalized_unit': 'mmol/L',
+          'reference_range_text': '3.9-6.1',
+          'reference_low': 3.9,
+          'reference_high': 6.1,
         },
       ],
     },
     fields: const [
       OcrFieldDraft(
-        path: 'items.0.value',
+        path: 'items.0.raw_value',
         value: '5.2',
         confidence: 0.72,
         sourceText: '5.2',

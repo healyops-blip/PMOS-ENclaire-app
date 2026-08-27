@@ -55,6 +55,18 @@ class OCRRepository:
         self.session.add(task)
         self.session.flush()
 
+    def claim_confirmation(self, task_id: str, *, now: datetime) -> bool:
+        """Serialize confirmation so concurrent identical requests remain idempotent."""
+
+        statement = update(OCRTask).where(
+            OCRTask.id == task_id,
+            OCRTask.status == "pending_confirmation",
+        )
+        if self.patient_id is not None:
+            statement = statement.where(OCRTask.patient_id == self.patient_id)
+        claimed = self.session.execute(statement.values(updated_at=now))
+        return claimed.rowcount == 1
+
     def claim(self, *, worker_id: str, now: datetime, lease_seconds: int) -> OCRTask | None:
         """Atomically claim one due task; compatible with multiple SQLite processes."""
 

@@ -22,6 +22,7 @@ class CreateOCRTaskRequest(BaseModel):
 class LabConfirmationItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    source_index: int | None = Field(default=None, ge=0)
     name: str | None = None
     value: str | int | float | None = None
     unit: str | None = None
@@ -43,7 +44,7 @@ class ConfirmLabRequest(BaseModel):
     exam_date: str | None = None
     report_date: str | None = None
     visit_date: str | None = None
-    items: list[LabConfirmationItem] = Field(max_length=500)
+    items: list[LabConfirmationItem] = Field(max_length=200)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
