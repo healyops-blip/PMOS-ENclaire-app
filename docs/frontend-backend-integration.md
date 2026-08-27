@@ -303,18 +303,20 @@ PUT 允许分步部分更新。请求中的 `complete_onboarding=true` 只有在
 - `result_source`：`qwen_api/fallback/null`。
 - Flutter 在 `pending/processing` 时每 2 秒轮询，进入后台后暂停高频轮询。
 
-草稿公共字段：`result_id`、`task_id`、`document_type`、`validation_status`、`critical_error`、`result_source`、`fields[]`、`draft`。
+草稿公共字段：`id`（即 result ID）、`task_id`、`raw_response`、`validated_draft`、`user_modified_data`、`confirmed_data`、`fields[]`、`source_document`。`source_document` 明确给出 `document_id`、`document_revision_id`、文件名、MIME、修订号和私有文件接口。
 
-字段级 `fields[]`：`field_path`、`raw_text`、`parsed_value`、`confidence`、`uncertainty_reason`、`source_region`、`user_value`、`confirmation_status`。
+字段级 `fields[]`：`path`、`source_text`、`parsed_value`、`confidence`、`uncertainty_reason`、`source_region`、`user_value`、`confirmation_status`。
 
 四类 `draft`：
 
-- 化验：`hospital_name`、`sample_date`、`report_date`、`items[]`；item 含 `item_name/item_code/raw_value/numeric_value/raw_unit/normalized_unit/reference_range_text/reference_low/reference_high`。
+- 化验 OCR 草稿：`facility`、`report_date`、`items[]`。化验确认请求中的 item 使用 `name/value/unit/reference_range/sample_date/exam_date/report_date/visit_date/note`；模型字段只是初值，正式规范化字段由后端重算。
 - 医嘱：`hospital_name`、`department_name`、`prescribed_at`、`orders[]`；order 含 `source_text/drug_name/normalized_drug_name/specification/dosage_text/dosage_value/dosage_unit/frequency/duration/route/instruction`。
 - 影像文字：`examination_name`、`body_part`、`examination_method`、`findings_text`、`conclusion_text`、`examined_at`、`reported_at`。
 - 门诊：`hospital_name`、`department_name`、`doctor_name`、`visit_date`、`chief_complaint`、`diagnosis_summary`、`treatment_plan`、`medical_advice`。
 
-确认请求必须携带 `result_id`、`expected_revision_id`、`confirmed_data` 和 `field_confirmations[]`。医嘱每个 order 都必须确认，只有化验允许批量确认。响应返回 `created_resource_ids[]`、`confirmed_at`、`reconciliation_required`。
+已实现的化验确认使用 `POST /api/ocr/tasks/{task_id}/confirm`，请求必须携带 `result_id`、`expected_revision_id` 和修改后的 `items[]`，报告级四类日期可为空。响应返回 `created_resource_ids[]`、`confirmed_at`、`observations[]`、`p0_evaluation` 和 `reused`。P0 `name/value/unit` 错误时返回 `error.details.fields[]`，Flutter 必须按 `path` 高亮并保留表单。其他三类材料的确认 payload 由对应 Issue 落地，不能复用化验结构猜测。
+
+`lab_observation` 只保存用户确认成功的数据，并强制关联明确材料、修订和 OCR 结果。指标别名未命中时 `mapping_status=needs_manual_review`；异常状态由材料参考范围确定性计算；趋势日期优先级为采样、检查、报告、就诊。正式数据读取接口为 `GET /api/lab-observations` 和 `GET /api/lab-observations/{id}`，均按当前 UID 隔离。
 
 ### 5.8 用药对账
 

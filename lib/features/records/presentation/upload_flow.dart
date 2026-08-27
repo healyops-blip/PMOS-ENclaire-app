@@ -123,8 +123,11 @@ Future<void> showUploadFlow(
         label: '开始识别',
         onPressed: () => Navigator.of(context).push<void>(
           MaterialPageRoute(
-            builder: (_) =>
-                OcrTaskPage(repository: ocrRepository, document: uploaded),
+            builder: (_) => OcrTaskPage(
+              repository: ocrRepository,
+              document: uploaded,
+              documentRepository: repository,
+            ),
           ),
         ),
       ),

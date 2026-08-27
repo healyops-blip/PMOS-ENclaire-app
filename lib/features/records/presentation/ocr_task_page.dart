@@ -3,17 +3,20 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
+import 'package:pmos_enclaire/features/records/presentation/lab_confirmation_page.dart';
 
 class OcrTaskPage extends StatefulWidget {
   const OcrTaskPage({
     required this.repository,
     required this.document,
+    this.documentRepository,
     this.pollInterval = const Duration(seconds: 2),
     super.key,
   });
 
   final OcrRepository repository;
   final MedicalDocument document;
+  final DocumentRepository? documentRepository;
   final Duration pollInterval;
 
   @override
@@ -121,10 +124,16 @@ class _OcrTaskPageState extends State<OcrTaskPage> with WidgetsBindingObserver {
   void _openConfirmation() {
     Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (_) => OcrPendingConfirmationPage(
-          repository: widget.repository,
-          task: _task!,
-        ),
+        builder: (_) => _task!.materialType == 'lab_report'
+            ? LabConfirmationPage(
+                repository: widget.repository,
+                task: _task!,
+                documentRepository: widget.documentRepository,
+              )
+            : OcrPendingConfirmationPage(
+                repository: widget.repository,
+                task: _task!,
+              ),
       ),
     );
   }
