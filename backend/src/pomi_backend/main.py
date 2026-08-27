@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy import Engine
@@ -18,6 +21,7 @@ from pomi_backend.api.errors import (
     validation_error_handler,
 )
 from pomi_backend.api.health import router as health_router
+from pomi_backend.api.medications import router as medications_router
 from pomi_backend.api.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
 from pomi_backend.api.patient import router as patient_router
 from pomi_backend.config import Settings
@@ -48,6 +52,8 @@ def create_app(*, settings: Settings | None = None, engine: Engine | None = None
         attempts=active_settings.auth_rate_limit_attempts,
         window_seconds=active_settings.auth_rate_limit_window_seconds,
     )
+    business_timezone = ZoneInfo(active_settings.business_timezone)
+    app.state.business_date_provider = lambda: datetime.now(business_timezone).date()
 
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RequestContextMiddleware)
@@ -65,6 +71,7 @@ def create_app(*, settings: Settings | None = None, engine: Engine | None = None
     app.include_router(auth_router)
     app.include_router(cycles_router)
     app.include_router(health_router)
+    app.include_router(medications_router)
     app.include_router(patient_router)
     return app
 

@@ -8,6 +8,7 @@ import 'package:pmos_enclaire/features/auth/domain/demo_account.dart';
 import 'package:pmos_enclaire/features/auth/presentation/login_page.dart';
 import 'package:pmos_enclaire/features/cycle/data/cycle_repository.dart';
 import 'package:pmos_enclaire/features/dashboard/presentation/dashboard_page.dart';
+import 'package:pmos_enclaire/features/medications/data/medication_repository.dart';
 import 'package:pmos_enclaire/features/onboarding/presentation/onboarding_page.dart';
 import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
 
@@ -22,12 +23,14 @@ class PomiApp extends StatefulWidget {
     this.authRepository,
     this.profileRepository,
     this.cycleRepository,
+    this.medicationRepository,
     super.key,
   });
 
   final AuthRepository? authRepository;
   final PatientProfileRepository? profileRepository;
   final CycleRepository? cycleRepository;
+  final MedicationRepository? medicationRepository;
 
   @override
   State<PomiApp> createState() => _PomiAppState();
@@ -48,6 +51,11 @@ class _PomiAppState extends State<PomiApp> {
       (widget.authRepository is DemoAuthRepository
           ? null
           : FastApiCycleRepository(_apiClient));
+  late final MedicationRepository? _medicationRepository =
+      widget.medicationRepository ??
+      (widget.authRepository is DemoAuthRepository
+          ? null
+          : FastApiMedicationRepository(_apiClient));
 
   late final GoRouter _router = GoRouter(
     initialLocation: PomiRoutes.login,
@@ -103,6 +111,7 @@ class _PomiAppState extends State<PomiApp> {
             account: account,
             profileRepository: _profileRepository,
             cycleRepository: _cycleRepository,
+            medicationRepository: _medicationRepository,
           );
         },
       ),

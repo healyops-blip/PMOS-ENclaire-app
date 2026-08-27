@@ -6,6 +6,8 @@ import 'package:pmos_enclaire/features/auth/domain/demo_account.dart';
 import 'package:pmos_enclaire/features/cycle/data/cycle_repository.dart';
 import 'package:pmos_enclaire/features/cycle/presentation/cycle_page.dart';
 import 'package:pmos_enclaire/features/dashboard/domain/medication.dart';
+import 'package:pmos_enclaire/features/medications/application/medication_status_controller.dart';
+import 'package:pmos_enclaire/features/medications/data/medication_repository.dart';
 import 'package:pmos_enclaire/features/medications/presentation/medication_page.dart';
 import 'package:pmos_enclaire/features/profile/presentation/profile_page.dart';
 import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
@@ -18,12 +20,14 @@ class DashboardPage extends StatefulWidget {
     required this.account,
     required this.profileRepository,
     this.cycleRepository,
+    this.medicationRepository,
     super.key,
   });
 
   final DemoAccount account;
   final PatientProfileRepository profileRepository;
   final CycleRepository? cycleRepository;
+  final MedicationRepository? medicationRepository;
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -31,44 +35,126 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   int _selectedTab = 0;
-  late List<Medication> _medications = const [
-    Medication(
-      name: '二甲双胍',
-      dose: '500 mg · 晚餐随餐',
-      group: '多囊用药',
-      status: MedicationStatus.taken,
-      takenDays: 22,
-      missedDays: 2,
-    ),
-    Medication(
-      name: '优思明',
-      dose: '1 片 · 每晚',
-      group: '多囊用药',
-      status: MedicationStatus.unrecorded,
-      takenDays: 20,
-      missedDays: 1,
-    ),
-    Medication(
-      name: '维生素 D3',
-      dose: '1000 IU · 早餐后',
-      group: '日常补剂',
-      status: MedicationStatus.taken,
-      takenDays: 24,
-      missedDays: 1,
-    ),
-  ];
+  late List<Medication> _medications = widget.medicationRepository == null
+      ? const [
+          Medication(
+            id: 'demo-metformin',
+            name: '二甲双胍',
+            dose: '500 mg · 晚餐随餐',
+            group: '多囊用药',
+            status: MedicationStatus.taken,
+            takenDays: 22,
+            missedDays: 2,
+          ),
+          Medication(
+            id: 'demo-yasmin',
+            name: '优思明',
+            dose: '1 片 · 每晚',
+            group: '多囊用药',
+            status: MedicationStatus.unrecorded,
+            takenDays: 20,
+            missedDays: 1,
+          ),
+          Medication(
+            id: 'demo-vitamin-d3',
+            name: '维生素 D3',
+            dose: '1000 IU · 早餐后',
+            group: '日常补剂',
+            status: MedicationStatus.taken,
+            takenDays: 24,
+            missedDays: 1,
+          ),
+        ]
+      : const [];
+  late final MedicationRepository _medicationRepository;
+  late final MedicationStatusController _medicationStatusController;
 
-  void _cycleMedicationStatus(int index) {
-    final current = _medications[index];
-    final next = switch (current.status) {
-      MedicationStatus.unrecorded => MedicationStatus.taken,
-      MedicationStatus.taken => MedicationStatus.missed,
-      MedicationStatus.missed => MedicationStatus.unrecorded,
-    };
-    setState(() {
-      _medications = [..._medications]
-        ..[index] = current.copyWith(status: next);
-    });
+  @override
+  void initState() {
+    super.initState();
+    _medicationRepository =
+        widget.medicationRepository ?? DemoMedicationRepository(_medications);
+    _medicationStatusController = MedicationStatusController(
+      gateway: _medicationRepository,
+      medications: _medications,
+    )..addListener(_syncMedicationStatus);
+    _refreshMedications();
+  }
+
+  Future<void> _refreshMedications() async {
+    try {
+      final medications = await _medicationRepository.listMedications();
+      if (mounted) {
+        _medicationStatusController.replaceMedications(medications);
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('用药数据加载失败：$error')));
+    }
+  }
+
+  void _syncMedicationStatus() {
+    if (!mounted) return;
+    setState(() => _medications = _medicationStatusController.medications);
+  }
+
+  Future<void> _setMedicationStatus(int index, MedicationStatus status) async {
+    try {
+      await _medicationStatusController.setStatus(index, status);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('状态保存失败，已恢复原状态：$error')));
+    }
+  }
+
+  void _toggleTaken(int index) {
+    final current = _medications[index].status;
+    _setMedicationStatus(
+      index,
+      current == MedicationStatus.taken
+          ? MedicationStatus.unrecorded
+          : MedicationStatus.taken,
+    );
+  }
+
+  Future<void> _showStatusActions(int index) async {
+    final selected = await showModalBottomSheet<MedicationStatus>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.check_rounded),
+              title: const Text('标记已服用'),
+              onTap: () => Navigator.pop(context, MedicationStatus.taken),
+            ),
+            ListTile(
+              key: const Key('mark-medication-missed'),
+              leading: const Icon(Icons.close_rounded),
+              title: const Text('标记主动漏服'),
+              onTap: () => Navigator.pop(context, MedicationStatus.missed),
+            ),
+            ListTile(
+              leading: const Icon(Icons.undo_rounded),
+              title: const Text('取消当天记录'),
+              onTap: () => Navigator.pop(context, MedicationStatus.unrecorded),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (selected != null) await _setMedicationStatus(index, selected);
+  }
+
+  @override
+  void dispose() {
+    _medicationStatusController
+      ..removeListener(_syncMedicationStatus)
+      ..dispose();
+    super.dispose();
   }
 
   @override
@@ -84,11 +170,14 @@ class _DashboardPageState extends State<DashboardPage> {
             _DashboardBody(
               account: widget.account,
               medications: _medications,
-              onStatusTap: _cycleMedicationStatus,
+              onStatusTap: _toggleTaken,
+              onStatusLongPress: _showStatusActions,
               onMedicationManage: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) =>
-                      MedicationPage(initialMedications: _medications),
+                  builder: (_) => MedicationPage(
+                    initialMedications: _medications,
+                    repository: _medicationRepository,
+                  ),
                 ),
               ),
               onReport: () => Navigator.of(context).push(
@@ -128,6 +217,7 @@ class _DashboardBody extends StatelessWidget {
     required this.account,
     required this.medications,
     required this.onStatusTap,
+    required this.onStatusLongPress,
     required this.onMedicationManage,
     required this.onReport,
   });
@@ -135,6 +225,7 @@ class _DashboardBody extends StatelessWidget {
   final DemoAccount account;
   final List<Medication> medications;
   final ValueChanged<int> onStatusTap;
+  final ValueChanged<int> onStatusLongPress;
   final VoidCallback onMedicationManage;
   final VoidCallback onReport;
 
@@ -162,6 +253,7 @@ class _DashboardBody extends StatelessWidget {
                         index: index,
                         last: index == medications.length - 1,
                         onTap: () => onStatusTap(index),
+                        onLongPress: () => onStatusLongPress(index),
                       ),
                   ],
                 ),
@@ -430,12 +522,14 @@ class _MedicationRow extends StatelessWidget {
     required this.index,
     required this.last,
     required this.onTap,
+    required this.onLongPress,
   });
 
   final Medication medication;
   final int index;
   final bool last;
   final VoidCallback onTap;
+  final VoidCallback onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -471,6 +565,7 @@ class _MedicationRow extends StatelessWidget {
             key: Key('medication-status-$index'),
             status: medication.status,
             onTap: onTap,
+            onLongPress: onLongPress,
           ),
         ],
       ),
@@ -479,10 +574,16 @@ class _MedicationRow extends StatelessWidget {
 }
 
 class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.status, required this.onTap, super.key});
+  const _StatusPill({
+    required this.status,
+    required this.onTap,
+    required this.onLongPress,
+    super.key,
+  });
 
   final MedicationStatus status;
   final VoidCallback onTap;
+  final VoidCallback onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -508,6 +609,7 @@ class _StatusPill extends StatelessWidget {
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(999),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
