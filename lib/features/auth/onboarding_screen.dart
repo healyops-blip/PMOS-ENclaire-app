@@ -370,6 +370,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     showFrame: false,
     padding: _onboardingContentPadding,
     children: [
+      const Text('最近经期', style: TextStyle(fontWeight: FontWeight.w700)),
+      const SizedBox(height: _onboardingLabelGap),
       _validationSlot(
         TextFormField(
           controller: _nickname,
@@ -507,7 +509,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           readOnly: true,
           onTap: () => _chooseDate(_lastPeriod),
           decoration: const InputDecoration(
-            labelText: '最近一次经期开始日期（选填）',
+            labelText: '开始日期（选填）',
             suffixIcon: Icon(Icons.calendar_today_outlined),
             helperText: '\u00A0',
             helperStyle: TextStyle(fontSize: 12, height: 1),
