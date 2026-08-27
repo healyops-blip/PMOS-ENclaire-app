@@ -584,11 +584,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     showFrame: false,
     padding: _onboardingContentPadding,
     children: [
-      const Text(
-        '选择当前正在使用的药品或补剂',
-        style: TextStyle(fontWeight: FontWeight.w700),
-      ),
-      const SizedBox(height: _onboardingSectionGap),
       Wrap(
         spacing: _onboardingLabelGap,
         runSpacing: _onboardingLabelGap,
