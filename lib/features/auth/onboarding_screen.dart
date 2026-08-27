@@ -219,6 +219,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         textAlign: TextAlign.center,
         decoration: const InputDecoration(
           labelText: '昵称',
+          floatingLabelBehavior: FloatingLabelBehavior.always,
           floatingLabelAlignment: FloatingLabelAlignment.center,
         ),
         validator:
