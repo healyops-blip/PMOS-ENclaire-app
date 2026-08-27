@@ -155,7 +155,8 @@ Authorization: Bearer <session_id>
 | OCR 创建 | `POST /api/ocr/tasks` | 上传完成后 | 异步任务 |
 | OCR 状态 | `GET /api/ocr/tasks/{task_id}` | 2 秒轮询 | 状态、错误、进度 |
 | OCR 草稿 | `GET /api/ocr/tasks/{task_id}/result` | 四类确认页 | 字段级草稿 |
-| OCR 确认（后续 Issue） | `POST /api/ocr/tasks/{task_id}/confirm` | 四类确认页 | 当前未实现，前端不得调用 |
+| 化验 OCR 确认 | `POST /api/ocr/tasks/{task_id}/confirm` | 化验确认页 | 已实现；其他三类材料尚不可复用该 payload |
+| 正式化验数据 | `GET /api/lab-observations`、`GET /api/lab-observations/{id}` | 化验历史/详情 | 仅返回当前 UID 已确认且可追溯的数据 |
 | OCR 重试 | `POST /api/ocr/tasks/{task_id}/retry` | 失败页 | 新任务 |
 | 用药对账 | `POST /api/medication-reconciliations` | 医嘱确认后 | 对账草稿 |
 | 对账详情 | `GET/PUT /api/medication-reconciliations/{reconciliation_id}` | 对账页 | 差异和用户决策 |
@@ -322,18 +323,22 @@ PUT 允许分步部分更新。请求中的 `complete_onboarding=true` 只有在
 - `result_source`：`qwen3-vl/null`。
 - Flutter 在 `queued/processing` 时每 2 秒轮询，进入后台后暂停，恢复前台时立即继续。
 
-草稿响应字段：`id`、`task_id`、`raw_response`、`validated_draft`、`user_modified_data`、`confirmed_data`、`fields[]`、`created_at`。原始响应只通过当前 Session 的所属患者鉴权接口返回，不进入普通日志。
+草稿响应字段：`id`（即 result ID）、`task_id`、`raw_response`、`validated_draft`、`user_modified_data`、`confirmed_data`、`fields[]`、`source_document`、`created_at`。`source_document` 明确给出 `document_id`、`document_revision_id`、文件名、MIME、修订号和私有文件接口；原始响应只通过当前 Session 的所属患者鉴权接口返回，不进入普通日志。
 
 字段级 `fields[]`：`id`、`path`、`source_text`、`parsed_value`、`confidence`、`uncertainty_reason`、`source_region`、`user_value`、`confirmation_status`。每个 `path` 必须解析到 `validated_draft` 的实际叶字段，且值一致、路径唯一并完整覆盖草稿叶字段。
 
 四类 `validated_draft`：
 
-- 化验：`hospital_name`、`sample_date`、`report_date`、`items[]`；item 含 `item_name/item_code/raw_value/numeric_value/raw_unit/normalized_unit/reference_range_text/reference_low/reference_high`。
+- 化验 OCR 草稿：`hospital_name`、`sample_date`、`report_date`、`items[]`；item 使用 `item_name/item_code/raw_value/numeric_value/raw_unit/normalized_unit/reference_range_text/reference_low/reference_high`。化验确认请求中的 item 使用 `source_index/name/value/unit/reference_range/sample_date/exam_date/report_date/visit_date/note`；模型字段只是初值，正式规范化字段由后端重算。
 - 医嘱：`hospital_name`、`department_name`、`prescribed_at`、`orders[]`；order 含 `source_text/drug_name/normalized_drug_name/specification/dosage_text/dosage_value/dosage_unit/frequency/duration/route/instruction`。
 - 影像文字：`examination_name`、`body_part`、`examination_method`、`findings_text`、`conclusion_text`、`examined_at`、`reported_at`。
 - 门诊：`hospital_name`、`department_name`、`doctor_name`、`visit_date`、`chief_complaint`、`diagnosis_summary`、`treatment_plan`、`medical_advice`。
 
-当前 Issue 只生成 `pending_confirmation` 草稿，不写入正式医疗表。总 OpenAPI 中的 `/confirm` 与正式入库字段属于后续 Issue，当前前端不得调用。失败或超时任务通过 `POST /api/ocr/tasks/{task_id}/retry` 创建唯一关联的新尝试；重复点击返回同一个子任务。
+已实现的化验确认使用 `POST /api/ocr/tasks/{task_id}/confirm`，请求必须携带 `result_id`、`expected_revision_id` 和修改后的 `items[]`，报告级四类日期可为空。原草稿项目携带稳定的 `source_index`，删除项目会把其字段标记为 `rejected`，新增项目使用 `source_index=null`，避免列表删项后错误关联原字段。响应返回 `created_resource_ids[]`、`confirmed_at`、`observations[]`、`p0_evaluation` 和 `reused`。P0 `name/value/unit` 错误时返回 `error.details.fields[]`，Flutter 必须按 `path` 高亮并保留表单。其他三类材料的确认 payload 由对应 Issue 落地，不能复用化验结构猜测。
+
+`lab_observation` 只保存用户确认成功的数据，并强制关联明确材料、修订和 OCR 结果。指标别名未命中时 `mapping_status=needs_manual_review`；异常状态由材料参考范围确定性计算；趋势日期优先级为采样、检查、报告、就诊。正式数据读取接口为 `GET /api/lab-observations` 和 `GET /api/lab-observations/{id}`，均按当前 UID 隔离。
+
+失败或超时任务通过 `POST /api/ocr/tasks/{task_id}/retry` 创建唯一关联的新尝试；重复点击返回同一个子任务。
 
 ### 5.8 用药对账
 

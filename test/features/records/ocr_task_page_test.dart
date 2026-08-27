@@ -173,6 +173,7 @@ class _SequenceRepository implements OcrRepository {
 
   @override
   Future<OcrTaskResult> result(String taskId) async => OcrTaskResult(
+    resultId: 'result-1',
     taskId: taskId,
     draft: const {'items': []},
     fields: const [
@@ -185,4 +186,16 @@ class _SequenceRepository implements OcrRepository {
     retryCalls += 1;
     return _task(OcrTaskStatus.queued);
   }
+
+  @override
+  Future<LabConfirmationResult> confirmLab({
+    required String taskId,
+    required String resultId,
+    required String expectedRevisionId,
+    required List<LabConfirmationItem> items,
+    String? sampleDate,
+    String? examDate,
+    String? reportDate,
+    String? visitDate,
+  }) => throw UnimplementedError();
 }

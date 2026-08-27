@@ -109,18 +109,48 @@ class OcrFieldDraft {
   final Map<String, dynamic>? sourceRegion;
 }
 
+class OcrSourceDocument {
+  const OcrSourceDocument({
+    required this.documentId,
+    required this.revisionId,
+    required this.fileName,
+    required this.mimeType,
+    required this.revisionNumber,
+  });
+
+  final String documentId;
+  final String revisionId;
+  final String fileName;
+  final String mimeType;
+  final int revisionNumber;
+
+  factory OcrSourceDocument.fromJson(Map<String, dynamic> json) =>
+      OcrSourceDocument(
+        documentId: json['document_id'] as String,
+        revisionId: json['document_revision_id'] as String,
+        fileName: json['original_file_name'] as String,
+        mimeType: json['mime_type'] as String,
+        revisionNumber: json['revision_number'] as int,
+      );
+}
+
 class OcrTaskResult {
   const OcrTaskResult({
+    required this.resultId,
     required this.taskId,
     required this.draft,
     required this.fields,
+    this.sourceDocument,
   });
 
+  final String resultId;
   final String taskId;
   final Map<String, dynamic> draft;
   final List<OcrFieldDraft> fields;
+  final OcrSourceDocument? sourceDocument;
 
   factory OcrTaskResult.fromJson(Map<String, dynamic> json) => OcrTaskResult(
+    resultId: json['id'] as String,
     taskId: json['task_id'] as String,
     draft: Map<String, dynamic>.from(json['validated_draft'] as Map),
     fields: (json['fields'] as List).map((item) {
@@ -136,7 +166,126 @@ class OcrTaskResult {
             : Map<String, dynamic>.from(value['source_region'] as Map),
       );
     }).toList(),
+    sourceDocument: json['source_document'] == null
+        ? null
+        : OcrSourceDocument.fromJson(
+            Map<String, dynamic>.from(json['source_document'] as Map),
+          ),
   );
+}
+
+class LabConfirmationItem {
+  const LabConfirmationItem({
+    this.sourceIndex,
+    required this.name,
+    required this.value,
+    required this.unit,
+    this.referenceRange,
+    this.sampleDate,
+    this.examDate,
+    this.reportDate,
+    this.visitDate,
+    this.note,
+  });
+
+  final int? sourceIndex;
+  final String name;
+  final String value;
+  final String unit;
+  final String? referenceRange;
+  final String? sampleDate;
+  final String? examDate;
+  final String? reportDate;
+  final String? visitDate;
+  final String? note;
+
+  Map<String, dynamic> toJson() => {
+    'source_index': sourceIndex,
+    'name': name,
+    'value': value,
+    'unit': unit,
+    'reference_range': _emptyAsNull(referenceRange),
+    'sample_date': _emptyAsNull(sampleDate),
+    'exam_date': _emptyAsNull(examDate),
+    'report_date': _emptyAsNull(reportDate),
+    'visit_date': _emptyAsNull(visitDate),
+    'note': _emptyAsNull(note),
+  };
+}
+
+class LabObservationSummary {
+  const LabObservationSummary({
+    required this.id,
+    required this.name,
+    required this.value,
+    required this.unit,
+    required this.abnormalStatus,
+    required this.mappingStatus,
+    this.metricId,
+    this.trendDate,
+  });
+
+  final String id;
+  final String name;
+  final String value;
+  final String unit;
+  final String abnormalStatus;
+  final String mappingStatus;
+  final String? metricId;
+  final String? trendDate;
+
+  factory LabObservationSummary.fromJson(Map<String, dynamic> json) =>
+      LabObservationSummary(
+        id: json['id'] as String,
+        name: json['original_item_name'] as String,
+        value: json['numeric_value'].toString(),
+        unit: json['standard_unit'] as String,
+        abnormalStatus: json['abnormal_status'] as String,
+        mappingStatus: json['mapping_status'] as String,
+        metricId: json['standard_metric_id'] as String?,
+        trendDate: json['trend_date'] as String?,
+      );
+}
+
+class LabConfirmationResult {
+  const LabConfirmationResult({
+    required this.taskId,
+    required this.reused,
+    required this.confirmedAt,
+    required this.observations,
+  });
+
+  final String taskId;
+  final bool reused;
+  final DateTime? confirmedAt;
+  final List<LabObservationSummary> observations;
+
+  factory LabConfirmationResult.fromJson(Map<String, dynamic> json) =>
+      LabConfirmationResult(
+        taskId: json['task_id'] as String,
+        reused: json['reused'] as bool? ?? false,
+        confirmedAt: json['confirmed_at'] == null
+            ? null
+            : DateTime.parse(json['confirmed_at'] as String),
+        observations: (json['observations'] as List)
+            .map(
+              (value) => LabObservationSummary.fromJson(
+                Map<String, dynamic>.from(value as Map),
+              ),
+            )
+            .toList(),
+      );
+}
+
+class OcrFieldError {
+  const OcrFieldError({
+    required this.path,
+    required this.code,
+    required this.message,
+  });
+  final String path;
+  final String code;
+  final String message;
 }
 
 abstract interface class OcrRepository {
@@ -147,6 +296,16 @@ abstract interface class OcrRepository {
   Future<OcrTask> get(String taskId);
   Future<OcrTaskResult> result(String taskId);
   Future<OcrTask> retry(String taskId);
+  Future<LabConfirmationResult> confirmLab({
+    required String taskId,
+    required String resultId,
+    required String expectedRevisionId,
+    required List<LabConfirmationItem> items,
+    String? sampleDate,
+    String? examDate,
+    String? reportDate,
+    String? visitDate,
+  });
 }
 
 class FastApiOcrRepository implements OcrRepository {
@@ -187,6 +346,37 @@ class FastApiOcrRepository implements OcrRepository {
     () => client.dio.post<Map<String, dynamic>>('/ocr/tasks/$taskId/retry'),
   );
 
+  @override
+  Future<LabConfirmationResult> confirmLab({
+    required String taskId,
+    required String resultId,
+    required String expectedRevisionId,
+    required List<LabConfirmationItem> items,
+    String? sampleDate,
+    String? examDate,
+    String? reportDate,
+    String? visitDate,
+  }) async {
+    try {
+      final response = await client.dio.post<Map<String, dynamic>>(
+        '/ocr/tasks/$taskId/confirm',
+        data: {
+          'result_id': resultId,
+          'expected_revision_id': expectedRevisionId,
+          'visit_id': null,
+          'sample_date': _emptyAsNull(sampleDate),
+          'exam_date': _emptyAsNull(examDate),
+          'report_date': _emptyAsNull(reportDate),
+          'visit_date': _emptyAsNull(visitDate),
+          'items': items.map((item) => item.toJson()).toList(),
+        },
+      );
+      return LabConfirmationResult.fromJson(_data(response.data!));
+    } on DioException catch (error) {
+      throw _failure(error);
+    }
+  }
+
   Future<OcrTask> _taskRequest(
     Future<Response<Map<String, dynamic>>> Function() request,
   ) async {
@@ -208,16 +398,33 @@ class FastApiOcrRepository implements OcrRepository {
       return OcrException(
         value['code']?.toString() ?? 'OCR_REQUEST_FAILED',
         value['message']?.toString() ?? '识别请求失败',
+        fieldErrors: _fieldErrors(value),
       );
     }
     return const OcrException('NETWORK_ERROR', '网络连接中断，请稍后重试。');
   }
+
+  List<OcrFieldError> _fieldErrors(Map value) {
+    final details = value['details'];
+    if (details is! Map || details['fields'] is! List) return const [];
+    return (details['fields'] as List)
+        .whereType<Map>()
+        .map(
+          (field) => OcrFieldError(
+            path: field['path']?.toString() ?? '',
+            code: field['code']?.toString() ?? 'LAB_FIELD_INVALID',
+            message: field['message']?.toString() ?? '字段无效',
+          ),
+        )
+        .toList();
+  }
 }
 
 class OcrException implements Exception {
-  const OcrException(this.code, this.message);
+  const OcrException(this.code, this.message, {this.fieldErrors = const []});
   final String code;
   final String message;
+  final List<OcrFieldError> fieldErrors;
 
   @override
   String toString() => message;
@@ -270,9 +477,69 @@ class DemoOcrRepository implements OcrRepository {
   }
 
   @override
-  Future<OcrTaskResult> result(String taskId) async =>
-      OcrTaskResult(taskId: taskId, draft: const {}, fields: const []);
+  Future<OcrTaskResult> result(String taskId) async => OcrTaskResult(
+    resultId: 'demo-result-1',
+    taskId: taskId,
+    draft: const {
+      'hospital_name': 'Pomi Hospital',
+      'sample_date': '2026-08-19',
+      'report_date': '2026-08-20',
+      'items': [
+        {
+          'item_name': '空腹血糖',
+          'item_code': 'GLU',
+          'raw_value': '5.2',
+          'numeric_value': 5.2,
+          'raw_unit': 'mmol/L',
+          'normalized_unit': 'mmol/L',
+          'reference_range_text': '3.9-6.1',
+          'reference_low': 3.9,
+          'reference_high': 6.1,
+        },
+      ],
+    },
+    fields: const [
+      OcrFieldDraft(
+        path: 'items.0.raw_value',
+        value: '5.2',
+        confidence: 0.72,
+        sourceText: '5.2',
+      ),
+    ],
+  );
 
   @override
   Future<OcrTask> retry(String taskId) async => _tasks[taskId]!;
+
+  @override
+  Future<LabConfirmationResult> confirmLab({
+    required String taskId,
+    required String resultId,
+    required String expectedRevisionId,
+    required List<LabConfirmationItem> items,
+    String? sampleDate,
+    String? examDate,
+    String? reportDate,
+    String? visitDate,
+  }) async => LabConfirmationResult(
+    taskId: taskId,
+    reused: false,
+    confirmedAt: DateTime.now(),
+    observations: [
+      for (var index = 0; index < items.length; index++)
+        LabObservationSummary(
+          id: 'demo-lab-$index',
+          name: items[index].name,
+          value: items[index].value,
+          unit: items[index].unit,
+          abnormalStatus: 'unknown',
+          mappingStatus: 'needs_manual_review',
+        ),
+    ],
+  );
+}
+
+String? _emptyAsNull(String? value) {
+  final trimmed = value?.trim();
+  return trimmed == null || trimmed.isEmpty ? null : trimmed;
 }
