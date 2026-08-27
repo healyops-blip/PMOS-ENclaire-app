@@ -31,6 +31,26 @@ flutter pub get
 flutter run
 ```
 
+## UI demo scope
+
+The current Flutter UI uses local demo data and includes:
+
+- fixed new/existing demo-account routes;
+- three-step patient onboarding;
+- dashboard and medication three-state interactions;
+- medication management and reminder screens;
+- menstrual-cycle calendar and weight trends;
+- visit records and source traceability;
+- upload, OCR review, draft confirmation, and medication reconciliation;
+- report generation and three-layer report navigation;
+- doctor KYC, signature, and test-chain certification states;
+- patient profile and authorization entry points.
+
+The Flutter screens still use local demo data. The FastAPI account-name/password
+authentication API and SQLite persistence are implemented, but the Flutter auth
+screens are not connected to them yet. Patient data APIs, real OCR, identity
+providers, blockchain nodes, and PDF export remain unimplemented.
+
 ## Quality checks
 
 Run the same core checks used by GitHub Actions:
@@ -40,3 +60,12 @@ dart format --output=none --set-exit-if-changed lib test
 flutter analyze --fatal-infos
 flutter test
 ```
+
+## Frontend/backend integration
+
+- Human-readable task and field guide:
+  [`docs/frontend-backend-integration.md`](docs/frontend-backend-integration.md)
+- Machine-readable API contract:
+  [`contracts/openapi/pomi-api-v1.yaml`](contracts/openapi/pomi-api-v1.yaml)
+
+See `THIRD_PARTY_NOTICES.md` for UI dependency licenses.
