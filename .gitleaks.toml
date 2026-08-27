@@ -9,8 +9,10 @@ condition = "AND"
 paths = [
   '''^docs/backend-api\.md$''',
   '''^backend/tests/test_admin_accounts\.py$''',
+  '''^backend/tests/test_medication_api\.py$''',
 ]
 regexes = [
   '''^StrongPass123$''',
   '''^IgnoredPass123$''',
+  '''^Medication123$''',
 ]
