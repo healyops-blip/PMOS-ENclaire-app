@@ -24,6 +24,7 @@ from pomi_backend.api.medications import router as medications_router
 from pomi_backend.api.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
 from pomi_backend.api.ocr import router as ocr_router
 from pomi_backend.api.patient import router as patient_router
+from pomi_backend.api.reconciliations import router as reconciliations_router
 from pomi_backend.config import Settings
 from pomi_backend.db import build_engine, build_session_factory
 from pomi_backend.services.auth import AuthError
@@ -73,6 +74,7 @@ def create_app(*, settings: Settings | None = None, engine: Engine | None = None
     app.include_router(documents_router)
     app.include_router(ocr_router)
     app.include_router(medications_router)
+    app.include_router(reconciliations_router)
     return app
 
 

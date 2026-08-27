@@ -3,17 +3,21 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
+import 'package:pmos_enclaire/features/records/data/order_reconciliation_repository.dart';
+import 'package:pmos_enclaire/features/records/presentation/medical_order_review_page.dart';
 
 class OcrTaskPage extends StatefulWidget {
   const OcrTaskPage({
     required this.repository,
     required this.document,
+    this.documentRepository,
     this.pollInterval = const Duration(seconds: 2),
     super.key,
   });
 
   final OcrRepository repository;
   final MedicalDocument document;
+  final DocumentRepository? documentRepository;
   final Duration pollInterval;
 
   @override
@@ -124,6 +128,8 @@ class _OcrTaskPageState extends State<OcrTaskPage> with WidgetsBindingObserver {
         builder: (_) => OcrPendingConfirmationPage(
           repository: widget.repository,
           task: _task!,
+          document: widget.document,
+          documentRepository: widget.documentRepository,
         ),
       ),
     );
@@ -190,38 +196,54 @@ class OcrPendingConfirmationPage extends StatelessWidget {
   const OcrPendingConfirmationPage({
     required this.repository,
     required this.task,
+    this.document,
+    this.documentRepository,
     super.key,
   });
   final OcrRepository repository;
   final OcrTask task;
+  final MedicalDocument? document;
+  final DocumentRepository? documentRepository;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => FutureBuilder<OcrTaskResult>(
+    future: repository.result(task.id),
+    builder: (context, snapshot) {
+      if (!snapshot.hasData) {
+        if (snapshot.hasError) {
+          return Scaffold(body: Center(child: Text(snapshot.error.toString())));
+        }
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      }
+      if (task.materialType == 'medical_order' &&
+          repository is MedicalOrderGateway) {
+        return MedicalOrderReviewPage(
+          gateway: repository as MedicalOrderGateway,
+          task: task,
+          result: snapshot.data!,
+          document: document,
+          documentRepository: documentRepository,
+        );
+      }
+      return _genericPage(snapshot.data!);
+    },
+  );
+
+  Widget _genericPage(OcrTaskResult result) => Scaffold(
     key: Key('ocr-confirmation-${task.materialType}'),
     appBar: AppBar(title: Text('${_materialLabel(task.materialType)}待确认')),
-    body: FutureBuilder<OcrTaskResult>(
-      future: repository.result(task.id),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          if (snapshot.hasError) {
-            return Center(child: Text(snapshot.error.toString()));
-          }
-          return const Center(child: CircularProgressIndicator());
-        }
-        return ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            const Text('识别草稿尚未写入正式医疗记录，请在后续确认页面逐项核对。'),
-            const SizedBox(height: 12),
-            for (final field in snapshot.data!.fields)
-              ListTile(
-                title: Text(field.path),
-                subtitle: Text(field.sourceText ?? '未识别到原文'),
-                trailing: Text('${(field.confidence * 100).round()}%'),
-              ),
-          ],
-        );
-      },
+    body: ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        const Text('识别草稿尚未写入正式医疗记录，请在后续确认页面逐项核对。'),
+        const SizedBox(height: 12),
+        for (final field in result.fields)
+          ListTile(
+            title: Text(field.path),
+            subtitle: Text(field.sourceText ?? '未识别到原文'),
+            trailing: Text('${(field.confidence * 100).round()}%'),
+          ),
+      ],
     ),
   );
 }

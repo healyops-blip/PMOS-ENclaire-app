@@ -93,6 +93,7 @@ class Medication(Base):
     specification: Mapped[str | None] = mapped_column(String(200))
     dosage_value: Mapped[Decimal | None] = mapped_column(Numeric(8, 3))
     dosage_unit: Mapped[str | None] = mapped_column(String(32))
+    standard_drug_id: Mapped[str | None] = mapped_column(String(80))
     frequency: Mapped[str | None] = mapped_column(String(200))
     route: Mapped[str | None] = mapped_column(String(80))
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="active")

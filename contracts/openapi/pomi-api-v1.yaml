@@ -830,7 +830,6 @@ paths:
       summary: Confirm edited OCR fields and create formal data atomically
       parameters:
         - $ref: '#/components/parameters/TaskId'
-        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -838,8 +837,8 @@ paths:
             schema:
               $ref: '#/components/schemas/OcrConfirmRequest'
       responses:
-        '200':
-          description: OCR result confirmed
+        '201':
+          description: Every medication confirmed and formal medical orders created
           content:
             application/json:
               schema:
@@ -848,7 +847,7 @@ paths:
                   - type: object
                     properties:
                       data:
-                        $ref: '#/components/schemas/OcrConfirmResult'
+                        $ref: '#/components/schemas/MedicalOrderConfirmationResult'
         '409':
           $ref: '#/components/responses/ErrorResponse'
         '422':
@@ -885,8 +884,6 @@ paths:
       tags: [Reconciliations]
       operationId: createMedicationReconciliation
       summary: Generate a deterministic medication reconciliation draft
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -2322,17 +2319,11 @@ components:
 
     MedicalOrderItemDraft:
       type: object
-      required: [source_text, drug_name]
+      required: [drug_name, specification, dosage_value, dosage_unit, frequency, course, route, instructions, raw_order_text, explicitly_stopped]
       properties:
-        source_text:
-          type: string
         drug_name:
-          type: string
-        normalized_drug_name:
           type: [string, 'null']
         specification:
-          type: [string, 'null']
-        dosage_text:
           type: [string, 'null']
         dosage_value:
           type: [number, 'null']
@@ -2340,25 +2331,29 @@ components:
           type: [string, 'null']
         frequency:
           type: [string, 'null']
-        duration:
+        course:
           type: [string, 'null']
         route:
           type: [string, 'null']
-        instruction:
+        instructions:
           type: [string, 'null']
+        raw_order_text:
+          type: [string, 'null']
+        explicitly_stopped:
+          type: boolean
 
     MedicalOrderDraft:
       type: object
-      required: [orders]
+      required: [order_text, medications]
       properties:
-        hospital_name:
+        facility:
           type: [string, 'null']
-        department_name:
+        order_text:
           type: [string, 'null']
-        prescribed_at:
+        order_date:
           type: [string, 'null']
           format: date
-        orders:
+        medications:
           type: array
           minItems: 1
           items:
@@ -2437,63 +2432,62 @@ components:
           type: string
           format: date-time
 
-    FieldConfirmation:
+    MedicalOrderConfirmationItem:
       type: object
-      required: [field_path, confirmation_status]
+      required: [index, confirmed, drug_name, dosage_value, dosage_unit, frequency, order_date, raw_order_text]
       properties:
-        field_path:
+        index:
+          type: integer
+          minimum: 0
+        confirmed:
+          type: boolean
+          enum: [true]
+        drug_name:
           type: string
-        user_value: {}
-        confirmation_status:
+        specification:
+          type: [string, 'null']
+        dosage_value:
+          type: number
+          exclusiveMinimum: 0
+        dosage_unit:
           type: string
-          enum: [confirmed, edited, rejected]
+        frequency:
+          type: string
+        course:
+          type: [string, 'null']
+        route:
+          type: [string, 'null']
+        instructions:
+          type: [string, 'null']
+        order_date:
+          type: string
+          format: date
+        raw_order_text:
+          type: string
+        explicitly_stopped:
+          type: boolean
+          default: false
 
     OcrConfirmRequest:
       type: object
-      required: [result_id, expected_revision_id, document_type, confirmed_data, field_confirmations]
+      required: [items]
       properties:
-        result_id:
-          type: string
-          format: uuid
-        expected_revision_id:
-          type: string
-          format: uuid
-        document_type:
-          $ref: '#/components/schemas/DocumentType'
-        confirmed_data:
-          oneOf:
-            - $ref: '#/components/schemas/LabDraft'
-            - $ref: '#/components/schemas/MedicalOrderDraft'
-            - $ref: '#/components/schemas/ImagingTextDraft'
-            - $ref: '#/components/schemas/OutpatientRecordDraft'
-        field_confirmations:
+        items:
           type: array
+          minItems: 1
           items:
-            $ref: '#/components/schemas/FieldConfirmation'
-        confirm_all:
-          type: boolean
-          default: false
-          description: Allowed only for lab reports after critical-field validation.
+            $ref: '#/components/schemas/MedicalOrderConfirmationItem'
 
-    OcrConfirmResult:
+    MedicalOrderConfirmationResult:
       type: object
-      required: [task_id, result_id, created_resource_ids, confirmed_at, reconciliation_required]
+      required: [items, reused]
       properties:
-        task_id:
-          type: string
-          format: uuid
-        result_id:
-          type: string
-          format: uuid
-        created_resource_ids:
+        items:
           type: array
           items:
-            type: string
-            format: uuid
-        confirmed_at:
-          type: string
-          format: date-time
-        reconciliation_required:
+            type: object
+            additionalProperties: true
+        reused:
           type: boolean
 
     OcrRetryRequest:
@@ -2508,7 +2502,7 @@ components:
 
     ReconciliationStatus:
       type: string
-      enum: [pending, confirmed, cancelled]
+      enum: [draft, executed]
 
     ComparisonType:
       type: string
@@ -2516,50 +2510,34 @@ components:
 
     ReconciliationDecision:
       type: string
-      enum: [accept, keep_existing, confirm_stopped, needs_review]
+      enum: [accept, keep_current, reject]
 
     ReconciliationCreate:
       type: object
-      required: [source_document_id]
+      required: [ocr_task_id]
       properties:
-        source_document_id:
+        ocr_task_id:
           type: string
           format: uuid
-        medical_order_ids:
-          type: array
-          items:
-            type: string
-            format: uuid
 
     ReconciliationItem:
       type: object
-      required: [id, drug_name, comparison_type, differences]
+      required: [id, position, suggestion, match_basis]
       properties:
         id:
           type: string
           format: uuid
-        existing_medication_id:
-          type: [string, 'null']
-          format: uuid
-        new_medical_order_id:
-          type: [string, 'null']
-          format: uuid
-        medication_concept_id:
-          type: [string, 'null']
-        drug_name:
-          type: string
-        comparison_type:
+        position:
+          type: integer
+        old_medication:
+          type: [object, 'null']
+          additionalProperties: true
+        new_medical_order:
+          type: [object, 'null']
+          additionalProperties: true
+        suggestion:
           $ref: '#/components/schemas/ComparisonType'
-        rule_id:
-          type: [string, 'null']
-          format: uuid
-        old_instruction:
-          type: [object, 'null']
-          additionalProperties: true
-        new_instruction:
-          type: [object, 'null']
-          additionalProperties: true
-        differences:
+        match_basis:
           type: object
           additionalProperties: true
         user_decision:
@@ -2568,43 +2546,47 @@ components:
             - type: 'null'
         decision_note:
           type: [string, 'null']
+        stop_date:
+          type: [string, 'null']
+          format: date
+        stop_source:
+          type: [string, 'null']
+        execution_result:
+          type: [object, 'null']
+          additionalProperties: true
 
     MedicationReconciliation:
       type: object
-      required: [id, source_document_id, status, summary, items, created_at]
+      required: [id, ocr_task_id, rule_version, status, items]
       properties:
         id:
           type: string
           format: uuid
-        source_document_id:
+        ocr_task_id:
           type: string
           format: uuid
+        rule_version:
+          type: string
         status:
           $ref: '#/components/schemas/ReconciliationStatus'
-        summary:
-          type: object
-          additionalProperties: true
         items:
           type: array
           items:
             $ref: '#/components/schemas/ReconciliationItem'
-        created_at:
-          type: string
-          format: date-time
-        confirmed_at:
+        executed_at:
           type: [string, 'null']
           format: date-time
 
     ReconciliationItemDecision:
       type: object
-      required: [item_id, user_decision]
+      required: [item_id, decision]
       properties:
         item_id:
           type: string
           format: uuid
-        user_decision:
+        decision:
           $ref: '#/components/schemas/ReconciliationDecision'
-        decision_note:
+        note:
           type: [string, 'null']
           maxLength: 500
         stop_date:
@@ -2617,12 +2599,9 @@ components:
 
     ReconciliationUpdate:
       type: object
-      required: [status, items]
+      required: [decisions]
       properties:
-        status:
-          type: string
-          enum: [confirmed, cancelled]
-        items:
+        decisions:
           type: array
           minItems: 1
           items:
