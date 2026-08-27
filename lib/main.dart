@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pmos_enclaire/app/pomi_app.dart';
 import 'package:pmos_enclaire/features/auth/data/auth_repository.dart';
+import 'package:pmos_enclaire/features/cycle/data/cycle_repository.dart';
 import 'package:pmos_enclaire/features/medications/data/medication_repository.dart';
 import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
 
@@ -13,12 +14,14 @@ class MainApp extends StatelessWidget {
   const MainApp({
     this.authRepository,
     this.profileRepository,
+    this.cycleRepository,
     this.medicationRepository,
     super.key,
   });
 
   final AuthRepository? authRepository;
   final PatientProfileRepository? profileRepository;
+  final CycleRepository? cycleRepository;
   final MedicationRepository? medicationRepository;
 
   @override
@@ -27,6 +30,7 @@ class MainApp extends StatelessWidget {
       child: PomiApp(
         authRepository: authRepository,
         profileRepository: profileRepository,
+        cycleRepository: cycleRepository,
         medicationRepository: medicationRepository,
       ),
     );

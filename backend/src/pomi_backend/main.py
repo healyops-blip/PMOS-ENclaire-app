@@ -12,6 +12,8 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from pomi_backend.api.auth import router as auth_router
 from pomi_backend.api.business import BusinessError
+from pomi_backend.api.cycles import cycle_error_handler
+from pomi_backend.api.cycles import router as cycles_router
 from pomi_backend.api.errors import (
     auth_error_handler,
     business_error_handler,
@@ -25,6 +27,7 @@ from pomi_backend.api.patient import router as patient_router
 from pomi_backend.config import Settings
 from pomi_backend.db import build_engine, build_session_factory
 from pomi_backend.services.auth import AuthError
+from pomi_backend.services.cycles import CycleError
 from pomi_backend.services.rate_limit import RateLimitExceeded, SlidingWindowRateLimiter
 from pomi_backend.services.security import PasswordManager
 
@@ -61,10 +64,12 @@ def create_app(*, settings: Settings | None = None, engine: Engine | None = None
         )
 
     app.add_exception_handler(AuthError, auth_error_handler)
+    app.add_exception_handler(CycleError, cycle_error_handler)
     app.add_exception_handler(RateLimitExceeded, rate_limit_error_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.add_exception_handler(BusinessError, business_error_handler)
     app.include_router(auth_router)
+    app.include_router(cycles_router)
     app.include_router(health_router)
     app.include_router(medications_router)
     app.include_router(patient_router)

@@ -459,7 +459,7 @@ paths:
     delete:
       tags: [Cycles]
       operationId: deleteCycle
-      summary: Logically delete a menstrual cycle
+      summary: Soft-delete a menstrual cycle
       parameters:
         - name: cycle_id
           in: path
@@ -469,7 +469,7 @@ paths:
             format: uuid
       responses:
         '204':
-          description: Cycle logically deleted
+          description: Cycle deleted
         '404':
           $ref: '#/components/responses/ErrorResponse'
 

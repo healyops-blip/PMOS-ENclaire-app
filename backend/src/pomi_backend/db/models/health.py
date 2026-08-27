@@ -186,6 +186,14 @@ class MenstrualCycle(Base):
             "end_date IS NULL OR end_date >= start_date",
             name="menstrual_cycle_date_order",
         ),
+        CheckConstraint(
+            "flow_level IS NULL OR flow_level IN ('light', 'medium', 'heavy', 'unknown')",
+            name="menstrual_cycle_flow_level",
+        ),
+        CheckConstraint(
+            "source_type IN ('manual', 'imported')",
+            name="menstrual_cycle_source_type",
+        ),
         Index("ix_menstrual_cycle_patient_start", "patient_id", "start_date"),
     )
 
@@ -195,7 +203,9 @@ class MenstrualCycle(Base):
     )
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date | None] = mapped_column(Date)
+    flow_level: Mapped[str | None] = mapped_column(String(16))
     note: Mapped[str | None] = mapped_column(Text)
+    source_type: Mapped[str] = mapped_column(String(16), nullable=False, default="manual")
     deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(

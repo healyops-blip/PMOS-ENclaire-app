@@ -3,6 +3,7 @@ import 'package:pmos_enclaire/core/theme/pomi_theme.dart';
 import 'package:pmos_enclaire/core/widgets/demo_badge.dart';
 import 'package:pmos_enclaire/core/widgets/frosted_panel.dart';
 import 'package:pmos_enclaire/features/auth/domain/demo_account.dart';
+import 'package:pmos_enclaire/features/cycle/data/cycle_repository.dart';
 import 'package:pmos_enclaire/features/cycle/presentation/cycle_page.dart';
 import 'package:pmos_enclaire/features/dashboard/domain/medication.dart';
 import 'package:pmos_enclaire/features/medications/application/medication_status_controller.dart';
@@ -18,12 +19,14 @@ class DashboardPage extends StatefulWidget {
   const DashboardPage({
     required this.account,
     required this.profileRepository,
+    this.cycleRepository,
     this.medicationRepository,
     super.key,
   });
 
   final DemoAccount account;
   final PatientProfileRepository profileRepository;
+  final CycleRepository? cycleRepository;
   final MedicationRepository? medicationRepository;
 
   @override
@@ -183,7 +186,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               ),
             ),
-            const CyclePage(),
+            CyclePage(repository: widget.cycleRepository),
             const RecordsPage(),
             ProfilePage(
               account: widget.account,
