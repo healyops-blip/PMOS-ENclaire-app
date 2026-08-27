@@ -36,14 +36,21 @@ def test_all_local_schema_references_resolve() -> None:
 def test_medication_contract_preserves_versions_and_pause_resume_events() -> None:
     schemas = load_contract()["components"]["schemas"]
 
-    assert schemas["MedicationStatus"]["enum"] == ["active", "paused", "stopped", "unknown"]
+    assert schemas["MedicationStatus"]["enum"] == ["active", "paused", "stopped"]
     assert schemas["MedicationEventType"]["enum"] == [
-        "started",
+        "created",
         "adjusted",
         "paused",
         "resumed",
         "stopped",
     ]
+    assert schemas["MedicationUpdateEventType"]["enum"] == [
+        "adjusted",
+        "paused",
+        "resumed",
+        "stopped",
+    ]
+    assert schemas["MedicationPage"]["allOf"][1]["properties"]["server_date"]["format"] == ("date")
     medication_properties = schemas["Medication"]["allOf"][1]["properties"]
     assert medication_properties["replaces_medication_id"]["format"] == "uuid"
 

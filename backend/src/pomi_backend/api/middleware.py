@@ -1,4 +1,4 @@
-"""Request-context and security-header middleware for API responses."""
+"""Request context and security headers for JSON API responses."""
 
 from __future__ import annotations
 

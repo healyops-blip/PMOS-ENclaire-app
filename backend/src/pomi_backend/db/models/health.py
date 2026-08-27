@@ -89,6 +89,7 @@ class Medication(Base):
         ),
         UniqueConstraint("patient_id", "id", name="uq_medication_patient_id"),
         Index("ix_medication_patient_status", "patient_id", "status"),
+        UniqueConstraint("patient_id", "idempotency_key", name="uq_medication_patient_idempotency"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
@@ -106,6 +107,7 @@ class Medication(Base):
     start_date: Mapped[date | None] = mapped_column(Date)
     end_date: Mapped[date | None] = mapped_column(Date)
     replaces_medication_id: Mapped[str | None] = mapped_column(String(36))
+    idempotency_key: Mapped[str | None] = mapped_column(String(128))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         UTCDateTime, nullable=False, default=utc_now, onupdate=utc_now
@@ -143,6 +145,7 @@ class MedicationEvent(Base):
         String(36), ForeignKey("user_account.uid", ondelete="RESTRICT"), nullable=False
     )
     note: Mapped[str | None] = mapped_column(Text)
+    stop_source: Mapped[str | None] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, default=utc_now)
 
 
