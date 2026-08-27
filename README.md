@@ -31,6 +31,21 @@ flutter pub get
 flutter run
 ```
 
+## Web Preview against the production API
+
+Build the web client with the loopback preview URL, then serve it through the
+local same-origin proxy. The proxy forwards only `/api/*` and `/health/*` to
+the HTTPS API; it does not require production CORS changes.
+
+```bash
+flutter build web \
+  --dart-define=POMI_API_BASE_URL=http://127.0.0.1:3001
+python3 tools/web_preview_proxy.py --root build/web
+```
+
+Open `http://127.0.0.1:3001`. Override `--upstream` when testing against a
+different HTTPS API.
+
 ## Quality checks
 
 Run the same core checks used by GitHub Actions:

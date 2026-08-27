@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1280" viewBox="0 0 1280 1280" role="img" aria-labelledby="title desc">
+  <title id="title">POMI logo</title>
+  <desc id="desc">Purple POMI animal logo on a transparent background.</desc>
+  <defs><linearGradient id="pomi-purple" gradientUnits="userSpaceOnUse" x1="405" y1="1040" x2="865" y2="250"><stop offset="0" stop-color="#5d48ae"/><stop offset="0.48" stop-color="#7560bd"/><stop offset="1" stop-color="#aa8fd5"/></linearGradient></defs>
+  <path fill="url(#pomi-purple)" d="M409 860 V483 C409 355 509 256 636 256 C762 256 862 355 862 483 C862 617 765 722 638 722 H572 C586 672 620 627 673 597 C743 558 789 532 804 474 C810 452 805 444 790 440 C772 436 763 431 756 416 C735 380 691 365 644 365 C567 365 510 416 510 490 V802 L444 860 Z"/>
+  <path fill="url(#pomi-purple)" d="M570 462 C575 445 592 438 606 444 C612 447 617 452 620 457 L587 493 C577 483 567 473 570 462 Z"/>
+  <path fill="url(#pomi-purple)" d="M688 456 C688 440 698 431 713 431 C730 431 739 442 739 458 C739 465 735 471 737 477 C733 483 724 485 716 483 C699 483 688 473 688 456 Z"/>
+  <g fill="url(#pomi-purple)" fill-rule="evenodd"><path d="M421 910 H470 C499 910 516 925 516 950 C516 976 499 992 470 992 H450 V1026 H421 Z M450 932 V970 H467 C480 970 487 963 487 951 C487 939 480 932 467 932 Z"/><path d="M528 968 C528 932 553 907 590 907 C627 907 652 932 652 968 C652 1004 627 1029 590 1029 C553 1029 528 1004 528 968 Z M557 968 C557 991 570 1006 590 1006 C610 1006 623 991 623 968 C623 945 610 930 590 930 C570 930 557 945 557 968 Z"/><path d="M672 910 H706 L733 980 L760 910 H795 V1026 H768 V952 L744 1026 H721 L698 952 V1026 H672 Z"/><path d="M824 910 H851 V1026 H824 Z"/></g>
+</svg>
