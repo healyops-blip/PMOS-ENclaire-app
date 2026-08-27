@@ -214,7 +214,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     children: [
       TextFormField(
         controller: _nickname,
-        decoration: const InputDecoration(labelText: '怎么称呼你'),
+        decoration: const InputDecoration(labelText: '昵称'),
         validator:
             (value) => value == null || value.trim().isEmpty ? '请输入称呼' : null,
       ),
