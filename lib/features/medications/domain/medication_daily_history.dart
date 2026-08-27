@@ -62,12 +62,25 @@ class MedicationDailyHistory {
   MedicationDailyHistory replaceAt(
     int index,
     MedicationDailyRecord replacement,
-  ) => MedicationDailyHistory(
-    businessDate: businessDate,
-    editableFrom: editableFrom,
-    items: [...items]..[index] = replacement,
-    takenCount: takenCount,
-    missedCount: missedCount,
-    unrecordedCount: unrecordedCount,
-  );
+  ) {
+    final previous = items[index];
+    if (previous.status == replacement.status) return this;
+
+    int adjustedCount(int current, MedicationStatus countedStatus) =>
+        current -
+        (previous.status == countedStatus ? 1 : 0) +
+        (replacement.status == countedStatus ? 1 : 0);
+
+    return MedicationDailyHistory(
+      businessDate: businessDate,
+      editableFrom: editableFrom,
+      items: [...items]..[index] = replacement,
+      takenCount: adjustedCount(takenCount, MedicationStatus.taken),
+      missedCount: adjustedCount(missedCount, MedicationStatus.missed),
+      unrecordedCount: adjustedCount(
+        unrecordedCount,
+        MedicationStatus.unrecorded,
+      ),
+    );
+  }
 }

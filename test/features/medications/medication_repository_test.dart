@@ -99,6 +99,61 @@ void main() {
     expect(dailyWrite.data['record_date'], '2026-08-28');
     expect(controller.medications.single.status, MedicationStatus.taken);
   });
+
+  test(
+    'history window is derived from the server date, not the device clock',
+    () async {
+      final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api'));
+      RequestOptions? historyRequest;
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            if (options.path == '/medications') {
+              handler.resolve(
+                Response(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: {
+                    'success': true,
+                    'data': {'server_date': '2026-01-02', 'items': const []},
+                  },
+                ),
+              );
+              return;
+            }
+            historyRequest = options;
+            handler.resolve(
+              Response(
+                requestOptions: options,
+                statusCode: 200,
+                data: {
+                  'success': true,
+                  'data': {
+                    'from': '2025-12-04',
+                    'to': '2026-01-02',
+                    'business_date': '2026-01-02',
+                    'editable_from': '2025-12-27',
+                    'taken_count': 0,
+                    'missed_count': 0,
+                    'unrecorded_count': 0,
+                    'items': const [],
+                  },
+                },
+              ),
+            );
+          },
+        ),
+      );
+      final repository = FastApiMedicationRepository(PomiApiClient(dio: dio));
+
+      final history = await repository.listDailyHistory('medication-1');
+
+      expect(historyRequest!.queryParameters['from'], '2025-12-04');
+      expect(historyRequest!.queryParameters['to'], '2026-01-02');
+      expect(history.businessDate, DateTime(2026, 1, 2));
+      expect(history.editableFrom, DateTime(2025, 12, 27));
+    },
+  );
 }
 
 const _medication = <String, dynamic>{

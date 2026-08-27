@@ -99,7 +99,12 @@ class DashboardService:
         return [
             {
                 **medication_data(item),
-                "daily": daily_data(item, self.business_date, explicit.get(item.id)),
+                "daily": daily_data(
+                    item,
+                    self.business_date,
+                    explicit.get(item.id),
+                    editable=True,
+                ),
             }
             for item in due
         ]

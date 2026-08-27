@@ -410,7 +410,11 @@ class DemoMedicationRepository implements MedicationRepository {
     DateTime date,
     MedicationStatus status,
   ) async {
-    _dailyStates['$medicationId-${FastApiMedicationRepository._date(date)}'] =
-        status;
+    final key = '$medicationId-${FastApiMedicationRepository._date(date)}';
+    if (status == MedicationStatus.unrecorded) {
+      _dailyStates.remove(key);
+    } else {
+      _dailyStates[key] = status;
+    }
   }
 }

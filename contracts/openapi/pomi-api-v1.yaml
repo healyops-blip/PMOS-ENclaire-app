@@ -330,7 +330,7 @@ paths:
                   - type: object
                     properties:
                       data:
-                        $ref: '#/components/schemas/MedicationDaily'
+                        $ref: '#/components/schemas/MedicationDailyMutation'
 
   /api/medication-daily:
     get:
@@ -1939,20 +1939,29 @@ components:
           $ref: '#/components/schemas/IntakeStatus'
 
     MedicationDaily:
-      allOf:
-        - $ref: '#/components/schemas/MedicationDailyUpsert'
-        - type: object
-          required: [medication_id]
-          properties:
-            id:
-              type: [string, 'null']
-              format: uuid
-            medication_id:
-              type: string
-              format: uuid
-            recorded_at:
-              type: [string, 'null']
-              format: date-time
+      type: object
+      required:
+        [id, medication_id, record_date, intake_status, recorded_at, recorded_by_uid, editable]
+      properties:
+        id:
+          type: [string, 'null']
+          format: uuid
+        medication_id:
+          type: string
+          format: uuid
+        record_date:
+          type: string
+          format: date
+        intake_status:
+          $ref: '#/components/schemas/IntakeStatus'
+        recorded_at:
+          type: [string, 'null']
+          format: date-time
+        recorded_by_uid:
+          type: [string, 'null']
+          format: uuid
+        editable:
+          type: boolean
 
     ThreeStateStats:
       type: object
@@ -1972,7 +1981,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/ThreeStateStats'
         - type: object
-          required: [from, to, items]
+          required: [from, to, items, business_date, editable_from]
           properties:
             from:
               type: string
@@ -1984,6 +1993,27 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/MedicationDaily'
+            business_date:
+              type: string
+              format: date
+            editable_from:
+              type: string
+              format: date
+
+    MedicationDailyMutation:
+      allOf:
+        - $ref: '#/components/schemas/MedicationDaily'
+        - type: object
+          required: [business_date, editable_from, month_summary]
+          properties:
+            business_date:
+              type: string
+              format: date
+            editable_from:
+              type: string
+              format: date
+            month_summary:
+              $ref: '#/components/schemas/MedicationDailyRange'
 
     FlowLevel:
       type: string

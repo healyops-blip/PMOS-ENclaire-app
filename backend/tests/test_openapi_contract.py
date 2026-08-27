@@ -82,6 +82,28 @@ def test_medication_contract_preserves_versions_and_pause_resume_events() -> Non
     assert medication_properties["replaces_medication_id"]["format"] == "uuid"
 
 
+def test_medication_adherence_contract_exposes_edit_window_and_audit_fields() -> None:
+    contract = load_contract()
+    schemas = contract["components"]["schemas"]
+    paths = contract["paths"]
+
+    daily = schemas["MedicationDaily"]
+    assert {"recorded_by_uid", "editable"} <= set(daily["required"])
+    assert daily["properties"]["editable"]["type"] == "boolean"
+
+    history = schemas["MedicationDailyRange"]["allOf"][1]
+    assert {"business_date", "editable_from"} <= set(history["required"])
+    assert history["properties"]["business_date"]["format"] == "date"
+
+    mutation = schemas["MedicationDailyMutation"]["allOf"][1]
+    assert {"business_date", "editable_from", "month_summary"} == set(mutation["required"])
+    response = paths["/api/medications/{medication_id}/daily-status"]["put"]["responses"]["200"]
+    reference = response["content"]["application/json"]["schema"]["allOf"][1]["properties"]["data"][
+        "$ref"
+    ]
+    assert reference.endswith("/MedicationDailyMutation")
+
+
 def test_cycle_delete_and_weight_limits_match_issues() -> None:
     contract = load_contract()
 

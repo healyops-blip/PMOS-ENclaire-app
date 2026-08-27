@@ -159,9 +159,8 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Future<void> _openMedicationManager() async {
     if (_dashboardController.offline) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('离线状态不能修改用药')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('离线状态不能修改用药')));
       return;
     }
     await Navigator.of(context).push(
