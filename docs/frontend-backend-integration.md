@@ -270,10 +270,11 @@ PUT 允许分步部分更新。请求中的 `complete_onboarding=true` 只有在
 - `cycle_length_days` 和 `duration_days` 由后端计算。
 - 周期重叠返回 `CYCLE_DATE_OVERLAP`。
 
-体重字段：`id`、`measured_at`、`weight_kg`、`source_type`、`note`、`created_at`。
+体重字段：`id`、`record_date`、`weight_kg`、`created_at`、`updated_at`。
 
-- 只保存 kg，合理范围 20–350 kg。
+- 只保存 kg，合理范围 20.0–300.0 kg，最多一位小数。
 - 同一患者同一自然日 POST 视为更新并返回现有 ID。
+- GET 按 `record_date` 升序返回；可使用 `from`、`to` 做日期过滤。
 
 ### 5.6 材料与修订
 

@@ -5,18 +5,179 @@ import 'package:pmos_enclaire/core/widgets/pomi_line_chart.dart';
 import 'package:pmos_enclaire/core/widgets/pomi_surfaces.dart';
 import 'package:pmos_enclaire/features/cycle/data/cycle_repository.dart';
 import 'package:pmos_enclaire/features/cycle/domain/menstrual_cycle.dart';
+import 'package:pmos_enclaire/features/weight/application/weight_controller.dart';
+import 'package:pmos_enclaire/features/weight/data/weight_repository.dart';
+import 'package:pmos_enclaire/features/weight/domain/weight_input_validator.dart';
+import 'package:pmos_enclaire/features/weight/domain/weight_record.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 class CyclePage extends StatefulWidget {
-  const CyclePage({this.repository, super.key});
+  const CyclePage({this.weightController, this.repository, super.key});
 
+  final WeightController? weightController;
   final CycleRepository? repository;
 
   @override
   State<CyclePage> createState() => _CyclePageState();
 }
 
+class _WeightSection extends StatelessWidget {
+  const _WeightSection({
+    required this.controller,
+    required this.selectedDate,
+    required this.existing,
+    required this.onRecord,
+  });
+
+  final WeightController controller;
+  final DateTime selectedDate;
+  final WeightRecord? existing;
+  final VoidCallback onRecord;
+
+  @override
+  Widget build(BuildContext context) {
+    final records = controller.records;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            const Expanded(child: PomiSectionTitle(title: '体重趋势')),
+            SizedBox(
+              width: 148,
+              child: FilledButton.icon(
+                key: const Key('record-weight-button'),
+                onPressed: controller.isLoading ? null : onRecord,
+                icon: const Icon(Icons.monitor_weight_outlined),
+                label: Text(existing == null ? '记录体重' : '修改体重'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (controller.isLoading && records.isEmpty)
+          const PomiSectionCard(
+            child: Center(
+              child: CircularProgressIndicator(key: Key('weight-loading')),
+            ),
+          )
+        else if (records.isEmpty)
+          PomiSectionCard(
+            child: Padding(
+              key: const Key('weight-empty-state'),
+              padding: const EdgeInsets.symmetric(vertical: 22),
+              child: Column(
+                children: [
+                  const Icon(
+                    Icons.monitor_weight_outlined,
+                    color: PomiColors.primary,
+                    size: 34,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(controller.errorMessage ?? '还没有体重记录'),
+                  const SizedBox(height: 4),
+                  Text(
+                    controller.errorMessage == null
+                        ? '选择日期，记录第一条体重'
+                        : '检查网络后重新加载',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  if (controller.errorMessage != null)
+                    TextButton(
+                      onPressed: controller.load,
+                      child: const Text('重试'),
+                    ),
+                ],
+              ),
+            ),
+          )
+        else
+          PomiSectionCard(
+            key: const Key('weight-trend-card'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${records.last.weightKg.toStringAsFixed(1)} kg',
+                  key: const Key('weight-latest-value'),
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+                const SizedBox(height: 12),
+                PomiLineChart(
+                  values: [for (final record in records) record.weightKg],
+                  labels: [
+                    for (final record in records)
+                      '${record.recordDate.month}/${record.recordDate.day}',
+                  ],
+                  color: PomiColors.glowPink,
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _WeightEntryDialog extends StatefulWidget {
+  const _WeightEntryDialog({this.initialWeight});
+
+  final double? initialWeight;
+
+  @override
+  State<_WeightEntryDialog> createState() => _WeightEntryDialogState();
+}
+
+class _WeightEntryDialogState extends State<_WeightEntryDialog> {
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.initialWeight?.toStringAsFixed(1) ?? '',
+  );
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final error = validateWeightInput(_controller.text);
+    if (error != null) {
+      setState(() => _error = error);
+      return;
+    }
+    Navigator.pop(context, double.parse(_controller.text.trim()));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.initialWeight == null ? '记录体重' : '修改体重'),
+      content: TextField(
+        key: const Key('weight-input'),
+        controller: _controller,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: InputDecoration(suffixText: 'kg', errorText: _error),
+        onSubmitted: (_) => _save(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          key: const Key('save-weight-button'),
+          onPressed: _save,
+          child: const Text('保存'),
+        ),
+      ],
+    );
+  }
+}
+
 class _CyclePageState extends State<CyclePage> {
+  late WeightController _weightController;
+  late bool _ownsWeightController;
   late CycleRepository _repository;
   List<MenstrualCycle>? _cycles;
   Object? _loadError;
@@ -28,6 +189,11 @@ class _CyclePageState extends State<CyclePage> {
   void initState() {
     super.initState();
     _repository = widget.repository ?? DemoCycleRepository();
+    _ownsWeightController = widget.weightController == null;
+    _weightController =
+        widget.weightController ?? WeightController(MemoryWeightRepository());
+    _weightController.addListener(_onWeightChanged);
+    if (_ownsWeightController) _weightController.load();
     _load();
   }
 
@@ -39,6 +205,58 @@ class _CyclePageState extends State<CyclePage> {
       _repository = widget.repository!;
       _load();
     }
+    if (oldWidget.weightController != widget.weightController) {
+      _weightController.removeListener(_onWeightChanged);
+      if (_ownsWeightController) _weightController.dispose();
+      _ownsWeightController = widget.weightController == null;
+      _weightController =
+          widget.weightController ?? WeightController(MemoryWeightRepository());
+      _weightController.addListener(_onWeightChanged);
+      if (_ownsWeightController) _weightController.load();
+    }
+  }
+
+  void _onWeightChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _weightController.removeListener(_onWeightChanged);
+    if (_ownsWeightController) _weightController.dispose();
+    super.dispose();
+  }
+
+  WeightRecord? _weightFor(DateTime day) {
+    for (final record in _weightController.records) {
+      if (record.recordDate.year == day.year &&
+          record.recordDate.month == day.month &&
+          record.recordDate.day == day.day) {
+        return record;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _recordWeight() async {
+    final existing = _weightFor(_selectedDay);
+    final value = await showDialog<double>(
+      context: context,
+      builder: (_) => _WeightEntryDialog(initialWeight: existing?.weightKg),
+    );
+    if (value == null || !mounted) return;
+    final saved = await _weightController.save(
+      recordDate: _selectedDay,
+      weightKg: value,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          saved ? '体重已保存' : _weightController.errorMessage ?? '保存失败',
+        ),
+      ),
+    );
   }
 
   Future<void> _load() async {
@@ -144,7 +362,20 @@ class _CyclePageState extends State<CyclePage> {
           ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 126),
-            sliver: SliverToBoxAdapter(child: _content()),
+            sliver: SliverToBoxAdapter(
+              child: Column(
+                children: [
+                  _content(),
+                  const SizedBox(height: 20),
+                  _WeightSection(
+                    controller: _weightController,
+                    selectedDate: _selectedDay,
+                    existing: _weightFor(_selectedDay),
+                    onRecord: _recordWeight,
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
