@@ -229,6 +229,8 @@ paths:
       tags: [Medications]
       operationId: createMedication
       summary: Add a medication and its first event
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -779,7 +781,13 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/OcrTask'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
         '409':
+          $ref: '#/components/responses/ErrorResponse'
+        '422':
           $ref: '#/components/responses/ErrorResponse'
 
   /api/ocr/tasks/{task_id}:
@@ -801,6 +809,10 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/OcrTask'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
 
   /api/ocr/tasks/{task_id}/result:
     get:
@@ -822,6 +834,10 @@ paths:
                       data:
                         $ref: '#/components/schemas/OcrDraftResult'
         '409':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
           $ref: '#/components/responses/ErrorResponse'
 
   /api/ocr/tasks/{task_id}/confirm:
@@ -880,6 +896,12 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/OcrTask'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
 
   /api/medication-reconciliations:
     post:
@@ -2438,7 +2460,7 @@ components:
 
     FieldConfirmationStatus:
       type: string
-      enum: [pending, accepted, corrected, rejected]
+      enum: [pending, confirmed, edited, rejected]
 
     OcrFieldResult:
       type: object
@@ -2467,14 +2489,15 @@ components:
 
     LabItemDraft:
       type: object
-      required: [item_name, raw_value]
+      required: [item_name, item_code, raw_value, numeric_value, raw_unit, normalized_unit, reference_range_text, reference_low, reference_high]
+      additionalProperties: false
       properties:
         item_name:
-          type: string
+          type: [string, 'null']
         item_code:
           type: [string, 'null']
         raw_value:
-          type: string
+          type: [string, 'null']
         numeric_value:
           type: [number, 'null']
         raw_unit:
@@ -2490,7 +2513,8 @@ components:
 
     LabDraft:
       type: object
-      required: [items]
+      required: [hospital_name, sample_date, report_date, items]
+      additionalProperties: false
       properties:
         hospital_name:
           type: [string, 'null']
@@ -2502,18 +2526,18 @@ components:
           format: date
         items:
           type: array
-          minItems: 1
           items:
             $ref: '#/components/schemas/LabItemDraft'
 
     MedicalOrderItemDraft:
       type: object
-      required: [source_text, drug_name]
+      required: [source_text, drug_name, normalized_drug_name, specification, dosage_text, dosage_value, dosage_unit, frequency, duration, route, instruction]
+      additionalProperties: false
       properties:
         source_text:
-          type: string
+          type: [string, 'null']
         drug_name:
-          type: string
+          type: [string, 'null']
         normalized_drug_name:
           type: [string, 'null']
         specification:
@@ -2535,7 +2559,8 @@ components:
 
     MedicalOrderDraft:
       type: object
-      required: [orders]
+      required: [hospital_name, department_name, prescribed_at, orders]
+      additionalProperties: false
       properties:
         hospital_name:
           type: [string, 'null']
@@ -2546,13 +2571,13 @@ components:
           format: date
         orders:
           type: array
-          minItems: 1
           items:
             $ref: '#/components/schemas/MedicalOrderItemDraft'
 
     ImagingTextDraft:
       type: object
-      required: [findings_text, conclusion_text]
+      required: [examination_name, body_part, examination_method, findings_text, conclusion_text, examined_at, reported_at]
+      additionalProperties: false
       properties:
         examination_name:
           type: [string, 'null']
@@ -2561,9 +2586,9 @@ components:
         examination_method:
           type: [string, 'null']
         findings_text:
-          type: string
+          type: [string, 'null']
         conclusion_text:
-          type: string
+          type: [string, 'null']
         examined_at:
           type: [string, 'null']
           format: date
@@ -2573,7 +2598,8 @@ components:
 
     OutpatientRecordDraft:
       type: object
-      required: [visit_date, diagnosis_summary, treatment_plan]
+      required: [hospital_name, department_name, doctor_name, visit_date, chief_complaint, diagnosis_summary, treatment_plan, medical_advice]
+      additionalProperties: false
       properties:
         hospital_name:
           type: [string, 'null']
@@ -2582,14 +2608,14 @@ components:
         doctor_name:
           type: [string, 'null']
         visit_date:
-          type: string
+          type: [string, 'null']
           format: date
         chief_complaint:
           type: [string, 'null']
         diagnosis_summary:
-          type: string
+          type: [string, 'null']
         treatment_plan:
-          type: string
+          type: [string, 'null']
         medical_advice:
           type: [string, 'null']
 
@@ -2607,8 +2633,11 @@ components:
           type: object
           additionalProperties: true
         validated_draft:
-          type: object
-          additionalProperties: true
+          oneOf:
+            - $ref: '#/components/schemas/LabDraft'
+            - $ref: '#/components/schemas/MedicalOrderDraft'
+            - $ref: '#/components/schemas/ImagingTextDraft'
+            - $ref: '#/components/schemas/OutpatientRecordDraft'
         user_modified_data:
           type: [object, 'null']
           additionalProperties: true

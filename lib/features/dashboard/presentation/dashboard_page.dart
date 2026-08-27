@@ -30,8 +30,8 @@ class DashboardPage extends StatefulWidget {
     required this.profileRepository,
     required this.patientNoteRepository,
     required this.documentRepository,
-    required this.ocrRepository,
     required this.weightRepository,
+    this.ocrRepository,
     this.dashboardRepository,
     this.onLogout,
     this.now,
@@ -44,7 +44,7 @@ class DashboardPage extends StatefulWidget {
   final PatientProfileRepository profileRepository;
   final PatientNoteRepository patientNoteRepository;
   final DocumentRepository documentRepository;
-  final OcrRepository ocrRepository;
+  final OcrRepository? ocrRepository;
   final WeightRepository weightRepository;
   final DashboardRepository? dashboardRepository;
   final Future<void> Function()? onLogout;
@@ -61,6 +61,8 @@ class _DashboardPageState extends State<DashboardPage> {
   int _recordsVersion = 0;
   late final WeightController _weightController;
   late final DashboardController _dashboardController;
+  late final OcrRepository _ocrRepository =
+      widget.ocrRepository ?? DemoOcrRepository();
   List<Medication> _medications = const [];
   late final MedicationRepository _medicationRepository;
   late final MedicationStatusController _medicationStatusController;
@@ -226,7 +228,7 @@ class _DashboardPageState extends State<DashboardPage> {
             RecordsPage(
               key: ValueKey(_recordsVersion),
               repository: widget.documentRepository,
-              ocrRepository: widget.ocrRepository,
+              ocrRepository: _ocrRepository,
             ),
             ProfilePage(
               account: widget.account,
@@ -241,7 +243,7 @@ class _DashboardPageState extends State<DashboardPage> {
         onPressed: () => showUploadFlow(
           context,
           repository: widget.documentRepository,
-          ocrRepository: widget.ocrRepository,
+          ocrRepository: _ocrRepository,
           onUploaded: () => setState(() => _recordsVersion++),
         ),
         backgroundColor: PomiColors.primary,

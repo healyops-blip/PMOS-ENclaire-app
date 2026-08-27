@@ -99,6 +99,6 @@ def test_report_migration_upgrades_the_current_main_schema(
     } <= set(inspect(engine).get_table_names())
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-            "20260827_0027"
+            "20260827_0028"
         )
     engine.dispose()

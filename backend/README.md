@@ -35,7 +35,6 @@ python -m alembic upgrade head
 pytest
 ruff check .
 uvicorn pomi_backend.main:app --reload
-pomi-ocr-worker --once
 ```
 
 The default database path is `backend/runtime/pomi.db`. Set
@@ -51,7 +50,11 @@ call. If a worker stops while a provider request is in flight, the task becomes
 
 Qwen3-VL configuration is server-only: `POMI_OCR_API_KEY`, `POMI_OCR_API_BASE_URL`,
 `POMI_OCR_MODEL`, `POMI_OCR_TIMEOUT_SECONDS`, and `POMI_OCR_LEASE_SECONDS`. Never put
-the key in Flutter, a database row, logs, or source control.
+the key in Flutter, a database row, logs, or source control. The Worker refuses to
+start until the API key is set and the lease is at least 30 seconds longer than the
+provider timeout.
+After loading the key from a local secret source (without placing it in shell history),
+run `pomi-ocr-worker --once` for one local claim or omit `--once` for the polling loop.
 
 ## Current authentication persistence
 

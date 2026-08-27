@@ -30,6 +30,12 @@ calls an `OCRProvider`, validates the material-specific JSON Schema, applies onl
 deterministic whitespace cleaning, and persists the result and field evidence in one
 transaction.
 
+The four draft schemas use the field sets in the integration contract. Every returned
+evidence path must resolve to one actual draft leaf, have the same parsed value, be
+unique, and collectively cover all draft leaves. One-page PDFs are rendered to an
+image inside the Worker before Qwen3-VL Chat Completions is called; PDF bytes are not
+sent through an image URL.
+
 Network, timeout, rate-limit, and temporary provider failures receive at most two
 automatic retries. Schema or response-format failures receive at most one. File and
 unsupported-format errors do not retry. A lease that expired before the provider call
@@ -38,6 +44,9 @@ is unknowable, so the task becomes `timed_out` instead of duplicating disclosure
 
 Qwen3-VL is configured only with server environment variables. Provider responses
 are persisted in protected storage but never emitted to ordinary logs.
+The API key lives only in `/etc/pomi/pomi-ocr.env`; the Worker refuses to start when
+the key is absent or when the lease is shorter than the request timeout plus its
+safety margin.
 
 ## Flutter lifecycle
 

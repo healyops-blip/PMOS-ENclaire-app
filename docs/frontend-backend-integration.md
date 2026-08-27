@@ -118,7 +118,7 @@ Authorization: Bearer <session_id>
 
 ### 3.4 幂等和并发
 
-- 下列创建请求必须携带 `Idempotency-Key`：文件上传、OCR 创建/重试、对账创建、报告生成、PDF 生成。当前注册接口不要求该 Header。
+- 下列创建请求必须携带 `Idempotency-Key`：文件上传、对账创建、报告生成、PDF 生成。当前 OCR 创建/重试按服务端 UID、文件哈希、材料类型和 Prompt 配置幂等，不接收该 Header；注册接口也不要求。
 - 服务端对同一会话和幂等键返回同一资源，不重复写入。
 - 更新接口携带 `updated_at` 或 `expected_revision_id`；版本不一致返回 `409 RESOURCE_VERSION_CONFLICT`。
 - Flutter 按钮提交期间禁用；每日用药可乐观更新，失败必须回滚。
@@ -155,7 +155,7 @@ Authorization: Bearer <session_id>
 | OCR 创建 | `POST /api/ocr/tasks` | 上传完成后 | 异步任务 |
 | OCR 状态 | `GET /api/ocr/tasks/{task_id}` | 2 秒轮询 | 状态、错误、进度 |
 | OCR 草稿 | `GET /api/ocr/tasks/{task_id}/result` | 四类确认页 | 字段级草稿 |
-| OCR 确认 | `POST /api/ocr/tasks/{task_id}/confirm` | 四类确认页 | 正式数据 ID |
+| OCR 确认（后续 Issue） | `POST /api/ocr/tasks/{task_id}/confirm` | 四类确认页 | 当前未实现，前端不得调用 |
 | OCR 重试 | `POST /api/ocr/tasks/{task_id}/retry` | 失败页 | 新任务 |
 | 用药对账 | `POST /api/medication-reconciliations` | 医嘱确认后 | 对账草稿 |
 | 对账详情 | `GET/PUT /api/medication-reconciliations/{reconciliation_id}` | 对账页 | 差异和用户决策 |
@@ -314,26 +314,26 @@ PUT 允许分步部分更新。请求中的 `complete_onboarding=true` 只有在
 
 ### 5.7 OCR 任务与四类草稿
 
-创建请求：`document_id`、`document_revision_id`、可选 `force_new_attempt=false`。材料类型、Prompt 和模型由后端根据修订确定。
+当前已实现的创建请求为 `document_id`、`document_revision_id`。材料类型、Prompt 和模型由后端根据材料与明确修订确定；同一 UID、文件哈希、材料类型、模型、Prompt 和 Schema 自动复用任务，不接受客户端强制绕过幂等。
 
-任务字段：`id`、`document_id`、`document_revision_id`、`document_type`、`task_status`、`attempt_count`、`max_attempts`、`queued_at`、`started_at`、`finished_at`、`processing_ms`、`error_code`、`error_message`、`result_source`、`progress`。
+任务字段：`id`、`document_id`、`document_revision_id`、`material_type`、`status`、`model`、`prompt_version`、`schema_version`、`attempt_number`、`parent_task_id`、`provider_attempts`、`attempt_history`、`duration_ms`、`error`、`result_source`、`created_at`、`updated_at`；创建和主动重试响应还包含 `reused`。
 
-- `task_status`：`pending/processing/succeeded/failed/timeout/fallback/confirmed`。
-- `result_source`：`qwen_api/fallback/null`。
-- Flutter 在 `pending/processing` 时每 2 秒轮询，进入后台后暂停高频轮询。
+- `status`：`queued/processing/pending_confirmation/confirmed/failed/timed_out`。
+- `result_source`：`qwen3-vl/null`。
+- Flutter 在 `queued/processing` 时每 2 秒轮询，进入后台后暂停，恢复前台时立即继续。
 
-草稿公共字段：`result_id`、`task_id`、`document_type`、`validation_status`、`critical_error`、`result_source`、`fields[]`、`draft`。
+草稿响应字段：`id`、`task_id`、`raw_response`、`validated_draft`、`user_modified_data`、`confirmed_data`、`fields[]`、`created_at`。原始响应只通过当前 Session 的所属患者鉴权接口返回，不进入普通日志。
 
-字段级 `fields[]`：`field_path`、`raw_text`、`parsed_value`、`confidence`、`uncertainty_reason`、`source_region`、`user_value`、`confirmation_status`。
+字段级 `fields[]`：`id`、`path`、`source_text`、`parsed_value`、`confidence`、`uncertainty_reason`、`source_region`、`user_value`、`confirmation_status`。每个 `path` 必须解析到 `validated_draft` 的实际叶字段，且值一致、路径唯一并完整覆盖草稿叶字段。
 
-四类 `draft`：
+四类 `validated_draft`：
 
 - 化验：`hospital_name`、`sample_date`、`report_date`、`items[]`；item 含 `item_name/item_code/raw_value/numeric_value/raw_unit/normalized_unit/reference_range_text/reference_low/reference_high`。
 - 医嘱：`hospital_name`、`department_name`、`prescribed_at`、`orders[]`；order 含 `source_text/drug_name/normalized_drug_name/specification/dosage_text/dosage_value/dosage_unit/frequency/duration/route/instruction`。
 - 影像文字：`examination_name`、`body_part`、`examination_method`、`findings_text`、`conclusion_text`、`examined_at`、`reported_at`。
 - 门诊：`hospital_name`、`department_name`、`doctor_name`、`visit_date`、`chief_complaint`、`diagnosis_summary`、`treatment_plan`、`medical_advice`。
 
-确认请求必须携带 `result_id`、`expected_revision_id`、`confirmed_data` 和 `field_confirmations[]`。医嘱每个 order 都必须确认，只有化验允许批量确认。响应返回 `created_resource_ids[]`、`confirmed_at`、`reconciliation_required`。
+当前 Issue 只生成 `pending_confirmation` 草稿，不写入正式医疗表。总 OpenAPI 中的 `/confirm` 与正式入库字段属于后续 Issue，当前前端不得调用。失败或超时任务通过 `POST /api/ocr/tasks/{task_id}/retry` 创建唯一关联的新尝试；重复点击返回同一个子任务。
 
 ### 5.8 用药对账
 

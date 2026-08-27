@@ -142,7 +142,7 @@ def upgrade() -> None:
         sa.Column("created_at", pomi_backend.db.types.UTCDateTime(timezone=True), nullable=False),
         sa.Column("updated_at", pomi_backend.db.types.UTCDateTime(timezone=True), nullable=False),
         sa.CheckConstraint(
-            "confirmation_status IN ('pending', 'accepted', 'corrected', 'rejected')",
+            "confirmation_status IN ('pending', 'confirmed', 'edited', 'rejected')",
             name=op.f("ck_ocr_field_result_ocr_field_confirmation_status"),
         ),
         sa.ForeignKeyConstraint(

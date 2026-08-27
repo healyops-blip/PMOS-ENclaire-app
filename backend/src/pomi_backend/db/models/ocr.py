@@ -108,7 +108,7 @@ class OCRFieldResult(Base):
     __tablename__ = "ocr_field_result"
     __table_args__ = (
         CheckConstraint(
-            "confirmation_status IN ('pending', 'accepted', 'corrected', 'rejected')",
+            "confirmation_status IN ('pending', 'confirmed', 'edited', 'rejected')",
             name="ocr_field_confirmation_status",
         ),
         UniqueConstraint("result_id", "field_path", name="uq_ocr_field_result_path"),

@@ -27,7 +27,11 @@ def test_systemd_service_is_loopback_only_and_hardened() -> None:
     assert "NoNewPrivileges=true" in worker
     assert "ProtectSystem=strict" in worker
     assert "EnvironmentFile=/etc/pomi/pomi.env" in worker
+    assert "EnvironmentFile=/etc/pomi/pomi-ocr.env" in worker
     assert "--workers" not in worker
+
+    api = read("deploy/systemd/pomi-api.service")
+    assert "pomi-ocr.env" not in api
 
 
 def test_nginx_has_tls_limits_and_local_upstream() -> None:
@@ -49,8 +53,11 @@ def test_nginx_has_tls_limits_and_local_upstream() -> None:
 
 def test_environment_example_and_repository_contain_no_seed_passwords() -> None:
     environment_example = read("deploy/systemd/pomi.env.example")
+    ocr_environment_example = read("deploy/systemd/pomi-ocr.env.example")
     assert "PASSWORD=" not in environment_example
     assert "SECRET=" not in environment_example
+    assert "POMI_OCR_API_KEY=" not in environment_example
+    assert "POMI_OCR_API_KEY=" in ocr_environment_example
 
     tracked_text = "\n".join(
         path.read_text(encoding="utf-8", errors="ignore")
