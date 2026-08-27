@@ -12,6 +12,7 @@ from pomi_backend.db.base import Base
 from pomi_backend.db.models import (  # noqa: F401
     Document,
     DocumentRevision,
+    LabObservation,
     Medication,
     MedicationDaily,
     MedicationEvent,

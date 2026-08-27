@@ -16,6 +16,8 @@ void main() {
             requests.add(options);
             final payload = options.path.endsWith('/result')
                 ? _result
+                : options.path.endsWith('/confirm')
+                ? _confirmation
                 : {
                     ..._task,
                     'status': options.path.endsWith('/retry')
@@ -41,11 +43,20 @@ void main() {
       final polled = await repository.get(created.id);
       final result = await repository.result(created.id);
       final retried = await repository.retry(created.id);
+      final confirmed = await repository.confirmLab(
+        taskId: created.id,
+        resultId: 'result-1',
+        expectedRevisionId: 'rev-1',
+        items: const [
+          LabConfirmationItem(name: '血糖', value: '5.2', unit: 'mmol/L'),
+        ],
+      );
 
       expect(created.status, OcrTaskStatus.processing);
       expect(polled.providerAttempts, 1);
       expect(result.fields.single.sourceRegion?['page'], 1);
       expect(retried.status, OcrTaskStatus.queued);
+      expect(confirmed.observations.single.name, '血糖');
       expect(requests.first.data, {
         'document_id': 'doc-1',
         'document_revision_id': 'rev-1',
@@ -55,6 +66,7 @@ void main() {
         '/ocr/tasks/task-1',
         '/ocr/tasks/task-1/result',
         '/ocr/tasks/task-1/retry',
+        '/ocr/tasks/task-1/confirm',
       ]);
     },
   );
@@ -156,6 +168,7 @@ final _task = <String, dynamic>{
 };
 
 final _result = <String, dynamic>{
+  'id': 'result-1',
   'task_id': 'task-1',
   'validated_draft': {'items': []},
   'fields': [
@@ -183,6 +196,27 @@ final _reconciliation = <String, dynamic>{
       'match_basis': {'standard_drug_id': 'rxnorm:metformin'},
       'suggestion': 'unchanged',
       'user_decision': null,
+    },
+  ],
+};
+
+final _confirmation = <String, dynamic>{
+  'task_id': 'task-1',
+  'result_id': 'result-1',
+  'status': 'confirmed',
+  'reused': false,
+  'confirmed_at': '2026-08-27T12:00:00Z',
+  'created_resource_ids': ['lab-1'],
+  'observations': [
+    {
+      'id': 'lab-1',
+      'original_item_name': '血糖',
+      'numeric_value': '5.200000',
+      'standard_unit': 'mmol/L',
+      'abnormal_status': 'normal',
+      'mapping_status': 'mapped',
+      'standard_metric_id': 'glucose',
+      'trend_date': null,
     },
   ],
 };

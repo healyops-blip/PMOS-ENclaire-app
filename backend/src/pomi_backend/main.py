@@ -20,6 +20,7 @@ from pomi_backend.api.errors import (
     validation_error_handler,
 )
 from pomi_backend.api.health import router as health_router
+from pomi_backend.api.labs import router as labs_router
 from pomi_backend.api.medications import router as medications_router
 from pomi_backend.api.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
 from pomi_backend.api.ocr import router as ocr_router
@@ -73,6 +74,7 @@ def create_app(*, settings: Settings | None = None, engine: Engine | None = None
     app.include_router(patient_router)
     app.include_router(documents_router)
     app.include_router(ocr_router)
+    app.include_router(labs_router)
     app.include_router(medications_router)
     app.include_router(reconciliations_router)
     return app

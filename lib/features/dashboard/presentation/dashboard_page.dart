@@ -92,9 +92,8 @@ class _DashboardPageState extends State<DashboardPage> {
       await _medicationStatusController.setStatus(index, status);
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('状态保存失败，已恢复原状态：$error')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('状态保存失败，已恢复原状态：$error')));
     }
   }
 

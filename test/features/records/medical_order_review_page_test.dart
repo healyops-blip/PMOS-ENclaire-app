@@ -159,6 +159,7 @@ class _Gateway implements OcrRepository, MedicalOrderGateway {
 
   @override
   Future<OcrTaskResult> result(String taskId) async => OcrTaskResult(
+    resultId: 'result-order',
     taskId: taskId,
     draft: const {
       'order_date': '2026-08-27',
@@ -188,4 +189,16 @@ class _Gateway implements OcrRepository, MedicalOrderGateway {
   Future<OcrTask> get(String taskId) async => _task;
   @override
   Future<OcrTask> retry(String taskId) async => _task;
+
+  @override
+  Future<LabConfirmationResult> confirmLab({
+    required String taskId,
+    required String resultId,
+    required String expectedRevisionId,
+    required List<LabConfirmationItem> items,
+    String? sampleDate,
+    String? examDate,
+    String? reportDate,
+    String? visitDate,
+  }) => throw UnimplementedError();
 }

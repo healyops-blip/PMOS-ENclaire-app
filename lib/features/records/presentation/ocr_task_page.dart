@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:pmos_enclaire/features/records/data/order_reconciliation_repository.dart';
+import 'package:pmos_enclaire/features/records/presentation/lab_confirmation_page.dart';
 import 'package:pmos_enclaire/features/records/presentation/medical_order_review_page.dart';
 
 class OcrTaskPage extends StatefulWidget {
@@ -125,12 +126,18 @@ class _OcrTaskPageState extends State<OcrTaskPage> with WidgetsBindingObserver {
   void _openConfirmation() {
     Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (_) => OcrPendingConfirmationPage(
-          repository: widget.repository,
-          task: _task!,
-          document: widget.document,
-          documentRepository: widget.documentRepository,
-        ),
+        builder: (_) => _task!.materialType == 'lab_report'
+            ? LabConfirmationPage(
+                repository: widget.repository,
+                task: _task!,
+                documentRepository: widget.documentRepository,
+              )
+            : OcrPendingConfirmationPage(
+                repository: widget.repository,
+                task: _task!,
+                document: widget.document,
+                documentRepository: widget.documentRepository,
+              ),
       ),
     );
   }
