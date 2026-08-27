@@ -1,0 +1,63 @@
+{
+  "font_path": "C:\\\\Windows\\\\Fonts\\\\simkai.ttf",
+  "fields": [
+    {
+      "name": "name",
+      "bbox": [50, 50, 200, 80],
+      "template": "姓名：{name}"
+    },
+    {
+      "name": "patient_id",
+      "bbox": [50, 90, 250, 120],
+      "template": "病历号：{patient_id}"
+    },
+    {
+      "name": "age",
+      "bbox": [50, 130, 150, 160],
+      "template": "年龄：{age}岁"
+    },
+    {
+      "name": "gender",
+      "bbox": [50, 170, 150, 200],
+      "template": "性别：{gender}"
+    },
+    {
+      "name": "exam_date",
+      "bbox": [50, 210, 250, 240],
+      "template": "检查日期：{exam_date}"
+    },
+    {
+      "name": "doctor",
+      "bbox": [50, 250, 250, 280],
+      "template": "医生：{doctor}"
+    },
+    {
+      "name": "uterus_length",
+      "bbox": [50, 320, 300, 350],
+      "template": "子宫长径：{uterus_length}mm"
+    },
+    {
+      "name": "uterus_width",
+      "bbox": [50, 360, 300, 390],
+      "template": "子宫宽径：{uterus_width}mm"
+    },
+    {
+      "name": "endometrium",
+      "bbox": [50, 400, 350, 430],
+      "template": "内膜：{endometrium}"
+    },
+    {
+      "name": "pelvic_effusion",
+      "bbox": [50, 440, 350, 470],
+      "template": "盆腔积液：{pelvic_effusion}"
+    }
+  ],
+  "rotation_range": [-1.0, 1.0],
+  "brightness_range": [0.95, 1.05],
+  "contrast_range": [0.95, 1.05],
+  "blur_probability": 0.2,
+  "noise_probability": 0.2,
+  "noise_std": 3,
+  "jpeg_quality_min": 85,
+  "jpeg_quality_max": 100
+}

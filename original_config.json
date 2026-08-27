@@ -1,0 +1,67 @@
+{
+  "font_path": "C:\\Windows\\Fonts\\simkai.ttf",
+  "fields": [
+    {
+      "name": "exam_date",
+      "bbox": [789, 240, 1190, 265],
+      "template": "检查日期：{exam_date}",
+      "font_size": 20
+    },
+    {
+      "name": "patient_id",
+      "bbox": [1000, 265, 1190, 290],
+      "template": "病历号：{patient_id}",
+      "font_size": 18
+    },
+    {
+      "name": "name",
+      "bbox": [60, 315, 840, 350],
+      "template": "姓名：{name}   年龄：{age}岁   性别：{gender}",
+      "font_size": 22
+    },
+    {
+      "name": "doctor",
+      "bbox": [60, 360, 840, 395],
+      "template": "医生：{doctor}",
+      "font_size": 22
+    },
+    {
+      "name": "right_ovary",
+      "bbox": [55, 770, 770, 858],
+      "template": "右卵巢:多囊样改变,大小:{right_ovary_length}*{right_ovary_width}*{right_ovary_height}mm,基础卵泡:{follicle_count_right}个",
+      "font_size": 18
+    },
+    {
+      "name": "left_ovary",
+      "bbox": [55, 884, 800, 996],
+      "template": "左卵巢:多囊样改变,大小:{left_ovary_length}*{left_ovary_width}*{left_ovary_height}mm,基础卵泡:{follicle_count_left}个",
+      "font_size": 18
+    },
+    {
+      "name": "pelvic_effusion",
+      "bbox": [60, 1000, 170, 1025],
+      "template": "盆腔积液：{pelvic_effusion}",
+      "font_size": 18
+    },
+    {
+      "name": "impression",
+      "bbox": [60, 1275, 1010, 1350],
+      "template": "印象：{impression}",
+      "font_size": 22
+    },
+    {
+      "name": "recommendation",
+      "bbox": [60, 1365, 570, 1435],
+      "template": "建议：{recommendation}",
+      "font_size": 22
+    }
+  ],
+  "rotation_range": [-1.0, 1.0],
+  "brightness_range": [0.95, 1.05],
+  "contrast_range": [0.95, 1.05],
+  "blur_probability": 0.2,
+  "noise_probability": 0.2,
+  "noise_std": 3,
+  "jpeg_quality_min": 85,
+  "jpeg_quality_max": 100
+}

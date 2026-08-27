@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*.pyo
+*.DS_Store
+.idea/
+.vscode/
+
+# Generated outputs
+/result/
+
+# Logs and temp
+*.log
+tmp/
+temp/
+~$*

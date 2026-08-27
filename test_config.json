@@ -1,0 +1,18 @@
+{
+  "font_path": "C:\\Windows\\Fonts\\simkai.ttf",
+  "fields": [
+    {
+      "name": "right_ovary",
+      "bbox": [55, 770, 1160, 860],
+      "template": "右卵巢:多囊样改变",
+      "font_size": 24
+    }
+  ],
+  "rotation_range": [0, 0],
+  "brightness_range": [1.0, 1.0],
+  "contrast_range": [1.0, 1.0],
+  "blur_probability": 0,
+  "noise_probability": 0,
+  "jpeg_quality_min": 100,
+  "jpeg_quality_max": 100
+}
