@@ -25,6 +25,7 @@ def test_systemd_service_is_loopback_only_and_hardened() -> None:
 
 def test_nginx_has_tls_limits_and_local_upstream() -> None:
     nginx = read("deploy/nginx/pomi-api.conf")
+    bootstrap = read("deploy/nginx/pomi-api-http.conf")
     assert "server 127.0.0.1:8010" in nginx
     assert "api.healy1012-ops.top" in nginx
     assert "ssl_certificate /etc/letsencrypt/" in nginx
@@ -34,6 +35,9 @@ def test_nginx_has_tls_limits_and_local_upstream() -> None:
     assert "proxy_set_header X-Forwarded-Proto https" in nginx
     assert "Strict-Transport-Security" in nginx
     assert nginx.count("proxy_hide_header Server") == 3
+    assert "ssl_certificate" not in bootstrap
+    assert "root /var/www/certbot" in bootstrap
+    assert "proxy_pass http://127.0.0.1:8010" in bootstrap
 
 
 def test_environment_example_and_repository_contain_no_seed_passwords() -> None:

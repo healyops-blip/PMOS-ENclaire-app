@@ -15,13 +15,20 @@ sudo systemctl reload nginx
 ```
 
 The certificate paths expect a Let's Encrypt certificate. Confirm that the
-certificate already exists before enabling this site. If it does not, obtain
-one only after DNS points at the server; for a new server with Nginx not yet
-serving traffic, `certbot certonly --standalone` can provision it before this
-configuration is enabled:
+certificate already exists before enabling this site. If it does not, install
+the HTTP bootstrap site first, obtain the certificate through the isolated ACME
+webroot, then replace it with the HTTPS site. This does not stop other Nginx
+sites:
 
 ```bash
-sudo certbot certonly --standalone -d api.healy1012-ops.top
+sudo install -d -o www-data -g www-data -m 0755 /var/www/certbot
+sudo cp /opt/pomi/current/deploy/nginx/pomi-api-http.conf /etc/nginx/sites-available/pomi-api.conf
+sudo nginx -t
+sudo systemctl reload nginx
+sudo certbot certonly --webroot -w /var/www/certbot -d api.healy1012-ops.top
+sudo cp /opt/pomi/current/deploy/nginx/pomi-api.conf /etc/nginx/sites-available/pomi-api.conf
+sudo nginx -t
+sudo systemctl reload nginx
 ```
 
 The HSTS header applies only to `api.healy1012-ops.top`; it deliberately omits
