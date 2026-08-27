@@ -133,3 +133,7 @@ class AuthService:
         self._repository.touch_session(user_session, at=now)
         self._session.commit()
         return account
+
+    def logout(self, session_id: str) -> None:
+        self._repository.revoke_session(hash_session_credential(session_id))
+        self._session.commit()

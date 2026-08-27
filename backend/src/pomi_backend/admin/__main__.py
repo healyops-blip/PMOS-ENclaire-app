@@ -1,0 +1,88 @@
+"""Command-line entrypoint for server-local administrative operations."""
+
+from __future__ import annotations
+
+import argparse
+import getpass
+import os
+from collections.abc import Sequence
+
+from pomi_backend.admin.accounts import AccountNotFound, reset_password, seed_initial_accounts
+from pomi_backend.config import Settings
+from pomi_backend.db import build_engine, build_session_factory
+from pomi_backend.services.security import PasswordManager
+
+
+def read_secret(environment_name: str, prompt: str) -> str:
+    value = os.getenv(environment_name)
+    if value is not None:
+        return value
+    return getpass.getpass(prompt)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="pomi-admin", description="Server-local Pomi administrative commands"
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers.add_parser(
+        "seed-accounts", help="Idempotently create initial and returning accounts"
+    )
+    reset_parser = subparsers.add_parser(
+        "reset-password", help="Reset one account password and revoke all Sessions"
+    )
+    reset_parser.add_argument("account_name")
+    return parser
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    settings = Settings.from_env()
+    engine = build_engine(settings.database_url)
+    session_factory = build_session_factory(engine)
+    password_manager = PasswordManager(settings)
+
+    try:
+        with session_factory() as session:
+            if args.command == "seed-accounts":
+                results = seed_initial_accounts(
+                    session,
+                    password_manager,
+                    first_time_account_name=os.getenv(
+                        "POMI_FIRST_TIME_ACCOUNT_NAME", "first-time-user"
+                    ),
+                    first_time_password=read_secret(
+                        "POMI_FIRST_TIME_ACCOUNT_PASSWORD", "First-time account password: "
+                    ),
+                    returning_account_name=os.getenv(
+                        "POMI_RETURNING_ACCOUNT_NAME", "returning-user"
+                    ),
+                    returning_password=read_secret(
+                        "POMI_RETURNING_ACCOUNT_PASSWORD", "Returning account password: "
+                    ),
+                )
+                for result in results:
+                    action = "created" if result.created else "already exists"
+                    print(
+                        f"{result.account_name}: {action}; "
+                        f"uid={result.uid}; onboarding_completed={result.onboarding_completed}"
+                    )
+                return 0
+
+            revoked_count = reset_password(
+                session,
+                password_manager,
+                account_name=args.account_name,
+                new_password=read_secret("POMI_RESET_PASSWORD", "New password: "),
+            )
+            print(f"Password reset completed; revoked_sessions={revoked_count}")
+            return 0
+    except (AccountNotFound, ValueError) as error:
+        print(f"Operation failed: {error}")
+        return 2
+    finally:
+        engine.dispose()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

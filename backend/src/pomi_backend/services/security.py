@@ -12,6 +12,15 @@ from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatc
 from pomi_backend.config import Settings
 
 
+def validate_password_strength(password: str) -> None:
+    if len(password) < 8 or len(password) > 128:
+        raise ValueError("password must contain 8 to 128 characters")
+    if not any(character.isalpha() for character in password) or not any(
+        character.isdigit() for character in password
+    ):
+        raise ValueError("password must contain at least one letter and one number")
+
+
 class PasswordManager:
     def __init__(self, settings: Settings) -> None:
         self._hasher = PasswordHasher(
