@@ -308,52 +308,58 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     showFrame: false,
     padding: const EdgeInsets.all(16),
     children: [
-      TextFormField(
-        controller: _nickname,
-        textAlign: TextAlign.center,
-        decoration: const InputDecoration(
-          labelText: '昵称',
-          helperText: ' ',
-          helperStyle: TextStyle(fontSize: 12, height: 1),
-          errorStyle: TextStyle(fontSize: 12, height: 1),
-          floatingLabelAlignment: FloatingLabelAlignment.start,
+      _validationSlot(
+        TextFormField(
+          controller: _nickname,
+          textAlign: TextAlign.center,
+          decoration: const InputDecoration(
+            labelText: '昵称',
+            helperText: '\u00A0',
+            helperStyle: TextStyle(fontSize: 12, height: 1),
+            errorStyle: TextStyle(fontSize: 12, height: 1),
+            floatingLabelAlignment: FloatingLabelAlignment.start,
+          ),
+          validator:
+              (value) => value == null || value.trim().isEmpty ? '请输入昵称' : null,
         ),
-        validator:
-            (value) => value == null || value.trim().isEmpty ? '请输入昵称' : null,
       ),
       Row(
         children: [
           Expanded(
-            child: TextFormField(
-              controller: _birthYear,
-              readOnly: true,
-              onTap: () => _chooseYear(_birthYear, fallbackYear: 1997),
-              textAlign: TextAlign.left,
-              decoration: const InputDecoration(
-                labelText: '出生年份',
-                helperText: ' ',
-                helperStyle: TextStyle(fontSize: 12, height: 1),
-                errorStyle: TextStyle(fontSize: 12, height: 1),
-                floatingLabelAlignment: FloatingLabelAlignment.start,
+            child: _validationSlot(
+              TextFormField(
+                controller: _birthYear,
+                readOnly: true,
+                onTap: () => _chooseYear(_birthYear, fallbackYear: 1997),
+                textAlign: TextAlign.left,
+                decoration: const InputDecoration(
+                  labelText: '出生年份',
+                  helperText: '\u00A0',
+                  helperStyle: TextStyle(fontSize: 12, height: 1),
+                  errorStyle: TextStyle(fontSize: 12, height: 1),
+                  floatingLabelAlignment: FloatingLabelAlignment.start,
+                ),
+                validator: _yearValidator,
               ),
-              validator: _yearValidator,
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: TextFormField(
-              controller: _diagnosisYear,
-              readOnly: true,
-              onTap: () => _chooseYear(_diagnosisYear, fallbackYear: 2023),
-              textAlign: TextAlign.left,
-              decoration: const InputDecoration(
-                labelText: '确诊年份',
-                helperText: ' ',
-                helperStyle: TextStyle(fontSize: 12, height: 1),
-                errorStyle: TextStyle(fontSize: 12, height: 1),
-                floatingLabelAlignment: FloatingLabelAlignment.start,
+            child: _validationSlot(
+              TextFormField(
+                controller: _diagnosisYear,
+                readOnly: true,
+                onTap: () => _chooseYear(_diagnosisYear, fallbackYear: 2023),
+                textAlign: TextAlign.left,
+                decoration: const InputDecoration(
+                  labelText: '确诊年份',
+                  helperText: '\u00A0',
+                  helperStyle: TextStyle(fontSize: 12, height: 1),
+                  errorStyle: TextStyle(fontSize: 12, height: 1),
+                  floatingLabelAlignment: FloatingLabelAlignment.start,
+                ),
+                validator: _yearValidator,
               ),
-              validator: _yearValidator,
             ),
           ),
         ],
@@ -361,49 +367,55 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       Row(
         children: [
           Expanded(
-            child: TextFormField(
-              controller: _height,
-              keyboardType: TextInputType.number,
-              textAlign: TextAlign.center,
-              decoration: const InputDecoration(
-                labelText: '身高',
-                suffixText: 'cm',
-                helperText: ' ',
-                helperStyle: TextStyle(fontSize: 12, height: 1),
-                errorStyle: TextStyle(fontSize: 12, height: 1),
-                floatingLabelAlignment: FloatingLabelAlignment.start,
+            child: _validationSlot(
+              TextFormField(
+                controller: _height,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                decoration: const InputDecoration(
+                  labelText: '身高',
+                  suffixText: 'cm',
+                  helperText: '\u00A0',
+                  helperStyle: TextStyle(fontSize: 12, height: 1),
+                  errorStyle: TextStyle(fontSize: 12, height: 1),
+                  floatingLabelAlignment: FloatingLabelAlignment.start,
+                ),
+                validator: (value) {
+                  final height = double.tryParse(value ?? '');
+                  return height == null || height < 100 || height > 230
+                      ? '请输入 100–230 cm'
+                      : null;
+                },
               ),
-              validator: (value) {
-                final height = double.tryParse(value ?? '');
-                return height == null || height < 100 || height > 230
-                    ? '请输入 100–230 cm'
-                    : null;
-              },
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: TextFormField(
-              controller: _weight,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
+            child: _validationSlot(
+              TextFormField(
+                controller: _weight,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                textAlign: TextAlign.center,
+                decoration: const InputDecoration(
+                  labelText: '体重',
+                  suffixText: 'kg',
+                  helperText: '\u00A0',
+                  helperStyle: TextStyle(fontSize: 12, height: 1),
+                  errorStyle: TextStyle(fontSize: 12, height: 1),
+                  floatingLabelAlignment: FloatingLabelAlignment.start,
+                ),
+                validator: _weightValidator,
               ),
-              textAlign: TextAlign.center,
-              decoration: const InputDecoration(
-                labelText: '体重',
-                suffixText: 'kg',
-                helperText: ' ',
-                helperStyle: TextStyle(fontSize: 12, height: 1),
-                errorStyle: TextStyle(fontSize: 12, height: 1),
-                floatingLabelAlignment: FloatingLabelAlignment.start,
-              ),
-              validator: _weightValidator,
             ),
           ),
         ],
       ),
     ],
   );
+
+  Widget _validationSlot(Widget child) => SizedBox(height: 76, child: child);
 
   String? _yearValidator(String? value) {
     final year = int.tryParse(value ?? '');
