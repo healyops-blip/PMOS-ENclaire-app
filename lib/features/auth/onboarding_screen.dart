@@ -215,7 +215,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   Widget _basicStep() => _StepCard(
     showFrame: false,
-    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+    padding: const EdgeInsets.all(16),
     children: [
       TextFormField(
         controller: _nickname,
