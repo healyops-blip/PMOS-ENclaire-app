@@ -1,7 +1,7 @@
 """add OCR task worker pipeline
 
-Revision ID: 20260827_0021
-Revises: 20260827_0020
+Revision ID: 20260827_0028
+Revises: 20260827_0027
 Create Date: 2026-08-27 20:54:17.468719
 """
 
@@ -12,8 +12,8 @@ from alembic import op
 
 import pomi_backend.db.types
 
-revision: str = "20260827_0021"
-down_revision: str | None = "20260827_0020"
+revision: str = "20260827_0028"
+down_revision: str | None = "20260827_0027"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

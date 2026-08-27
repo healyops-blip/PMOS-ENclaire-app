@@ -17,6 +17,7 @@ DEFAULT_ALLOWED_HOSTS = ("api.healy1012-ops.top", "localhost", "127.0.0.1")
 DEFAULT_STORAGE_ROOT = Path("./runtime/storage")
 DEFAULT_OCR_API_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 DEFAULT_OCR_MODEL = "qwen3-vl-plus"
+DEFAULT_BUSINESS_TIMEZONE = "Asia/Singapore"
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +39,7 @@ class Settings:
     ocr_model: str = DEFAULT_OCR_MODEL
     ocr_request_timeout_seconds: int = 90
     ocr_lease_seconds: int = 180
+    business_timezone: str = DEFAULT_BUSINESS_TIMEZONE
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -79,4 +81,5 @@ class Settings:
             ocr_model=os.getenv("POMI_OCR_MODEL", DEFAULT_OCR_MODEL),
             ocr_request_timeout_seconds=int(os.getenv("POMI_OCR_TIMEOUT_SECONDS", "90")),
             ocr_lease_seconds=int(os.getenv("POMI_OCR_LEASE_SECONDS", "180")),
+            business_timezone=os.getenv("POMI_BUSINESS_TIMEZONE", DEFAULT_BUSINESS_TIMEZONE),
         )
