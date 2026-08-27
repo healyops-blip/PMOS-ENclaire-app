@@ -10,11 +10,16 @@ from sqlalchemy import engine_from_config, pool
 
 from pomi_backend.db.base import Base
 from pomi_backend.db.models import (  # noqa: F401
+    Document,
+    DocumentRevision,
     Medication,
     MedicationDaily,
     MedicationEvent,
     MenstrualCycle,
+    PatientNote,
     PatientProfile,
+    ReportSnapshot,
+    ReportSource,
     UserAccount,
     UserSession,
     WeightRecord,

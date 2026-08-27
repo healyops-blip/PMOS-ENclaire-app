@@ -6,6 +6,7 @@ import argparse
 import getpass
 import os
 from collections.abc import Sequence
+from datetime import UTC, datetime
 
 from pomi_backend.admin.accounts import AccountNotFound, reset_password, seed_initial_accounts
 from pomi_backend.admin.health_seed import seed_health_data
@@ -31,6 +32,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers.add_parser(
         "seed-health", help="Idempotently create synthetic health records for seeded accounts"
+    )
+    subparsers.add_parser(
+        "purge-documents", help="Delete expired, unreferenced document files after retention"
     )
     reset_parser = subparsers.add_parser(
         "reset-password", help="Reset one account password and revoke all Sessions"
@@ -96,6 +100,17 @@ def main(argv: Sequence[str] | None = None) -> int:
                     f"returning_patient_id={result.returning_patient_id}; "
                     f"created_rows={result.created_rows}"
                 )
+                return 0
+
+            if args.command == "purge-documents":
+                from pomi_backend.services.documents import purge_deleted_documents
+
+                removed = purge_deleted_documents(
+                    session,
+                    settings.storage_root,
+                    now=datetime.now(UTC),
+                )
+                print(f"Document cleanup completed; removed_files={removed}")
                 return 0
 
             revoked_count = reset_password(

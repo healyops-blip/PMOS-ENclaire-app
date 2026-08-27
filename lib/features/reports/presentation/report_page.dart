@@ -11,21 +11,98 @@ import 'package:pmos_enclaire/core/widgets/pomi_surfaces.dart';
 import 'package:pmos_enclaire/features/certification/application/certification_providers.dart';
 import 'package:pmos_enclaire/features/certification/domain/certification_record.dart';
 import 'package:pmos_enclaire/features/certification/presentation/certification_page.dart';
+import 'package:pmos_enclaire/features/reports/data/patient_note_repository.dart';
 import 'package:printing/printing.dart';
 
 enum _PdfAction { save, share, print }
 
 class ReportGeneratorPage extends StatefulWidget {
-  const ReportGeneratorPage({super.key});
+  const ReportGeneratorPage({required this.repository, super.key});
+
+  final PatientNoteRepository repository;
 
   @override
   State<ReportGeneratorPage> createState() => _ReportGeneratorPageState();
 }
 
 class _ReportGeneratorPageState extends State<ReportGeneratorPage> {
-  final _noteController = TextEditingController(
-    text: '最近两个月经期仍不规律，体重略有下降。二甲双胍偶尔因胃部不适漏服，希望复诊时讨论剂量。',
-  );
+  final _noteController = TextEditingController();
+  PatientNote? _note;
+  bool _busy = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final note = await widget.repository.latest();
+      if (!mounted) return;
+      setState(() {
+        _note = note;
+        _noteController.text = note?.originalText ?? '';
+        _busy = false;
+      });
+    } on Exception catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _busy = false;
+        });
+      }
+    }
+  }
+
+  Future<PatientNote> _saveCurrent() async {
+    final current = _note;
+    if (current == null) return widget.repository.create(_noteController.text);
+    if (current.status == PatientNoteStatus.consumed) {
+      final copied = await widget.repository.copy(current.id);
+      return widget.repository.update(copied.id, _noteController.text);
+    }
+    return widget.repository.update(current.id, _noteController.text);
+  }
+
+  Future<void> _run(Future<PatientNote> Function() action) async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final note = await action();
+      if (mounted) {
+        setState(() {
+          _note = note;
+          _noteController.text = note.originalText;
+        });
+      }
+    } on Exception catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _confirm() => _run(() async {
+    final saved = await _saveCurrent();
+    return widget.repository.confirm(saved.id);
+  });
+
+  Future<void> _skip() => _run(() async {
+    var current = _note;
+    if (current == null || current.status == PatientNoteStatus.consumed) {
+      current = await widget.repository.create('');
+    }
+    return widget.repository.skip(current.id);
+  });
+
+  Future<void> _copy() => _run(() async {
+    final copied = await widget.repository.copy(_note!.id);
+    return copied;
+  });
 
   @override
   void dispose() {
@@ -40,6 +117,7 @@ class _ReportGeneratorPageState extends State<ReportGeneratorPage> {
       appBar: AppBar(title: const Text('生成复诊报告')),
       backgroundColor: PomiColors.surfaceMuted,
       body: ListView(
+        key: const Key('report-generator-scroll'),
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
         children: [
           const PomiSectionCard(
@@ -74,7 +152,9 @@ class _ReportGeneratorPageState extends State<ReportGeneratorPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 TextField(
+                  key: const Key('patient-note-field'),
                   controller: _noteController,
+                  onChanged: (_) => setState(() {}),
                   minLines: 5,
                   maxLines: 8,
                   decoration: const InputDecoration(
@@ -83,8 +163,51 @@ class _ReportGeneratorPageState extends State<ReportGeneratorPage> {
                 ),
                 const SizedBox(height: 9),
                 Text(
-                  '自述原文将按当前内容进入报告，不经过模型改写。',
+                  '患者自述，仅供参考，不构成诊断，不进入正式病历。原文不会经过模型改写。',
                   style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Chip(label: Text(_noteStatusLabel(_note?.status))),
+                    const Spacer(),
+                    if (_busy)
+                      const SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                  ],
+                ),
+                if (_error != null)
+                  Text(_error!, style: const TextStyle(color: Colors.red)),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    OutlinedButton(
+                      key: const Key('save-patient-note-draft'),
+                      onPressed: _busy ? null : () => _run(_saveCurrent),
+                      child: const Text('保存草稿'),
+                    ),
+                    FilledButton(
+                      key: const Key('confirm-patient-note'),
+                      onPressed: _busy || _noteController.text.trim().isEmpty
+                          ? null
+                          : _confirm,
+                      child: const Text('确认原文'),
+                    ),
+                    TextButton(
+                      key: const Key('skip-patient-note'),
+                      onPressed: _busy ? null : _skip,
+                      child: const Text('本次跳过'),
+                    ),
+                    if (_note?.status == PatientNoteStatus.confirmed ||
+                        _note?.status == PatientNoteStatus.consumed)
+                      TextButton(
+                        key: const Key('copy-patient-note'),
+                        onPressed: _busy ? null : _copy,
+                        child: const Text('复制为新草稿'),
+                      ),
+                  ],
                 ),
               ],
             ),
@@ -123,11 +246,16 @@ class _ReportGeneratorPageState extends State<ReportGeneratorPage> {
           const SizedBox(height: 18),
           FilledButton.icon(
             key: const Key('generate-report-button'),
-            onPressed: () => Navigator.of(context).pushReplacement(
-              MaterialPageRoute<void>(builder: (_) => const ReportPage()),
-            ),
+            onPressed:
+                !_busy &&
+                    (_note?.status == PatientNoteStatus.confirmed ||
+                        _note?.status == PatientNoteStatus.skipped)
+                ? () => Navigator.of(context).pushReplacement(
+                    MaterialPageRoute<void>(builder: (_) => const ReportPage()),
+                  )
+                : null,
             icon: const Icon(Icons.auto_awesome_rounded),
-            label: const Text('生成报告快照'),
+            label: const Text('继续查看报告演示'),
           ),
           const SizedBox(height: 10),
           const Text(
@@ -140,6 +268,14 @@ class _ReportGeneratorPageState extends State<ReportGeneratorPage> {
     );
   }
 }
+
+String _noteStatusLabel(PatientNoteStatus? status) => switch (status) {
+  null => '尚未保存',
+  PatientNoteStatus.draft => '草稿 · 待确认',
+  PatientNoteStatus.confirmed => '原文已确认',
+  PatientNoteStatus.skipped => '本次已明确跳过',
+  PatientNoteStatus.consumed => '已用于历史报告 · 只读',
+};
 
 class ReportPage extends StatefulWidget {
   const ReportPage({super.key});

@@ -38,7 +38,7 @@ class _MedicationPageState extends State<MedicationPage> {
   Future<void> _refresh() async {
     try {
       final records = await _repository.listMedications();
-      if (mounted && records.isNotEmpty) setState(() => _medications = records);
+      if (mounted) setState(() => _medications = records);
     } catch (error) {
       _showError(error);
     }

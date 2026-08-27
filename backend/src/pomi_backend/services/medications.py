@@ -7,7 +7,8 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from pomi_backend.api.business import BusinessError
@@ -211,6 +212,16 @@ class MedicationService:
             raise BusinessError(
                 "INVALID_EVENT_DATE", "The event cannot precede the medication version.", 422
             )
+        latest_event_date = self.session.scalar(
+            select(func.max(MedicationEvent.event_date)).where(
+                MedicationEvent.patient_id == medication.patient_id,
+                MedicationEvent.medication_id == medication.id,
+            )
+        )
+        if latest_event_date is not None and payload.event_date < latest_event_date:
+            raise BusinessError(
+                "INVALID_EVENT_DATE", "The event cannot precede the latest event.", 422
+            )
 
         if payload.event_type == "adjusted":
             return self._adjust(medication, payload)
@@ -409,7 +420,24 @@ class MedicationService:
             record.intake_status = payload.intake_status
             record.recorded_by_uid = self.account.uid
             record.recorded_at = utc_now()
-        self.session.commit()
+        try:
+            self.session.commit()
+        except IntegrityError:
+            self.session.rollback()
+            record = self.session.scalar(
+                select(MedicationDaily).where(
+                    MedicationDaily.patient_id == medication.patient_id,
+                    MedicationDaily.medication_id == medication.id,
+                    MedicationDaily.record_date == payload.record_date,
+                )
+            )
+            if record is None:
+                raise
+            if record.intake_status != payload.intake_status:
+                record.intake_status = payload.intake_status
+                record.recorded_by_uid = self.account.uid
+                record.recorded_at = utc_now()
+                self.session.commit()
         self.session.refresh(record)
         daily = daily_data(medication, payload.record_date, record, editable=True)
         return self._daily_mutation_result(daily)
