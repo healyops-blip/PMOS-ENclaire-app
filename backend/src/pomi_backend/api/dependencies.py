@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from pomi_backend.db.models import UserAccount
 from pomi_backend.services import AuthService
 from pomi_backend.services.auth import AuthError
+from pomi_backend.services.medications import MedicationService
 
 bearer_scheme = HTTPBearer(auto_error=False, scheme_name="SessionBearer")
 
@@ -52,3 +53,18 @@ def get_current_account(service: AuthServiceDependency, session_id: SessionId) -
 
 
 CurrentAccount = Annotated[UserAccount, Depends(get_current_account)]
+
+
+def get_medication_service(
+    request: Request,
+    session: DatabaseSession,
+    account: CurrentAccount,
+) -> MedicationService:
+    return MedicationService(
+        session,
+        account,
+        request.app.state.business_date_provider(),
+    )
+
+
+MedicationServiceDependency = Annotated[MedicationService, Depends(get_medication_service)]
