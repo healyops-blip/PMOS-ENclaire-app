@@ -1,6 +1,7 @@
 """ORM models."""
 
 from pomi_backend.db.models.auth import UserAccount, UserSession
+from pomi_backend.db.models.clinical_text import ImagingReport, OutpatientRecord
 from pomi_backend.db.models.documents import Document, DocumentRevision
 from pomi_backend.db.models.health import (
     Medication,
@@ -14,12 +15,14 @@ from pomi_backend.db.models.ocr import OCRFieldResult, OCRResult, OCRTask
 
 __all__ = [
     "Medication",
+    "ImagingReport",
     "MedicationDaily",
     "MedicationEvent",
     "MenstrualCycle",
     "OCRFieldResult",
     "OCRResult",
     "OCRTask",
+    "OutpatientRecord",
     "PatientProfile",
     "Document",
     "DocumentRevision",

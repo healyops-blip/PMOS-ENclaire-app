@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request, status
+from typing import Annotated
+
+from fastapi import APIRouter, Header, Request, status
 from pydantic import BaseModel, ConfigDict
 
 from pomi_backend.api.business import success
-from pomi_backend.api.dependencies import OCRTaskServiceDependency
+from pomi_backend.api.dependencies import (
+    ClinicalTextConfirmationServiceDependency,
+    OCRTaskServiceDependency,
+)
+from pomi_backend.schemas.clinical_text import ClinicalTextConfirmRequest
 from pomi_backend.services.ocr import task_data
 
 router = APIRouter(prefix="/api/ocr/tasks", tags=["ocr"])
+IdempotencyKey = Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=128)]
 
 
 class CreateOCRTaskRequest(BaseModel):
@@ -43,3 +50,15 @@ def get_ocr_result(task_id: str, request: Request, service: OCRTaskServiceDepend
 def retry_ocr_task(task_id: str, request: Request, service: OCRTaskServiceDependency) -> dict:
     task, created = service.retry(task_id)
     return success(request, {**task_data(task), "reused": not created})
+
+
+@router.post("/{task_id}/confirm")
+def confirm_ocr_clinical_text(
+    task_id: str,
+    payload: ClinicalTextConfirmRequest,
+    request: Request,
+    service: ClinicalTextConfirmationServiceDependency,
+    idempotency_key: IdempotencyKey,
+) -> dict:
+    del idempotency_key  # The immutable OCR result is the idempotency resource key.
+    return success(request, service.confirm(task_id, payload))

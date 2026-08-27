@@ -34,6 +34,9 @@ def _draft_schema(material_type: str) -> dict[str, Any]:
             "type": "object",
             "properties": {
                 "facility": {"type": ["string", "null"]},
+                "examination_name": {"type": ["string", "null"]},
+                "body_part": {"type": ["string", "null"]},
+                "examination_date": {"type": ["string", "null"]},
                 "report_date": {"type": ["string", "null"]},
                 "modality": {"type": ["string", "null"]},
                 "findings": {"type": ["string", "null"]},
@@ -47,12 +50,14 @@ def _draft_schema(material_type: str) -> dict[str, Any]:
             "properties": {
                 "facility": {"type": ["string", "null"]},
                 "department": {"type": ["string", "null"]},
+                "doctor_name": {"type": ["string", "null"]},
                 "visit_date": {"type": ["string", "null"]},
                 "chief_complaint": {"type": ["string", "null"]},
-                "diagnoses": {"type": "array", "items": {"type": "string"}},
-                "plan": {"type": ["string", "null"]},
+                "diagnosis_summary": {"type": ["string", "null"]},
+                "treatment_plan": {"type": ["string", "null"]},
+                "medical_advice": {"type": ["string", "null"]},
             },
-            "required": ["diagnoses"],
+            "required": ["visit_date", "diagnosis_summary", "medical_advice"],
             "additionalProperties": False,
         },
     }

@@ -123,4 +123,21 @@ class _SequenceRepository implements OcrRepository {
     retryCalls += 1;
     return _task(OcrTaskStatus.queued);
   }
+
+  @override
+  Future<List<int>> sourceFile(OcrTask task) async => const [];
+
+  @override
+  Future<ClinicalConfirmationResult> confirmClinical({
+    required OcrTask task,
+    required String resultId,
+    required Map<String, dynamic> confirmedData,
+    required List<Map<String, dynamic>> fieldConfirmations,
+  }) async => ClinicalConfirmationResult(
+    recordId: 'record-1',
+    materialType: 'imaging_text_report',
+    documentRevisionId: 'rev-1',
+    summary: confirmedData,
+    reused: false,
+  );
 }

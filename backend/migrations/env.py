@@ -12,6 +12,7 @@ from pomi_backend.db.base import Base
 from pomi_backend.db.models import (  # noqa: F401
     Document,
     DocumentRevision,
+    ImagingReport,
     Medication,
     MedicationDaily,
     MedicationEvent,
@@ -19,6 +20,7 @@ from pomi_backend.db.models import (  # noqa: F401
     OCRFieldResult,
     OCRResult,
     OCRTask,
+    OutpatientRecord,
     PatientProfile,
     UserAccount,
     UserSession,

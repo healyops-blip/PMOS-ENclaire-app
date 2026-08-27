@@ -136,7 +136,16 @@ class OCRTaskService:
         result = self.repository.result(task.id)
         if result is None:
             raise BusinessError("OCR_RESULT_NOT_READY", "OCR result is not ready.", 409)
-        return result_data(result, self.repository.fields(result.id))
+        return {
+            **result_data(result, self.repository.fields(result.id)),
+            "source": {
+                "document_id": task.document_id,
+                "document_revision_id": task.document_revision_id,
+                "file_url": (
+                    f"/api/documents/{task.document_id}/revisions/{task.document_revision_id}/file"
+                ),
+            },
+        }
 
     def retry(self, task_id: str) -> tuple[OCRTask, bool]:
         original = self.owned(task_id)
