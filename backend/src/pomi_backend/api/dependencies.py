@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from pomi_backend.db.models import UserAccount
 from pomi_backend.services import AuthService
 from pomi_backend.services.auth import AuthError
+from pomi_backend.services.documents import DocumentService
 from pomi_backend.services.patient import PatientProfileService
 
 bearer_scheme = HTTPBearer(auto_error=False, scheme_name="SessionBearer")
@@ -64,3 +65,12 @@ def get_patient_profile_service(
 PatientProfileServiceDependency = Annotated[
     PatientProfileService, Depends(get_patient_profile_service)
 ]
+
+
+def get_document_service(
+    request: Request, session: DatabaseSession, account: CurrentAccount
+) -> DocumentService:
+    return DocumentService(session, account, request.app.state.settings.storage_root)
+
+
+DocumentServiceDependency = Annotated[DocumentService, Depends(get_document_service)]

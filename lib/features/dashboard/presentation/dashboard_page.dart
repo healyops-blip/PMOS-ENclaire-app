@@ -10,17 +10,20 @@ import 'package:pmos_enclaire/features/profile/presentation/profile_page.dart';
 import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
 import 'package:pmos_enclaire/features/records/presentation/records_page.dart';
 import 'package:pmos_enclaire/features/records/presentation/upload_flow.dart';
+import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/reports/presentation/report_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({
     required this.account,
     required this.profileRepository,
+    required this.documentRepository,
     super.key,
   });
 
   final DemoAccount account;
   final PatientProfileRepository profileRepository;
+  final DocumentRepository documentRepository;
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -28,6 +31,7 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   int _selectedTab = 0;
+  int _recordsVersion = 0;
   late List<Medication> _medications = const [
     Medication(
       name: '二甲双胍',
@@ -95,7 +99,10 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
             ),
             const CyclePage(),
-            const RecordsPage(),
+            RecordsPage(
+              key: ValueKey(_recordsVersion),
+              repository: widget.documentRepository,
+            ),
             ProfilePage(
               account: widget.account,
               repository: widget.profileRepository,
@@ -105,7 +112,11 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       floatingActionButton: FloatingActionButton(
         key: const Key('upload-button'),
-        onPressed: () => showUploadFlow(context),
+        onPressed: () => showUploadFlow(
+          context,
+          repository: widget.documentRepository,
+          onUploaded: () => setState(() => _recordsVersion++),
+        ),
         backgroundColor: PomiColors.primary,
         foregroundColor: Colors.white,
         shape: const CircleBorder(),
