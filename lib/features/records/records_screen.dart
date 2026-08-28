@@ -141,14 +141,7 @@ class _VisitRecordsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-          child: Row(
-            children: [
-              Text('就诊记录', style: Theme.of(context).textTheme.headlineMedium),
-            ],
-          ),
-        ),
+        const SizedBox(height: 18),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 22, 20, 96),
