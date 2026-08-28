@@ -1199,6 +1199,7 @@ class _ReportViewerState extends ConsumerState<ReportViewer> {
       ),
     };
     return Scaffold(
+      backgroundColor: Colors.white,
       body: Column(
         children: [
           Expanded(
