@@ -326,22 +326,31 @@ def replace_logo(image, logo_path, logo_bbox=None, clean_mode="safe", clean_pad=
     offset_x = x1 + (target_w - new_w) // 2
     offset_y = y1 + (target_h - new_h) // 2
 
-    # 3) 在粘贴区域铺一层不透明的“背板”（纯白），防止半透明 logo 下透出旧文字；
+    # 3) 在粘贴区域铺一层不透明的“背板”，防止半透明 logo 下透出旧文字；
+    #    背板颜色优先取自目标区域邻域的采样均值，避免在非纯白页眉上出现白色块感。
     #    同时在目标框四周各扩 1px 再覆盖一层，减少边缘拼接痕迹。
     draw = ImageDraw.Draw(image)
-    # 直接使用纯白背板，避免采样色与背景不一致产生边框
-    avg = (255, 255, 255)
     back_x1 = max(0, offset_x - 2)
     back_y1 = max(0, offset_y - 2)
     back_x2 = min(image.size[0], offset_x + new_w + 2)
     back_y2 = min(image.size[1], offset_y + new_h + 2)
-    draw.rectangle([back_x1, back_y1, back_x2, back_y2], fill=avg)
+    # 采样邻域颜色作为背板色（若采样失败则回退纯白）
+    try:
+        band = image.crop((back_x1, max(0, back_y1 - 4), back_x2, back_y1))
+        if band.size[0] and band.size[1]:
+            back_color = tuple(int(v) for v in np.array(band).reshape(-1, 3).mean(axis=0))
+        else:
+            band2 = image.crop((back_x2, back_y1, min(image.size[0], back_x2 + 6), back_y2))
+            back_color = tuple(int(v) for v in np.array(band2).reshape(-1, 3).mean(axis=0)) if band2.size[0] and band2.size[1] else (255, 255, 255)
+    except Exception:
+        back_color = (255, 255, 255)
+    draw.rectangle([back_x1, back_y1, back_x2, back_y2], fill=back_color)
     # 额外一层轻微扩展覆盖，压暗线性插值造成的边缘锯齿
     pad2 = 1
     draw.rectangle([
         max(0, back_x1 - pad2), max(0, back_y1 - pad2),
         min(image.size[0], back_x2 + pad2), min(image.size[1], back_y2 + pad2)
-    ], fill=avg)
+    ], fill=back_color)
 
     # 4) 将 logo 转换为完全不透明（去alpha），避免半透明区透出底色；再直接粘贴
     if logo.mode in ("RGBA", "LA"):
