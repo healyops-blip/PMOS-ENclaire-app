@@ -64,6 +64,11 @@ class _AppShellState extends State<AppShell> {
       RecordsScreen(
         key: ValueKey('records-$_recordsTab'),
         initialTab: _recordsTab,
+        onBack:
+            () => setState(() {
+              _recordsTab = 0;
+              _index = 0;
+            }),
       ),
       ProfileScreen(onOpenRecords: _openRecords),
     ];

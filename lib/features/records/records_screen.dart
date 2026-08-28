@@ -20,9 +20,10 @@ final recordsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((
 });
 
 class RecordsScreen extends ConsumerWidget {
-  const RecordsScreen({this.initialTab = 0, super.key});
+  const RecordsScreen({this.initialTab = 0, this.onBack, super.key});
 
   final int initialTab;
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -49,7 +50,10 @@ class RecordsScreen extends ConsumerWidget {
           );
           if (initialTab == 1) {
             if (smokeMode) {
-              return ReportViewer(report: _smokeDashboardReport);
+              return ReportViewer(
+                report: _smokeDashboardReport,
+                onBack: onBack,
+              );
             }
             return _ReportsList(reports: reports);
           }
@@ -1179,9 +1183,10 @@ class _ReportsList extends ConsumerWidget {
 }
 
 class ReportViewer extends ConsumerStatefulWidget {
-  const ReportViewer({required this.report, super.key});
+  const ReportViewer({required this.report, this.onBack, super.key});
 
   final Map<String, dynamic> report;
+  final VoidCallback? onBack;
 
   @override
   ConsumerState<ReportViewer> createState() => _ReportViewerState();
@@ -1253,7 +1258,13 @@ class _ReportViewerState extends ConsumerState<ReportViewer> {
               alignment: Alignment.centerLeft,
               child: IconButton(
                 tooltip: '返回',
-                onPressed: () => Navigator.of(context).maybePop(),
+                onPressed: () {
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  } else {
+                    widget.onBack?.call();
+                  }
+                },
                 icon: const Icon(Icons.arrow_back_rounded),
               ),
             ),
