@@ -1349,6 +1349,60 @@ class _ReportSummaryLayer extends StatelessWidget {
         ),
       ),
       const SizedBox(height: 18),
+      Row(
+        children: [
+          const Text(
+            '关键指标',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(width: 8),
+          const Text(
+            '点击进入查看趋势详情',
+            style: TextStyle(color: pomiMuted, fontSize: 12),
+          ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      GridView.count(
+        crossAxisCount: 2,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+        childAspectRatio: 1.55,
+        children:
+            labs.take(4).map((item) {
+              final value = item['raw_value']?.toString() ?? '—';
+              final unit = item['raw_unit']?.toString() ?? '';
+              return PomiGlassCard(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item['item_name']?.toString() ?? '指标',
+                      style: const TextStyle(color: pomiMuted),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '$value $unit',
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      item['sample_date']?.toString() ??
+                          item['report_date']?.toString() ??
+                          '',
+                      style: const TextStyle(color: pomiMuted, fontSize: 11),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+      ),
+      const SizedBox(height: 18),
       _ReportSection(
         title: '当前用药',
         count: medicines.length,
