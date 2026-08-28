@@ -28,7 +28,7 @@ class RecordsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(recordsProvider);
     return Scaffold(
-      appBar: initialTab == 1 ? AppBar(title: const Text('就诊报告')) : null,
+      appBar: initialTab == 1 ? AppBar(title: const Text('指标看板')) : null,
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stack) => Center(child: Text(error.toString())),
@@ -980,7 +980,7 @@ class _ReportsList extends ConsumerWidget {
                         foregroundColor: pomiCoral,
                         child: Icon(Icons.summarize_outlined),
                       ),
-                      title: const Text('复诊准备报告'),
+                      title: const Text('指标看板'),
                       subtitle: Text(report['generated_at'].toString()),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () async {
@@ -1169,7 +1169,7 @@ class _ReportViewerState extends ConsumerState<ReportViewer> {
     };
     return Scaffold(
       appBar: AppBar(
-        title: const Text('就诊准备报告'),
+        title: const Text('指标看板'),
         actions: [
           IconButton(
             tooltip: '分享 PDF',
@@ -1250,7 +1250,7 @@ class _ReportSummaryLayer extends StatelessWidget {
     padding: const EdgeInsets.fromLTRB(18, 10, 18, 32),
     children: [
       Text(
-        'PCOS 就诊报告',
+        'PCOS 指标看板',
         style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
       ),
       const SizedBox(height: 4),
