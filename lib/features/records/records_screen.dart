@@ -33,6 +33,14 @@ class RecordsScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stack) => Center(child: Text(error.toString())),
         data: (data) {
+          final documentPage = Map<String, dynamic>.from(
+            data['documents'] as Map,
+          );
+          final documents = List<Map<String, dynamic>>.from(
+            (documentPage['items'] as List).map(
+              (item) => Map<String, dynamic>.from(item as Map),
+            ),
+          );
           final reportPage = Map<String, dynamic>.from(data['reports'] as Map);
           final reports = List<Map<String, dynamic>>.from(
             (reportPage['items'] as List).map(
@@ -40,7 +48,8 @@ class RecordsScreen extends ConsumerWidget {
             ),
           );
           if (initialTab == 1) return _ReportsList(reports: reports);
-          return const _VisitRecordsPage();
+          if (smokeMode) return const _VisitRecordsPage();
+          return _DocumentsList(documents: documents);
         },
       ),
     );
@@ -235,6 +244,93 @@ class _VisitRecordsPage extends StatelessWidget {
           ),
         ),
   );
+}
+
+class _DocumentsList extends StatelessWidget {
+  const _DocumentsList({required this.documents});
+
+  final List<Map<String, dynamic>> documents;
+
+  static const labels = {
+    'lab_report': '化验 / 检测',
+    'medical_order': '医嘱 / 处方',
+    'imaging_text_report': '影像文字报告',
+    'outpatient_record': '门诊病历',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    if (documents.isEmpty) {
+      return const _EmptyState(
+        icon: Icons.folder_open_outlined,
+        text: '还没有上传医疗资料',
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 96),
+      itemCount: documents.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final document = documents[index];
+        return PomiGlassCard(
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 6,
+            ),
+            leading: _DocumentIcon(type: document['document_type'].toString()),
+            title: Text(
+              document['original_file_name'].toString(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Text(
+              '${labels[document['document_type']] ?? document['document_type']} · '
+              '${_statusLabel(document['latest_ocr_status']?.toString())}',
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap:
+                () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder:
+                        (context) => DocumentDetailScreen(document: document),
+                  ),
+                ),
+          ),
+        );
+      },
+    );
+  }
+
+  static String _statusLabel(String? status) => switch (status) {
+    'confirmed' => '已确认',
+    'succeeded' || 'fallback' => '待确认',
+    'processing' => '识别中',
+    'pending' => '排队中',
+    'failed' => '识别失败',
+    _ => '未识别',
+  };
+}
+
+class _DocumentIcon extends StatelessWidget {
+  const _DocumentIcon({required this.type});
+
+  final String type;
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = switch (type) {
+      'lab_report' => Icons.science_outlined,
+      'medical_order' => Icons.medication_outlined,
+      'imaging_text_report' => Icons.image_search_outlined,
+      _ => Icons.description_outlined,
+    };
+    return CircleAvatar(
+      backgroundColor: pomiMint.withValues(alpha: .15),
+      foregroundColor: pomiTeal,
+      child: Icon(icon),
+    );
+  }
 }
 
 enum _VisitStatusTone { purple, blue, gray }

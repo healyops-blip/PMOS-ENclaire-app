@@ -900,14 +900,12 @@ class _WeightTrendCard extends StatelessWidget {
         ordered.length > 8 ? ordered.sublist(ordered.length - 8) : ordered;
     final values =
         visible.map((item) => (item['weight_kg'] as num).toDouble()).toList();
-    final chartValues =
-        values.isEmpty ? <double>[69.8, 70.4, 70, 70.7, 70.2] : values;
     final spots = List.generate(
-      chartValues.length,
-      (index) => FlSpot(index.toDouble(), chartValues[index]),
+      values.length,
+      (index) => FlSpot(index.toDouble(), values[index]),
     );
-    final minimum = chartValues.reduce(math.min);
-    final maximum = chartValues.reduce(math.max);
+    final minimum = values.isEmpty ? 0.0 : values.reduce(math.min);
+    final maximum = values.isEmpty ? 0.0 : values.reduce(math.max);
     final span = math.max(maximum - minimum, 1);
     final latest = ordered.isEmpty ? null : ordered.last['weight_kg'];
 
@@ -951,35 +949,43 @@ class _WeightTrendCard extends StatelessWidget {
           const SizedBox(height: 20),
           SizedBox(
             height: 128,
-            child: LineChart(
-              LineChartData(
-                minX: 0,
-                maxX: math.max(1, spots.length - 1).toDouble(),
-                minY: minimum - span * .35,
-                maxY: maximum + span * .35,
-                gridData: const FlGridData(show: false),
-                titlesData: const FlTitlesData(show: false),
-                borderData: FlBorderData(show: false),
-                lineTouchData: const LineTouchData(enabled: false),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: spots,
-                    isCurved: true,
-                    curveSmoothness: .35,
-                    gradient: const LinearGradient(
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                      colors: [Color(0xFFD868C8), Color(0xFF7A42D8)],
+            child:
+                values.isEmpty
+                    ? Center(
+                      child: Text(
+                        '暂无体重记录',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    )
+                    : LineChart(
+                      LineChartData(
+                        minX: 0,
+                        maxX: math.max(1, spots.length - 1).toDouble(),
+                        minY: minimum - span * .35,
+                        maxY: maximum + span * .35,
+                        gridData: const FlGridData(show: false),
+                        titlesData: const FlTitlesData(show: false),
+                        borderData: FlBorderData(show: false),
+                        lineTouchData: const LineTouchData(enabled: false),
+                        lineBarsData: [
+                          LineChartBarData(
+                            spots: spots,
+                            isCurved: true,
+                            curveSmoothness: .35,
+                            gradient: const LinearGradient(
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                              colors: [Color(0xFFD868C8), Color(0xFF7A42D8)],
+                            ),
+                            barWidth: 6,
+                            isStrokeCapRound: true,
+                            isStrokeJoinRound: true,
+                            dotData: const FlDotData(show: false),
+                            belowBarData: BarAreaData(show: false),
+                          ),
+                        ],
+                      ),
                     ),
-                    barWidth: 6,
-                    isStrokeCapRound: true,
-                    isStrokeJoinRound: true,
-                    dotData: const FlDotData(show: false),
-                    belowBarData: BarAreaData(show: false),
-                  ),
-                ],
-              ),
-            ),
           ),
           const SizedBox(height: 28),
           Row(

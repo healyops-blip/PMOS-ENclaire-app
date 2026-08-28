@@ -41,6 +41,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               diagnosisYear == null
                   ? null
                   : DateTime.now().year - diagnosisYear;
+          final profileSummary = [
+            if (smokeMode) '模拟患者',
+            if (age != null) '$age 岁',
+            if (diagnosedYears != null) '已确诊 PCOS $diagnosedYears 年',
+          ];
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 96),
             children: [
@@ -93,15 +98,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: 3),
-                    Text(
-                      [
-                        '模拟患者',
-                        if (age != null) '$age 岁',
-                        if (diagnosedYears != null)
-                          '已确诊 PCOS $diagnosedYears 年',
-                      ].join(' · '),
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
+                    if (profileSummary.isNotEmpty)
+                      Text(
+                        profileSummary.join(' · '),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                   ],
                 ),
               ),

@@ -223,8 +223,10 @@ class _DashboardBody extends ConsumerWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
-              _LatestVisitStatusCard(onTap: () => onOpenRecords()),
+              if (smokeMode) ...[
+                const SizedBox(height: 14),
+                _LatestVisitStatusCard(onTap: () => onOpenRecords()),
+              ],
             ],
           ),
         ),
@@ -413,61 +415,85 @@ class MedicationManagementScreen extends ConsumerWidget {
               items
                   .where((item) => item['current_status'] == 'active')
                   .toList();
+          final inactive =
+              items
+                  .where((item) => item['current_status'] != 'active')
+                  .toList();
+          final reminders =
+              active
+                  .map(
+                    (item) => _MedicationReminder(
+                      name: _shortMedicationName(item['drug_name']?.toString()),
+                      time:
+                          item['scheduled_time']
+                                      ?.toString()
+                                      .trim()
+                                      .isNotEmpty ==
+                                  true
+                              ? item['scheduled_time'].toString()
+                              : '未设置',
+                    ),
+                  )
+                  .toList();
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 36),
             children: [
-              const _MedicationPageHeading('用药提醒'),
+              _MedicationPageHeading(smokeMode ? '用药提醒' : '当前用药'),
               const SizedBox(height: 16),
-              _ReminderCard(
-                reminders: const [
-                  _MedicationReminder(name: '二甲双胍', time: '18:30'),
-                  _MedicationReminder(name: '维生素 D3', time: '08:00'),
-                ],
-              ),
-              const SizedBox(height: 28),
-              const _MedicationPageHeading('本月状态'),
-              const SizedBox(height: 16),
-              _MonthlyMedicationCard(
-                rows: [
-                  _MonthlyMedicationStatus(
-                    name:
-                        active.isNotEmpty
-                            ? _shortMedicationName(
-                              active[0]['drug_name']?.toString(),
-                            )
-                            : '盐酸二甲双胍...',
-                    taken: 22,
-                    missed: 2,
-                    unrecorded: 2,
-                  ),
-                  _MonthlyMedicationStatus(
-                    name:
-                        active.length > 1
-                            ? _shortMedicationName(
-                              active[1]['drug_name']?.toString(),
-                            )
-                            : '叶酸',
-                    taken: 24,
-                    missed: 1,
-                    unrecorded: 1,
-                  ),
-                  _MonthlyMedicationStatus(
-                    name:
-                        active.length > 2
-                            ? _shortMedicationName(
-                              active[2]['drug_name']?.toString(),
-                            )
-                            : '维生素 D3',
-                    taken: 25,
-                    missed: 1,
-                    unrecorded: 0,
-                  ),
-                ],
-              ),
+              if (smokeMode)
+                if (reminders.isEmpty)
+                  const _MedicationEmptyCard(message: '还没有当前用药')
+                else
+                  _ReminderCard(reminders: reminders)
+              else
+                _CurrentMedicationCard(items: active),
+              if (smokeMode) ...[
+                const SizedBox(height: 28),
+                const _MedicationPageHeading('本月状态'),
+                const SizedBox(height: 16),
+                _MonthlyMedicationCard(
+                  rows: [
+                    _MonthlyMedicationStatus(
+                      name:
+                          active.isNotEmpty
+                              ? _shortMedicationName(
+                                active[0]['drug_name']?.toString(),
+                              )
+                              : '盐酸二甲双胍...',
+                      taken: 22,
+                      missed: 2,
+                      unrecorded: 2,
+                    ),
+                    _MonthlyMedicationStatus(
+                      name:
+                          active.length > 1
+                              ? _shortMedicationName(
+                                active[1]['drug_name']?.toString(),
+                              )
+                              : '叶酸',
+                      taken: 24,
+                      missed: 1,
+                      unrecorded: 1,
+                    ),
+                    _MonthlyMedicationStatus(
+                      name:
+                          active.length > 2
+                              ? _shortMedicationName(
+                                active[2]['drug_name']?.toString(),
+                              )
+                              : '维生素 D3',
+                      taken: 25,
+                      missed: 1,
+                      unrecorded: 0,
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 28),
               const _MedicationPageHeading('停换药历史'),
               const SizedBox(height: 16),
               _MedicationHistoryCard(
+                items: smokeMode ? null : inactive,
                 onRejoin: () => _addMedication(context, ref),
               ),
             ],
@@ -716,6 +742,64 @@ class _MonthlyMedicationStatus {
   final int unrecorded;
 }
 
+class _CurrentMedicationCard extends StatelessWidget {
+  const _CurrentMedicationCard({required this.items});
+
+  final List<Map<String, dynamic>> items;
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return const _MedicationEmptyCard(message: '还没有当前用药');
+    }
+    return PomiGlassCard(
+      padding: const EdgeInsets.symmetric(horizontal: 18),
+      borderRadius: 22,
+      backgroundOpacity: .34,
+      child: Column(
+        children: [
+          for (var index = 0; index < items.length; index++) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Row(
+                children: [
+                  const Icon(Icons.medication_outlined, color: pomiPurple),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          items[index]['drug_name']?.toString() ?? '未命名用药',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          [
+                                items[index]['specification']?.toString(),
+                                items[index]['frequency']?.toString(),
+                              ]
+                              .where(
+                                (value) => value != null && value.isNotEmpty,
+                              )
+                              .join(' · '),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (index != items.length - 1)
+              const Divider(height: 1, color: pomiLine),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _MonthlyMedicationCard extends StatelessWidget {
   const _MonthlyMedicationCard({required this.rows});
 
@@ -831,33 +915,84 @@ class _StatusLegend extends StatelessWidget {
 }
 
 class _MedicationHistoryCard extends StatelessWidget {
-  const _MedicationHistoryCard({required this.onRejoin});
+  const _MedicationHistoryCard({required this.items, required this.onRejoin});
 
+  final List<Map<String, dynamic>>? items;
   final VoidCallback onRejoin;
 
   @override
   Widget build(BuildContext context) {
+    final records = items;
+    if (records != null && records.isEmpty) {
+      return const _MedicationEmptyCard(message: '暂无停换药历史');
+    }
     return PomiGlassCard(
       padding: const EdgeInsets.symmetric(horizontal: 18),
       borderRadius: 22,
       backgroundOpacity: .34,
       child: Column(
-        children: [
-          _MedicationHistoryRow(
-            name: '优思明（炔雌醇屈螺酮片）',
-            detail: '2025-11 ~ 2026-06 · 已停用 · 医生书面医嘱',
-            onRejoin: onRejoin,
-          ),
-          const Divider(height: 1, color: pomiLine),
-          _MedicationHistoryRow(
-            name: '布洛芬缓释胶囊',
-            detail: '2025-03 · 短期 · 非 PCOS 用药 · 已停用',
-            onRejoin: onRejoin,
-          ),
-        ],
+        children:
+            records == null
+                ? [
+                  _MedicationHistoryRow(
+                    name: '优思明（炔雌醇屈螺酮片）',
+                    detail: '2025-11 ~ 2026-06 · 已停用 · 医生书面医嘱',
+                    onRejoin: onRejoin,
+                  ),
+                  const Divider(height: 1, color: pomiLine),
+                  _MedicationHistoryRow(
+                    name: '布洛芬缓释胶囊',
+                    detail: '2025-03 · 短期 · 非 PCOS 用药 · 已停用',
+                    onRejoin: onRejoin,
+                  ),
+                ]
+                : [
+                  for (var index = 0; index < records.length; index++) ...[
+                    _MedicationHistoryRow(
+                      name: records[index]['drug_name']?.toString() ?? '未命名用药',
+                      detail: _medicationHistoryDetail(records[index]),
+                      onRejoin: onRejoin,
+                    ),
+                    if (index != records.length - 1)
+                      const Divider(height: 1, color: pomiLine),
+                  ],
+                ],
       ),
     );
   }
+
+  static String _medicationHistoryDetail(Map<String, dynamic> item) {
+    final start = item['start_date']?.toString();
+    final end = item['end_date']?.toString();
+    final dates = [
+      if (start != null && start.isNotEmpty) start,
+      if (end != null && end.isNotEmpty) end,
+    ].join(' ~ ');
+    final status = switch (item['current_status']?.toString()) {
+      'paused' => '已暂停',
+      'stopped' => '已停用',
+      _ => '历史用药',
+    };
+    return [if (dates.isNotEmpty) dates, status].join(' · ');
+  }
+}
+
+class _MedicationEmptyCard extends StatelessWidget {
+  const _MedicationEmptyCard({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => PomiGlassCard(
+    borderRadius: 22,
+    backgroundOpacity: .34,
+    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
+    child: Text(
+      message,
+      textAlign: TextAlign.center,
+      style: Theme.of(context).textTheme.bodyMedium,
+    ),
+  );
 }
 
 class _MedicationHistoryRow extends StatelessWidget {
