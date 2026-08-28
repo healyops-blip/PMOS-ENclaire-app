@@ -1194,7 +1194,7 @@ class _ReportViewerState extends ConsumerState<ReportViewer> {
               segments: const [
                 ButtonSegment(value: 0, label: Text('① 摘要')),
                 ButtonSegment(value: 1, label: Text('② 趋势')),
-                ButtonSegment(value: 2, label: Text('③ 来源')),
+                ButtonSegment(value: 2, label: Text('③ 原始数据')),
               ],
               selected: {_layer},
               onSelectionChanged:
@@ -1257,7 +1257,7 @@ class _ReportSummaryLayer extends StatelessWidget {
     padding: const EdgeInsets.fromLTRB(18, 10, 18, 32),
     children: [
       Text(
-        summary['patient_name']?.toString() ?? '就诊摘要',
+        'PCOS 就诊报告',
         style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
       ),
       const SizedBox(height: 4),
@@ -1333,6 +1333,19 @@ class _ReportSummaryLayer extends StatelessWidget {
             Text('用药记录：当前 ${medicines.length} 项'),
             Text('就诊记录：$sourceCount 次历史 + 1 次当前'),
           ],
+        ),
+      ),
+      const SizedBox(height: 18),
+      const Text(
+        '基本信息',
+        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+      ),
+      const SizedBox(height: 8),
+      PomiGlassCard(
+        padding: const EdgeInsets.all(15),
+        child: Text(
+          '已确诊 PCOS · 当前健康信息已汇总\n最近记录与就诊资料可在下方查看',
+          style: const TextStyle(height: 1.6),
         ),
       ),
       const SizedBox(height: 18),
