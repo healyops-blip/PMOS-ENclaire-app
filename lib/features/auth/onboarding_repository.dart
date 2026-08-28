@@ -40,7 +40,7 @@ class OnboardingBasicDraft {
     return OnboardingBasicDraft(
       nickname: jsonString(json, 'nickname'),
       birthYear: jsonInt(json, 'birth_year'),
-      diagnosisYear: jsonInt(json, 'diagnosis_year'),
+      diagnosisYear: jsonIntOrNull(json, 'diagnosis_year'),
       heightCm: jsonDoubleOrNull(json, 'height_cm'),
       weightKg: jsonDoubleOrNull(json, 'weight_kg'),
       updatedAt: jsonDateTimeOrNull(json, 'updated_at'),

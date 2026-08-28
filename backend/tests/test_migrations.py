@@ -82,7 +82,7 @@ def test_initial_migration_is_repeatable_and_safe(tmp_path: Path, monkeypatch: M
 
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-            "20260827_0031"
+            "20260828_0032"
         )
     command.downgrade(config, "20260826_0001")
     inspector = inspect(engine)
@@ -124,6 +124,6 @@ def test_laboratory_migration_upgrades_the_current_main_schema(
     } <= set(inspect(engine).get_table_names())
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-            "20260827_0031"
+            "20260828_0032"
         )
     engine.dispose()

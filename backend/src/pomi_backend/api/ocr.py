@@ -16,13 +16,20 @@ from pomi_backend.api.dependencies import (
     OCRTaskServiceDependency,
 )
 from pomi_backend.config import DEFAULT_OCR_MODEL
-from pomi_backend.repositories import DocumentRepository
+from pomi_backend.db.models import OCRFieldResult, OCRResult, OCRTask
+from pomi_backend.db.models.health import new_uuid
+from pomi_backend.repositories import DocumentRepository, OCRRepository
 from pomi_backend.schemas.clinical_text import ClinicalTextConfirmRequest
-from pomi_backend.schemas.ocr_recognize import OCRRecognizeData
+from pomi_backend.schemas.ocr_recognize import OCRRecognizeData, OCRResultConfirmRequest
 from pomi_backend.schemas.orders import MedicalOrderConfirmation
 from pomi_backend.services.document_storage import private_path
 from pomi_backend.services.documents import DocumentService
-from pomi_backend.services.ocr import task_data
+from pomi_backend.services.ocr import (
+    deduplication_key,
+    normalize_algorithm_payload,
+    sync_result_data,
+    task_data,
+)
 from pomi_backend.services.ocr_provider import (
     OCRProviderError,
     OCRProviderRequest,
@@ -33,6 +40,16 @@ from pomi_backend.services.orders import medical_order_data, medical_order_p0
 router = APIRouter(prefix="/api/ocr/tasks", tags=["ocr"])
 
 sync_router = APIRouter(prefix="/api/ocr", tags=["ocr"])
+
+
+@sync_router.post("/results/{result_id}/confirm")
+def confirm_sync_result(
+    result_id: str,
+    payload: OCRResultConfirmRequest,
+    request: Request,
+    service: OCRTaskServiceDependency,
+) -> dict:
+    return success(request, service.confirm_result(result_id, payload))
 
 
 @sync_router.post("/recognize")
@@ -62,17 +79,27 @@ def recognize(
     if not idempotency_key:
         raise BusinessError("IDEMPOTENCY_KEY_REQUIRED", "Idempotency-Key is required.", 422)
     settings = request.app.state.settings
-    document = DocumentService(session, account, settings.storage_root).upload(
+    document_service = DocumentService(session, account, settings.storage_root)
+    document = document_service.upload(
         file,
         document_type=material_type,
         idempotency_key=idempotency_key,
         processing_notice_version=consent_version,
     )
-    revision = DocumentRepository(
-        session, DocumentService(session, account, settings.storage_root).patient.patient_id
-    ).revision(document.id, document.current_revision_id)
+    patient_id = document_service.patient.patient_id
+    revision = DocumentRepository(session, patient_id).revision(
+        document.id, document.current_revision_id
+    )
     if revision is None:
         raise BusinessError("OCR_FILE_NOT_FOUND", "The uploaded file is unavailable.", 404)
+    repository = OCRRepository(session, patient_id)
+    scoped_key = deduplication_key(account.uid, idempotency_key)
+    existing = repository.by_deduplication_key(scoped_key)
+    if existing is not None:
+        existing_result = repository.result(existing.id)
+        if existing_result is None:
+            raise BusinessError("OCR_RESULT_NOT_READY", "OCR result is not ready.", 409)
+        return success(request, sync_result_data(existing, existing_result))
     provider = Qwen3VLOCRProvider(
         api_base_url=settings.ocr_api_base_url,
         api_key=settings.ocr_api_key,
@@ -82,7 +109,7 @@ def recognize(
     try:
         response = provider.recognize(
             OCRProviderRequest(
-                task_id=idempotency_key,
+                task_id=scoped_key,
                 material_type=material_type,
                 mime_type=revision.mime_type,
                 file_path=private_path(settings.storage_root, revision.storage_path),
@@ -98,40 +125,50 @@ def recognize(
             504 if error.category == "timeout" else 503,
             details={"retryable": error.retryable},
         ) from error
-    payload = _normalize_algorithm_payload(dict(response.payload), document.original_file_name)
-    data = OCRRecognizeData.model_validate(payload).model_dump(mode="json")
-    return success(request, data)
-
-
-def _normalize_algorithm_payload(payload: dict, original_file_name: str) -> dict:
-    """Accept the algorithm's documented flat result and the legacy worker envelope."""
-    if isinstance(payload.get("draft"), dict):
-        draft = payload["draft"]
-        payload = {
-            "hospital": draft.get("hospital") or draft.get("hospital_name"),
-            "department": draft.get("department") or draft.get("department_name"),
-            "visit_date": draft.get("visit_date") or draft.get("prescribed_at"),
-            "diagnosis_summary": draft.get("diagnosis_summary"),
-            "medical_advice": draft.get("medical_advice") or draft.get("treatment_plan"),
-            "examinations": draft.get("examinations")
-            or [
-                {
-                    "item_name": item.get("item_name"),
-                    "value": item.get("raw_value")
-                    if item.get("raw_value") is not None
-                    else item.get("numeric_value"),
-                    "unit": item.get("raw_unit") or item.get("normalized_unit"),
-                    "reference_range": item.get("reference_range_text"),
-                }
-                for item in draft.get("items", [])
-                if isinstance(item, dict)
-            ],
-            "medication_suggestions": draft.get("medication_suggestions")
-            or draft.get("orders", []),
-            "evidence": payload.get("fields"),
-        }
-    payload.setdefault("original_file_name", original_file_name)
-    return payload
+    parsed = OCRRecognizeData.model_validate(
+        normalize_algorithm_payload(dict(response.payload), document.original_file_name)
+    )
+    task = OCRTask(
+        id=new_uuid(),
+        patient_id=patient_id,
+        requested_by_uid=account.uid,
+        document_id=document.id,
+        document_revision_id=revision.id,
+        material_type=material_type,
+        status="pending_confirmation",
+        model_name=settings.ocr_model or DEFAULT_OCR_MODEL,
+        prompt_version=prompt_version,
+        schema_version="pomi-ocr-schema-v1",
+        deduplication_key=scoped_key,
+        result_source=response.source,
+    )
+    draft = parsed.model_dump(mode="json", exclude={"ocr_task_id", "ocr_result_id"})
+    result = OCRResult(
+        id=new_uuid(),
+        task_id=task.id,
+        raw_response=response.raw_response,
+        validated_draft=draft,
+    )
+    session.add(task)
+    session.flush()
+    session.add(result)
+    session.flush()
+    for field in parsed.evidence or []:
+        if isinstance(field, dict) and field.get("path"):
+            session.add(
+                OCRFieldResult(
+                    id=new_uuid(),
+                    result_id=result.id,
+                    field_path=str(field["path"]),
+                    source_text=field.get("source_text"),
+                    parsed_value=field.get("value"),
+                    confidence=float(field.get("confidence", 0.0)),
+                    uncertainty_reason=field.get("uncertainty_reason"),
+                    source_region=field.get("source_region"),
+                )
+            )
+    session.commit()
+    return success(request, sync_result_data(task, result))
 
 
 class CreateOCRTaskRequest(BaseModel):

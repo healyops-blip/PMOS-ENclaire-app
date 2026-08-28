@@ -60,8 +60,7 @@ def test_adjustment_creates_version_and_keeps_complete_event_chain(
     api_client: TestClient,
 ) -> None:
     headers = authenticated(api_client)
-    created = create_medication(api_client, headers)
-    original = created["medication"]
+    original = create_medication(api_client, headers)
 
     paused = response_data(
         api_client.put(
@@ -80,7 +79,7 @@ def test_adjustment_creates_version_and_keeps_complete_event_chain(
         json={
             "event_type": "resumed",
             "event_date": "2026-08-04",
-            "updated_at": paused["medication"]["updated_at"],
+            "updated_at": paused["updated_at"],
         },
     )
     assert out_of_order.status_code == 422
@@ -92,7 +91,7 @@ def test_adjustment_creates_version_and_keeps_complete_event_chain(
             json={
                 "event_type": "resumed",
                 "event_date": "2026-08-08",
-                "updated_at": paused["medication"]["updated_at"],
+                "updated_at": paused["updated_at"],
             },
         )
     )
@@ -104,12 +103,12 @@ def test_adjustment_creates_version_and_keeps_complete_event_chain(
                 "event_type": "adjusted",
                 "event_date": "2026-08-10",
                 "dosage_value": 850,
-                "updated_at": resumed["medication"]["updated_at"],
+                "updated_at": resumed["updated_at"],
                 "change_reason": "doctor changed dose",
             },
         )
     )
-    replacement = adjusted["medication"]
+    replacement = adjusted
 
     assert replacement["id"] != original["id"]
     assert replacement["replaces_medication_id"] == original["id"]
@@ -143,7 +142,7 @@ def test_adjustment_creates_version_and_keeps_complete_event_chain(
             },
         )
     )
-    assert stopped["medication"]["status"] == "stopped"
+    assert stopped["current_status"] == "stopped"
     events = response_data(
         api_client.get(f"/api/medications/{replacement['id']}/events", headers=headers)
     )
@@ -168,7 +167,7 @@ def test_daily_state_is_idempotent_and_unrecorded_is_not_stored(
     api_engine,
 ) -> None:
     headers = authenticated(api_client, "daily-user")
-    medication = create_medication(api_client, headers, key="medication-create-0002")["medication"]
+    medication = create_medication(api_client, headers, key="medication-create-0002")
     api_client.app.state.business_date_provider = lambda: date(2026, 8, 2)
     url = f"/api/medications/{medication['id']}/daily-status"
 
@@ -216,10 +215,9 @@ def test_daily_state_is_idempotent_and_unrecorded_is_not_stored(
     dynamic = response_data(
         api_client.get("/api/medication-daily?from=2026-08-01&to=2026-08-31", headers=headers)
     )
-    assert dynamic["to"] == "2026-08-02"
-    assert dynamic["taken_count"] == dynamic["missed_count"] == 0
-    assert dynamic["unrecorded_count"] == 2
-    assert all(item["id"] is None for item in dynamic["items"])
+    assert len(dynamic) == 2
+    assert {item["record_date"] for item in dynamic} == {"2026-08-01", "2026-08-02"}
+    assert all(item["id"] is None for item in dynamic)
 
 
 def test_month_stats_respect_pause_resume_adjustment_and_stop_boundaries(
@@ -227,7 +225,7 @@ def test_month_stats_respect_pause_resume_adjustment_and_stop_boundaries(
     api_engine,
 ) -> None:
     headers = authenticated(api_client, "stats-user")
-    original = create_medication(api_client, headers, key="medication-create-0003")["medication"]
+    original = create_medication(api_client, headers, key="medication-create-0003")
 
     api_client.app.state.business_date_provider = lambda: date(2026, 8, 2)
     response_data(
@@ -247,7 +245,7 @@ def test_month_stats_respect_pause_resume_adjustment_and_stop_boundaries(
                 "updated_at": original["updated_at"],
             },
         )
-    )["medication"]
+    )
     resumed = response_data(
         api_client.put(
             f"/api/medications/{original['id']}",
@@ -258,7 +256,7 @@ def test_month_stats_respect_pause_resume_adjustment_and_stop_boundaries(
                 "updated_at": paused["updated_at"],
             },
         )
-    )["medication"]
+    )
     replacement = response_data(
         api_client.put(
             f"/api/medications/{original['id']}",
@@ -270,7 +268,7 @@ def test_month_stats_respect_pause_resume_adjustment_and_stop_boundaries(
                 "updated_at": resumed["updated_at"],
             },
         )
-    )["medication"]
+    )
     response_data(
         api_client.put(
             f"/api/medications/{replacement['id']}",
@@ -288,11 +286,11 @@ def test_month_stats_respect_pause_resume_adjustment_and_stop_boundaries(
     stats = response_data(
         api_client.get("/api/medication-daily?from=2026-08-01&to=2026-08-31", headers=headers)
     )
-    assert stats["taken_count"] == 1
-    assert stats["missed_count"] == 0
-    assert stats["unrecorded_count"] == 7
-    assert len(stats["items"]) == 8
-    assert {item["record_date"] for item in stats["items"]} == {
+    assert len(stats) == 8
+    assert sum(item["intake_status"] == "taken" for item in stats) == 1
+    assert sum(item["intake_status"] == "missed" for item in stats) == 0
+    assert sum(item["intake_status"] == "unrecorded" for item in stats) == 7
+    assert {item["record_date"] for item in stats} == {
         "2026-08-01",
         "2026-08-02",
         "2026-08-03",
@@ -312,7 +310,7 @@ def test_month_stats_respect_pause_resume_adjustment_and_stop_boundaries(
 
 def test_cross_account_medication_is_hidden(api_client: TestClient) -> None:
     first = authenticated(api_client, "private-owner")
-    medication = create_medication(api_client, first, key="medication-create-0004")["medication"]
+    medication = create_medication(api_client, first, key="medication-create-0004")
     second = authenticated(api_client, "other-owner")
     response = api_client.get(f"/api/medications/{medication['id']}/events", headers=second)
     assert response.status_code == 404

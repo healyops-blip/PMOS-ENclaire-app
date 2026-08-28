@@ -40,11 +40,16 @@ def test_new_patient_gets_stable_empty_sections_and_requires_authentication(
     api_client.app.state.business_date_provider = lambda: date(2026, 8, 27)
     dashboard = data(api_client.get("/api/dashboard", headers=auth(api_client, "dash-empty")))
 
-    assert dashboard["business_date"] == "2026-08-27"
+    assert dashboard["server_date"] == "2026-08-27"
     assert dashboard["follow_up"]["status"] == "empty"
     assert dashboard["today_medications"]["data"] == []
     assert dashboard["monthly_medication_summary"]["status"] == "empty"
-    assert dashboard["latest_report"] == {"status": "empty", "data": None, "error": None}
+    assert dashboard["latest_report"] == {
+        "status": "empty",
+        "data": None,
+        "error_code": None,
+        "error": None,
+    }
 
 
 def test_follow_up_states_never_return_negative_countdowns(api_client: TestClient) -> None:
@@ -134,11 +139,10 @@ def test_monthly_three_state_respects_pause_resume_and_stop_boundaries(
     dashboard = data(api_client.get("/api/dashboard", headers=headers))
     assert dashboard["today_medications"]["status"] == "empty"
     assert dashboard["monthly_medication_summary"]["data"] == {
-        "from": "2026-08-01",
-        "to": "2026-08-27",
-        "taken": 1,
-        "missed": 1,
-        "unrecorded": 12,
+        "month": "2026-08",
+        "taken_count": 1,
+        "missed_count": 1,
+        "unrecorded_count": 12,
     }
 
 
