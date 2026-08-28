@@ -47,6 +47,7 @@ void main() {
   test(
     'medication repository uses the direct item contract and idempotency header',
     () async {
+      const testRequestKey = 'repeatable-test-request';
       late ApiCall createCall;
       final api = FakeApiClient(
         handler: (call) {
@@ -62,12 +63,12 @@ void main() {
           dosageValue: 500,
           dosageUnit: 'mg',
         ),
-        idempotencyKey: 'medication-001',
+        idempotencyKey: testRequestKey,
       );
 
       expect(medication.currentStatus, MedicationStatus.active);
       expect(createCall.path, '/api/medications');
-      expect(createCall.headers, {'Idempotency-Key': 'medication-001'});
+      expect(createCall.headers, {'Idempotency-Key': testRequestKey});
       expect((createCall.data as Map)['drug_name'], '二甲双胍');
     },
   );
