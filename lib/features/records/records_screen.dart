@@ -1565,18 +1565,24 @@ class _BmiTrendChart extends StatelessWidget {
   final List<Map<String, dynamic>> weights;
   @override
   Widget build(BuildContext context) {
+    final points = weights.take(8).toList();
     final values =
-        weights.map((e) => (e['weight_kg'] as num?)?.toDouble() ?? 0).toList();
+        points.map((e) => (e['weight_kg'] as num?)?.toDouble() ?? 0).toList();
+    final labels =
+        points
+            .map((e) => e['record_date']?.toString().substring(0, 10) ?? '')
+            .toList();
     return CustomPaint(
-      painter: _BmiPainter(values),
+      painter: _BmiPainter(values, labels),
       child: const SizedBox.expand(),
     );
   }
 }
 
 class _BmiPainter extends CustomPainter {
-  _BmiPainter(this.values);
+  _BmiPainter(this.values, this.labels);
   final List<double> values;
+  final List<String> labels;
   @override
   void paint(Canvas canvas, Size size) {
     if (values.length < 2) return;
@@ -1615,7 +1621,7 @@ class _BmiPainter extends CustomPainter {
       final x = chart.left + chart.width * i / (values.length - 1);
       _drawText(
         canvas,
-        '26–${(8 + i * 4).toString().padLeft(2, '0')}',
+        labels[i],
         Offset(x - 14, chart.bottom + 8),
         const TextStyle(color: pomiMuted, fontSize: 10),
       );
