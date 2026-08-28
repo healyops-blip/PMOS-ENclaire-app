@@ -607,9 +607,7 @@ class ReportSnapshotService:
                 (next_start - start).days if next_start is not None else None
             )
             point["cycle_end_date"] = (
-                (next_start - timedelta(days=1)).isoformat()
-                if next_start is not None
-                else None
+                (next_start - timedelta(days=1)).isoformat() if next_start is not None else None
             )
         daily = [
             dated_point(item, "record_date", "record_date")
