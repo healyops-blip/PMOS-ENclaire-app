@@ -771,20 +771,27 @@ class _CurrentMedicationCard extends StatelessWidget {
                       children: [
                         Text(
                           items[index]['drug_name']?.toString() ?? '未命名用药',
-                          style: Theme.of(context).textTheme.titleMedium,
+                          style: Theme.of(
+                            context,
+                          ).textTheme.titleMedium?.copyWith(fontSize: 15),
                         ),
                         const SizedBox(height: 3),
-                        Text(
-                          [
-                                items[index]['specification']?.toString(),
-                                items[index]['frequency']?.toString(),
-                              ]
-                              .where(
-                                (value) => value != null && value.isNotEmpty,
-                              )
-                              .join(' · '),
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
+                        if ((items[index]['dosage_text']?.toString() ?? '')
+                            .isNotEmpty)
+                          Text(
+                            items[index]['dosage_text'].toString(),
+                            style: Theme.of(
+                              context,
+                            ).textTheme.bodySmall?.copyWith(fontSize: 12),
+                          ),
+                        if ((items[index]['frequency']?.toString() ?? '')
+                            .isNotEmpty)
+                          Text(
+                            items[index]['frequency'].toString(),
+                            style: Theme.of(
+                              context,
+                            ).textTheme.bodySmall?.copyWith(fontSize: 12),
+                          ),
                       ],
                     ),
                   ),
