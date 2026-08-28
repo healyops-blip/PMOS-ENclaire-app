@@ -136,12 +136,16 @@ void main() {
       Widget app(MedicalDocument document) => ProviderScope(
         overrides: [certificationRepositoryProvider.overrideWithValue(local)],
         child: MaterialApp(
-          home: OcrTaskPage(repository: repository, document: document),
+          home: OcrTaskPage(
+            repository: repository,
+            document: document,
+            documentRepository: _StaticDocumentRepository(document),
+          ),
         ),
       );
 
       await tester.pumpWidget(app(_document));
-      await tester.pump();
+      await tester.pumpAndSettle();
       expect(find.byKey(const Key('certification-entry-card')), findsOneWidget);
 
       await tester.pumpWidget(
@@ -157,7 +161,7 @@ void main() {
           ),
         ),
       );
-      await tester.pump();
+      await tester.pumpAndSettle();
       expect(find.byKey(const Key('certification-entry-card')), findsNothing);
     },
   );
@@ -254,4 +258,16 @@ class _SequenceRepository implements OcrRepository {
     String? reportDate,
     String? visitDate,
   }) => throw UnimplementedError();
+}
+
+class _StaticDocumentRepository implements DocumentRepository {
+  _StaticDocumentRepository(this.document);
+
+  final MedicalDocument document;
+
+  @override
+  Future<MedicalDocument> get(String id) async => document;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

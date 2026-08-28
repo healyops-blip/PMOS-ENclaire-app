@@ -54,6 +54,9 @@ unimplemented. The
 certification interaction is explicitly a local UI demo: it does not represent
 a hospital, doctor, signature, credential, or blockchain transaction.
 
+The certification interaction is explicitly a local UI demo: it does not
+represent a hospital, doctor, signature, credential, or blockchain transaction.
+
 ## Quality checks
 
 Run the same core checks used by GitHub Actions:

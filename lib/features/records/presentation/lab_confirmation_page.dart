@@ -11,14 +11,12 @@ class LabConfirmationPage extends StatefulWidget {
     required this.repository,
     required this.task,
     this.documentRepository,
-    this.currentRevisionAvailable = false,
     super.key,
   });
 
   final OcrRepository repository;
   final OcrTask task;
   final DocumentRepository? documentRepository;
-  final bool currentRevisionAvailable;
 
   @override
   State<LabConfirmationPage> createState() => _LabConfirmationPageState();
@@ -421,13 +419,14 @@ class _LabConfirmationPageState extends State<LabConfirmationPage> {
               trailing: Text('${item.value} ${item.unit}'),
             ),
           const SizedBox(height: 12),
-          CertificationEntryCard(
-            documentId: widget.task.documentId,
-            revisionId: widget.task.documentRevisionId,
-            materialLabel: '化验／检测报告',
-            ocrConfirmed: true,
-            currentRevisionAvailable: widget.currentRevisionAvailable,
-          ),
+          if (widget.documentRepository != null)
+            CertificationEntryCard(
+              documentId: widget.task.documentId,
+              revisionId: widget.task.documentRevisionId,
+              materialLabel: '化验／检测报告',
+              ocrConfirmed: _confirmed != null,
+              documentRepository: widget.documentRepository!,
+            ),
         ],
       );
 }

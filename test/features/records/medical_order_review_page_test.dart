@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
+import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:pmos_enclaire/features/records/data/order_reconciliation_repository.dart';
 import 'package:pmos_enclaire/features/records/presentation/ocr_task_page.dart';
 
@@ -17,7 +17,7 @@ void main() {
             home: OcrPendingConfirmationPage(
               repository: gateway,
               task: _task,
-              document: _document,
+              documentRepository: _CurrentDocumentRepository(),
             ),
           ),
         ),
@@ -112,6 +112,19 @@ void main() {
   });
 }
 
+class _CurrentDocumentRepository extends DemoDocumentRepository {
+  @override
+  Future<MedicalDocument> get(String id) async => MedicalDocument(
+    id: id,
+    documentType: 'medical_order',
+    originalFileName: 'order.png',
+    mimeType: 'image/png',
+    fileSizeBytes: 1,
+    currentRevisionId: 'rev-order',
+    uploadedAt: DateTime.utc(2026, 8, 27),
+  );
+}
+
 const _task = OcrTask(
   id: 'task-order',
   documentId: 'doc-order',
@@ -120,16 +133,6 @@ const _task = OcrTask(
   status: OcrTaskStatus.pendingConfirmation,
   attemptNumber: 1,
   providerAttempts: 1,
-);
-
-final _document = MedicalDocument(
-  id: 'doc-order',
-  documentType: 'medical_order',
-  originalFileName: 'order.png',
-  mimeType: 'image/png',
-  fileSizeBytes: 100,
-  currentRevisionId: 'rev-order',
-  uploadedAt: DateTime(2026),
 );
 
 class _Gateway implements OcrRepository, MedicalOrderGateway {

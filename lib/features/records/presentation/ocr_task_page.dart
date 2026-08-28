@@ -133,9 +133,6 @@ class _OcrTaskPageState extends State<OcrTaskPage> with WidgetsBindingObserver {
                 repository: widget.repository,
                 task: _task!,
                 documentRepository: widget.documentRepository,
-                currentRevisionAvailable:
-                    widget.document.currentRevisionId ==
-                    _task!.documentRevisionId,
               )
             : OcrPendingConfirmationPage(
                 repository: widget.repository,
@@ -197,13 +194,15 @@ class _OcrTaskPageState extends State<OcrTaskPage> with WidgetsBindingObserver {
                   onPressed: _openConfirmation,
                   child: Text('进入${_materialLabel(task!.materialType)}确认'),
                 ),
-              if (task?.status == OcrTaskStatus.confirmed) ...[
+              if (task?.status == OcrTaskStatus.confirmed &&
+                  widget.documentRepository != null) ...[
                 const SizedBox(height: 18),
                 CertificationEntryCard(
                   documentId: task!.documentId,
                   revisionId: task.documentRevisionId,
                   materialLabel: _materialLabel(task.materialType),
-                  ocrConfirmed: true,
+                  ocrConfirmed: task.status == OcrTaskStatus.confirmed,
+                  documentRepository: widget.documentRepository!,
                   currentRevisionAvailable:
                       widget.document.currentRevisionId ==
                       task.documentRevisionId,
@@ -237,8 +236,7 @@ class OcrPendingConfirmationPage extends StatelessWidget {
       return ClinicalTextConfirmationPage(
         repository: repository,
         task: task,
-        currentRevisionAvailable:
-            document?.currentRevisionId == task.documentRevisionId,
+        documentRepository: documentRepository,
       );
     }
     return FutureBuilder<OcrTaskResult>(
