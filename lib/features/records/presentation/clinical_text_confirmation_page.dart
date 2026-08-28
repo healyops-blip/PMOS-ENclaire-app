@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:pmos_enclaire/features/certification/presentation/certification_page.dart';
+import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:printing/printing.dart';
 
@@ -9,11 +10,13 @@ class ClinicalTextConfirmationPage extends StatefulWidget {
   const ClinicalTextConfirmationPage({
     required this.repository,
     required this.task,
+    this.documentRepository,
     super.key,
   });
 
   final OcrRepository repository;
   final OcrTask task;
+  final DocumentRepository? documentRepository;
 
   @override
   State<ClinicalTextConfirmationPage> createState() =>
@@ -261,12 +264,14 @@ class _ClinicalTextConfirmationPageState
                       ),
                     ),
                     const SizedBox(height: 12),
-                    CertificationEntryCard(
-                      documentId: widget.task.documentId,
-                      revisionId: widget.task.documentRevisionId,
-                      materialLabel: _imaging ? '影像文字报告' : '门诊病历／就诊记录',
-                      ocrConfirmed: true,
-                    ),
+                    if (widget.documentRepository != null)
+                      CertificationEntryCard(
+                        documentId: widget.task.documentId,
+                        revisionId: widget.task.documentRevisionId,
+                        materialLabel: _imaging ? '影像文字报告' : '门诊病历／就诊记录',
+                        ocrConfirmed: _confirmed != null,
+                        documentRepository: widget.documentRepository!,
+                      ),
                   ],
                 ),
             ],

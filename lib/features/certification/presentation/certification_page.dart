@@ -8,6 +8,7 @@ import 'package:pmos_enclaire/features/certification/application/certification_f
 import 'package:pmos_enclaire/features/certification/application/certification_providers.dart';
 import 'package:pmos_enclaire/features/certification/domain/certification_copy.dart';
 import 'package:pmos_enclaire/features/certification/domain/certification_record.dart';
+import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 
 class CertificationPage extends ConsumerStatefulWidget {
   const CertificationPage({
@@ -156,7 +157,7 @@ class CertificationEntryCard extends ConsumerStatefulWidget {
     required this.revisionId,
     required this.materialLabel,
     required this.ocrConfirmed,
-    this.currentRevisionAvailable = true,
+    required this.documentRepository,
     this.demoPlan = const CertificationDemoPlan(),
     this.transitionDuration = const Duration(milliseconds: 1400),
     super.key,
@@ -166,13 +167,12 @@ class CertificationEntryCard extends ConsumerStatefulWidget {
   final String revisionId;
   final String materialLabel;
   final bool ocrConfirmed;
-  final bool currentRevisionAvailable;
+  final DocumentRepository documentRepository;
   final CertificationDemoPlan demoPlan;
   final Duration transitionDuration;
 
   bool get eligible =>
       ocrConfirmed &&
-      currentRevisionAvailable &&
       documentId.trim().isNotEmpty &&
       revisionId.trim().isNotEmpty;
 
@@ -184,6 +184,8 @@ class CertificationEntryCard extends ConsumerStatefulWidget {
 class _CertificationEntryCardState
     extends ConsumerState<CertificationEntryCard> {
   CertificationRecord? _record;
+  bool _currentRevisionAvailable = false;
+  int _loadGeneration = 0;
 
   @override
   void initState() {
@@ -194,22 +196,74 @@ class _CertificationEntryCardState
   @override
   void didUpdateWidget(CertificationEntryCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.eligible &&
-        (!oldWidget.eligible ||
-            oldWidget.documentId != widget.documentId ||
-            oldWidget.revisionId != widget.revisionId)) {
+    final inputChanged =
+        oldWidget.eligible != widget.eligible ||
+        oldWidget.documentId != widget.documentId ||
+        oldWidget.revisionId != widget.revisionId ||
+        oldWidget.documentRepository != widget.documentRepository;
+    if (!inputChanged) return;
+    _loadGeneration++;
+    _record = null;
+    _currentRevisionAvailable = false;
+    if (widget.eligible) {
       _load();
     }
   }
 
-  Future<void> _load() async {
-    final record = await ref
-        .read(certificationRepositoryProvider)
-        .read(widget.documentId, widget.revisionId);
-    if (mounted) setState(() => _record = record);
+  Future<bool> _load() async {
+    final generation = ++_loadGeneration;
+    final documentId = widget.documentId;
+    final revisionId = widget.revisionId;
+    if (!widget.eligible) return false;
+    try {
+      final document = await widget.documentRepository.get(documentId);
+      if (!_isCurrentRequest(generation, documentId, revisionId)) return false;
+      if (document.currentRevisionId != revisionId) {
+        setState(() {
+          _record = null;
+          _currentRevisionAvailable = false;
+        });
+        return false;
+      }
+      final record = await ref
+          .read(certificationRepositoryProvider)
+          .read(documentId, revisionId);
+      if (!_isCurrentRequest(generation, documentId, revisionId)) return false;
+      setState(() {
+        _record = record;
+        _currentRevisionAvailable = true;
+      });
+      return true;
+    } on Object {
+      if (_isCurrentRequest(generation, documentId, revisionId)) {
+        setState(() {
+          _record = null;
+          _currentRevisionAvailable = false;
+        });
+      }
+      return false;
+    }
+  }
+
+  bool _isCurrentRequest(
+    int generation,
+    String documentId,
+    String revisionId,
+  ) =>
+      mounted &&
+      generation == _loadGeneration &&
+      widget.eligible &&
+      widget.documentId == documentId &&
+      widget.revisionId == revisionId;
+
+  @override
+  void dispose() {
+    _loadGeneration++;
+    super.dispose();
   }
 
   Future<void> _open() async {
+    if (!await _load() || !mounted) return;
     await Navigator.of(context).push<CertificationRecord>(
       MaterialPageRoute(
         builder: (_) => CertificationPage(
@@ -226,7 +280,9 @@ class _CertificationEntryCardState
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.eligible) return const SizedBox.shrink();
+    if (!widget.eligible || !_currentRevisionAvailable) {
+      return const SizedBox.shrink();
+    }
     final status = _record?.status ?? CertificationStatus.notStarted;
     final succeeded = status == CertificationStatus.succeeded;
     return PomiSectionCard(

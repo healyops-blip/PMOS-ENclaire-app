@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:pmos_enclaire/features/records/data/order_reconciliation_repository.dart';
 import 'package:pmos_enclaire/features/records/presentation/ocr_task_page.dart';
@@ -13,7 +14,11 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp(
-            home: OcrPendingConfirmationPage(repository: gateway, task: _task),
+            home: OcrPendingConfirmationPage(
+              repository: gateway,
+              task: _task,
+              documentRepository: _CurrentDocumentRepository(),
+            ),
           ),
         ),
       );
@@ -105,6 +110,19 @@ void main() {
     expect(find.text('开具日期不能晚于服务器业务日期'), findsOneWidget);
     expect(find.text('盐酸二甲双胍'), findsOneWidget);
   });
+}
+
+class _CurrentDocumentRepository extends DemoDocumentRepository {
+  @override
+  Future<MedicalDocument> get(String id) async => MedicalDocument(
+    id: id,
+    documentType: 'medical_order',
+    originalFileName: 'order.png',
+    mimeType: 'image/png',
+    fileSizeBytes: 1,
+    currentRevisionId: 'rev-order',
+    uploadedAt: DateTime.utc(2026, 8, 27),
+  );
 }
 
 const _task = OcrTask(

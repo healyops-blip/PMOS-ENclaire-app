@@ -419,12 +419,14 @@ class _LabConfirmationPageState extends State<LabConfirmationPage> {
               trailing: Text('${item.value} ${item.unit}'),
             ),
           const SizedBox(height: 12),
-          CertificationEntryCard(
-            documentId: widget.task.documentId,
-            revisionId: widget.task.documentRevisionId,
-            materialLabel: '化验／检测报告',
-            ocrConfirmed: true,
-          ),
+          if (widget.documentRepository != null)
+            CertificationEntryCard(
+              documentId: widget.task.documentId,
+              revisionId: widget.task.documentRevisionId,
+              materialLabel: '化验／检测报告',
+              ocrConfirmed: _confirmed != null,
+              documentRepository: widget.documentRepository!,
+            ),
         ],
       );
 }

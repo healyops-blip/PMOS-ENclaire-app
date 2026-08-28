@@ -194,16 +194,15 @@ class _OcrTaskPageState extends State<OcrTaskPage> with WidgetsBindingObserver {
                   onPressed: _openConfirmation,
                   child: Text('进入${_materialLabel(task!.materialType)}确认'),
                 ),
-              if (task?.status == OcrTaskStatus.confirmed) ...[
+              if (task?.status == OcrTaskStatus.confirmed &&
+                  widget.documentRepository != null) ...[
                 const SizedBox(height: 18),
                 CertificationEntryCard(
                   documentId: task!.documentId,
                   revisionId: task.documentRevisionId,
                   materialLabel: _materialLabel(task.materialType),
-                  ocrConfirmed: true,
-                  currentRevisionAvailable:
-                      widget.document.currentRevisionId ==
-                      task.documentRevisionId,
+                  ocrConfirmed: task.status == OcrTaskStatus.confirmed,
+                  documentRepository: widget.documentRepository!,
                 ),
               ],
             ],
@@ -231,7 +230,11 @@ class OcrPendingConfirmationPage extends StatelessWidget {
   Widget build(BuildContext context) {
     if (task.materialType == 'imaging_text_report' ||
         task.materialType == 'outpatient_record') {
-      return ClinicalTextConfirmationPage(repository: repository, task: task);
+      return ClinicalTextConfirmationPage(
+        repository: repository,
+        task: task,
+        documentRepository: documentRepository,
+      );
     }
     return FutureBuilder<OcrTaskResult>(
       future: repository.result(task.id),
