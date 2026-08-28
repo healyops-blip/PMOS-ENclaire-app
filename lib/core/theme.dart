@@ -86,6 +86,7 @@ class PomiGlassCard extends StatelessWidget {
     this.onTap,
     this.borderRadius = 24,
     this.backgroundOpacity = .18,
+    this.backgroundColor,
     this.blurSigma = 12,
     super.key,
   });
@@ -95,6 +96,7 @@ class PomiGlassCard extends StatelessWidget {
   final VoidCallback? onTap;
   final double borderRadius;
   final double backgroundOpacity;
+  final Color? backgroundColor;
   final double blurSigma;
 
   @override
@@ -119,7 +121,9 @@ class PomiGlassCard extends StatelessWidget {
           filter: ui.ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: backgroundOpacity),
+              color:
+                  backgroundColor ??
+                  Colors.white.withValues(alpha: backgroundOpacity),
               borderRadius: radius,
               border: Border.all(
                 color: Colors.white.withValues(alpha: .40),

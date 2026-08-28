@@ -24,6 +24,7 @@ class OnboardingCycleInput(BaseModel):
     last_menstrual_start_date: date | None = None
     usual_cycle_min_days: int | None = Field(default=None, ge=15, le=120)
     usual_cycle_max_days: int | None = Field(default=None, ge=15, le=120)
+    period_duration_days: int | None = Field(default=None, ge=1, le=14)
     next_visit_date: date | None = None
     updated_at: datetime | None = None
 

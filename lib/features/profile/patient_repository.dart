@@ -19,6 +19,7 @@ class PatientProfile {
     this.heightCm,
     this.usualCycleMinDays,
     this.usualCycleMaxDays,
+    this.periodDurationDays,
     this.nextVisitDate,
     this.healthGoal,
   });
@@ -33,6 +34,7 @@ class PatientProfile {
       heightCm: jsonDoubleOrNull(json, 'height_cm'),
       usualCycleMinDays: jsonIntOrNull(json, 'usual_cycle_min_days'),
       usualCycleMaxDays: jsonIntOrNull(json, 'usual_cycle_max_days'),
+      periodDurationDays: jsonIntOrNull(json, 'period_duration_days'),
       nextVisitDate: jsonStringOrNull(json, 'next_visit_date'),
       healthGoal: jsonStringOrNull(json, 'health_goal'),
       onboardingCompleted: jsonBool(json, 'onboarding_completed'),
@@ -48,6 +50,7 @@ class PatientProfile {
   final double? heightCm;
   final int? usualCycleMinDays;
   final int? usualCycleMaxDays;
+  final int? periodDurationDays;
   final String? nextVisitDate;
   final String? healthGoal;
   final bool onboardingCompleted;
@@ -64,6 +67,7 @@ class PatientProfileUpdate {
     this.heightCm = const JsonPatchField.absent(),
     this.usualCycleMinDays = const JsonPatchField.absent(),
     this.usualCycleMaxDays = const JsonPatchField.absent(),
+    this.periodDurationDays = const JsonPatchField.absent(),
     this.nextVisitDate = const JsonPatchField.absent(),
     this.healthGoal = const JsonPatchField.absent(),
   });
@@ -75,6 +79,7 @@ class PatientProfileUpdate {
   final JsonPatchField<double> heightCm;
   final JsonPatchField<int> usualCycleMinDays;
   final JsonPatchField<int> usualCycleMaxDays;
+  final JsonPatchField<int> periodDurationDays;
   final JsonPatchField<String> nextVisitDate;
   final JsonPatchField<String> healthGoal;
 
@@ -87,6 +92,8 @@ class PatientProfileUpdate {
       'usual_cycle_min_days': usualCycleMinDays.value,
     if (usualCycleMaxDays.isPresent)
       'usual_cycle_max_days': usualCycleMaxDays.value,
+    if (periodDurationDays.isPresent)
+      'period_duration_days': periodDurationDays.value,
     if (nextVisitDate.isPresent) 'next_visit_date': nextVisitDate.value,
     if (healthGoal.isPresent) 'health_goal': healthGoal.value,
     'updated_at': updatedAt.toUtc().toIso8601String(),

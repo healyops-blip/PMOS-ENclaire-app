@@ -399,6 +399,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
+      backgroundColor: Colors.white,
       builder:
           (sheetContext) => SafeArea(
             child: Padding(
@@ -555,15 +556,6 @@ class _HorizontalCycleCalendarState extends State<_HorizontalCycleCalendar> {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                  ),
-                  IconButton(
-                    tooltip: '记录经期',
-                    onPressed: widget.onAdd,
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.white.withValues(alpha: .48),
-                      foregroundColor: pomiPurple,
-                    ),
-                    icon: const Icon(Icons.calendar_month_outlined, size: 21),
                   ),
                 ],
               ),

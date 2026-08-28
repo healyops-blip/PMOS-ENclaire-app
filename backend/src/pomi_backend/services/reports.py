@@ -6,7 +6,7 @@ import hashlib
 import json
 from calendar import monthrange
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import NAMESPACE_URL, uuid5
@@ -40,8 +40,16 @@ from pomi_backend.repositories import (
 )
 from pomi_backend.schemas.reports import ReportCreate
 
-RULE_VERSION = "report-rules-v1"
-TEMPLATE_VERSION = "report-snapshot-v1"
+RULE_VERSION = "report-rules-v2"
+TEMPLATE_VERSION = "report-snapshot-v2"
+CANONICAL_TREND_UNITS = {
+    "glucose": "mmol/L",
+    "total_cholesterol": "mmol/L",
+    "total_testosterone": "nmol/L",
+    "testosterone": "nmol/L",
+}
+BMI_REFERENCE_LOWER = 18.5
+BMI_REFERENCE_UPPER = 24.0
 DISCLAIMER = [
     "模拟数据，仅供演示。",
     "患者自述仅供参考，不构成诊断，不进入正式病历。",
@@ -336,6 +344,7 @@ class ReportSnapshotService:
             "gender": self.profile.gender,
             "height_cm": _json_value(self.profile.height_cm),
             "diagnosis_year": self.profile.diagnosis_year,
+            "period_duration_days": self.profile.period_duration_days,
             "primary_condition": self.profile.primary_condition,
             "next_visit_date": _json_value(self.profile.next_visit_date),
             "health_goal": self.profile.health_goal,
@@ -561,11 +570,47 @@ class ReportSnapshotService:
             for item in collections["weights"]
             if "weights" in sections
         ]
+        height_cm = state["profile"].get("height_cm")
+        if height_cm:
+            height_m = float(height_cm) / 100
+            for point in weights:
+                bmi = round(float(point["weight_kg"]) / (height_m * height_m), 1)
+                point.update(
+                    {
+                        "bmi": bmi,
+                        "bmi_reference_lower": BMI_REFERENCE_LOWER,
+                        "bmi_reference_upper": BMI_REFERENCE_UPPER,
+                        "bmi_status": (
+                            "low"
+                            if bmi < BMI_REFERENCE_LOWER
+                            else "in_range"
+                            if bmi <= BMI_REFERENCE_UPPER
+                            else "high"
+                        ),
+                    }
+                )
         cycles = [
             dated_point(item, "start_date", "record_date")
             for item in collections["cycles"]
             if "cycles" in sections
         ]
+        for index, point in enumerate(cycles):
+            start = date.fromisoformat(point["start_date"])
+            period_end = date.fromisoformat(point["end_date"]) if point["end_date"] else None
+            next_start = (
+                date.fromisoformat(cycles[index + 1]["start_date"])
+                if index + 1 < len(cycles)
+                else None
+            )
+            point["duration_days"] = (
+                (period_end - start).days + 1 if period_end is not None else None
+            )
+            point["cycle_length_days"] = (
+                (next_start - start).days if next_start is not None else None
+            )
+            point["cycle_end_date"] = (
+                (next_start - timedelta(days=1)).isoformat() if next_start is not None else None
+            )
         daily = [
             dated_point(item, "record_date", "record_date")
             for item in collections["medication_daily"]
@@ -591,6 +636,23 @@ class ReportSnapshotService:
             else []
         )
         active_medications = [item for item in medication_history if item["status"] == "active"]
+        for medication in active_medications:
+            adherence_records = [
+                item for item in daily if item["medication_id"] == medication["id"]
+            ]
+            counts = {
+                status: sum(item["intake_status"] == status for item in adherence_records)
+                for status in ("taken", "missed", "unrecorded")
+            }
+            medication["adherence"] = {
+                **counts,
+                "recorded_days": len(adherence_records),
+                "adherence_percent": (
+                    round(counts["taken"] / len(adherence_records) * 100)
+                    if adherence_records
+                    else None
+                ),
+            }
         lab_trends: list[dict[str, Any]] = []
         lab_groups: dict[str, list[dict[str, Any]]] = {}
         for item in collections["labs"] if "labs" in sections else []:
@@ -601,9 +663,8 @@ class ReportSnapshotService:
             contexts = {
                 item["sample_context"] for item in items if item["sample_context"] is not None
             }
-            target_unit = next(
-                (item["standard_unit"] for item in items if item["standard_unit"]),
-                None,
+            target_unit = CANONICAL_TREND_UNITS.get(metric_id) or next(
+                (item["standard_unit"] for item in items if item["standard_unit"]), None
             )
             group_reason: str | None = None
             group_comparability = "comparable"
@@ -612,6 +673,8 @@ class ReportSnapshotService:
                 point_reason: str | None = None
                 normalized_value = item["numeric_value"]
                 normalized_unit = item["standard_unit"]
+                normalized_reference_lower = item["reference_lower"]
+                normalized_reference_upper = item["reference_upper"]
                 if item["mapping_status"] != "mapped":
                     point_reason = "metric_needs_manual_review"
                 elif item["trend_date"] is None:
@@ -629,6 +692,20 @@ class ReportSnapshotService:
                         point_reason = "unsafe_unit_conversion"
                     else:
                         normalized_value = converted
+                        if normalized_reference_lower is not None:
+                            normalized_reference_lower = self._convert_lab_value(
+                                metric_id,
+                                normalized_reference_lower,
+                                normalized_unit,
+                                target_unit,
+                            )
+                        if normalized_reference_upper is not None:
+                            normalized_reference_upper = self._convert_lab_value(
+                                metric_id,
+                                normalized_reference_upper,
+                                normalized_unit,
+                                target_unit,
+                            )
                         normalized_unit = target_unit
                 if len(contexts) > 1:
                     point_reason = point_reason or "sample_context_mismatch"
@@ -648,6 +725,8 @@ class ReportSnapshotService:
                         "date_source": item["trend_date_source"],
                         "normalized_value": normalized_value,
                         "normalized_unit": normalized_unit,
+                        "normalized_reference_lower": normalized_reference_lower,
+                        "normalized_reference_upper": normalized_reference_upper,
                         "freshness": level,
                         "default_collapsed": level == "archived",
                         "comparability": "incomparable" if point_reason else "comparable",
@@ -722,6 +801,28 @@ class ReportSnapshotService:
             for trend in lab_trends
             if trend["points"] and trend["points"][-1]["date"] is not None
         ]
+        cycle_summary = (
+            {
+                "count": len(cycles),
+                "range_start": cycles[0]["start_date"],
+                "range_end": self.business_date.isoformat(),
+            }
+            if cycles
+            else None
+        )
+        latest_weight = weights[-1] if weights else None
+        weight_summary = (
+            {
+                "count": len(weights),
+                "latest_weight_kg": latest_weight["weight_kg"],
+                "latest_bmi": latest_weight.get("bmi"),
+                "bmi_reference_lower": latest_weight.get("bmi_reference_lower"),
+                "bmi_reference_upper": latest_weight.get("bmi_reference_upper"),
+                "bmi_status": latest_weight.get("bmi_status"),
+            }
+            if latest_weight
+            else None
+        )
         snapshot = {
             "metadata": {
                 "rule_version": RULE_VERSION,
@@ -747,6 +848,8 @@ class ReportSnapshotService:
                 ),
                 "current_medications": active_medications if "medications" in sections else [],
                 "latest_observations": latest_observations if "labs" in sections else [],
+                "cycle_summary": cycle_summary if "cycles" in sections else None,
+                "weight_summary": weight_summary if "weights" in sections else None,
                 "missing_sections": missing,
                 "disclaimers": DISCLAIMER,
             },
@@ -844,6 +947,7 @@ class ReportSnapshotService:
             "abnormal_status": ReportSnapshotService._abnormal_status(item),
             "trend_date": _json_value(item.trend_date),
             "trend_date_source": item.trend_date_source,
+            "facility": context.get("hospital_name") or context.get("hospital"),
             "sample_context": context.get("sample_context") or context.get("sample_type"),
             "cycle_phase": context.get("cycle_phase"),
             "cycle_day": context.get("cycle_day"),
@@ -929,7 +1033,14 @@ class ReportSnapshotService:
 
     @staticmethod
     def _hormone_context_incomplete(metric_id: str, items: list[dict[str, Any]]) -> bool:
-        hormone_metrics = {"lh", "fsh", "estradiol", "progesterone", "testosterone"}
+        hormone_metrics = {
+            "lh",
+            "fsh",
+            "estradiol",
+            "progesterone",
+            "total_testosterone",
+            "testosterone",
+        }
         if metric_id not in hormone_metrics:
             return False
         return any(

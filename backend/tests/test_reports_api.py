@@ -41,6 +41,18 @@ def test_report_freshness_uses_calendar_month_boundaries() -> None:
     assert _freshness(date(2025, 8, 30), as_of) == "archived"
 
 
+def test_total_testosterone_requires_hormone_context() -> None:
+    complete = {
+        "cycle_phase": "follicular",
+        "hormone_medication_status": False,
+        "method": "immunoassay",
+    }
+    assert not ReportSnapshotService._hormone_context_incomplete("total_testosterone", [complete])
+    assert ReportSnapshotService._hormone_context_incomplete(
+        "total_testosterone", [{**complete, "method": None}]
+    )
+
+
 def _auth(client: TestClient, account_name: str) -> dict[str, str]:
     password = "report-pass-44"
     register = client.post(
@@ -78,6 +90,7 @@ def _seed_confirmed_health_data(engine: Engine, account_name: str) -> str:
         )
         assert profile is not None
         profile.nickname = "Pomi Demo"
+        profile.height_cm = Decimal("160.0")
         profile.onboarding_completed = True
         medication = Medication(
             patient_id=profile.patient_id,
@@ -492,8 +505,37 @@ def test_report_uses_only_confirmed_ocr_records_with_revision_level_sources(
         glucose = snapshot["trends"]["labs"][0]
         assert glucose["display_mode"] == "trend"
         assert glucose["comparability"] == "comparable"
-        assert glucose["points"][1]["normalized_value"] == 126
+        assert glucose["unit"] == "mmol/L"
+        assert glucose["points"][1]["normalized_value"] == 7.0
+        assert glucose["points"][2]["normalized_reference_lower"] == pytest.approx(70 / 18)
+        assert glucose["points"][2]["normalized_reference_upper"] == 5.5
         assert glucose["points"][2]["date_source"] == "sample_date"
+        weight = snapshot["trends"]["weights"][0]
+        assert weight["bmi"] == 23.9
+        assert weight["bmi_reference_lower"] == 18.5
+        assert weight["bmi_reference_upper"] == 24.0
+        assert weight["bmi_status"] == "in_range"
+        assert snapshot["summary"]["weight_summary"] == {
+            "count": 1,
+            "latest_weight_kg": 61.2,
+            "latest_bmi": 23.9,
+            "bmi_reference_lower": 18.5,
+            "bmi_reference_upper": 24.0,
+            "bmi_status": "in_range",
+        }
+        cycle = snapshot["trends"]["cycles"][0]
+        assert cycle["duration_days"] == 5
+        assert cycle["cycle_length_days"] is None
+        assert cycle["cycle_end_date"] is None
+        assert snapshot["summary"]["cycle_summary"]["count"] == 1
+        medication = snapshot["summary"]["current_medications"][0]
+        assert medication["adherence"] == {
+            "taken": 1,
+            "missed": 0,
+            "unrecorded": 0,
+            "recorded_days": 1,
+            "adherence_percent": 100,
+        }
         unmapped = snapshot["trends"]["labs"][1]
         assert unmapped["points"][0]["exclusion_reason"] == ("metric_needs_manual_review")
         assert unmapped["points"][0]["date"] is None

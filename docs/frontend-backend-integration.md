@@ -239,6 +239,7 @@ Authorization: Bearer <session_id>
 | `diagnosis_year` | integer | 是 | 用户，不能晚于当前年 |
 | `primary_condition` | string | 是 | 当前默认 `pcos` |
 | `usual_cycle_length_days` | integer | 是 | 引导周期步骤，15–120 |
+| `period_duration_days` | integer | 是 | 通常经期持续天数，1–14；完成引导后写入患者画像 |
 | `last_menstrual_start_date` | date | 是 | 引导周期步骤 |
 | `next_visit_date` | date | 是 | 首页倒计时 |
 | `health_goal` | string | 是 | 管理目标 |
@@ -393,7 +394,9 @@ item 字段：`id`、`position`、`old_medication`、`new_medical_order`、`matc
 报告详情三层结构：
 
 - `summary`：患者摘要、自述原文、当前用药、最新指标、经期/体重摘要、免责声明。
-- `trends[]`：`metric_id`、`metric_name`、`unit`、`comparability`、`points[]`；point 含 `value/raw_value/date/date_source/abnormal_status/source_id`。
+- `trends.labs[]`：`metric_id`、`metric_name`、规范展示 `unit`、`comparability`、`display_mode`、`points[]`；point 含原始值/单位、`normalized_value/normalized_unit`、原始及规范化参考上下限、`date/date_source`、`abnormal_status/comparability` 和来源编号。已登记白名单的指标由后端统一到规范展示单位（例如空腹血糖统一为 `mmol/L`），Flutter 只按快照字段渲染，不保存或重算化验业务值。
+- POMI 报告页面只读取不可变的 `GET /api/reports/{report_id}` 快照。检验值/参考区间、BMI/参考状态、周期长度和用药依从性均由后端计算；Flutter 只负责格式化和绘制。本地 Smoke 预览也模拟相同的列表/详情 API，不再向报告组件直接注入数据。
+- `trends.weights[]`：保留后端体重记录的 `weight_kg/date/date_source`，画像存在身高时由后端同时输出一位小数的 `bmi`、参考区间和状态；Flutter 的 BMI 图只绘制该字段，不把体重误当作 BMI。
 - `sources[]`：`source_number`、`source_type`、`source_id`、`document_id`、`document_revision_id`、`original_value`、`original_unit`、`reference_range_text`、`material_date`、`date_source`、`file_url`。
 
 后端报告不接收或聚合 Flutter 本地认证状态。Flutter拿到 `document_id + document_revision_id` 后自行叠加本地水印。

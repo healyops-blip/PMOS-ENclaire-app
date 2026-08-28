@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
+import '../../core/api_client.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../profile/profile_screen.dart';
 import '../records/records_screen.dart';
@@ -16,7 +17,8 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _index = 0;
-  int _recordsTab = 0;
+  // The navigation entry opens the complete reports list by default.
+  int _recordsTab = 1;
   void _openTab(int index) {
     if (index == 2) {
       _showUploadDialog();
@@ -62,12 +64,20 @@ class _AppShellState extends State<AppShell> {
       RecordsScreen(
         key: ValueKey('records-$_recordsTab'),
         initialTab: _recordsTab,
+        onBack:
+            () => setState(() {
+              _recordsTab = 0;
+              _index = 0;
+            }),
       ),
       ProfileScreen(onOpenRecords: _openRecords),
     ];
     return Scaffold(
       body: IndexedStack(index: _index, children: pages),
-      bottomNavigationBar: _PomiBottomNav(index: _index, onSelected: _openTab),
+      bottomNavigationBar:
+          smokeMode && _index == 3 && _recordsTab == 1
+              ? null
+              : _PomiBottomNav(index: _index, onSelected: _openTab),
     );
   }
 }

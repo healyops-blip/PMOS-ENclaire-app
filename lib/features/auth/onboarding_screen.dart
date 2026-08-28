@@ -30,11 +30,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _diagnosisYear = TextEditingController(text: '2023');
   final _lastPeriod = TextEditingController();
   final _nextVisit = TextEditingController();
+  final _medicationSearch = TextEditingController();
   final Set<String> _medications = {};
   final List<String> _customCycleRanges = [];
   final List<String> _customMedicationOptions = [];
   int _step = 0;
   String _cycleRange = '35-45 天';
+  String _periodDuration = '4-5 天';
   bool _saving = false;
 
   static const _cycleOptions = ['21-28 天', '28-35 天', '35-45 天', '45 天以上'];
@@ -112,6 +114,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       _diagnosisYear,
       _lastPeriod,
       _nextVisit,
+      _medicationSearch,
     ]) {
       controller.dispose();
     }
@@ -273,6 +276,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               range == null || range.group(2) == null
                   ? (_cycleRange.startsWith('45') ? null : null)
                   : int.parse(range.group(2)!),
+          periodDurationDays: int.tryParse(
+            RegExp(r'^(\d+)').firstMatch(_periodDuration)?.group(1) ?? '',
+          ),
           nextVisitDate: _nextVisit.text.isEmpty ? null : _nextVisit.text,
         ),
       );
@@ -546,6 +552,28 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               ),
       ),
       const SizedBox(height: _onboardingSectionGap),
+      const Text('经期持续天数', style: TextStyle(fontWeight: FontWeight.w700)),
+      const SizedBox(height: _onboardingLabelGap),
+      Wrap(
+        spacing: _onboardingLabelGap,
+        runSpacing: _onboardingLabelGap,
+        children:
+            ['1-3 天', '4-5 天', '6-7 天', '7 天以上']
+                .map(
+                  (value) => ChoiceChip(
+                    label: Text(value),
+                    selected: _periodDuration == value,
+                    showCheckmark: false,
+                    backgroundColor: Colors.white,
+                    selectedColor: _onboardingSelectedColor,
+                    shape: const StadiumBorder(),
+                    side: const BorderSide(color: pomiLine),
+                    onSelected: (_) => setState(() => _periodDuration = value),
+                  ),
+                )
+                .toList(),
+      ),
+      const SizedBox(height: _onboardingSectionGap),
       const Text('下次就诊', style: TextStyle(fontWeight: FontWeight.w700)),
       const SizedBox(height: _onboardingLabelGap),
       _validationSlot(
@@ -568,11 +596,26 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     showFrame: false,
     padding: _onboardingContentPadding,
     children: [
+      TextFormField(
+        controller: _medicationSearch,
+        decoration: const InputDecoration(
+          labelText: '搜索并添加药品',
+          hintText: '例如搜索「优思明」或「二甲双胍」',
+          prefixIcon: Icon(Icons.search_rounded),
+        ),
+        onChanged: (_) => setState(() {}),
+      ),
+      const SizedBox(height: 14),
       Wrap(
         spacing: _onboardingLabelGap,
         runSpacing: _onboardingLabelGap,
         children:
             [..._medicationOptions.keys, ..._customMedicationOptions]
+                .where(
+                  (name) => name.toLowerCase().contains(
+                    _medicationSearch.text.trim().toLowerCase(),
+                  ),
+                )
                 .map<Widget>(
                   (name) => FilterChip(
                     label: Text(name),
