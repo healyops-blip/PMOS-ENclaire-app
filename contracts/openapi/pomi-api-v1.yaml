@@ -2975,7 +2975,7 @@ components:
           format: uuid
         document_type:
           type: string
-          enum: [imaging_text_report, outpatient_record]
+      enum: [imaging_text_report]
         confirmed_data:
           oneOf:
             - $ref: '#/components/schemas/ImagingTextConfirmation'
@@ -3032,7 +3032,7 @@ components:
           const: false
         material_type:
           type: string
-          enum: [imaging_text_report, outpatient_record]
+      enum: [imaging_text_report]
         document_id:
           type: string
           format: uuid

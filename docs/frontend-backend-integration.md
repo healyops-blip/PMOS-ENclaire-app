@@ -312,7 +312,7 @@ PUT 允许分步部分更新。请求中的 `complete_onboarding=true` 只有在
 - `lab_report`
 - `medical_order`
 - `imaging_text_report`
-- `outpatient_record`
+<!-- outpatient_record 已移除 -->
 
 上传使用 `multipart/form-data`：`file`、`document_type`、可选 `external_processing_consent_version`，并在 Header 发送 8–128 字符的 `Idempotency-Key`。提示版本发生实质变化后 Flutter 必须重新确认；拒绝时不得发送上传请求。
 
@@ -354,7 +354,7 @@ PUT 允许分步部分更新。请求中的 `complete_onboarding=true` 只有在
 影像与门诊确认由 #24 落到独立正式表：
 
 - `imaging_report` 保存 `document_id + document_revision_id + ocr_result_id`、检查名称/部位/方式/日期、报告日期、所见原文、结论原文、确认人和时间。只处理报告文字，不分析影像本体。
-- `outpatient_record` 保存同样的三段来源标识，以及医院、科室、医生、就诊日期、主诉、诊断摘要、治疗计划、处理意见、确认人和时间。病历中的药物只保留为原文，不写当前用药或复诊日期。
+<!-- outpatient_record 段落移除 -->
 - Flutter 共用原件图片/单页 PDF 对照和长文本编辑组件；低置信度、缺失及日期异常会高亮。失败保留编辑值与滚动位置。
 - 确认请求必须携带 `result_id`、`expected_revision_id`、材料类型和字段决定；后端重新校验并在单一事务中写 OCR 最终值、字段状态和正式记录。重复确认返回同一正式记录。
 - `confirmed_data` 的字段名与上述 `validated_draft` 完全一致；影像的 `findings_text/conclusion_text`，以及门诊的 `visit_date/diagnosis_summary/medical_advice` 均为正式保存前的必填字段。

@@ -155,7 +155,7 @@ def test_qwen_provider_configuration_and_temporary_errors_are_typed(tmp_path: Pa
 def test_all_material_prompts_and_schemas_are_versioned_and_distinct() -> None:
     assert PROMPT_VERSION == "pomi-ocr-v1"
     assert SCHEMA_VERSION == "pomi-ocr-schema-v1"
-    kinds = ("lab_report", "medical_order", "imaging_text_report", "outpatient_record")
+    kinds = ("lab_report", "medical_order", "imaging_text_report")
     schemas = [schema_for(kind) for kind in kinds]
     assert all("fields" in schema["properties"] for schema in schemas)
     assert (

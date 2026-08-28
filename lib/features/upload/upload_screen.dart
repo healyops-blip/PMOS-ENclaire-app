@@ -29,7 +29,6 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     'lab': '化验 / 检测',
     'medical_order': '医嘱 / 处方',
     'imaging': '影像文字报告',
-    'outpatient': '门诊病历',
   };
 
   Future<void> _pickFile() async {
@@ -123,7 +122,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     'lab' => 'lab_report',
     'medical_order' => 'medical_order',
     'imaging' => 'imaging_text_report',
-    _ => 'outpatient_record',
+    _ => 'imaging_text_report',
   };
 
   @override

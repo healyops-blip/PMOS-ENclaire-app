@@ -99,29 +99,7 @@ def _draft_schema(material_type: str) -> dict[str, Any]:
             },
             "required": ["hospital_name", "department_name", "prescribed_at", "orders"],
             "additionalProperties": False,
-        },
-        "imaging_text_report": {
-            "type": "object",
-            "properties": {
-                "examination_name": nullable_text,
-                "body_part": nullable_text,
-                "examination_method": nullable_text,
-                "findings_text": nullable_text,
-                "conclusion_text": nullable_text,
-                "examined_at": nullable_date,
-                "reported_at": nullable_date,
-            },
-            "required": [
-                "examination_name",
-                "body_part",
-                "examination_method",
-                "findings_text",
-                "conclusion_text",
-                "examined_at",
-                "reported_at",
-            ],
-            "additionalProperties": False,
-        },
+        # 已移除 outpatient_record（门诊病历）
         "outpatient_record": {
             "type": "object",
             "properties": {
@@ -208,7 +186,6 @@ def prompt_for(material_type: str) -> str:
         "lab_report": "化验/检验报告",
         "medical_order": "医嘱/处方",
         "imaging_text_report": "影像文字报告",
-        "outpatient_record": "门诊病历",
     }
     base = (
         f"你是医疗材料文字转录工具。材料类型已由用户确定为{labels[material_type]}。"
