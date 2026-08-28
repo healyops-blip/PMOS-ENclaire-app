@@ -1523,6 +1523,25 @@ class _ReportTrendLayer extends StatelessWidget {
                 .toList(),
         onTap: onOpenSources,
       ),
+      const SizedBox(height: 10),
+      _TrendCard(
+        icon: Icons.show_chart_rounded,
+        title: '总睾酮趋势',
+        subtitle: '参考 0.2 – 0.8 ng/mL · ${labs.length} 个可比较点',
+        values:
+            labs
+                .where(
+                  (item) =>
+                      (item['item_name']?.toString() ?? '').contains('睾酮'),
+                )
+                .take(6)
+                .map(
+                  (item) =>
+                      '${item['sample_date'] ?? item['report_date'] ?? ''}  ${item['raw_value'] ?? ''} ${item['raw_unit'] ?? ''}',
+                )
+                .toList(),
+        onTap: onOpenSources,
+      ),
     ],
   );
 }
