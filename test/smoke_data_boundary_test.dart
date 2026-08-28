@@ -6,6 +6,7 @@ import 'package:pmos_enclaire/features/dashboard/dashboard_screen.dart';
 import 'package:pmos_enclaire/features/profile/profile_screen.dart';
 import 'package:pmos_enclaire/features/records/records_screen.dart';
 import 'package:pmos_enclaire/features/tracking/tracking_screen.dart';
+import 'package:pmos_enclaire/features/upload/upload_screen.dart';
 
 void main() {
   Widget app(Widget child) => MaterialApp(theme: buildPomiTheme(), home: child);
@@ -161,5 +162,12 @@ void main() {
 
     expect(find.text('真实用户'), findsOneWidget);
     expect(find.text('模拟患者'), findsNothing);
+  });
+
+  testWidgets('upload flow keeps the OCR recognition action', (tester) async {
+    usePhoneViewport(tester);
+    await tester.pumpWidget(app(const UploadScreen()));
+
+    expect(find.widgetWithText(FilledButton, '开始识别'), findsOneWidget);
   });
 }
