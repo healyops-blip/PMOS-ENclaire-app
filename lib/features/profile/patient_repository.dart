@@ -10,8 +10,8 @@ final patientRepositoryProvider = Provider<PatientRepository>(
 class PatientProfile {
   const PatientProfile({
     required this.id,
-    required this.nickname,
-    required this.birthYear,
+    this.nickname,
+    this.birthYear,
     this.diagnosisYear,
     required this.onboardingCompleted,
     required this.createdAt,
@@ -27,9 +27,9 @@ class PatientProfile {
     final json = jsonObject(value, 'patient profile');
     return PatientProfile(
       id: jsonString(json, 'id'),
-      nickname: jsonString(json, 'nickname'),
-      birthYear: jsonInt(json, 'birth_year'),
-      diagnosisYear: jsonInt(json, 'diagnosis_year'),
+      nickname: jsonStringOrNull(json, 'nickname'),
+      birthYear: jsonIntOrNull(json, 'birth_year'),
+      diagnosisYear: jsonIntOrNull(json, 'diagnosis_year'),
       heightCm: jsonDoubleOrNull(json, 'height_cm'),
       usualCycleMinDays: jsonIntOrNull(json, 'usual_cycle_min_days'),
       usualCycleMaxDays: jsonIntOrNull(json, 'usual_cycle_max_days'),
@@ -42,8 +42,8 @@ class PatientProfile {
   }
 
   final String id;
-  final String nickname;
-  final int birthYear;
+  final String? nickname;
+  final int? birthYear;
   final int? diagnosisYear;
   final double? heightCm;
   final int? usualCycleMinDays;

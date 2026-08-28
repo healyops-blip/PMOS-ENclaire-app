@@ -58,7 +58,7 @@ void main() {
       },
     });
 
-    expect(dashboard.followUp.data?.days, 8);
+    expect(dashboard.followUp.data?.daysRemaining, 8);
     expect(dashboard.todayMedications.data?.single.medicationId, 'med-1');
     expect(dashboard.latestReport.data?.id, 'report-1');
     expect(dashboard.documentSummary.data?.total, 2);

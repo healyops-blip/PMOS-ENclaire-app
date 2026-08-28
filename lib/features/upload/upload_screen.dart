@@ -78,26 +78,19 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       );
       if (!mounted) return;
       setState(() => _status = '识别完成');
-      final taskId = result['task_id']?.toString();
-      final resultId = result['result_id']?.toString();
-      final revisionId = result['document_revision_id']?.toString();
-      final draft = result['draft'];
-      if (taskId == null ||
-          resultId == null ||
-          revisionId == null ||
-          draft is! Map) {
+      final resultId = result['ocr_result_id']?.toString();
+      if (resultId == null) {
         throw const FormatException('识别结果缺少确认所需的版本信息，请重新识别');
       }
+      final draft = Map<String, dynamic>.from(result)
+        ..removeWhere((key, _) => _ocrMetadataKeys.contains(key));
       final confirmed = await Navigator.of(context).push<bool>(
         MaterialPageRoute(
           builder:
               (_) => OcrConfirmScreen(
-                taskId: taskId,
                 resultId: resultId,
-                revisionId: revisionId,
-                documentType: _wireMaterialType,
                 resultSource: result['result_source']?.toString() ?? 'qwen3-vl',
-                draft: Map<String, dynamic>.from(draft),
+                draft: draft,
               ),
         ),
       );
@@ -242,19 +235,13 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
 
 class OcrConfirmScreen extends ConsumerStatefulWidget {
   const OcrConfirmScreen({
-    required this.taskId,
     required this.resultId,
-    required this.revisionId,
-    required this.documentType,
     required this.resultSource,
     required this.draft,
     super.key,
   });
 
-  final String taskId;
   final String resultId;
-  final String revisionId;
-  final String documentType;
   final String resultSource;
   final Map<String, dynamic> draft;
 
@@ -280,13 +267,8 @@ class _OcrConfirmScreenState extends ConsumerState<OcrConfirmScreen> {
       await ref
           .read(apiClientProvider)
           .post(
-            '/api/ocr/tasks/${widget.taskId}/confirm',
-            data: buildOcrConfirmationPayload(
-              documentType: widget.documentType,
-              resultId: widget.resultId,
-              revisionId: widget.revisionId,
-              draft: _draft,
-            ),
+            '/api/ocr/results/${widget.resultId}/confirm',
+            data: buildOcrConfirmationPayload(_draft),
           );
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
@@ -401,6 +383,14 @@ class _JsonFields extends StatelessWidget {
     'diagnosis_summary': '诊断摘要',
     'treatment_plan': '处理意见',
     'medical_advice': '医嘱',
+    'hospital': '医院',
+    'department': '科室',
+    'examinations': '检查项目',
+    'medication_suggestions': '用药建议',
+    'dosage': '剂量',
+    'instruction': '用药说明',
+    'start_date': '开始日期',
+    'source_category': '药物分类',
   };
 
   @override
@@ -487,74 +477,50 @@ class _JsonFields extends StatelessWidget {
       const {'医嘱原文', '检查所见', '检查结论', '主诉', '诊断摘要', '处理意见', '医嘱'}.contains(name);
 }
 
-Map<String, dynamic> buildOcrConfirmationPayload({
-  required String documentType,
-  required String resultId,
-  required String revisionId,
-  required Map<String, dynamic> draft,
-}) {
-  if (documentType == 'lab_report') {
-    final items = (draft['items'] as List? ?? const []).whereType<Map>().toList(
-      growable: false,
-    );
-    return {
-      'result_id': resultId,
-      'expected_revision_id': revisionId,
-      'sample_date': draft['sample_date'],
-      'report_date': draft['report_date'],
-      'items': [
-        for (var index = 0; index < items.length; index++)
-          {
-            'source_index': index,
-            'name': items[index]['item_name'],
-            'value': items[index]['raw_value'] ?? items[index]['numeric_value'],
-            'unit': items[index]['raw_unit'] ?? items[index]['normalized_unit'],
-            'reference_range': items[index]['reference_range_text'],
-          },
-      ],
-    };
-  }
-  if (documentType == 'medical_order') {
-    final orders = (draft['orders'] as List? ?? const [])
-        .whereType<Map>()
-        .toList(growable: false);
-    return {
-      'result_id': resultId,
-      'expected_revision_id': revisionId,
-      'items': [
-        for (var index = 0; index < orders.length; index++)
-          {
-            'source_index': index,
-            'confirmed': true,
-            'source_text': orders[index]['source_text'],
-            'drug_name': orders[index]['drug_name'],
-            'specification': orders[index]['specification'],
-            'dosage_value': orders[index]['dosage_value'],
-            'dosage_unit': orders[index]['dosage_unit'],
-            'frequency': orders[index]['frequency'],
-            'duration': orders[index]['duration'],
-            'route': orders[index]['route'],
-            'instruction': orders[index]['instruction'],
-            'prescribed_at': draft['prescribed_at'],
-            'explicitly_stopped': orders[index]['explicitly_stopped'] ?? false,
-          },
-      ],
-    };
-  }
-  if (documentType == 'imaging_text_report' ||
-      documentType == 'outpatient_record') {
-    return {
-      'result_id': resultId,
-      'expected_revision_id': revisionId,
-      'document_type': documentType,
-      'confirmed_data': draft,
-      'field_confirmations': const [],
-      'confirm_all': true,
-    };
-  }
-  throw ArgumentError.value(
-    documentType,
-    'documentType',
-    'unsupported OCR material type',
-  );
+const _ocrMetadataKeys = {
+  'ocr_task_id',
+  'ocr_result_id',
+  'document_id',
+  'document_revision_id',
+  'material_type',
+  'result_source',
+};
+
+Map<String, dynamic> buildOcrConfirmationPayload(Map<String, dynamic> draft) {
+  final examinations = (draft['examinations'] as List? ?? const [])
+      .whereType<Map>()
+      .toList(growable: false);
+  final medications = (draft['medication_suggestions'] as List? ?? const [])
+      .whereType<Map>()
+      .toList(growable: false);
+  return {
+    'visit_date': draft['visit_date'],
+    'examinations': [
+      for (var index = 0; index < examinations.length; index++)
+        {
+          'source_index': index,
+          'item_name': examinations[index]['item_name'],
+          'value': examinations[index]['value'],
+          'unit': examinations[index]['unit'],
+          'reference_range': examinations[index]['reference_range'],
+          if (examinations[index]['note'] != null)
+            'note': examinations[index]['note'],
+        },
+    ],
+    'medication_suggestions': [
+      for (var index = 0; index < medications.length; index++)
+        {
+          'source_index': index,
+          'drug_name': medications[index]['drug_name'],
+          'dosage': medications[index]['dosage'],
+          'frequency': medications[index]['frequency'],
+          'duration': medications[index]['duration'],
+          'instruction': medications[index]['instruction'],
+          'source_text': medications[index]['source_text'],
+          'source_category':
+              medications[index]['source_category'] ?? 'prescribed',
+          'start_date': medications[index]['start_date'] ?? draft['visit_date'],
+        },
+    ],
+  };
 }

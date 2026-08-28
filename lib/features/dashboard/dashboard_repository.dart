@@ -50,23 +50,23 @@ class DashboardSection<T> {
 
 class FollowUpSummary {
   const FollowUpSummary({
-    required this.date,
-    required this.timing,
-    required this.days,
+    required this.nextVisitDate,
+    required this.state,
+    required this.daysRemaining,
   });
 
   factory FollowUpSummary.fromJson(dynamic value) {
     final json = jsonObject(value, 'follow-up summary');
     return FollowUpSummary(
-      date: jsonString(json, 'next_visit_date'),
-      timing: jsonString(json, 'state'),
-      days: jsonInt(json, 'days_remaining'),
+      nextVisitDate: jsonString(json, 'next_visit_date'),
+      state: jsonString(json, 'state'),
+      daysRemaining: jsonInt(json, 'days_remaining'),
     );
   }
 
-  final String date;
-  final String timing;
-  final int days;
+  final String nextVisitDate;
+  final String state;
+  final int daysRemaining;
 }
 
 class TodayMedication {

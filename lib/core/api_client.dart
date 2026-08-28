@@ -462,14 +462,13 @@ class SmokeApiClient extends ApiClient {
     required String consentVersion,
     required String idempotencyKey,
   }) async => {
-    'task_id': 'smoke-ocr',
-    'result_id': 'smoke-result',
+    'ocr_task_id': 'smoke-ocr',
+    'ocr_result_id': 'smoke-result',
     'document_id': 'smoke-document',
     'document_revision_id': 'smoke-revision',
     'material_type': materialType,
     'status': 'pending_confirmation',
     'result_source': 'smoke',
-    'draft': _smokeOcrDraft(materialType),
     'hospital': '演示医院',
     'department': '妇科',
     'visit_date': DateTime.now().toIso8601String().substring(0, 10),
@@ -479,41 +478,6 @@ class SmokeApiClient extends ApiClient {
     'medication_suggestions': <Map<String, dynamic>>[],
     'original_file_name': file.uri.pathSegments.last,
   };
-
-  static Map<String, dynamic> _smokeOcrDraft(String materialType) =>
-      switch (materialType) {
-        'lab_report' => {
-          'hospital_name': '演示医院',
-          'sample_date': DateTime.now().toIso8601String().substring(0, 10),
-          'report_date': DateTime.now().toIso8601String().substring(0, 10),
-          'items': <Map<String, dynamic>>[],
-        },
-        'medical_order' => {
-          'hospital_name': '演示医院',
-          'department_name': '妇科',
-          'prescribed_at': DateTime.now().toIso8601String().substring(0, 10),
-          'orders': <Map<String, dynamic>>[],
-        },
-        'imaging_text_report' => {
-          'examination_name': '演示检查',
-          'body_part': null,
-          'examination_method': null,
-          'findings_text': '演示所见，请对照原件。',
-          'conclusion_text': '演示结论，请由医生复核。',
-          'examined_at': null,
-          'reported_at': null,
-        },
-        _ => {
-          'hospital_name': '演示医院',
-          'department_name': '妇科',
-          'doctor_name': null,
-          'visit_date': DateTime.now().toIso8601String().substring(0, 10),
-          'chief_complaint': null,
-          'diagnosis_summary': '多囊卵巢综合征',
-          'treatment_plan': null,
-          'medical_advice': '请携带原件与医生复核。',
-        },
-      };
 
   @override
   Future<List<int>> download(String path) async => <int>[];

@@ -110,7 +110,12 @@ DocumentServiceDependency = Annotated[DocumentService, Depends(get_document_serv
 def get_ocr_task_service(
     request: Request, session: DatabaseSession, account: CurrentAccount
 ) -> OCRTaskService:
-    return OCRTaskService(session, account, model_name=request.app.state.settings.ocr_model)
+    return OCRTaskService(
+        session,
+        account,
+        model_name=request.app.state.settings.ocr_model,
+        business_date=request.app.state.business_date_provider(),
+    )
 
 
 OCRTaskServiceDependency = Annotated[OCRTaskService, Depends(get_ocr_task_service)]
