@@ -43,6 +43,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
         _file = File(path);
         _idempotencyKey = null;
       });
+      await _start();
     }
   }
 
@@ -58,6 +59,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
         _file = File(result.path);
         _idempotencyKey = null;
       });
+      await _start();
     }
   }
 
@@ -249,6 +251,15 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     );
   }
 }
+
+const _ocrMetadataKeys = {
+  'ocr_task_id',
+  'ocr_result_id',
+  'document_id',
+  'document_revision_id',
+  'material_type',
+  'result_source',
+};
 
 class OcrConfirmScreen extends ConsumerStatefulWidget {
   const OcrConfirmScreen({
@@ -487,15 +498,6 @@ class _JsonFields extends StatelessWidget {
   bool _longField(String? name) =>
       const {'医嘱原文', '检查所见', '检查结论', '主诉', '诊断摘要', '处理意见', '医嘱'}.contains(name);
 }
-
-const _ocrMetadataKeys = {
-  'ocr_task_id',
-  'ocr_result_id',
-  'document_id',
-  'document_revision_id',
-  'material_type',
-  'result_source',
-};
 
 Map<String, dynamic> buildOcrConfirmationPayload(Map<String, dynamic> draft) {
   final examinations = (draft['examinations'] as List? ?? const [])
