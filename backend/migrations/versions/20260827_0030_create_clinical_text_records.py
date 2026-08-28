@@ -27,14 +27,14 @@ def upgrade() -> None:
         sa.Column("document_id", sa.String(length=36), nullable=False),
         sa.Column("document_revision_id", sa.String(length=36), nullable=False),
         sa.Column("ocr_result_id", sa.String(length=36), nullable=False),
-        sa.Column("facility", sa.String(length=200), nullable=True),
         sa.Column("examination_name", sa.String(length=200), nullable=True),
         sa.Column("body_part", sa.String(length=200), nullable=True),
-        sa.Column("modality", sa.String(length=100), nullable=True),
-        sa.Column("examination_date", sa.Date(), nullable=True),
-        sa.Column("report_date", sa.Date(), nullable=True),
+        sa.Column("examination_method", sa.String(length=200), nullable=True),
+        sa.Column("examined_at", sa.Date(), nullable=True),
+        sa.Column("reported_at", sa.Date(), nullable=True),
         sa.Column("findings_text", sa.Text(), nullable=False),
         sa.Column("conclusion_text", sa.Text(), nullable=False),
+        sa.Column("original_payload", sa.JSON(), nullable=False),
         sa.Column("confirmed_payload", sa.JSON(), nullable=False),
         sa.Column("confirmed_by_uid", sa.String(length=36), nullable=False),
         sa.Column("confirmed_at", pomi_backend.db.types.UTCDateTime(timezone=True), nullable=False),
@@ -69,11 +69,15 @@ def upgrade() -> None:
             ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_imaging_report")),
+        sa.CheckConstraint("length(trim(findings_text)) > 0", name="ck_imaging_findings_nonblank"),
+        sa.CheckConstraint(
+            "length(trim(conclusion_text)) > 0", name="ck_imaging_conclusion_nonblank"
+        ),
         sa.UniqueConstraint("ocr_result_id", name="uq_imaging_report_ocr_result"),
     )
     with op.batch_alter_table("imaging_report", schema=None) as batch_op:
         batch_op.create_index(
-            "ix_imaging_report_patient_examined", ["patient_id", "examination_date"], unique=False
+            "ix_imaging_report_patient_examined", ["patient_id", "examined_at"], unique=False
         )
 
     op.create_table(
@@ -83,14 +87,15 @@ def upgrade() -> None:
         sa.Column("document_id", sa.String(length=36), nullable=False),
         sa.Column("document_revision_id", sa.String(length=36), nullable=False),
         sa.Column("ocr_result_id", sa.String(length=36), nullable=False),
-        sa.Column("facility", sa.String(length=200), nullable=True),
-        sa.Column("department", sa.String(length=200), nullable=True),
+        sa.Column("hospital_name", sa.String(length=200), nullable=True),
+        sa.Column("department_name", sa.String(length=200), nullable=True),
         sa.Column("doctor_name", sa.String(length=100), nullable=True),
         sa.Column("visit_date", sa.Date(), nullable=False),
         sa.Column("chief_complaint", sa.Text(), nullable=True),
         sa.Column("diagnosis_summary", sa.Text(), nullable=False),
         sa.Column("treatment_plan", sa.Text(), nullable=True),
         sa.Column("medical_advice", sa.Text(), nullable=False),
+        sa.Column("original_payload", sa.JSON(), nullable=False),
         sa.Column("confirmed_payload", sa.JSON(), nullable=False),
         sa.Column("confirmed_by_uid", sa.String(length=36), nullable=False),
         sa.Column("confirmed_at", pomi_backend.db.types.UTCDateTime(timezone=True), nullable=False),
@@ -125,6 +130,12 @@ def upgrade() -> None:
             ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_outpatient_record")),
+        sa.CheckConstraint(
+            "length(trim(diagnosis_summary)) > 0", name="ck_outpatient_diagnosis_nonblank"
+        ),
+        sa.CheckConstraint(
+            "length(trim(medical_advice)) > 0", name="ck_outpatient_advice_nonblank"
+        ),
         sa.UniqueConstraint("ocr_result_id", name="uq_outpatient_record_ocr_result"),
     )
     with op.batch_alter_table("outpatient_record", schema=None) as batch_op:

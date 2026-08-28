@@ -30,16 +30,15 @@ class ClinicalTextConfirmRequest(BaseModel):
 class ImagingTextConfirmation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    facility: str | None = Field(default=None, max_length=200)
     examination_name: str | None = Field(default=None, max_length=200)
     body_part: str | None = Field(default=None, max_length=200)
-    modality: str | None = Field(default=None, max_length=100)
-    examination_date: date | None = None
-    report_date: date | None = None
-    findings: str = Field(min_length=1, max_length=20000)
-    impression: str = Field(min_length=1, max_length=20000)
+    examination_method: str | None = Field(default=None, max_length=200)
+    findings_text: str = Field(min_length=1, max_length=20000)
+    conclusion_text: str = Field(min_length=1, max_length=20000)
+    examined_at: date | None = None
+    reported_at: date | None = None
 
-    @field_validator("findings", "impression")
+    @field_validator("findings_text", "conclusion_text")
     @classmethod
     def non_blank(cls, value: str) -> str:
         if not value.strip():
@@ -50,8 +49,8 @@ class ImagingTextConfirmation(BaseModel):
 class OutpatientConfirmation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    facility: str | None = Field(default=None, max_length=200)
-    department: str | None = Field(default=None, max_length=200)
+    hospital_name: str | None = Field(default=None, max_length=200)
+    department_name: str | None = Field(default=None, max_length=200)
     doctor_name: str | None = Field(default=None, max_length=100)
     visit_date: date
     chief_complaint: str | None = Field(default=None, max_length=20000)

@@ -211,8 +211,12 @@ def test_lab_confirmation_contract_matches_runtime_and_traceability() -> None:
     schemas = contract["components"]["schemas"]
 
     confirmation = paths["/api/ocr/tasks/{task_id}/confirm"]["post"]
-    request_ref = confirmation["requestBody"]["content"]["application/json"]["schema"]["$ref"]
-    assert request_ref.endswith("/LabConfirmRequest")
+    request_schema = confirmation["requestBody"]["content"]["application/json"]["schema"]
+    request_refs = {item["$ref"] for item in request_schema["oneOf"]}
+    assert request_refs == {
+        "#/components/schemas/LabConfirmRequest",
+        "#/components/schemas/ClinicalTextConfirmRequest",
+    }
     assert {"401", "404", "409", "422"} <= set(confirmation["responses"])
     assert "Idempotency-Key" not in str(confirmation.get("parameters", []))
 
@@ -236,3 +240,19 @@ def test_lab_confirmation_contract_matches_runtime_and_traceability() -> None:
         "confirmed_item_data",
         "confirmed_by_uid",
     } <= set(observation["required"])
+
+
+def test_clinical_text_confirmation_contract_uses_worker_draft_fields() -> None:
+    schemas = load_contract()["components"]["schemas"]
+    imaging = schemas["ImagingTextConfirmation"]
+    outpatient = schemas["OutpatientRecordConfirmation"]
+
+    assert set(imaging["required"]) == {"findings_text", "conclusion_text"}
+    assert {"examination_method", "examined_at", "reported_at"} <= set(imaging["properties"])
+    assert {"visit_date", "diagnosis_summary", "medical_advice"} == set(outpatient["required"])
+    assert {"hospital_name", "department_name"} <= set(outpatient["properties"])
+    assert schemas["ClinicalFieldConfirmation"]["properties"]["confirmation_status"]["enum"] == [
+        "confirmed",
+        "edited",
+        "rejected",
+    ]

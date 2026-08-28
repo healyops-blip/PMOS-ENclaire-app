@@ -113,9 +113,11 @@ def test_laboratory_migration_upgrades_the_current_main_schema(
         "ocr_task",
         "ocr_result",
         "lab_observation",
+        "imaging_report",
+        "outpatient_record",
     } <= set(inspect(engine).get_table_names())
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-            "20260827_0029"
+            "20260827_0030"
         )
     engine.dispose()

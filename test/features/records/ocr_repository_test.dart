@@ -147,10 +147,10 @@ void main() {
       final result = await repository.confirmClinical(
         task: task,
         resultId: 'result-1',
-        confirmedData: {'findings': 'verbatim'},
+        confirmedData: {'findings_text': 'verbatim'},
         fieldConfirmations: const [
           {
-            'field_path': 'findings',
+            'field_path': 'findings_text',
             'user_value': 'verbatim',
             'confirmation_status': 'confirmed',
           },
@@ -159,10 +159,7 @@ void main() {
 
       expect(result.recordId, 'imaging-1');
       expect(request!.path, '/ocr/tasks/task-1/confirm');
-      expect(
-        request!.headers['Idempotency-Key'],
-        startsWith('flutter-confirm-'),
-      );
+      expect(request!.headers['Idempotency-Key'], isNull);
       expect(request!.data['result_id'], 'result-1');
       expect(request!.data['expected_revision_id'], 'rev-1');
       expect(request!.data['document_type'], 'imaging_text_report');

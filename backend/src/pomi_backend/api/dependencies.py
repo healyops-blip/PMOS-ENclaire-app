@@ -114,9 +114,11 @@ OCRTaskServiceDependency = Annotated[OCRTaskService, Depends(get_ocr_task_servic
 
 
 def get_clinical_text_confirmation_service(
-    session: DatabaseSession, account: CurrentAccount
+    request: Request, session: DatabaseSession, account: CurrentAccount
 ) -> ClinicalTextConfirmationService:
-    return ClinicalTextConfirmationService(session, account)
+    return ClinicalTextConfirmationService(
+        session, account, business_date=request.app.state.business_date_provider()
+    )
 
 
 ClinicalTextConfirmationServiceDependency = Annotated[

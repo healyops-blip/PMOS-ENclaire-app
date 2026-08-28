@@ -344,6 +344,9 @@ PUT 允许分步部分更新。请求中的 `complete_onboarding=true` 只有在
 - `outpatient_record` 保存同样的三段来源标识，以及医院、科室、医生、就诊日期、主诉、诊断摘要、治疗计划、处理意见、确认人和时间。病历中的药物只保留为原文，不写当前用药或复诊日期。
 - Flutter 共用原件图片/单页 PDF 对照和长文本编辑组件；低置信度、缺失及日期异常会高亮。失败保留编辑值与滚动位置。
 - 确认请求必须携带 `result_id`、`expected_revision_id`、材料类型和字段决定；后端重新校验并在单一事务中写 OCR 最终值、字段状态和正式记录。重复确认返回同一正式记录。
+- `confirmed_data` 的字段名与上述 `validated_draft` 完全一致；影像的 `findings_text/conclusion_text`，以及门诊的 `visit_date/diagnosis_summary/medical_advice` 均为正式保存前的必填字段。
+- 字段错误统一返回 `error.details.fields[]`（`path/code/message`），客户端按 `path` 高亮且不得清空用户输入。相同请求重放返回 `reused=true`；已确认任务使用不同内容重放返回 `OCR_ALREADY_CONFIRMED`（409）。
+- 成功响应包含正式记录 ID、完整来源链路和 `p0_evaluation`；确认只保存临床文字，不会创建或修改用药、复诊或其他医疗行为数据。
 
 失败或超时任务通过 `POST /api/ocr/tasks/{task_id}/retry` 创建唯一关联的新尝试；重复点击返回同一个子任务。
 
