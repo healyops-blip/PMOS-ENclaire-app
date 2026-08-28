@@ -60,6 +60,11 @@ void main() {
       find.byKey(const ValueKey('pomi-verified-stamp')),
     );
     expect(stamp.width, 132);
+    final stampPosition = tester.widget<Positioned>(
+      find.byKey(const ValueKey('pomi-verified-stamp-position')),
+    );
+    expect(stampPosition.right, -8);
+    expect(stampPosition.top, 0);
     expect(
       find.byKey(const ValueKey('pomi-verified-stamp-rotation')),
       findsOneWidget,

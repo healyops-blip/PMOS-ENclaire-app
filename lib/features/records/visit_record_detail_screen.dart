@@ -495,8 +495,9 @@ class _VisitHeroCard extends StatelessWidget {
             ],
           ),
           Positioned(
-            right: 4,
-            top: 12,
+            key: const ValueKey('pomi-verified-stamp-position'),
+            right: -8,
+            top: 0,
             child: Semantics(
               image: true,
               label: '该报告已核验',
