@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pmos_enclaire/features/certification/application/certification_providers.dart';
+import 'package:pmos_enclaire/features/certification/data/certification_repository.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:pmos_enclaire/features/records/presentation/ocr_task_page.dart';
@@ -122,6 +125,46 @@ void main() {
     expect(repository.getCalls, 2);
     expect(find.byKey(const Key('ocr-confirmation-entry')), findsOneWidget);
   });
+
+  testWidgets(
+    'confirmed task exposes certification only for the current revision',
+    (tester) async {
+      final repository = _SequenceRepository(const [])
+        ..createValue = _task(OcrTaskStatus.confirmed);
+      final local = MemoryCertificationRepository();
+
+      Widget app(MedicalDocument document) => ProviderScope(
+        overrides: [certificationRepositoryProvider.overrideWithValue(local)],
+        child: MaterialApp(
+          home: OcrTaskPage(
+            repository: repository,
+            document: document,
+            documentRepository: _StaticDocumentRepository(document),
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(app(_document));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('certification-entry-card')), findsOneWidget);
+
+      await tester.pumpWidget(
+        app(
+          MedicalDocument(
+            id: 'doc-1',
+            documentType: 'lab_report',
+            originalFileName: 'lab.png',
+            mimeType: 'image/png',
+            fileSizeBytes: 100,
+            currentRevisionId: 'rev-2',
+            uploadedAt: DateTime(2026),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('certification-entry-card')), findsNothing);
+    },
+  );
 }
 
 OcrTask _task(OcrTaskStatus status, {String? category}) => OcrTask(
@@ -198,8 +241,8 @@ class _SequenceRepository implements OcrRepository {
     required List<Map<String, dynamic>> fieldConfirmations,
   }) async => ClinicalConfirmationResult(
     recordId: 'record-1',
-    materialType: 'imaging_text_report',
-    documentRevisionId: 'rev-1',
+    materialType: task.materialType,
+    documentRevisionId: task.documentRevisionId,
     summary: confirmedData,
     reused: false,
   );
@@ -215,4 +258,16 @@ class _SequenceRepository implements OcrRepository {
     String? reportDate,
     String? visitDate,
   }) => throw UnimplementedError();
+}
+
+class _StaticDocumentRepository implements DocumentRepository {
+  _StaticDocumentRepository(this.document);
+
+  final MedicalDocument document;
+
+  @override
+  Future<MedicalDocument> get(String id) async => document;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

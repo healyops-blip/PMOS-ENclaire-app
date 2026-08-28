@@ -1,5 +1,10 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:pmos_enclaire/features/records/presentation/lab_confirmation_page.dart';
 
@@ -11,8 +16,14 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final repository = _LabRepository();
       await tester.pumpWidget(
-        MaterialApp(
-          home: LabConfirmationPage(repository: repository, task: _task),
+        ProviderScope(
+          child: MaterialApp(
+            home: LabConfirmationPage(
+              repository: repository,
+              task: _task,
+              documentRepository: _CurrentDocumentRepository('doc-1', 'rev-1'),
+            ),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -75,10 +86,35 @@ void main() {
 
       expect(repository.confirmCalls, 2);
       expect(find.byKey(const Key('lab-confirmation-success')), findsOneWidget);
+      expect(find.byKey(const Key('certification-entry-card')), findsOneWidget);
       expect(find.text('已确认 1 项正式数据'), findsOneWidget);
       expect(find.text('5.200000 mmol/L'), findsOneWidget);
     },
   );
+}
+
+class _CurrentDocumentRepository extends DemoDocumentRepository {
+  _CurrentDocumentRepository(this.documentId, this.revisionId);
+
+  final String documentId;
+  final String revisionId;
+
+  @override
+  Future<MedicalDocument> get(String id) async => MedicalDocument(
+    id: documentId,
+    documentType: 'lab_report',
+    originalFileName: 'lab.png',
+    mimeType: 'image/png',
+    fileSizeBytes: 1,
+    currentRevisionId: revisionId,
+    uploadedAt: DateTime.utc(2026, 8, 27),
+  );
+
+  @override
+  Future<Uint8List> download(String documentId, String revisionId) async =>
+      base64Decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      );
 }
 
 const _task = OcrTask(

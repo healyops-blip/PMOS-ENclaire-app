@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:pmos_enclaire/features/certification/presentation/certification_page.dart';
+import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:printing/printing.dart';
 
@@ -8,11 +10,13 @@ class ClinicalTextConfirmationPage extends StatefulWidget {
   const ClinicalTextConfirmationPage({
     required this.repository,
     required this.task,
+    this.documentRepository,
     super.key,
   });
 
   final OcrRepository repository;
   final OcrTask task;
+  final DocumentRepository? documentRepository;
 
   @override
   State<ClinicalTextConfirmationPage> createState() =>
@@ -239,22 +243,36 @@ class _ClinicalTextConfirmationPageState
                   child: Text(_submitting ? '确认保存中…' : '整份核对完成并确认'),
                 )
               else
-                Card(
-                  key: const Key('clinical-confirmation-success'),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          '已确认并保存',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Card(
+                      key: const Key('clinical-confirmation-success'),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              '已确认并保存',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            Text('来源修订：${_confirmed!.documentRevisionId}'),
+                            Text('正式记录：${_confirmed!.recordId}'),
+                          ],
                         ),
-                        Text('来源修订：${_confirmed!.documentRevisionId}'),
-                        Text('正式记录：${_confirmed!.recordId}'),
-                      ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 12),
+                    if (widget.documentRepository != null)
+                      CertificationEntryCard(
+                        documentId: widget.task.documentId,
+                        revisionId: widget.task.documentRevisionId,
+                        materialLabel: _imaging ? '影像文字报告' : '门诊病历／就诊记录',
+                        ocrConfirmed: _confirmed != null,
+                        documentRepository: widget.documentRepository!,
+                      ),
+                  ],
                 ),
             ],
           ),

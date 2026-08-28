@@ -3,7 +3,6 @@ import 'package:pmos_enclaire/core/theme/pomi_theme.dart';
 import 'package:pmos_enclaire/core/widgets/demo_badge.dart';
 import 'package:pmos_enclaire/core/widgets/pomi_surfaces.dart';
 import 'package:pmos_enclaire/features/auth/domain/demo_account.dart';
-import 'package:pmos_enclaire/features/certification/presentation/certification_page.dart';
 import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
 
 String nextVisitStatus(DateTime visit, {DateTime? today}) {
@@ -197,24 +196,12 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                const PomiSectionTitle(title: '认证演示与隐私'),
+                const PomiSectionTitle(title: '隐私与说明'),
                 const SizedBox(height: 8),
                 PomiSectionCard(
                   padding: EdgeInsets.zero,
                   child: Column(
                     children: [
-                      _ProfileAction(
-                        key: const Key('certification-entry'),
-                        icon: Icons.verified_user_outlined,
-                        title: '医院认证演示',
-                        subtitle: '本地四状态 · 绑定当前材料版本',
-                        badge: '仅前端',
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const CertificationPage(),
-                          ),
-                        ),
-                      ),
                       _ProfileAction(
                         icon: Icons.share_outlined,
                         title: '跨院授权记录（P1）',
@@ -456,7 +443,6 @@ class _ProfileAction extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
-    this.badge,
     this.last = false,
     super.key,
   });
@@ -465,7 +451,6 @@ class _ProfileAction extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
-  final String? badge;
   final bool last;
 
   @override
@@ -499,8 +484,6 @@ class _ProfileAction extends StatelessWidget {
                 ],
               ),
             ),
-            if (badge != null)
-              PomiPill(label: badge!, color: PomiColors.primary),
             const Icon(
               Icons.chevron_right_rounded,
               color: PomiColors.textMuted,

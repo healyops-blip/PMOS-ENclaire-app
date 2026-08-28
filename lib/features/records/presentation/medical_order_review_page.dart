@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pmos_enclaire/features/certification/presentation/certification_page.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:pmos_enclaire/features/records/data/order_reconciliation_repository.dart';
@@ -28,6 +29,7 @@ class _MedicalOrderReviewPageState extends State<MedicalOrderReviewPage> {
     widget.result.draft,
   );
   bool _submitting = false;
+  bool _ocrConfirmed = false;
   Object? _error;
   Map<String, String> _fieldErrors = const {};
 
@@ -48,6 +50,7 @@ class _MedicalOrderReviewPageState extends State<MedicalOrderReviewPage> {
         widget.task.documentRevisionId,
         _items,
       );
+      _ocrConfirmed = true;
       final reconciliation = await widget.gateway.createReconciliation(
         widget.task.id,
       );
@@ -57,6 +60,10 @@ class _MedicalOrderReviewPageState extends State<MedicalOrderReviewPage> {
           builder: (_) => MedicationReconciliationPage(
             gateway: widget.gateway,
             reconciliation: reconciliation,
+            documentId: widget.task.documentId,
+            revisionId: widget.task.documentRevisionId,
+            documentRepository: widget.documentRepository,
+            ocrConfirmed: _ocrConfirmed,
           ),
         ),
       );
@@ -319,10 +326,18 @@ class MedicationReconciliationPage extends StatefulWidget {
   const MedicationReconciliationPage({
     required this.gateway,
     required this.reconciliation,
+    required this.ocrConfirmed,
+    this.documentId,
+    this.revisionId,
+    this.documentRepository,
     super.key,
   });
   final MedicalOrderGateway gateway;
   final MedicationReconciliationDraft reconciliation;
+  final bool ocrConfirmed;
+  final String? documentId;
+  final String? revisionId;
+  final DocumentRepository? documentRepository;
 
   @override
   State<MedicationReconciliationPage> createState() =>
@@ -370,6 +385,18 @@ class _MedicationReconciliationPageState
         Text('规则版本：${_reconciliation.ruleVersion}'),
         const Text('旧药未在新医嘱出现只会标记为“不确定”，不会自动停药。请逐项决定。'),
         const SizedBox(height: 12),
+        if (widget.documentId != null &&
+            widget.revisionId != null &&
+            widget.documentRepository != null) ...[
+          CertificationEntryCard(
+            documentId: widget.documentId!,
+            revisionId: widget.revisionId!,
+            materialLabel: '医嘱／处方',
+            ocrConfirmed: widget.ocrConfirmed,
+            documentRepository: widget.documentRepository!,
+          ),
+          const SizedBox(height: 12),
+        ],
         for (final item in _reconciliation.items)
           Card(
             key: Key('reconciliation-item-${item.id}'),
