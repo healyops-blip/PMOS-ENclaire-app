@@ -237,6 +237,10 @@ class ApiClient {
 class SmokeApiClient extends ApiClient {
   SmokeApiClient(super.storage);
 
+  /// Credentials shown on the local Smoke Preview login screen.
+  static const demoAccountName = 'smoke';
+  static const demoPassword = 'Pomi1234';
+
   final Map<String, dynamic> _profile = {
     'nickname': 'Pomi',
     'id': 'smoke-patient',
@@ -250,9 +254,48 @@ class SmokeApiClient extends ApiClient {
     'onboarding_completed': true,
     'updated_at': '2026-08-27T00:00:00Z',
   };
-  final List<Map<String, dynamic>> _weights = [];
+  final List<Map<String, dynamic>> _weights = List.generate(7, (index) {
+    const values = [71.3, 70.5, 71.0, 70.7, 69.9, 70.4, 70.0];
+    final timestamp =
+        DateTime.now().subtract(Duration(days: (6 - index) * 4)).toUtc();
+    return {
+      'id': 'smoke-weight-${index + 1}',
+      'record_date': timestamp.toIso8601String().substring(0, 10),
+      'weight_kg': values[index],
+      'created_at': timestamp.toIso8601String(),
+      'updated_at': timestamp.toIso8601String(),
+    };
+  });
   final List<Map<String, dynamic>> _cycles = [];
-  final List<Map<String, dynamic>> _medications = [];
+  final List<Map<String, dynamic>> _medications = [
+    {
+      'id': 'smoke-medication-1',
+      'drug_name': '盐酸二甲双胍缓释片',
+      'specification': '500mg',
+      'frequency': '每日 2 次 · 随餐',
+      'scheduled_time': '08:00',
+      'current_status': 'active',
+      'today_status': 'taken',
+    },
+    {
+      'id': 'smoke-medication-2',
+      'drug_name': '叶酸',
+      'specification': '0.4mg',
+      'frequency': '每日 1 次',
+      'scheduled_time': '08:00',
+      'current_status': 'active',
+      'today_status': 'taken',
+    },
+    {
+      'id': 'smoke-medication-3',
+      'drug_name': '维生素 D3',
+      'specification': '2000IU',
+      'frequency': '每日 1 次',
+      'scheduled_time': '20:00',
+      'current_status': 'active',
+      'today_status': 'unrecorded',
+    },
+  ];
   int _nextId = 1;
 
   String _id(String prefix) => '$prefix-${_nextId++}';
@@ -292,6 +335,7 @@ class SmokeApiClient extends ApiClient {
                   'specification': item['specification'],
                   'dosage_text': item['specification'],
                   'frequency': item['frequency'],
+                  'scheduled_time': item['scheduled_time'],
                   'intake_status': item['today_status'] ?? 'unrecorded',
                   'recorded_at': null,
                 },

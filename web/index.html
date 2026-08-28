@@ -85,7 +85,11 @@
       border-radius: 32px;
       overflow: hidden;
       box-shadow: 0 8px 32px rgba(74, 46, 107, 0.16);
-      background: #ffffff;
+      background:
+        radial-gradient(circle at 100% 0%, rgba(221, 245, 255, .72), transparent 54%),
+        radial-gradient(circle at 100% 36%, rgba(110, 80, 230, .48), transparent 58%),
+        radial-gradient(circle at 0% 72%, rgba(242, 154, 211, .40), transparent 62%),
+        #fffefa;
       display: flex;
       flex-direction: column;
       position: relative;
@@ -100,7 +104,7 @@
       padding: 0 13px;
       box-sizing: border-box;
       color: #111111;
-      background: #f8f5fa;
+      background: transparent;
       font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
       font-size: 10px;
       font-weight: 700;
