@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
@@ -429,46 +431,43 @@ class _VisitHeroCard extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Padding(
-                padding: EdgeInsets.only(right: isVerified ? 88 : 0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 46,
-                      height: 46,
-                      decoration: BoxDecoration(
-                        color: pomiPurple.withValues(alpha: .11),
-                        borderRadius: BorderRadius.circular(15),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: .68),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      color: pomiPurple.withValues(alpha: .11),
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: .68),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.event_note_rounded,
+                      color: pomiPurple,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          visit.date,
+                          style: Theme.of(context).textTheme.headlineMedium,
                         ),
-                      ),
-                      child: const Icon(
-                        Icons.event_note_rounded,
-                        color: pomiPurple,
-                        size: 24,
-                      ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '就诊记录 · 演示数据',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            visit.date,
-                            style: Theme.of(context).textTheme.headlineMedium,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '就诊记录 · 演示数据',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
               const SizedBox(height: 18),
               Text(
@@ -499,19 +498,23 @@ class _VisitHeroCard extends StatelessWidget {
           ),
           if (isVerified)
             Positioned(
-              right: 0,
-              top: 0,
+              right: 23,
+              top: 23,
               child: Semantics(
                 image: true,
                 label: '该报告已核验',
                 child: Opacity(
                   opacity: .88,
-                  child: Image.asset(
-                    'assets/images/pomi_verified_stamp.png',
-                    key: const ValueKey('pomi-verified-stamp'),
-                    width: 80,
-                    height: 80,
-                    filterQuality: FilterQuality.high,
+                  child: Transform.rotate(
+                    key: const ValueKey('pomi-verified-stamp-rotation'),
+                    angle: -math.pi / 4,
+                    child: Image.asset(
+                      'assets/images/pomi_verified_stamp.png',
+                      key: const ValueKey('pomi-verified-stamp'),
+                      width: 112,
+                      height: 112,
+                      filterQuality: FilterQuality.high,
+                    ),
                   ),
                 ),
               ),
@@ -778,7 +781,7 @@ class _LabResultRow extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final value = Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text.rich(
                 TextSpan(
@@ -798,40 +801,35 @@ class _LabResultRow extends StatelessWidget {
                     ),
                   ],
                 ),
+                key: ValueKey('lab-value-${result.name}'),
                 maxLines: 1,
               ),
               const SizedBox(height: 4),
-              _StatusLabel(
+              _ReferenceLabel(
                 icon: status.icon,
-                label: status.label,
+                label: '参考 ${result.reference}',
                 color: status.valueColor,
+                resultName: result.name,
               ),
             ],
           );
-          final name = Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(result.name, style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 4),
-              Text(
-                '参考 ${result.reference}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
+          final name = Text(
+            result.name,
+            style: Theme.of(context).textTheme.titleMedium,
           );
           if (constraints.maxWidth < 300) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                name,
-                const SizedBox(height: 10),
-                Align(alignment: Alignment.centerLeft, child: value),
-              ],
+              children: [name, const SizedBox(height: 10), value],
             );
           }
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [Expanded(child: name), const SizedBox(width: 12), value],
+            children: [
+              Expanded(child: name),
+              const SizedBox(width: 12),
+              SizedBox(width: 176, child: value),
+            ],
           );
         },
       ),
@@ -839,28 +837,34 @@ class _LabResultRow extends StatelessWidget {
   }
 }
 
-class _StatusLabel extends StatelessWidget {
-  const _StatusLabel({
+class _ReferenceLabel extends StatelessWidget {
+  const _ReferenceLabel({
     required this.icon,
     required this.label,
     required this.color,
+    required this.resultName,
   });
 
   final IconData icon;
   final String label;
   final Color color;
+  final String resultName;
 
   @override
   Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
     children: [
       Icon(icon, size: 14, color: color),
-      const SizedBox(width: 3),
-      Text(
-        label,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: color,
-          fontWeight: FontWeight.w700,
+      const SizedBox(width: 4),
+      Expanded(
+        child: Text(
+          label,
+          key: ValueKey('lab-reference-$resultName'),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: color,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     ],
@@ -908,71 +912,44 @@ class _OrderRow extends StatelessWidget {
     final style = _orderStyle(item.change);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 15),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: style.background,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              Icons.medication_rounded,
-              color: style.foreground,
-              size: 19,
-            ),
-          ),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        item.name,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: style.background,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        style.label,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: style.foreground,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  item.name,
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  '${item.dosage} · ${item.frequency}',
-                  style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: style.background,
+                  borderRadius: BorderRadius.circular(999),
                 ),
-                if (item.note != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    item.note!,
-                    style: Theme.of(context).textTheme.bodySmall,
+                child: Text(
+                  style.label,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: style.foreground,
+                    fontWeight: FontWeight.w700,
                   ),
-                ],
-              ],
-            ),
+                ),
+              ),
+            ],
           ),
+          const SizedBox(height: 4),
+          Text(
+            '${item.dosage} · ${item.frequency}',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          if (item.note != null) ...[
+            const SizedBox(height: 4),
+            Text(item.note!, style: Theme.of(context).textTheme.bodySmall),
+          ],
         ],
       ),
     );
@@ -1026,30 +1003,25 @@ class _MedicalDisclaimer extends StatelessWidget {
   ),
 };
 
-({String label, Color valueColor, IconData icon}) _labStatusStyle(
-  VisitLabStatus status,
-) => switch (status) {
-  VisitLabStatus.normal => (
-    label: '在参考范围内',
-    valueColor: pomiSuccess,
-    icon: Icons.check_circle_outline_rounded,
-  ),
-  VisitLabStatus.high => (
-    label: '高于参考范围',
-    valueColor: const Color(0xFFD24A54),
-    icon: Icons.arrow_upward_rounded,
-  ),
-  VisitLabStatus.low => (
-    label: '低于参考范围',
-    valueColor: const Color(0xFFC77A16),
-    icon: Icons.arrow_downward_rounded,
-  ),
-  VisitLabStatus.pending => (
-    label: '等待确认',
-    valueColor: pomiSecondaryText,
-    icon: Icons.schedule_rounded,
-  ),
-};
+({Color valueColor, IconData icon}) _labStatusStyle(VisitLabStatus status) =>
+    switch (status) {
+      VisitLabStatus.normal => (
+        valueColor: pomiSuccess,
+        icon: Icons.check_circle_outline_rounded,
+      ),
+      VisitLabStatus.high => (
+        valueColor: const Color(0xFFD24A54),
+        icon: Icons.arrow_upward_rounded,
+      ),
+      VisitLabStatus.low => (
+        valueColor: const Color(0xFFC77A16),
+        icon: Icons.arrow_downward_rounded,
+      ),
+      VisitLabStatus.pending => (
+        valueColor: pomiSecondaryText,
+        icon: Icons.schedule_rounded,
+      ),
+    };
 
 ({String label, Color background, Color foreground}) _orderStyle(
   VisitOrderChange change,
