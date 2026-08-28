@@ -399,6 +399,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
+      backgroundColor: Colors.white,
       builder:
           (sheetContext) => SafeArea(
             child: Padding(
