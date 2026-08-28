@@ -1633,6 +1633,46 @@ class _BmiPainter extends CustomPainter {
       oldDelegate.values != values;
 }
 
+class _GlucoseTrendChart extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => CustomPaint(
+    painter: _GlucosePainter(const [5.4, 5.2, 5.0, 5.1, 5.3, 5.6]),
+    child: const SizedBox.expand(),
+  );
+}
+
+class _GlucosePainter extends CustomPainter {
+  _GlucosePainter(this.values);
+  final List<double> values;
+  @override
+  void paint(Canvas canvas, Size size) {
+    const min = 3.57, max = 6.43;
+    final chart = Rect.fromLTWH(42, 10, size.width - 52, size.height - 32);
+    final grid = Paint()..color = const Color(0xFFECEAF0);
+    for (var i = 0; i < 3; i++) {
+      final y = chart.top + chart.height * i / 2;
+      canvas.drawLine(Offset(chart.left, y), Offset(chart.right, y), grid);
+    }
+    final path = Path();
+    for (var i = 0; i < values.length; i++) {
+      final x = chart.left + chart.width * i / (values.length - 1);
+      final y = chart.bottom - (values[i] - min) / (max - min) * chart.height;
+      i == 0 ? path.moveTo(x, y) : path.lineTo(x, y);
+      canvas.drawCircle(Offset(x, y), 5, Paint()..color = pomiSuccess);
+    }
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = pomiPurple
+        ..strokeWidth = 3
+        ..style = PaintingStyle.stroke,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _GlucosePainter oldDelegate) => false;
+}
+
 class _ReportMedicationTile extends StatelessWidget {
   const _ReportMedicationTile({required this.item});
   final Map<String, dynamic> item;
@@ -1854,6 +1894,21 @@ class _ReportTrendLayer extends StatelessWidget {
           '26–08  5.6 mmol/L',
         ],
         onTap: onOpenSources,
+      ),
+      const SizedBox(height: 10),
+      PomiGlassCard(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '空腹血糖趋势图',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(height: 210, child: _GlucoseTrendChart()),
+          ],
+        ),
       ),
     ],
   );
