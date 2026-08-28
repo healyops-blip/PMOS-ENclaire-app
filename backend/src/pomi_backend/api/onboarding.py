@@ -21,17 +21,23 @@ def get_draft(request: Request, service: OnboardingServiceDependency) -> dict:
 
 
 @router.put("/steps/basic")
-def save_basic(payload: OnboardingBasicInput, request: Request, service: OnboardingServiceDependency) -> dict:
+def save_basic(
+    payload: OnboardingBasicInput, request: Request, service: OnboardingServiceDependency
+) -> dict:
     return success(request, draft_data(service.save_basic(payload)))
 
 
 @router.put("/steps/cycle")
-def save_cycle(payload: OnboardingCycleInput, request: Request, service: OnboardingServiceDependency) -> dict:
+def save_cycle(
+    payload: OnboardingCycleInput, request: Request, service: OnboardingServiceDependency
+) -> dict:
     return success(request, draft_data(service.save_cycle(payload)))
 
 
 @router.put("/steps/medications")
-def save_medications(payload: OnboardingMedicationsInput, request: Request, service: OnboardingServiceDependency) -> dict:
+def save_medications(
+    payload: OnboardingMedicationsInput, request: Request, service: OnboardingServiceDependency
+) -> dict:
     return success(request, draft_data(service.save_medications(payload)))
 
 

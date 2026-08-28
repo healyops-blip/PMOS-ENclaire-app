@@ -3,25 +3,24 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import date
-from datetime import datetime, UTC
+from datetime import UTC, date, datetime
 from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from pomi_backend.db.models import (
+    Document,
     Medication,
     MedicationDaily,
+    MenstrualCycle,
     PatientProfile,
     ReportSnapshot,
-    Document,
-    MenstrualCycle,
-    WeightRecord,
     UserAccount,
+    WeightRecord,
 )
 from pomi_backend.schemas.dashboard import DashboardSection, DashboardSectionError
-from pomi_backend.services.medications import MedicationService, daily_data, medication_data
+from pomi_backend.services.medications import MedicationService, daily_data
 
 
 class DashboardService:
@@ -43,8 +42,12 @@ class DashboardService:
             "monthly_medication_summary": self._section(
                 "MEDICATION_SUMMARY_UNAVAILABLE", self.monthly_medication_summary
             ),
-            "tracking_summary": self._section("TRACKING_SUMMARY_UNAVAILABLE", self.tracking_summary),
-            "document_summary": self._section("DOCUMENT_SUMMARY_UNAVAILABLE", self.document_summary),
+            "tracking_summary": self._section(
+                "TRACKING_SUMMARY_UNAVAILABLE", self.tracking_summary
+            ),
+            "document_summary": self._section(
+                "DOCUMENT_SUMMARY_UNAVAILABLE", self.document_summary
+            ),
             "latest_report": self._section("LATEST_REPORT_UNAVAILABLE", self.latest_report),
         }
 
@@ -115,8 +118,12 @@ class DashboardService:
                     else None
                 ),
                 "frequency": item.frequency,
-                "intake_status": daily_data(item, self.business_date, explicit.get(item.id), editable=True)["intake_status"],
-                "recorded_at": daily_data(item, self.business_date, explicit.get(item.id), editable=True)["recorded_at"],
+                "intake_status": daily_data(
+                    item, self.business_date, explicit.get(item.id), editable=True
+                )["intake_status"],
+                "recorded_at": daily_data(
+                    item, self.business_date, explicit.get(item.id), editable=True
+                )["recorded_at"],
             }
             for item in due
         ]
@@ -141,7 +148,9 @@ class DashboardService:
             return None
         cycle = self.session.scalar(
             select(MenstrualCycle)
-            .where(MenstrualCycle.patient_id == profile.patient_id, MenstrualCycle.deleted_at.is_(None))
+            .where(
+                MenstrualCycle.patient_id == profile.patient_id, MenstrualCycle.deleted_at.is_(None)
+            )
             .order_by(MenstrualCycle.start_date.desc())
             .limit(1)
         )
@@ -152,20 +161,42 @@ class DashboardService:
             .limit(1)
         )
         return {
-            "latest_cycle": None if cycle is None else {"id": cycle.id, "start_date": cycle.start_date.isoformat()},
-            "latest_weight": None if weight is None else {"id": weight.id, "record_date": weight.record_date.isoformat(), "weight_kg": float(weight.weight_kg)},
+            "latest_cycle": None
+            if cycle is None
+            else {"id": cycle.id, "start_date": cycle.start_date.isoformat()},
+            "latest_weight": None
+            if weight is None
+            else {
+                "id": weight.id,
+                "record_date": weight.record_date.isoformat(),
+                "weight_kg": float(weight.weight_kg),
+            },
         }
 
     def document_summary(self) -> dict[str, int] | None:
         profile = self._profile()
         if profile is None:
             return None
-        total = self.session.scalar(
-            select(func.count()).select_from(Document).where(Document.patient_id == profile.patient_id, Document.deleted_at.is_(None))
-        ) or 0
-        confirmed = self.session.scalar(
-            select(func.count()).select_from(Document).where(Document.patient_id == profile.patient_id, Document.deleted_at.is_(None), Document.upload_status == "ready")
-        ) or 0
+        total = (
+            self.session.scalar(
+                select(func.count())
+                .select_from(Document)
+                .where(Document.patient_id == profile.patient_id, Document.deleted_at.is_(None))
+            )
+            or 0
+        )
+        confirmed = (
+            self.session.scalar(
+                select(func.count())
+                .select_from(Document)
+                .where(
+                    Document.patient_id == profile.patient_id,
+                    Document.deleted_at.is_(None),
+                    Document.upload_status == "ready",
+                )
+            )
+            or 0
+        )
         return {"confirmed": int(confirmed), "total": int(total)}
 
     def latest_report(self) -> dict[str, Any] | None:

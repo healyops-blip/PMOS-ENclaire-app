@@ -26,7 +26,8 @@ from pomi_backend.api.health import router as health_router
 from pomi_backend.api.labs import router as labs_router
 from pomi_backend.api.medications import router as medications_router
 from pomi_backend.api.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
-from pomi_backend.api.ocr import router as ocr_router, sync_router as ocr_sync_router
+from pomi_backend.api.ocr import router as ocr_router
+from pomi_backend.api.ocr import sync_router as ocr_sync_router
 from pomi_backend.api.onboarding import router as onboarding_router
 from pomi_backend.api.patient import router as patient_router
 from pomi_backend.api.patient_notes import router as patient_notes_router

@@ -59,4 +59,3 @@ class OnboardingDraftResponse(BaseModel):
     cycle: dict | None = None
     medications: dict | None = None
     updated_at: datetime
-

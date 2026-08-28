@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -53,10 +54,14 @@ class OnboardingService:
         return draft
 
     def save_basic(self, payload: OnboardingBasicInput) -> OnboardingDraft:
-        return self._save("basic_data", payload.model_dump(mode="json", exclude_none=False), "cycle")
+        return self._save(
+            "basic_data", payload.model_dump(mode="json", exclude_none=False), "cycle"
+        )
 
     def save_cycle(self, payload: OnboardingCycleInput) -> OnboardingDraft:
-        return self._save("cycle_data", payload.model_dump(mode="json", exclude_none=False), "medications")
+        return self._save(
+            "cycle_data", payload.model_dump(mode="json", exclude_none=False), "medications"
+        )
 
     def save_medications(self, payload: OnboardingMedicationsInput) -> OnboardingDraft:
         return self._save(
@@ -69,7 +74,9 @@ class OnboardingService:
         draft = self.draft()
         expected = value.pop("updated_at", None)
         if expected is not None and _as_utc(_datetime_value(expected)) != _as_utc(draft.updated_at):
-            raise BusinessError("RESOURCE_VERSION_CONFLICT", "The onboarding draft has changed.", 409)
+            raise BusinessError(
+                "RESOURCE_VERSION_CONFLICT", "The onboarding draft has changed.", 409
+            )
         setattr(draft, field, value)
         draft.current_step = next_step
         draft.updated_at = utc_now()

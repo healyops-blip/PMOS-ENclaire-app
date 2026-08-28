@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
-from datetime import UTC
+from datetime import UTC, date
 
 from sqlalchemy.orm import Session
 

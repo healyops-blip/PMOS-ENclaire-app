@@ -121,4 +121,6 @@ def update_weight(
             detail="A weight record already exists for that date.",
         ) from error
     except WeightVersionConflict as error:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Weight record has changed.") from error
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Weight record has changed."
+        ) from error
