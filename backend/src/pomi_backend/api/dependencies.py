@@ -16,6 +16,7 @@ from pomi_backend.services.clinical_text import ClinicalTextConfirmationService
 from pomi_backend.services.documents import DocumentService
 from pomi_backend.services.medications import MedicationService
 from pomi_backend.services.ocr import OCRTaskService
+from pomi_backend.services.orders import MedicalOrderService, ReconciliationService
 from pomi_backend.services.patient import PatientProfileService
 from pomi_backend.services.patient_notes import PatientNoteService
 
@@ -111,6 +112,30 @@ def get_ocr_task_service(
 
 
 OCRTaskServiceDependency = Annotated[OCRTaskService, Depends(get_ocr_task_service)]
+
+
+def get_medical_order_service(
+    request: Request, session: DatabaseSession, account: CurrentAccount
+) -> MedicalOrderService:
+    return MedicalOrderService(
+        session, account, business_date=request.app.state.business_date_provider()
+    )
+
+
+MedicalOrderServiceDependency = Annotated[MedicalOrderService, Depends(get_medical_order_service)]
+
+
+def get_reconciliation_service(
+    request: Request, session: DatabaseSession, account: CurrentAccount
+) -> ReconciliationService:
+    return ReconciliationService(
+        session, account, business_date=request.app.state.business_date_provider()
+    )
+
+
+ReconciliationServiceDependency = Annotated[
+    ReconciliationService, Depends(get_reconciliation_service)
+]
 
 
 def get_clinical_text_confirmation_service(

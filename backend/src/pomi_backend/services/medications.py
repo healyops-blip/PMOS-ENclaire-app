@@ -38,6 +38,7 @@ def _number(value: Decimal | None) -> float | None:
 def instruction_data(medication: Medication) -> dict[str, Any]:
     return {
         "drug_name": medication.drug_name,
+        "standard_drug_id": medication.standard_drug_id,
         "specification": medication.specification,
         "dosage_value": _number(medication.dosage_value),
         "dosage_unit": medication.dosage_unit,

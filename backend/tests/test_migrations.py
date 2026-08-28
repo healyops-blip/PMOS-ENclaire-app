@@ -30,6 +30,9 @@ def test_initial_migration_is_repeatable_and_safe(tmp_path: Path, monkeypatch: M
         "medication",
         "medication_daily",
         "medication_event",
+        "medical_order",
+        "medication_reconciliation",
+        "medication_reconciliation_item",
         "menstrual_cycle",
         "ocr_field_result",
         "ocr_result",
@@ -79,7 +82,7 @@ def test_initial_migration_is_repeatable_and_safe(tmp_path: Path, monkeypatch: M
 
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-            "20260827_0030"
+            "20260827_0031"
         )
     command.downgrade(config, "20260826_0001")
     inspector = inspect(engine)
@@ -115,9 +118,12 @@ def test_laboratory_migration_upgrades_the_current_main_schema(
         "lab_observation",
         "imaging_report",
         "outpatient_record",
+        "medical_order",
+        "medication_reconciliation",
+        "medication_reconciliation_item",
     } <= set(inspect(engine).get_table_names())
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-            "20260827_0030"
+            "20260827_0031"
         )
     engine.dispose()

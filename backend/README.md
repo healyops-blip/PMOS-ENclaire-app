@@ -126,6 +126,27 @@ The server business date uses `POMI_BUSINESS_TIMEZONE` (`Asia/Singapore` by
 default). Daily totals exclude future dates and derive expected days from every
 start, pause, resume, adjustment, and stop boundary.
 
+## Medical-order confirmation and reconciliation
+
+- Qwen3-VL produces one `medical_order` draft containing `order_text` and a
+  `medications` array. Each item keeps drug name, specification, single dose,
+  unit, frequency, course, route, instructions, source text, and explicit-stop
+  evidence separate.
+- `POST /api/ocr/tasks/{task_id}/confirm` requires every extracted item with
+  `confirmed: true`. Missing drug name, positive dose, unit, frequency, date, or
+  raw source text rejects the whole request. Repeating a successful confirmation
+  returns the same `medical_order` rows.
+- Standard drug IDs use the exact controlled alias table in
+  `services/orders.py`. Unknown names stay `review_required`; no fuzzy or model
+  guess is persisted.
+- `POST /api/medication-reconciliations` accepts `ocr_task_id` and applies rule
+  version `pomi-med-reconcile-v1`. Suggestions are `unchanged`, `adjusted`,
+  `added`, `stopped`, `uncertain`, or `manual_review`.
+- `GET/PUT /api/medication-reconciliations/{id}` are patient scoped. PUT requires
+  one decision for every item and applies accepted changes in one transaction.
+  Omitted old drugs are always `uncertain` and never automatically stopped.
+  Explicit stopping additionally requires a date and source.
+
 ## Remaining P0 backend rules
 
 Implement Router, Pydantic Schema, Service, and Repository separately. SQLite is

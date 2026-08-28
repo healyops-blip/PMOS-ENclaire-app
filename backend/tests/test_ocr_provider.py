@@ -179,3 +179,13 @@ def test_all_material_prompts_and_schemas_are_versioned_and_distinct() -> None:
     assert all(
         schema["properties"]["draft"].get("additionalProperties") is False for schema in schemas
     )
+
+
+def test_medical_order_p0_fixture_covers_critical_fields() -> None:
+    fixture_path = Path(__file__).parent / "fixtures" / "ocr" / "medical_order_p0.json"
+    cases = json.loads(fixture_path.read_text(encoding="utf-8"))
+    assert len(cases) >= 5
+    assert all(
+        {"drug_name", "dosage_value", "dosage_unit", "frequency"} <= set(case["expected"])
+        for case in cases
+    )

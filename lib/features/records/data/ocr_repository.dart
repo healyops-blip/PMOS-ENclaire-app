@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:pmos_enclaire/core/network/pomi_api_client.dart';
+import 'package:pmos_enclaire/features/records/data/order_reconciliation_repository.dart';
 
 enum OcrTaskStatus {
   queued,
@@ -340,10 +341,28 @@ abstract interface class OcrRepository {
   });
 }
 
-class FastApiOcrRepository implements OcrRepository {
+class FastApiOcrRepository implements OcrRepository, MedicalOrderGateway {
   FastApiOcrRepository(this.client);
 
   final PomiApiClient client;
+  late final MedicalOrderGateway _orders = FastApiMedicalOrderGateway(client);
+
+  @override
+  Future<void> confirmMedicalOrder(
+    String taskId,
+    String resultId,
+    String expectedRevisionId,
+    List<MedicalOrderDraft> items,
+  ) => _orders.confirmMedicalOrder(taskId, resultId, expectedRevisionId, items);
+
+  @override
+  Future<MedicationReconciliationDraft> createReconciliation(String taskId) =>
+      _orders.createReconciliation(taskId);
+
+  @override
+  Future<MedicationReconciliationDraft> executeReconciliation(
+    MedicationReconciliationDraft reconciliation,
+  ) => _orders.executeReconciliation(reconciliation);
 
   @override
   Future<OcrTask> create({
@@ -499,7 +518,7 @@ class OcrException implements Exception {
   String toString() => message;
 }
 
-class DemoOcrRepository implements OcrRepository {
+class DemoOcrRepository implements OcrRepository, MedicalOrderGateway {
   final Map<String, OcrTask> _tasks = {};
   final Map<String, int> _polls = {};
 
@@ -579,6 +598,34 @@ class DemoOcrRepository implements OcrRepository {
 
   @override
   Future<OcrTask> retry(String taskId) async => _tasks[taskId]!;
+
+  @override
+  Future<void> confirmMedicalOrder(
+    String taskId,
+    String resultId,
+    String expectedRevisionId,
+    List<MedicalOrderDraft> items,
+  ) async {}
+
+  @override
+  Future<MedicationReconciliationDraft> createReconciliation(
+    String taskId,
+  ) async => const MedicationReconciliationDraft(
+    id: 'demo-reconciliation',
+    status: 'draft',
+    ruleVersion: 'pomi-med-reconcile-v1',
+    items: [],
+  );
+
+  @override
+  Future<MedicationReconciliationDraft> executeReconciliation(
+    MedicationReconciliationDraft reconciliation,
+  ) async => MedicationReconciliationDraft(
+    id: reconciliation.id,
+    status: 'executed',
+    ruleVersion: reconciliation.ruleVersion,
+    items: reconciliation.items,
+  );
 
   @override
   Future<List<int>> sourceFile(OcrTask task) async => const [];

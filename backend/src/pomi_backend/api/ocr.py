@@ -8,10 +8,13 @@ from pydantic import BaseModel, ConfigDict, Field
 from pomi_backend.api.business import success
 from pomi_backend.api.dependencies import (
     ClinicalTextConfirmationServiceDependency,
+    MedicalOrderServiceDependency,
     OCRTaskServiceDependency,
 )
 from pomi_backend.schemas.clinical_text import ClinicalTextConfirmRequest
+from pomi_backend.schemas.orders import MedicalOrderConfirmation
 from pomi_backend.services.ocr import task_data
+from pomi_backend.services.orders import medical_order_data, medical_order_p0
 
 router = APIRouter(prefix="/api/ocr/tasks", tags=["ocr"])
 
@@ -74,13 +77,24 @@ def get_ocr_result(task_id: str, request: Request, service: OCRTaskServiceDepend
 @router.post("/{task_id}/confirm")
 def confirm_ocr_lab(
     task_id: str,
-    payload: ConfirmLabRequest | ClinicalTextConfirmRequest,
+    payload: ConfirmLabRequest | ClinicalTextConfirmRequest | MedicalOrderConfirmation,
     request: Request,
     lab_service: OCRTaskServiceDependency,
     clinical_service: ClinicalTextConfirmationServiceDependency,
+    order_service: MedicalOrderServiceDependency,
 ) -> dict:
     if isinstance(payload, ClinicalTextConfirmRequest):
         return success(request, clinical_service.confirm(task_id, payload))
+    if isinstance(payload, MedicalOrderConfirmation):
+        orders, created = order_service.confirm(task_id, payload)
+        return success(
+            request,
+            {
+                "items": [medical_order_data(order) for order in orders],
+                "reused": not created,
+                "p0_evaluation": medical_order_p0(orders),
+            },
+        )
     return success(
         request,
         lab_service.confirm_lab(task_id, payload.model_dump(mode="json")),
