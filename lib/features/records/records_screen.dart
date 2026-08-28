@@ -28,7 +28,7 @@ class RecordsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(recordsProvider);
     return Scaffold(
-      appBar: initialTab == 1 ? AppBar(title: const Text('指标看板')) : null,
+      appBar: null,
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stack) => Center(child: Text(error.toString())),
@@ -1058,7 +1058,7 @@ class _ReportsList extends ConsumerWidget {
                         foregroundColor: pomiCoral,
                         child: Icon(Icons.summarize_outlined),
                       ),
-                      title: const Text('指标看板'),
+                      title: const Text('数据汇总'),
                       subtitle: Text(report['generated_at'].toString()),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () async {
