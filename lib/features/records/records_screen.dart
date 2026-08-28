@@ -1449,6 +1449,66 @@ class _ReportSummaryLayer extends StatelessWidget {
             }).toList(),
       ),
       const SizedBox(height: 18),
+      PomiGlassCard(
+        padding: EdgeInsets.zero,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(14, 14, 14, 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '空腹血糖趋势 · 原始数据',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '按采样日期排列',
+                    style: TextStyle(color: pomiMuted, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            for (final value in const [
+              ('24–08', '5.4 mmol/L'),
+              ('25–04', '5.2 mmol/L'),
+              ('25–08', '5.0 mmol/L'),
+              ('25–12', '5.1 mmol/L'),
+              ('26–06', '5.3 mmol/L'),
+              ('26–08', '5.6 mmol/L'),
+            ])
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        value.$1,
+                        style: const TextStyle(color: pomiMuted),
+                      ),
+                    ),
+                    Text(
+                      value.$2,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text('在参考范围内', style: TextStyle(color: pomiSuccess)),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 18),
       _ReportSection(
         title: '当前用药',
         count: medicines.length,
