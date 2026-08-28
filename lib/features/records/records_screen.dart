@@ -1254,19 +1254,24 @@ class _ReportViewerState extends ConsumerState<ReportViewer> {
         children: [
           SafeArea(
             bottom: false,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: IconButton(
-                tooltip: '返回',
-                onPressed: () {
-                  if (Navigator.of(context).canPop()) {
-                    Navigator.of(context).pop();
-                  } else {
-                    widget.onBack?.call();
-                  }
-                },
-                icon: const Icon(Icons.arrow_back_rounded),
-              ),
+            child: Row(
+              children: [
+                IconButton(
+                  tooltip: '返回',
+                  onPressed: () {
+                    if (Navigator.of(context).canPop()) {
+                      Navigator.of(context).pop();
+                    } else {
+                      widget.onBack?.call();
+                    }
+                  },
+                  icon: const Icon(Icons.arrow_back_rounded),
+                ),
+                const Text(
+                  'POMI报告',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                ),
+              ],
             ),
           ),
           Expanded(
