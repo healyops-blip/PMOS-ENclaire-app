@@ -25,15 +25,19 @@ class MedicationInstruction(StrictRequest):
 class MedicationCreate(MedicationInstruction):
     drug_name: str = Field(min_length=1, max_length=200)
     source_category: Literal["prescribed", "supplement", "other_long_term"]
-    start_date: date
-    event_date: date
+    start_date: date | None = None
+    event_date: date | None = None
     source_type: Literal["manual", "medical_order", "outpatient_record", "imported"] = "manual"
     source_document_id: str | None = None
     note: str | None = Field(default=None, max_length=500)
 
     @model_validator(mode="after")
     def event_cannot_precede_start(self) -> MedicationCreate:
-        if self.event_date < self.start_date:
+        if (
+            self.start_date is not None
+            and self.event_date is not None
+            and self.event_date < self.start_date
+        ):
             raise ValueError("event_date cannot precede start_date")
         return self
 

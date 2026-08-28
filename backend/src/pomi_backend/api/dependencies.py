@@ -16,6 +16,7 @@ from pomi_backend.services.clinical_text import ClinicalTextConfirmationService
 from pomi_backend.services.documents import DocumentService
 from pomi_backend.services.medications import MedicationService
 from pomi_backend.services.ocr import OCRTaskService
+from pomi_backend.services.onboarding import OnboardingService
 from pomi_backend.services.orders import MedicalOrderService, ReconciliationService
 from pomi_backend.services.patient import PatientProfileService
 from pomi_backend.services.patient_notes import PatientNoteService
@@ -109,10 +110,24 @@ DocumentServiceDependency = Annotated[DocumentService, Depends(get_document_serv
 def get_ocr_task_service(
     request: Request, session: DatabaseSession, account: CurrentAccount
 ) -> OCRTaskService:
-    return OCRTaskService(session, account, model_name=request.app.state.settings.ocr_model)
+    return OCRTaskService(
+        session,
+        account,
+        model_name=request.app.state.settings.ocr_model,
+        business_date=request.app.state.business_date_provider(),
+    )
 
 
 OCRTaskServiceDependency = Annotated[OCRTaskService, Depends(get_ocr_task_service)]
+
+
+def get_onboarding_service(
+    request: Request, session: DatabaseSession, account: CurrentAccount
+) -> OnboardingService:
+    return OnboardingService(session, account, request.app.state.business_date_provider())
+
+
+OnboardingServiceDependency = Annotated[OnboardingService, Depends(get_onboarding_service)]
 
 
 def get_medical_order_service(

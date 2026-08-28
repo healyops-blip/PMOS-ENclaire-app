@@ -1,9 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.CAMERA" />
-
     <application
-        android:label="Pomi"
+        android:label="pmos_enclaire"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

@@ -3,21 +3,25 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from pomi_backend.db.models import (
+    Document,
     Medication,
     MedicationDaily,
+    MenstrualCycle,
+    OCRTask,
     PatientProfile,
     ReportSnapshot,
     UserAccount,
+    WeightRecord,
 )
 from pomi_backend.schemas.dashboard import DashboardSection, DashboardSectionError
-from pomi_backend.services.medications import MedicationService, daily_data, medication_data
+from pomi_backend.services.medications import MedicationService, daily_data
 
 
 class DashboardService:
@@ -30,13 +34,20 @@ class DashboardService:
 
     def aggregate(self) -> dict[str, Any]:
         return {
-            "business_date": self.business_date.isoformat(),
+            "server_date": self.business_date.isoformat(),
+            "data_as_of": datetime.now(UTC).isoformat(),
             "follow_up": self._section("FOLLOW_UP_UNAVAILABLE", self.follow_up),
             "today_medications": self._section(
                 "TODAY_MEDICATIONS_UNAVAILABLE", self.today_medications
             ),
             "monthly_medication_summary": self._section(
                 "MEDICATION_SUMMARY_UNAVAILABLE", self.monthly_medication_summary
+            ),
+            "tracking_summary": self._section(
+                "TRACKING_SUMMARY_UNAVAILABLE", self.tracking_summary
+            ),
+            "document_summary": self._section(
+                "DOCUMENT_SUMMARY_UNAVAILABLE", self.document_summary
             ),
             "latest_report": self._section("LATEST_REPORT_UNAVAILABLE", self.latest_report),
         }
@@ -52,6 +63,7 @@ class DashboardService:
             self.session.rollback()
             return DashboardSection(
                 status="error",
+                error_code=code,
                 error=DashboardSectionError(
                     code=code,
                     message="This dashboard section is temporarily unavailable.",
@@ -98,13 +110,21 @@ class DashboardService:
         }
         return [
             {
-                **medication_data(item),
-                "daily": daily_data(
-                    item,
-                    self.business_date,
-                    explicit.get(item.id),
-                    editable=True,
+                "medication_id": item.id,
+                "drug_name": item.drug_name,
+                "specification": item.specification,
+                "dosage_text": (
+                    f"{item.dosage_value:g}{item.dosage_unit or ''}"
+                    if item.dosage_value is not None
+                    else None
                 ),
+                "frequency": item.frequency,
+                "intake_status": daily_data(
+                    item, self.business_date, explicit.get(item.id), editable=True
+                )["intake_status"],
+                "recorded_at": daily_data(
+                    item, self.business_date, explicit.get(item.id), editable=True
+                )["recorded_at"],
             }
             for item in due
         ]
@@ -117,12 +137,74 @@ class DashboardService:
             month_start, self.business_date
         )
         return {
-            "from": result["from"],
-            "to": result["to"],
-            "taken": result["taken_count"],
-            "missed": result["missed_count"],
-            "unrecorded": result["unrecorded_count"],
+            "month": month_start.strftime("%Y-%m"),
+            "taken_count": result["taken_count"],
+            "missed_count": result["missed_count"],
+            "unrecorded_count": result["unrecorded_count"],
         }
+
+    def tracking_summary(self) -> dict[str, Any] | None:
+        profile = self._profile()
+        if profile is None:
+            return None
+        cycle = self.session.scalar(
+            select(MenstrualCycle)
+            .where(
+                MenstrualCycle.patient_id == profile.patient_id, MenstrualCycle.deleted_at.is_(None)
+            )
+            .order_by(MenstrualCycle.start_date.desc())
+            .limit(1)
+        )
+        weight = self.session.scalar(
+            select(WeightRecord)
+            .where(WeightRecord.patient_id == profile.patient_id)
+            .order_by(WeightRecord.record_date.desc())
+            .limit(1)
+        )
+        return {
+            "latest_cycle": None
+            if cycle is None
+            else {"id": cycle.id, "start_date": cycle.start_date.isoformat()},
+            "latest_weight": None
+            if weight is None
+            else {
+                "id": weight.id,
+                "record_date": weight.record_date.isoformat(),
+                "weight_kg": float(weight.weight_kg),
+            },
+        }
+
+    def document_summary(self) -> dict[str, int] | None:
+        profile = self._profile()
+        if profile is None:
+            return None
+        total = (
+            self.session.scalar(
+                select(func.count())
+                .select_from(Document)
+                .where(Document.patient_id == profile.patient_id, Document.deleted_at.is_(None))
+            )
+            or 0
+        )
+        confirmed = (
+            self.session.scalar(
+                select(func.count(func.distinct(Document.id)))
+                .select_from(Document)
+                .join(
+                    OCRTask,
+                    (OCRTask.document_id == Document.id)
+                    & (OCRTask.document_revision_id == Document.current_revision_id),
+                )
+                .where(
+                    Document.patient_id == profile.patient_id,
+                    Document.deleted_at.is_(None),
+                    OCRTask.patient_id == profile.patient_id,
+                    OCRTask.status == "confirmed",
+                )
+            )
+            or 0
+        )
+        return {"confirmed": int(confirmed), "total": int(total)}
 
     def latest_report(self) -> dict[str, Any] | None:
         profile = self._profile()

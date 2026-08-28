@@ -61,7 +61,8 @@ class LoginRequest(StrictRequestModel):
     @field_validator("account_name")
     @classmethod
     def normalize_account_name(cls, value: str) -> str:
-        return value.strip().lower()
+        normalized = value.strip().replace(" ", "").replace("-", "")
+        return normalized if PHONE_PATTERN.fullmatch(normalized) else value.strip().lower()
 
 
 class AccountResponse(BaseModel):

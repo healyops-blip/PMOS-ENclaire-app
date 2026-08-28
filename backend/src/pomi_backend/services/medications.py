@@ -44,7 +44,7 @@ def instruction_data(medication: Medication) -> dict[str, Any]:
         "dosage_unit": medication.dosage_unit,
         "frequency": medication.frequency,
         "route": medication.route,
-        "status": medication.status,
+        "current_status": medication.status,
         "start_date": _iso(medication.start_date),
         "end_date": _iso(medication.end_date),
     }
@@ -190,7 +190,7 @@ class MedicationService:
             patient_id=profile.patient_id,
             medication_id=medication.id,
             event_type="created",
-            event_date=payload.event_date,
+            event_date=payload.event_date or self.business_date,
             new_instruction=instruction_data(medication),
             source_type=payload.source_type,
             source_document_id=payload.source_document_id,
@@ -534,7 +534,7 @@ class MedicationService:
             elif event.event_type in {"paused", "stopped"}:
                 active = False
             elif event.event_type == "adjusted":
-                active = (event.new_instruction or {}).get("status") == "active"
+                active = (event.new_instruction or {}).get("current_status") == "active"
         return active
 
 

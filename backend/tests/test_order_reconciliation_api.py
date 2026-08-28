@@ -154,7 +154,7 @@ def _medication(
             },
         ),
         201,
-    )["medication"]
+    )
 
 
 def _confirmed(index: int, name: str, dose: int, *, stopped: bool = False) -> dict:

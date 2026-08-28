@@ -4,13 +4,24 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
+from datetime import date
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from pomi_backend.api.business import BusinessError
-from pomi_backend.db.models import LabObservation, OCRFieldResult, OCRResult, OCRTask, UserAccount
+from pomi_backend.db.models import (
+    LabObservation,
+    Medication,
+    MedicationEvent,
+    OCRFieldResult,
+    OCRResult,
+    OCRTask,
+    UserAccount,
+)
 from pomi_backend.db.models.auth import utc_now
 from pomi_backend.db.models.health import new_uuid
 from pomi_backend.repositories import (
@@ -19,13 +30,16 @@ from pomi_backend.repositories import (
     OCRRepository,
     PatientRepository,
 )
+from pomi_backend.schemas.ocr_recognize import OCRResultConfirmRequest
 from pomi_backend.services.lab_rules import (
     FieldIssue,
     normalize_lab_item,
     p0_evaluation,
     parse_number,
 )
+from pomi_backend.services.medications import instruction_data, medication_data
 from pomi_backend.services.ocr_prompts import PROMPT_VERSION, SCHEMA_VERSION
+from pomi_backend.services.orders import standard_drug_id
 
 
 def task_data(task: OCRTask) -> dict[str, Any]:
@@ -90,6 +104,77 @@ def result_data(
     return data
 
 
+def normalize_algorithm_payload(payload: dict[str, Any], original_file_name: str) -> dict[str, Any]:
+    """Normalize the algorithm's flat response and the legacy worker envelope."""
+    evidence = payload.get("evidence")
+    if isinstance(payload.get("draft"), dict):
+        draft = payload["draft"]
+        evidence = payload.get("fields")
+        payload = {
+            "hospital": draft.get("hospital") or draft.get("hospital_name"),
+            "department": draft.get("department") or draft.get("department_name"),
+            "visit_date": draft.get("visit_date") or draft.get("prescribed_at"),
+            "diagnosis_summary": draft.get("diagnosis_summary"),
+            "medical_advice": draft.get("medical_advice") or draft.get("treatment_plan"),
+            "examinations": draft.get("examinations")
+            or [
+                {
+                    "item_name": item.get("item_name"),
+                    "value": item.get("raw_value")
+                    if item.get("raw_value") is not None
+                    else item.get("numeric_value"),
+                    "unit": item.get("raw_unit") or item.get("normalized_unit"),
+                    "reference_range": item.get("reference_range_text"),
+                }
+                for item in draft.get("items", [])
+                if isinstance(item, dict)
+            ],
+            "medication_suggestions": draft.get("medication_suggestions")
+            or draft.get("orders", []),
+        }
+    payload["original_file_name"] = original_file_name
+    if evidence is not None:
+        payload["evidence"] = evidence
+    payload.setdefault("examinations", [])
+    payload.setdefault("medication_suggestions", [])
+    return payload
+
+
+def sync_result_data(task: OCRTask, result: OCRResult) -> dict[str, Any]:
+    return {
+        **result.validated_draft,
+        "ocr_task_id": task.id,
+        "ocr_result_id": result.id,
+        "document_id": task.document_id,
+        "document_revision_id": task.document_revision_id,
+        "material_type": task.material_type,
+        "result_source": task.result_source,
+    }
+
+
+def deduplication_key(*parts: str) -> str:
+    return hashlib.sha256("\x1f".join(parts).encode()).hexdigest()
+
+
+def _source_item(draft: dict[str, Any], key: str, index: int) -> dict[str, Any]:
+    values = draft.get(key, [])
+    if isinstance(values, list) and 0 <= index < len(values) and isinstance(values[index], dict):
+        return values[index]
+    return {}
+
+
+def _dosage_parts(value: str | None) -> tuple[Decimal | None, str | None]:
+    if value is None or not value.strip():
+        return None, None
+    match = re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*([^\d\s]+)\s*", value)
+    if match is None:
+        return None, None
+    try:
+        return Decimal(match.group(1)), match.group(2)
+    except InvalidOperation:
+        return None, None
+
+
 def lab_observation_data(observation: LabObservation) -> dict[str, Any]:
     def decimal(value: Any) -> str | None:
         return None if value is None else format(value, "f")
@@ -136,10 +221,18 @@ def lab_observation_data(observation: LabObservation) -> dict[str, Any]:
 
 
 class OCRTaskService:
-    def __init__(self, session: Session, account: UserAccount, *, model_name: str) -> None:
+    def __init__(
+        self,
+        session: Session,
+        account: UserAccount,
+        *,
+        model_name: str,
+        business_date: date,
+    ) -> None:
         self.session = session
         self.account = account
         self.model_name = model_name
+        self.business_date = business_date
         self.patient = PatientRepository(session).get_or_create(account.uid)
         self.repository = OCRRepository(session, self.patient.patient_id)
         self.documents = DocumentRepository(session, self.patient.patient_id)
@@ -220,6 +313,197 @@ class OCRTaskService:
             self.repository.fields(result.id),
             source_document=source,
         )
+
+    def confirm_result(self, result_id: str, payload: OCRResultConfirmRequest) -> dict[str, Any]:
+        result = self.repository.result_by_id(result_id)
+        if result is None:
+            raise BusinessError("RESOURCE_NOT_FOUND", "OCR result was not found.", 404)
+        task = self.owned(result.task_id)
+        canonical = payload.model_dump(mode="json")
+        if result.confirmed_data is not None:
+            if result.confirmed_data.get("request") != canonical:
+                raise BusinessError(
+                    "OCR_ALREADY_CONFIRMED",
+                    "The OCR result was already confirmed with different data.",
+                    409,
+                )
+            return {**result.confirmed_data["created"], "reused": True}
+        if task.status != "pending_confirmation":
+            raise BusinessError(
+                "OCR_RESULT_NOT_CONFIRMABLE", "OCR result is not pending confirmation.", 409
+            )
+        if not payload.examinations and not payload.medication_suggestions:
+            raise BusinessError(
+                "OCR_CONFIRMATION_EMPTY", "At least one health item must be confirmed.", 422
+            )
+
+        report_dates = {
+            "sample_date": None,
+            "exam_date": None,
+            "report_date": None,
+            "visit_date": payload.visit_date,
+        }
+        normalized_labs = []
+        issues: list[FieldIssue] = []
+        source_examinations = result.validated_draft.get("examinations", [])
+        if not isinstance(source_examinations, list):
+            source_examinations = []
+        for index, item in enumerate(payload.examinations):
+            if item.source_index >= len(source_examinations):
+                issues.append(
+                    FieldIssue(
+                        f"examinations.{index}.source_index",
+                        "OCR_SOURCE_INDEX_INVALID",
+                        "来源检查项目不存在，请重新加载识别结果。",
+                    )
+                )
+            normalized, item_issues = normalize_lab_item(
+                {
+                    "name": item.item_name,
+                    "value": item.value,
+                    "unit": item.unit,
+                    "reference_range": item.reference_range,
+                },
+                index,
+                report_dates,
+            )
+            issues.extend(item_issues)
+            if normalized is not None:
+                normalized_labs.append((item, normalized))
+
+        medication_values = []
+        source_medications = result.validated_draft.get("medication_suggestions", [])
+        if not isinstance(source_medications, list):
+            source_medications = []
+        for index, item in enumerate(payload.medication_suggestions):
+            if item.source_index >= len(source_medications):
+                issues.append(
+                    FieldIssue(
+                        f"medication_suggestions.{index}.source_index",
+                        "OCR_SOURCE_INDEX_INVALID",
+                        "来源用药建议不存在，请重新加载识别结果。",
+                    )
+                )
+            identifier = standard_drug_id(item.drug_name.strip())
+            if identifier is None:
+                issues.append(
+                    FieldIssue(
+                        f"medication_suggestions.{index}.drug_name",
+                        "DRUG_MAPPING_REQUIRED",
+                        "药品不在确定性词库中，请手动添加或取消本次导入。",
+                    )
+                )
+            dosage_value, dosage_unit = _dosage_parts(item.dosage)
+            if item.dosage and (dosage_value is None or dosage_unit is None):
+                issues.append(
+                    FieldIssue(
+                        f"medication_suggestions.{index}.dosage",
+                        "DOSAGE_INVALID",
+                        "剂量必须包含可识别的数值和单位，例如 500mg。",
+                    )
+                )
+            medication_values.append((item, identifier, dosage_value, dosage_unit))
+        if issues:
+            raise BusinessError(
+                "OCR_CONFIRMATION_INVALID",
+                "Resolve the highlighted fields before importing.",
+                422,
+                details={"fields": [issue.as_dict() for issue in issues]},
+            )
+        if not self.repository.claim_confirmation(task.id, now=utc_now()):
+            self.session.rollback()
+            raise BusinessError(
+                "OCR_CONFIRMATION_IN_PROGRESS",
+                "Another confirmation request is being processed.",
+                409,
+            )
+
+        confirmed_at = utc_now()
+        observations: list[LabObservation] = []
+        medications: list[Medication] = []
+        try:
+            for item, normalized in normalized_labs:
+                observation = LabObservation(
+                    id=new_uuid(),
+                    patient_id=self.patient.patient_id,
+                    document_id=task.document_id,
+                    document_revision_id=task.document_revision_id,
+                    ocr_result_id=result.id,
+                    item_index=item.source_index,
+                    original_item_name=normalized.original_item_name,
+                    standard_metric_id=normalized.standard_metric_id,
+                    mapping_status=normalized.mapping_status,
+                    raw_value=normalized.raw_value,
+                    numeric_value=normalized.numeric_value,
+                    original_unit=normalized.original_unit,
+                    standard_unit=normalized.standard_unit,
+                    reference_range_raw=normalized.reference_range_raw,
+                    reference_lower=normalized.reference_lower,
+                    reference_upper=normalized.reference_upper,
+                    abnormal_status=normalized.abnormal_status,
+                    sample_date=normalized.sample_date,
+                    exam_date=normalized.exam_date,
+                    report_date=normalized.report_date,
+                    visit_date=normalized.visit_date,
+                    trend_date=normalized.trend_date,
+                    trend_date_source=normalized.trend_date_source,
+                    original_item_data=_source_item(
+                        result.validated_draft, "examinations", item.source_index
+                    ),
+                    confirmed_item_data=item.model_dump(mode="json"),
+                    confirmed_by_uid=self.account.uid,
+                    confirmed_at=confirmed_at,
+                    note=item.note,
+                )
+                self.labs.add(observation)
+                observations.append(observation)
+            for item, identifier, dosage_value, dosage_unit in medication_values:
+                medication = Medication(
+                    id=new_uuid(),
+                    patient_id=self.patient.patient_id,
+                    drug_name=item.drug_name.strip(),
+                    standard_drug_id=identifier,
+                    source_category=item.source_category,
+                    dosage_value=dosage_value,
+                    dosage_unit=dosage_unit,
+                    frequency=item.frequency,
+                    start_date=item.start_date or payload.visit_date,
+                    status="active",
+                    idempotency_key=f"ocr:{result.id}:{item.source_index}",
+                )
+                self.session.add(medication)
+                self.session.flush()
+                self.session.add(
+                    MedicationEvent(
+                        id=new_uuid(),
+                        patient_id=self.patient.patient_id,
+                        medication_id=medication.id,
+                        event_type="created",
+                        event_date=item.start_date or payload.visit_date or self.business_date,
+                        new_instruction=instruction_data(medication),
+                        source_type="medical_order",
+                        source_document_id=task.document_id,
+                        acted_by_uid=self.account.uid,
+                        note=item.instruction,
+                    )
+                )
+                medications.append(medication)
+            created = {
+                "ocr_result_id": result.id,
+                "status": "confirmed",
+                "observations": [lab_observation_data(item) for item in observations],
+                "medications": [medication_data(item) for item in medications],
+            }
+            result.user_modified_data = canonical
+            result.confirmed_data = {"request": canonical, "created": created}
+            task.status = "confirmed"
+            task.finished_at = task.finished_at or confirmed_at
+            task.updated_at = confirmed_at
+            self.session.commit()
+            return {**created, "reused": False}
+        except Exception:
+            self.session.rollback()
+            raise
 
     def confirm_lab(self, task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         task = self.owned(task_id)
@@ -547,4 +831,4 @@ class OCRTaskService:
 
     @staticmethod
     def _key(*parts: str) -> str:
-        return hashlib.sha256("\x1f".join(parts).encode()).hexdigest()
+        return deduplication_key(*parts)

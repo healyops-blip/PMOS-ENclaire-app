@@ -8,6 +8,7 @@ from pomi_backend.db.models.health import (
     MedicationDaily,
     MedicationEvent,
     MenstrualCycle,
+    OnboardingDraft,
     PatientProfile,
     WeightRecord,
 )
@@ -38,6 +39,7 @@ __all__ = [
     "OutpatientRecord",
     "PatientNote",
     "PatientProfile",
+    "OnboardingDraft",
     "ReportSnapshot",
     "ReportSource",
     "UserAccount",

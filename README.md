@@ -31,26 +31,110 @@ flutter pub get
 flutter run
 ```
 
-## UI demo scope
+## 开发者 Web Preview 启动指南
 
-The current Flutter UI uses local demo data and includes:
+以下命令均在仓库根目录执行。Preview 默认地址为
+`http://127.0.0.1:3001`。
 
-- fixed new/existing demo-account routes;
-- three-step patient onboarding;
-- dashboard and medication three-state interactions;
-- medication management and reminder screens;
-- menstrual-cycle calendar with add, edit, completion, deletion, and trend states;
-- visit records and source traceability;
-- upload, OCR review, draft confirmation, and medication reconciliation;
-- report generation and three-layer report navigation;
-- doctor KYC, signature, and test-chain certification states;
-- patient profile and authorization entry points.
+### 1. 首次安装
 
-The cycle screen now has a repository boundary and the authenticated FastAPI cycle
-history API is implemented; the demo shell injects local cycle data until Flutter
-authentication owns a live Session. Other Flutter screens still use local demo
-data. Real OCR, identity providers, blockchain nodes, and PDF export remain
-unimplemented.
+```bash
+flutter doctor
+flutter pub get
+```
+
+### 2. 使用 Smoke 数据预览（UI 开发推荐）
+
+该模式使用 Flutter App 内置的内存 API，不会启动、代理或依赖任何后端服务。
+登录、注册、Onboarding 和首页均可离线查看。
+
+终端 1——构建 Preview：
+
+```bash
+flutter build web --dart-define=POMI_SMOKE_MODE=true
+```
+
+终端 2——启动静态服务：
+
+```bash
+python3 tools/web_preview_proxy.py \
+  --root build/web \
+  --port 3001
+```
+
+打开 <http://127.0.0.1:3001>。修改 Flutter 代码后，在终端按 `Ctrl+C`
+停止服务，重新构建并启动。刷新浏览器页面会重置 Smoke 数据。
+
+如需在普通浏览器中使用 Flutter 热重载，可改用：
+
+```bash
+flutter run -d chrome \
+  --web-hostname 127.0.0.1 \
+  --web-port 3001 \
+  --dart-define=POMI_SMOKE_MODE=true
+```
+
+### 3. 连接已部署后端进行预览
+
+浏览器联调使用同源 Preview 代理：API 请求先发送到本地 Preview，再由代理转发至
+HTTPS 后端，从而避免浏览器 CORS 限制。以下命令不会部署或启动本地后端。
+
+终端 1——将 Preview 地址设为 App 的 API Base URL 并构建：
+
+```bash
+flutter build web \
+  --dart-define=POMI_API_BASE_URL=http://127.0.0.1:3001
+```
+
+终端 2——启动页面，并将 `/api/*` 转发至已部署后端：
+
+```bash
+python3 tools/web_preview_proxy.py \
+  --root build/web \
+  --backend server \
+  --upstream https://api.healy1012-ops.top \
+  --port 3001
+```
+
+测试其他服务器时替换 `--upstream` 地址；该参数必须是完整的 HTTPS URL。
+此模式不要添加 `POMI_SMOKE_MODE=true`，因为 Smoke 模式不会发出网络请求。
+
+检查当前 Preview 选择的后端：
+
+```bash
+curl http://127.0.0.1:3001/__preview/backend
+```
+
+仅在开发者明确需要本地后端时，可使用：
+
+```bash
+python3 tools/web_preview_proxy.py \
+  --root build/web \
+  --backend local \
+  --local-upstream http://127.0.0.1:8000 \
+  --port 3001
+```
+
+本地后端是可选项；正常前端开发应使用 Smoke 数据或已部署后端。
+
+### 4. 常见问题
+
+如果 `3001` 端口已被占用，先查看占用进程：
+
+```bash
+lsof -nP -iTCP:3001 -sTCP:LISTEN
+```
+
+在原终端按 `Ctrl+C` 停止已有 Preview；也可以同时修改构建地址和代理端口，例如：
+
+```bash
+flutter build web \
+  --dart-define=POMI_API_BASE_URL=http://127.0.0.1:3010
+python3 tools/web_preview_proxy.py --root build/web --port 3010
+```
+
+如果浏览器仍显示旧版本，请强制刷新，或清除 `127.0.0.1` 的站点数据。Preview
+联调禁止使用真实生产账号和敏感数据，应使用专用测试账号与测试数据。
 
 ## Quality checks
 
@@ -61,12 +145,3 @@ dart format --output=none --set-exit-if-changed lib test
 flutter analyze --fatal-infos
 flutter test
 ```
-
-## Frontend/backend integration
-
-- Human-readable task and field guide:
-  [`docs/frontend-backend-integration.md`](docs/frontend-backend-integration.md)
-- Machine-readable API contract:
-  [`contracts/openapi/pomi-api-v1.yaml`](contracts/openapi/pomi-api-v1.yaml)
-
-See `THIRD_PARTY_NOTICES.md` for UI dependency licenses.

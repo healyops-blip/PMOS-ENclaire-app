@@ -41,6 +41,11 @@ class PatientProfile(Base):
             "gender IS NULL OR gender IN ('female', 'male', 'other', 'prefer_not_to_say')",
             name="patient_profile_gender",
         ),
+        CheckConstraint(
+            "usual_cycle_min_days IS NULL OR usual_cycle_max_days IS NULL "
+            "OR usual_cycle_min_days <= usual_cycle_max_days",
+            name="patient_profile_cycle_range",
+        ),
     )
 
     patient_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
@@ -51,15 +56,45 @@ class PatientProfile(Base):
         unique=True,
     )
     nickname: Mapped[str | None] = mapped_column(String(80))
+    birth_year: Mapped[int | None] = mapped_column(Integer)
     birth_date: Mapped[date | None] = mapped_column(Date)
     gender: Mapped[str | None] = mapped_column(String(24))
     height_cm: Mapped[Decimal | None] = mapped_column(Numeric(4, 1))
     diagnosis_year: Mapped[int | None] = mapped_column(Integer)
+    usual_cycle_min_days: Mapped[int | None] = mapped_column(Integer)
+    usual_cycle_max_days: Mapped[int | None] = mapped_column(Integer)
     primary_condition: Mapped[str | None] = mapped_column(String(80))
     next_visit_date: Mapped[date | None] = mapped_column(Date)
     health_goal: Mapped[str | None] = mapped_column(String(500))
     onboarding_completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     onboarding_completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime, nullable=False, default=utc_now, onupdate=utc_now
+    )
+
+
+class OnboardingDraft(Base):
+    """Durable, resumable onboarding state kept separate from the formal profile."""
+
+    __tablename__ = "onboarding_draft"
+    __table_args__ = (
+        CheckConstraint(
+            "current_step IN ('basic', 'cycle', 'medications', 'complete')",
+            name="onboarding_draft_current_step",
+        ),
+        UniqueConstraint("account_uid", name="uq_onboarding_draft_account_uid"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    account_uid: Mapped[str] = mapped_column(
+        String(36), ForeignKey("user_account.uid", ondelete="CASCADE"), nullable=False
+    )
+    current_step: Mapped[str] = mapped_column(String(16), nullable=False, default="basic")
+    basic_data: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    cycle_data: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    medications_data: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         UTCDateTime, nullable=False, default=utc_now, onupdate=utc_now

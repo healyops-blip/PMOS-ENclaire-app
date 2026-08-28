@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date
 
 from sqlalchemy.orm import Session
 
@@ -54,6 +54,8 @@ class WeightService:
         record = self._repository.get(record_id)
         if record is None:
             raise WeightRecordNotFound
+        if payload.updated_at is None or _as_utc(payload.updated_at) != _as_utc(record.updated_at):
+            raise WeightVersionConflict
 
         same_day = self._repository.find_by_date(payload.record_date)
         if same_day is not None and same_day.id != record.id:
@@ -67,3 +69,13 @@ class WeightService:
         self._session.commit()
         self._session.refresh(record)
         return record
+
+
+class WeightVersionConflict(Exception):
+    """Raised when an update uses a stale or missing record version."""
+
+
+def _as_utc(value):
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
