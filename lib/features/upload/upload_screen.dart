@@ -229,6 +229,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
 
     return PomiGlassCard(
       borderRadius: 28,
+      backgroundOpacity: 1,
       child: Column(
         children: [
           Padding(
