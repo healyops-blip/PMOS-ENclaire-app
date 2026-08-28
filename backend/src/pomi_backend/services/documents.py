@@ -13,7 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from pomi_backend.api.business import BusinessError
-from pomi_backend.db.models import Document, DocumentRevision, UserAccount
+from pomi_backend.db.models import Document, DocumentRevision, OCRTask, UserAccount
 from pomi_backend.db.models.auth import utc_now
 from pomi_backend.db.models.health import new_uuid
 from pomi_backend.repositories import DocumentRepository, PatientRepository
@@ -78,7 +78,32 @@ class DocumentService:
         revision = self.repository.revision(document.id, document.current_revision_id)
         if revision is None:
             raise BusinessError("RESOURCE_NOT_FOUND", "Current revision was not found.", 404)
-        return document_data(document, revision)
+        return self.data(document, revision)
+
+    def data(
+        self,
+        document: Document,
+        current_revision: DocumentRevision | None = None,
+    ) -> dict[str, Any]:
+        """Return document metadata plus the latest OCR task needed by the client."""
+
+        latest_task = self.session.scalar(
+            select(OCRTask)
+            .where(
+                OCRTask.patient_id == self.patient.patient_id,
+                OCRTask.document_id == document.id,
+            )
+            .order_by(OCRTask.created_at.desc(), OCRTask.id.desc())
+            .limit(1)
+        )
+        return {
+            **document_data(document, current_revision),
+            "latest_ocr_task_id": latest_task.id if latest_task is not None else None,
+            "latest_ocr_status": latest_task.status if latest_task is not None else None,
+            "latest_ocr_result_source": (
+                latest_task.result_source if latest_task is not None else None
+            ),
+        }
 
     def upload(
         self,

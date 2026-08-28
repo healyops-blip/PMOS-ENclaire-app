@@ -1,6 +1,8 @@
 import '../../core/api_client.dart';
 import '../../core/json_value.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../medications/medication_repository.dart';
 import '../profile/patient_repository.dart';
 import 'auth_controller.dart';
@@ -40,7 +42,7 @@ class OnboardingBasicDraft {
     return OnboardingBasicDraft(
       nickname: jsonString(json, 'nickname'),
       birthYear: jsonInt(json, 'birth_year'),
-      diagnosisYear: jsonInt(json, 'diagnosis_year'),
+      diagnosisYear: jsonIntOrNull(json, 'diagnosis_year'),
       heightCm: jsonDoubleOrNull(json, 'height_cm'),
       weightKg: jsonDoubleOrNull(json, 'weight_kg'),
       updatedAt: jsonDateTimeOrNull(json, 'updated_at'),

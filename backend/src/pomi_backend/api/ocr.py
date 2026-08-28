@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, File, Form, Header, Request, UploadFile, status
+from jsonschema import ValidationError
 from pydantic import BaseModel, ConfigDict, Field
 
 from pomi_backend.api.business import BusinessError, success
@@ -28,6 +29,7 @@ from pomi_backend.services.ocr_provider import (
     OCRProviderRequest,
     Qwen3VLOCRProvider,
 )
+from pomi_backend.services.ocr_validation import validate_provider_payload
 from pomi_backend.services.orders import medical_order_data, medical_order_p0
 
 router = APIRouter(prefix="/api/ocr/tasks", tags=["ocr"])
@@ -40,6 +42,7 @@ def recognize(
     request: Request,
     session: DatabaseSession,
     account: CurrentAccount,
+    service: OCRTaskServiceDependency,
     file: Annotated[UploadFile, File()],
     material_type: Annotated[str, Form()] = "outpatient_record",
     prompt_version: Annotated[str, Form()] = "pomi-ocr-v1",
@@ -73,6 +76,17 @@ def recognize(
     ).revision(document.id, document.current_revision_id)
     if revision is None:
         raise BusinessError("OCR_FILE_NOT_FOUND", "The uploaded file is unavailable.", 404)
+    task, _ = service.create(document.id, revision.id)
+    existing = service.repository.result(task.id)
+    if existing is not None:
+        return success(
+            request,
+            _recognize_response(service, task, existing, document.original_file_name),
+        )
+    task = service.claim_synchronous(
+        task,
+        lease_seconds=settings.ocr_request_timeout_seconds + 30,
+    )
     provider = Qwen3VLOCRProvider(
         api_base_url=settings.ocr_api_base_url,
         api_key=settings.ocr_api_key,
@@ -82,7 +96,7 @@ def recognize(
     try:
         response = provider.recognize(
             OCRProviderRequest(
-                task_id=idempotency_key,
+                task_id=task.id,
                 material_type=material_type,
                 mime_type=revision.mime_type,
                 file_path=private_path(settings.storage_root, revision.storage_path),
@@ -92,15 +106,77 @@ def recognize(
             )
         )
     except OCRProviderError as error:
+        service.fail_synchronously(
+            task,
+            category=error.category,
+            code=error.code,
+            message=error.safe_message,
+            retryable=error.retryable,
+        )
         raise BusinessError(
             error.code,
             error.safe_message,
             504 if error.category == "timeout" else 503,
             details={"retryable": error.retryable},
         ) from error
-    payload = _normalize_algorithm_payload(dict(response.payload), document.original_file_name)
-    data = OCRRecognizeData.model_validate(payload).model_dump(mode="json")
-    return success(request, data)
+    try:
+        draft, fields = validate_provider_payload(material_type, dict(response.payload))
+    except ValidationError as error:
+        service.fail_synchronously(
+            task,
+            category="response_format",
+            code="OCR_SCHEMA_INVALID",
+            message="OCR response did not match the material schema.",
+            retryable=True,
+        )
+        raise BusinessError(
+            "OCR_SCHEMA_INVALID",
+            "OCR response did not match the material schema.",
+            503,
+            details={"retryable": True},
+        ) from error
+    result = service.complete_synchronously(
+        task,
+        raw_response=response.raw_response,
+        draft=draft,
+        fields=fields,
+        result_source=response.source,
+    )
+    return success(
+        request,
+        _recognize_response(service, task, result, document.original_file_name),
+    )
+
+
+def _recognize_response(service, task, result, original_file_name: str) -> dict:
+    fields = service.repository.fields(result.id)
+    evidence = [
+        {
+            "path": field.field_path,
+            "source_text": field.source_text,
+            "value": field.parsed_value,
+            "confidence": field.confidence,
+            "uncertainty_reason": field.uncertainty_reason,
+            "source_region": field.source_region,
+        }
+        for field in fields
+    ]
+    flat_payload = _normalize_algorithm_payload(
+        {"draft": result.validated_draft, "fields": evidence},
+        original_file_name,
+    )
+    flat = OCRRecognizeData.model_validate(flat_payload).model_dump(mode="json")
+    return {
+        **flat,
+        "task_id": task.id,
+        "result_id": result.id,
+        "document_id": task.document_id,
+        "document_revision_id": task.document_revision_id,
+        "material_type": task.material_type,
+        "status": task.status,
+        "result_source": task.result_source,
+        "draft": result.validated_draft,
+    }
 
 
 def _normalize_algorithm_payload(payload: dict, original_file_name: str) -> dict:

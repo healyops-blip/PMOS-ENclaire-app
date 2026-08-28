@@ -79,7 +79,11 @@ class AuthController extends AsyncNotifier<AuthSession?> {
     state = await AsyncValue.guard(() => _login(accountName.trim(), password));
   }
 
-  Future<void> register(String accountName, String password) async {
+  Future<void> register(
+    String accountName,
+    String password,
+    String phoneNumber,
+  ) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final normalizedAccountName = accountName.trim();
@@ -87,7 +91,11 @@ class AuthController extends AsyncNotifier<AuthSession?> {
           .read(apiClientProvider)
           .post(
             '/api/auth/register',
-            data: {'account_name': normalizedAccountName, 'password': password},
+            data: {
+              'account_name': normalizedAccountName,
+              'password': password,
+              'phone_number': phoneNumber.trim(),
+            },
           );
       return _login(normalizedAccountName, password);
     });

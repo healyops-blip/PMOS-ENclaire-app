@@ -41,6 +41,11 @@ class PatientProfile(Base):
             "gender IS NULL OR gender IN ('female', 'male', 'other', 'prefer_not_to_say')",
             name="patient_profile_gender",
         ),
+        CheckConstraint(
+            "usual_cycle_min_days IS NULL OR usual_cycle_max_days IS NULL "
+            "OR usual_cycle_min_days <= usual_cycle_max_days",
+            name="patient_profile_cycle_range",
+        ),
     )
 
     patient_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)

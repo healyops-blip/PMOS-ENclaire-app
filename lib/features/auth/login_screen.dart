@@ -15,6 +15,7 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _account = TextEditingController();
+  final _phone = TextEditingController();
   final _password = TextEditingController();
   bool _agreedToTerms = false;
   bool _isRegisterMode = false;
@@ -22,6 +23,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   void dispose() {
     _account.dispose();
+    _phone.dispose();
     _password.dispose();
     super.dispose();
   }
@@ -36,7 +38,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!_formKey.currentState!.validate()) return;
     final controller = ref.read(authControllerProvider.notifier);
     if (_isRegisterMode) {
-      await controller.register(_account.text.trim(), _password.text);
+      await controller.register(
+        _account.text.trim(),
+        _password.text,
+        _phone.text.trim(),
+      );
     } else {
       await controller.login(_account.text.trim(), _password.text);
     }
@@ -96,9 +102,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             ),
                           ),
                           const SizedBox(height: 16),
+                          if (_isRegisterMode) ...[
+                            _GlassField(
+                              controller: _phone,
+                              hint: '手 机 号',
+                              textInputAction: TextInputAction.next,
+                              validator: _validatePhone,
+                            ),
+                            const SizedBox(height: 24),
+                          ],
                           _GlassField(
                             controller: _account,
-                            hint: '账   号',
+                            hint: _isRegisterMode ? '账   号' : '账号 / 手机号',
                             textInputAction: TextInputAction.next,
                             validator: _validateAccountName,
                           ),
@@ -182,11 +197,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   String? _validateAccountName(String? value) {
     final accountName = value?.trim().toLowerCase() ?? '';
+    if (!_isRegisterMode && RegExp(r'^\+?[0-9]{7,20}$').hasMatch(accountName)) {
+      return null;
+    }
     if (accountName.length < 3 || accountName.length > 64) {
       return '账号长度需为 3～64 个字符';
     }
     if (!RegExp(r'^[a-z0-9][a-z0-9_.-]*$').hasMatch(accountName)) {
       return '仅支持小写字母、数字、点、下划线和短横线';
+    }
+    return null;
+  }
+
+  String? _validatePhone(String? value) {
+    if (!_isRegisterMode) return null;
+    final phone = value?.trim().replaceAll(' ', '').replaceAll('-', '') ?? '';
+    if (!RegExp(r'^\+?[0-9]{7,20}$').hasMatch(phone)) {
+      return '请输入 7～20 位手机号，可使用 +86 国家区号';
     }
     return null;
   }

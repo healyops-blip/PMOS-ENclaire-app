@@ -19,6 +19,7 @@ class UploadScreen extends ConsumerStatefulWidget {
 class _UploadScreenState extends ConsumerState<UploadScreen> {
   String _documentType = 'lab';
   File? _file;
+  String? _idempotencyKey;
   String? _status;
   bool _working = false;
 
@@ -35,7 +36,12 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       allowedExtensions: const ['jpg', 'jpeg', 'png', 'pdf'],
     );
     final path = file?.path;
-    if (path != null) setState(() => _file = File(path));
+    if (path != null) {
+      setState(() {
+        _file = File(path);
+        _idempotencyKey = null;
+      });
+    }
   }
 
   Future<void> _takePhoto() async {
@@ -45,7 +51,12 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       maxWidth: 4096,
       maxHeight: 4096,
     );
-    if (result != null) setState(() => _file = File(result.path));
+    if (result != null) {
+      setState(() {
+        _file = File(result.path);
+        _idempotencyKey = null;
+      });
+    }
   }
 
   Future<void> _start() async {
@@ -62,32 +73,41 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
         materialType: _wireMaterialType,
         promptVersion: 'pomi-ocr-v1',
         consentVersion: 'pomi-external-processing-v1',
-        idempotencyKey: 'ocr-${DateTime.now().microsecondsSinceEpoch}',
+        idempotencyKey:
+            _idempotencyKey ??= 'ocr-${DateTime.now().microsecondsSinceEpoch}',
       );
       if (!mounted) return;
       setState(() => _status = '识别完成');
-      await showDialog<void>(
-        context: context,
-        builder:
-            (context) => AlertDialog(
-              title: const Text('检测到以下健康信息'),
-              content: SingleChildScrollView(
-                child: Text(const JsonEncoder.withIndent('  ').convert(result)),
+      final taskId = result['task_id']?.toString();
+      final resultId = result['result_id']?.toString();
+      final revisionId = result['document_revision_id']?.toString();
+      final draft = result['draft'];
+      if (taskId == null ||
+          resultId == null ||
+          revisionId == null ||
+          draft is! Map) {
+        throw const FormatException('识别结果缺少确认所需的版本信息，请重新识别');
+      }
+      final confirmed = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder:
+              (_) => OcrConfirmScreen(
+                taskId: taskId,
+                resultId: resultId,
+                revisionId: revisionId,
+                documentType: _wireMaterialType,
+                resultSource: result['result_source']?.toString() ?? 'qwen3-vl',
+                draft: Map<String, dynamic>.from(draft),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('关闭'),
-                ),
-              ],
-            ),
+        ),
       );
-      if (mounted) {
+      if (mounted && confirmed == true) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('资料已确认，可在“记录”中查看和认证')));
         setState(() {
           _file = null;
+          _idempotencyKey = null;
           _status = null;
         });
       }
@@ -182,7 +202,12 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                 trailing: IconButton(
                   tooltip: '移除',
                   onPressed:
-                      _working ? null : () => setState(() => _file = null),
+                      _working
+                          ? null
+                          : () => setState(() {
+                            _file = null;
+                            _idempotencyKey = null;
+                          }),
                   icon: const Icon(Icons.close),
                 ),
               ),
@@ -218,6 +243,8 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
 class OcrConfirmScreen extends ConsumerStatefulWidget {
   const OcrConfirmScreen({
     required this.taskId,
+    required this.resultId,
+    required this.revisionId,
     required this.documentType,
     required this.resultSource,
     required this.draft,
@@ -225,6 +252,8 @@ class OcrConfirmScreen extends ConsumerStatefulWidget {
   });
 
   final String taskId;
+  final String resultId;
+  final String revisionId;
   final String documentType;
   final String resultSource;
   final Map<String, dynamic> draft;
@@ -252,7 +281,12 @@ class _OcrConfirmScreenState extends ConsumerState<OcrConfirmScreen> {
           .read(apiClientProvider)
           .post(
             '/api/ocr/tasks/${widget.taskId}/confirm',
-            data: {'result': _draft},
+            data: buildOcrConfirmationPayload(
+              documentType: widget.documentType,
+              resultId: widget.resultId,
+              revisionId: widget.revisionId,
+              draft: _draft,
+            ),
           );
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
@@ -329,16 +363,34 @@ class _JsonFields extends StatelessWidget {
     'sample_date': '采样日期',
     'report_date': '报告日期',
     'observations': '检查项目',
+    'items': '检查项目',
     'orders': '药品医嘱',
+    'hospital_name': '医院',
+    'department_name': '科室',
+    'doctor_name': '医生',
+    'prescribed_at': '开具日期',
+    'examined_at': '检查日期',
+    'reported_at': '报告日期',
+    'examination_name': '检查名称',
+    'body_part': '检查部位',
+    'examination_method': '检查方法',
     'item_name': '项目名称',
+    'item_code': '项目代码',
     'raw_value': '原始数值',
     'numeric_value': '数值',
     'unit': '单位',
+    'raw_unit': '原始单位',
+    'normalized_unit': '标准单位',
     'reference_range': '参考范围',
+    'reference_range_text': '参考范围',
+    'reference_low': '参考下限',
+    'reference_high': '参考上限',
     'source_text': '医嘱原文',
     'drug_name': '药名',
     'specification': '规格',
     'dosage_text': '单次剂量',
+    'dosage_value': '剂量数值',
+    'dosage_unit': '剂量单位',
     'frequency': '频次',
     'duration': '疗程',
     'route': '给药途径',
@@ -433,4 +485,76 @@ class _JsonFields extends StatelessWidget {
 
   bool _longField(String? name) =>
       const {'医嘱原文', '检查所见', '检查结论', '主诉', '诊断摘要', '处理意见', '医嘱'}.contains(name);
+}
+
+Map<String, dynamic> buildOcrConfirmationPayload({
+  required String documentType,
+  required String resultId,
+  required String revisionId,
+  required Map<String, dynamic> draft,
+}) {
+  if (documentType == 'lab_report') {
+    final items = (draft['items'] as List? ?? const []).whereType<Map>().toList(
+      growable: false,
+    );
+    return {
+      'result_id': resultId,
+      'expected_revision_id': revisionId,
+      'sample_date': draft['sample_date'],
+      'report_date': draft['report_date'],
+      'items': [
+        for (var index = 0; index < items.length; index++)
+          {
+            'source_index': index,
+            'name': items[index]['item_name'],
+            'value': items[index]['raw_value'] ?? items[index]['numeric_value'],
+            'unit': items[index]['raw_unit'] ?? items[index]['normalized_unit'],
+            'reference_range': items[index]['reference_range_text'],
+          },
+      ],
+    };
+  }
+  if (documentType == 'medical_order') {
+    final orders = (draft['orders'] as List? ?? const [])
+        .whereType<Map>()
+        .toList(growable: false);
+    return {
+      'result_id': resultId,
+      'expected_revision_id': revisionId,
+      'items': [
+        for (var index = 0; index < orders.length; index++)
+          {
+            'source_index': index,
+            'confirmed': true,
+            'source_text': orders[index]['source_text'],
+            'drug_name': orders[index]['drug_name'],
+            'specification': orders[index]['specification'],
+            'dosage_value': orders[index]['dosage_value'],
+            'dosage_unit': orders[index]['dosage_unit'],
+            'frequency': orders[index]['frequency'],
+            'duration': orders[index]['duration'],
+            'route': orders[index]['route'],
+            'instruction': orders[index]['instruction'],
+            'prescribed_at': draft['prescribed_at'],
+            'explicitly_stopped': orders[index]['explicitly_stopped'] ?? false,
+          },
+      ],
+    };
+  }
+  if (documentType == 'imaging_text_report' ||
+      documentType == 'outpatient_record') {
+    return {
+      'result_id': resultId,
+      'expected_revision_id': revisionId,
+      'document_type': documentType,
+      'confirmed_data': draft,
+      'field_confirmations': const [],
+      'confirm_all': true,
+    };
+  }
+  throw ArgumentError.value(
+    documentType,
+    'documentType',
+    'unsupported OCR material type',
+  );
 }

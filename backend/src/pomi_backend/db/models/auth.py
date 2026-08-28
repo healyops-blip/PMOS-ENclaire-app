@@ -38,7 +38,7 @@ class UserAccount(Base):
     uid: Mapped[str] = mapped_column(String(36), nullable=False, unique=True, default=new_uid)
     account_name: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    phone_number: Mapped[str | None] = mapped_column(String(32))
+    phone_number: Mapped[str | None] = mapped_column(String(32), unique=True)
     phone_verified_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     account_type: Mapped[str] = mapped_column(String(16), nullable=False, default="user")
     onboarding_completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

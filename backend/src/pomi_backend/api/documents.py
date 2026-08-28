@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 
 from pomi_backend.api.business import success
 from pomi_backend.api.dependencies import DocumentServiceDependency
-from pomi_backend.services.documents import document_data, revision_data
+from pomi_backend.services.documents import revision_data
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 DocumentType = Literal["lab_report", "medical_order", "imaging_text_report", "outpatient_record"]
@@ -46,7 +46,7 @@ def list_documents(
     return success(
         request,
         {
-            "items": [document_data(document) for document in page],
+            "items": [service.data(document) for document in page],
             "next_cursor": page[-1].uploaded_at.isoformat() if len(documents) > limit else None,
             "has_more": len(documents) > limit,
         },

@@ -14,6 +14,7 @@ from pomi_backend.db.models import (
     Medication,
     MedicationDaily,
     MenstrualCycle,
+    OCRTask,
     PatientProfile,
     ReportSnapshot,
     UserAccount,
@@ -187,12 +188,18 @@ class DashboardService:
         )
         confirmed = (
             self.session.scalar(
-                select(func.count())
+                select(func.count(func.distinct(Document.id)))
                 .select_from(Document)
+                .join(
+                    OCRTask,
+                    (OCRTask.document_id == Document.id)
+                    & (OCRTask.document_revision_id == Document.current_revision_id),
+                )
                 .where(
                     Document.patient_id == profile.patient_id,
                     Document.deleted_at.is_(None),
-                    Document.upload_status == "ready",
+                    OCRTask.patient_id == profile.patient_id,
+                    OCRTask.status == "confirmed",
                 )
             )
             or 0

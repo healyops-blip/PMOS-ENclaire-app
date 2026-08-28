@@ -107,7 +107,11 @@ def test_weight_update_and_patient_ownership_isolation(api_client: TestClient) -
     own_update = api_client.put(
         f"/api/weights/{created_data['id']}",
         headers=first_headers,
-        json={"record_date": "2026-08-21", "weight_kg": 69.9},
+        json={
+            "record_date": "2026-08-21",
+            "weight_kg": 69.9,
+            "updated_at": created_data["updated_at"],
+        },
     )
     assert own_update.status_code == 200
     assert response_data(own_update)["record_date"] == "2026-08-21"
@@ -122,7 +126,11 @@ def test_weight_update_and_patient_ownership_isolation(api_client: TestClient) -
     conflict = api_client.put(
         f"/api/weights/{second_data['id']}",
         headers=first_headers,
-        json={"record_date": "2026-08-21", "weight_kg": 69.7},
+        json={
+            "record_date": "2026-08-21",
+            "weight_kg": 69.7,
+            "updated_at": second_data["updated_at"],
+        },
     )
     assert conflict.status_code == 409
 

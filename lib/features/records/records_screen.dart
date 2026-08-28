@@ -53,8 +53,11 @@ class RecordsScreen extends ConsumerWidget {
                 (item) => Map<String, dynamic>.from(item as Map),
               ),
             );
+            final reportPage = Map<String, dynamic>.from(
+              data['reports'] as Map,
+            );
             final reports = List<Map<String, dynamic>>.from(
-              (data['reports'] as List).map(
+              (reportPage['items'] as List).map(
                 (item) => Map<String, dynamic>.from(item as Map),
               ),
             );
@@ -77,10 +80,10 @@ class _DocumentsList extends StatelessWidget {
   final List<Map<String, dynamic>> documents;
 
   static const labels = {
-    'lab': '化验 / 检测',
+    'lab_report': '化验 / 检测',
     'medical_order': '医嘱 / 处方',
-    'imaging': '影像文字报告',
-    'outpatient': '门诊病历',
+    'imaging_text_report': '影像文字报告',
+    'outpatient_record': '门诊病历',
   };
 
   @override
@@ -230,7 +233,7 @@ class _DocumentDetailScreenState extends ConsumerState<DocumentDetailScreen> {
           .read(apiClientProvider)
           .post(
             '/api/medication-reconciliations',
-            data: {'source_document_id': documentId},
+            data: {'ocr_task_id': widget.document['latest_ocr_task_id']},
           );
       if (!mounted) return;
       await Navigator.of(context).push(
@@ -600,12 +603,12 @@ class _ReportsList extends ConsumerWidget {
                         child: Icon(Icons.summarize_outlined),
                       ),
                       title: const Text('复诊准备报告'),
-                      subtitle: Text(report['report_generated_at'].toString()),
+                      subtitle: Text(report['generated_at'].toString()),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () async {
                         final detail = await ref
                             .read(apiClientProvider)
-                            .get('/api/reports/${report['id']}');
+                            .get('/api/reports/${report['report_id']}');
                         if (context.mounted) {
                           Navigator.of(context).push(
                             MaterialPageRoute(
@@ -685,11 +688,12 @@ class _ReportsList extends ConsumerWidget {
       final api = ref.read(apiClientProvider);
       final note = await api.post(
         '/api/patient-notes',
-        data: {'original_text': statement.text.trim(), 'confirm': true},
+        data: {'original_text': statement.text.trim()},
       );
+      await api.post('/api/patient-notes/${note['id']}/confirm');
       final report = await api.post(
         '/api/reports',
-        data: {'patient_note_id': note['id']},
+        data: {'patient_note_id': note['id'], 'confirm_incomplete': true},
       );
       ref.invalidate(recordsProvider);
       if (context.mounted) {
@@ -724,48 +728,12 @@ class ReportViewer extends ConsumerStatefulWidget {
 }
 
 class _ReportViewerState extends ConsumerState<ReportViewer> {
-  bool _exporting = false;
   int _layer = 0;
 
-  Future<Uint8List> _pdf() async {
-    final api = ref.read(apiClientProvider);
-    final id = widget.report['id'];
-    await api.post('/api/reports/$id/pdf');
-    for (var attempt = 0; attempt < 30; attempt++) {
-      await Future<void>.delayed(const Duration(seconds: 1));
-      final status = await api.get('/api/reports/$id/pdf');
-      if (status['generation_status'] == 'succeeded') {
-        return Uint8List.fromList(
-          await api.download('/api/reports/$id/pdf/file'),
-        );
-      }
-      if (status['generation_status'] == 'failed') {
-        throw ApiFailure(
-          'PDF_GENERATION_FAILED',
-          status['failure_reason']?.toString() ?? 'PDF 生成失败',
-        );
-      }
-    }
-    throw ApiFailure('PDF_GENERATION_PENDING', 'PDF 仍在生成，请稍后重试');
-  }
-
-  Future<void> _share() async {
-    setState(() => _exporting = true);
-    try {
-      final bytes = await _pdf();
-      await Printing.sharePdf(
-        bytes: bytes,
-        filename: 'pomi-follow-up-report.pdf',
-      );
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.toString())));
-      }
-    } finally {
-      if (mounted) setState(() => _exporting = false);
-    }
+  void _share() {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('PDF 导出正在开发，当前可先在应用内查看报告')));
   }
 
   @override
@@ -774,41 +742,49 @@ class _ReportViewerState extends ConsumerState<ReportViewer> {
       widget.report['snapshot'] as Map,
     );
     final summary = Map<String, dynamic>.from(snapshot['summary'] as Map);
-    final details = Map<String, dynamic>.from(snapshot['details'] as Map);
+    final profile = Map<String, dynamic>.from(
+      summary['profile'] as Map? ?? const {},
+    );
+    summary['patient_name'] = profile['nickname'];
+    summary['patient_statement'] = summary['patient_note_text'];
+    final trends = Map<String, dynamic>.from(snapshot['trends'] as Map);
     final medicines = List<Map<String, dynamic>>.from(
-      (details['medications'] as List? ?? []).map(
-        (item) => Map<String, dynamic>.from(item as Map),
-      ),
+      (summary['current_medications'] as List? ?? []).map((item) {
+        final value = Map<String, dynamic>.from(item as Map);
+        final dosageValue = value['dosage_value'];
+        final dosageUnit = value['dosage_unit']?.toString() ?? '';
+        value['dosage_text'] =
+            dosageValue == null
+                ? value['specification']
+                : '$dosageValue$dosageUnit';
+        return value;
+      }),
     );
     final labs = List<Map<String, dynamic>>.from(
-      (details['lab_observations'] as List? ?? []).map(
-        (item) => Map<String, dynamic>.from(item as Map),
-      ),
+      (trends['labs'] as List? ?? const []).expand((group) {
+        final value = Map<String, dynamic>.from(group as Map);
+        return (value['points'] as List? ?? const []).map((item) {
+          final point = Map<String, dynamic>.from(item as Map);
+          point['item_name'] = point['original_item_name'];
+          point['sample_date'] = point['date'];
+          point['raw_unit'] = point['original_unit'];
+          return point;
+        });
+      }),
     );
     final weights = List<Map<String, dynamic>>.from(
-      (details['weights'] as List? ?? []).map(
+      (trends['weights'] as List? ?? []).map(
         (item) => Map<String, dynamic>.from(item as Map),
       ),
     );
     final cycles = List<Map<String, dynamic>>.from(
-      (details['cycles'] as List? ?? []).map(
+      (trends['cycles'] as List? ?? []).map(
         (item) => Map<String, dynamic>.from(item as Map),
       ),
     );
     final sourceGroups = <String, List<Map<String, dynamic>>>{
-      '化验 / 检测': labs,
-      '医嘱 / 处方': List<Map<String, dynamic>>.from(
-        (details['medical_orders'] as List? ?? []).map(
-          (item) => Map<String, dynamic>.from(item as Map),
-        ),
-      ),
-      '影像文字报告': List<Map<String, dynamic>>.from(
-        (details['imaging_reports'] as List? ?? []).map(
-          (item) => Map<String, dynamic>.from(item as Map),
-        ),
-      ),
-      '门诊病历': List<Map<String, dynamic>>.from(
-        (details['outpatient_records'] as List? ?? []).map(
+      '报告来源': List<Map<String, dynamic>>.from(
+        (snapshot['sources'] as List? ?? []).map(
           (item) => Map<String, dynamic>.from(item as Map),
         ),
       ),
@@ -819,14 +795,8 @@ class _ReportViewerState extends ConsumerState<ReportViewer> {
         actions: [
           IconButton(
             tooltip: '分享 PDF',
-            onPressed: _exporting ? null : _share,
-            icon:
-                _exporting
-                    ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                    : const Icon(Icons.ios_share_outlined),
+            onPressed: _share,
+            icon: const Icon(Icons.ios_share_outlined),
           ),
         ],
       ),
@@ -855,7 +825,8 @@ class _ReportViewerState extends ConsumerState<ReportViewer> {
                   summary: summary,
                   medicines: medicines,
                   labs: labs,
-                  medicalBoundary: snapshot['medical_boundary'].toString(),
+                  medicalBoundary: (summary['disclaimers'] as List? ?? const [])
+                      .join('\n'),
                 ),
                 _ReportTrendLayer(
                   weights: weights,
@@ -897,7 +868,7 @@ class _ReportSummaryLayer extends StatelessWidget {
       ),
       const SizedBox(height: 4),
       Text(
-        '生成于 ${report['report_generated_at']}',
+        '生成于 ${report['generated_at']}',
         style: const TextStyle(color: pomiMuted),
       ),
       const SizedBox(height: 16),
@@ -1028,7 +999,7 @@ class _ReportTrendLayer extends StatelessWidget {
                 .take(6)
                 .map(
                   (item) =>
-                      '${item['measured_at'].toString().substring(0, 10)}  ${item['weight_kg']} kg',
+                      '${item['record_date'].toString().substring(0, 10)}  ${item['weight_kg']} kg',
                 )
                 .toList(),
       ),
@@ -1170,6 +1141,7 @@ class _ReportSourceLayer extends StatelessWidget {
                             item['item_name'] ??
                             item['drug_name'] ??
                             item['examination_name'] ??
+                            item['source_type'] ??
                             item['hospital_name'] ??
                             entry.key;
                         return ListTile(
@@ -1179,7 +1151,7 @@ class _ReportSourceLayer extends StatelessWidget {
                           ),
                           title: Text(label.toString()),
                           subtitle: Text(
-                            '材料 ${_shortId(item['document_id'])} · 修订 ${_shortId(item['source_revision_id'])}',
+                            '材料 ${_shortId(item['document_id'])} · 修订 ${_shortId(item['document_revision_id'])}',
                           ),
                         );
                       }).toList(),

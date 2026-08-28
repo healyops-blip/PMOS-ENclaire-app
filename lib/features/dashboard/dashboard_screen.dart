@@ -9,15 +9,48 @@ import '../../core/theme.dart';
 final dashboardProvider = FutureProvider.autoDispose<Map<String, dynamic>>((
   ref,
 ) async {
-  final data = await ref.read(apiClientProvider).get('/api/dashboard');
-  return Map<String, dynamic>.from(data as Map);
+  final values = await Future.wait([
+    ref.read(apiClientProvider).get('/api/dashboard'),
+    ref.read(apiClientProvider).get('/api/patient/profile'),
+  ]);
+  final data = Map<String, dynamic>.from(values[0] as Map);
+  dynamic section(String key) => (data[key] as Map?)?['data'];
+  final medications = (section('today_medications') as List? ?? const [])
+      .whereType<Map>()
+      .map(
+        (item) => {
+          ...Map<String, dynamic>.from(item),
+          'id': item['medication_id'],
+          'today_status': item['intake_status'],
+        },
+      )
+      .toList(growable: false);
+  final tracking = section('tracking_summary') as Map?;
+  return {
+    ...data,
+    'profile': values[1],
+    'medications': medications,
+    'documents': section('document_summary') ?? <String, dynamic>{},
+    'latest_weight': tracking?['latest_weight'],
+    'latest_cycle': tracking?['latest_cycle'],
+  };
 });
 
 final medicationsProvider =
     FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
       final data = await ref.read(apiClientProvider).get('/api/medications');
+      final page = Map<String, dynamic>.from(data as Map);
       return List<Map<String, dynamic>>.from(
-        (data as List).map((item) => Map<String, dynamic>.from(item as Map)),
+        (page['items'] as List).map((item) {
+          final value = Map<String, dynamic>.from(item as Map);
+          final dosageValue = value['dosage_value'];
+          final dosageUnit = value['dosage_unit']?.toString() ?? '';
+          value['dosage_text'] =
+              dosageValue == null
+                  ? value['specification']
+                  : '$dosageValue$dosageUnit';
+          return value;
+        }),
       );
     });
 
@@ -86,7 +119,7 @@ class _DashboardBody extends ConsumerWidget {
     final taken =
         medicines.where((item) => item['today_status'] == 'taken').length;
     final missed =
-        medicines.where((item) => item['today_status'] == 'not_taken').length;
+        medicines.where((item) => item['today_status'] == 'missed').length;
     final unrecorded = math.max(0, medicines.length - taken - missed);
     final completion = medicines.isEmpty ? 0.0 : taken / medicines.length;
     final nextVisit = profile['next_visit_date']?.toString();
@@ -565,9 +598,14 @@ class MedicationManagementScreen extends ConsumerWidget {
                         .read(apiClientProvider)
                         .post(
                           '/api/medications',
+                          headers: {
+                            'Idempotency-Key':
+                                'manual-${DateTime.now().microsecondsSinceEpoch}',
+                          },
                           data: {
                             'drug_name': name.text.trim(),
-                            'dosage_text':
+                            'source_category': 'other_long_term',
+                            'specification':
                                 dose.text.trim().isEmpty
                                     ? null
                                     : dose.text.trim(),
@@ -575,7 +613,6 @@ class MedicationManagementScreen extends ConsumerWidget {
                                 frequency.text.trim().isEmpty
                                     ? null
                                     : frequency.text.trim(),
-                            'current_status': 'active',
                           },
                         );
                     if (sheetContext.mounted) Navigator.pop(sheetContext, true);
@@ -603,7 +640,7 @@ class _MedicationRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final status = medicine['today_status']?.toString() ?? 'not_recorded';
+    final status = medicine['today_status']?.toString() ?? 'unrecorded';
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
@@ -656,8 +693,8 @@ class _MedicationRow extends ConsumerWidget {
             itemBuilder:
                 (context) => const [
                   PopupMenuItem(value: 'taken', child: Text('✓ 已服用')),
-                  PopupMenuItem(value: 'not_taken', child: Text('– 主动漏服')),
-                  PopupMenuItem(value: 'not_recorded', child: Text('○ 未记录')),
+                  PopupMenuItem(value: 'missed', child: Text('– 主动漏服')),
+                  PopupMenuItem(value: 'unrecorded', child: Text('○ 未记录')),
                 ],
             child: _StatusPill(status: status),
           ),
@@ -674,7 +711,7 @@ class _StatusPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final (label, color) = switch (status) {
       'taken' => ('✓ 已服用', pomiSuccess),
-      'not_taken' => ('– 主动漏服', pomiCoral),
+      'missed' => ('– 主动漏服', pomiCoral),
       _ => ('○ 未记录', pomiMuted),
     };
     return Container(

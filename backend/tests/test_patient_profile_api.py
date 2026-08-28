@@ -40,7 +40,7 @@ def test_profile_onboarding_and_nullable_visit_date_are_persistent(
             headers=headers,
             json={
                 "nickname": "Pomi User",
-                "birth_date": "1996-06-18",
+                "birth_year": 1996,
                 "gender": "female",
                 "height_cm": 165.5,
                 "diagnosis_year": 2024,
@@ -52,7 +52,8 @@ def test_profile_onboarding_and_nullable_visit_date_are_persistent(
             },
         )
     )
-    assert updated["patient_id"] == profile["patient_id"]
+    assert updated["id"] == profile["id"]
+    assert updated["birth_year"] == 1996
     assert updated["onboarding_completed"] is True
     assert updated["next_visit_date"] is None
     assert updated["onboarding_completed_at"] is not None
@@ -84,7 +85,7 @@ def test_profile_scope_conflict_and_validation(api_client: TestClient) -> None:
     second_headers = register_and_login(api_client, "profile-second")
     first = data(api_client.get("/api/patient/profile", headers=first_headers))
     second = data(api_client.get("/api/patient/profile", headers=second_headers))
-    assert first["patient_id"] != second["patient_id"]
+    assert first["id"] != second["id"]
 
     changed = data(
         api_client.put(
@@ -105,7 +106,7 @@ def test_profile_scope_conflict_and_validation(api_client: TestClient) -> None:
     invalid = api_client.put(
         "/api/patient/profile",
         headers=second_headers,
-        json={"birth_date": "2099-01-01"},
+        json={"birth_year": 2101, "updated_at": second["updated_at"]},
     )
     assert invalid.status_code == 422
     assert invalid.json()["error"]["code"] == "VALIDATION_ERROR"

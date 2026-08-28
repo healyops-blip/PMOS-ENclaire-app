@@ -29,6 +29,12 @@ class AccountNameTaken(AuthError):
     status_code = 409
 
 
+class PhoneNumberTaken(AuthError):
+    code = "PHONE_NUMBER_TAKEN"
+    message = "This phone number is already registered."
+    status_code = 409
+
+
 class InvalidCredentials(AuthError):
     code = "INVALID_CREDENTIALS"
     message = "The account name or password is incorrect."
@@ -66,6 +72,8 @@ class AuthService:
     ) -> UserAccount:
         if self._repository.get_account_by_name(account_name) is not None:
             raise AccountNameTaken
+        if phone_number is not None and self._repository.get_account_by_phone(phone_number):
+            raise PhoneNumberTaken
         try:
             account = self._repository.create_account(
                 account_name=account_name,
@@ -76,6 +84,11 @@ class AuthService:
             return account
         except IntegrityError as error:
             self._session.rollback()
+            if (
+                phone_number is not None
+                and self._repository.get_account_by_phone(phone_number) is not None
+            ):
+                raise PhoneNumberTaken from error
             raise AccountNameTaken from error
 
     def login(
@@ -87,6 +100,8 @@ class AuthService:
         device_name: str | None,
     ) -> LoginResult:
         account = self._repository.get_account_by_name(account_name)
+        if account is None and (account_name.startswith("+") or account_name.isdigit()):
+            account = self._repository.get_account_by_phone(account_name)
         password_hash = (
             account.password_hash if account is not None else self._password_manager.dummy_hash
         )

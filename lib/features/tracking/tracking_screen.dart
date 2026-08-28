@@ -154,7 +154,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
 
   bool _hasWeight(DateTime day, List<Map<String, dynamic>> weights) =>
       weights.any((weight) {
-        final date = DateTime.tryParse(weight['measured_at'].toString());
+        final date = DateTime.tryParse(weight['record_date'].toString());
         return date != null && DateUtils.isSameDay(date.toLocal(), day);
       });
 
@@ -256,7 +256,6 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                                     10,
                                   ),
                                   'flow_level': flow,
-                                  'symptoms': <String>[],
                                 },
                               );
                           if (sheetContext.mounted) {
@@ -334,19 +333,14 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                         onPressed: () async {
                           final value = double.tryParse(controller.text);
                           if (value == null) return;
-                          final measuredAt =
-                              DateTime(
-                                date.year,
-                                date.month,
-                                date.day,
-                                8,
-                              ).toUtc();
                           await ref
                               .read(apiClientProvider)
                               .post(
                                 '/api/weights',
                                 data: {
-                                  'measured_at': measuredAt.toIso8601String(),
+                                  'record_date': date
+                                      .toIso8601String()
+                                      .substring(0, 10),
                                   'weight_kg': value,
                                 },
                               );
@@ -570,7 +564,7 @@ class _WeightPanel extends StatelessWidget {
             .take(3)
             .map(
               (item) => _DataRow(
-                label: item['measured_at'].toString().substring(0, 10),
+                label: item['record_date'].toString().substring(0, 10),
                 value: '${item['weight_kg']} kg',
               ),
             ),

@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import timedelta
 from typing import Any
 
+from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -220,6 +222,151 @@ class OCRTaskService:
             self.repository.fields(result.id),
             source_document=source,
         )
+
+    def complete_synchronously(
+        self,
+        task: OCRTask,
+        *,
+        raw_response: dict[str, Any],
+        draft: dict[str, Any],
+        fields: list[dict[str, Any]],
+        result_source: str,
+    ) -> OCRResult:
+        """Persist a synchronous provider response in the normal confirmation workflow."""
+
+        owned = self.owned(task.id)
+        task_id = owned.id
+        existing = self.repository.result(owned.id)
+        if existing is not None:
+            return existing
+        if owned.status != "processing" or owned.lease_owner != f"sync:{owned.id}":
+            raise BusinessError(
+                "OCR_TASK_NOT_COMPLETABLE",
+                "OCR task cannot accept a provider result in its current state.",
+                409,
+            )
+        result = OCRResult(
+            id=new_uuid(),
+            task_id=owned.id,
+            raw_response=raw_response,
+            validated_draft=draft,
+        )
+        try:
+            self.session.add(result)
+            self.session.flush()
+            self.session.add_all(
+                [
+                    OCRFieldResult(
+                        id=new_uuid(),
+                        result_id=result.id,
+                        field_path=field["path"],
+                        source_text=field.get("source_text"),
+                        parsed_value=field.get("value"),
+                        confidence=float(field["confidence"]),
+                        uncertainty_reason=field.get("uncertainty_reason"),
+                        source_region=field.get("source_region"),
+                    )
+                    for field in fields
+                ]
+            )
+            now = utc_now()
+            history = list(owned.attempt_history)
+            if history and history[-1].get("status") == "started":
+                history[-1] = {
+                    **history[-1],
+                    "status": "succeeded",
+                    "finished_at": now.isoformat(),
+                }
+            owned.status = "pending_confirmation"
+            owned.result_source = result_source
+            owned.attempt_history = history
+            owned.finished_at = now
+            owned.lease_owner = None
+            owned.lease_expires_at = None
+            owned.provider_call_started_at = None
+            owned.updated_at = now
+            self.session.commit()
+            self.session.refresh(result)
+            return result
+        except IntegrityError:
+            self.session.rollback()
+            existing = self.repository.result(task_id)
+            if existing is None:
+                raise
+            return existing
+
+    def claim_synchronous(self, task: OCRTask, *, lease_seconds: int) -> OCRTask:
+        """Claim a queued task so the asynchronous worker cannot call the provider too."""
+
+        owned = self.owned(task.id)
+        now = utc_now()
+        attempt_number = owned.provider_attempts + 1
+        history = [
+            *owned.attempt_history,
+            {
+                "provider_attempt": attempt_number,
+                "started_at": now.isoformat(),
+                "status": "started",
+            },
+        ]
+        claimed = self.session.execute(
+            update(OCRTask)
+            .where(OCRTask.id == owned.id, OCRTask.status == "queued")
+            .values(
+                status="processing",
+                lease_owner=f"sync:{owned.id}",
+                lease_expires_at=now + timedelta(seconds=max(lease_seconds, 1)),
+                provider_call_started_at=now,
+                started_at=owned.started_at or now,
+                provider_attempts=attempt_number,
+                attempt_history=history,
+                updated_at=now,
+            )
+        )
+        if claimed.rowcount != 1:
+            self.session.rollback()
+            raise BusinessError(
+                "OCR_RECOGNITION_IN_PROGRESS",
+                "This document is already being recognized.",
+                409,
+            )
+        self.session.commit()
+        self.session.refresh(owned)
+        return owned
+
+    def fail_synchronously(
+        self,
+        task: OCRTask,
+        *,
+        category: str,
+        code: str,
+        message: str,
+        retryable: bool,
+    ) -> None:
+        """Release a synchronous task after a known provider or schema failure."""
+
+        owned = self.owned(task.id)
+        now = utc_now()
+        history = list(owned.attempt_history)
+        if history and history[-1].get("status") == "started":
+            history[-1] = {
+                **history[-1],
+                "status": "failed",
+                "finished_at": now.isoformat(),
+                "category": category,
+                "code": code,
+            }
+        owned.status = "queued" if retryable else "failed"
+        owned.error_category = category
+        owned.error_code = code
+        owned.error_message = message[:500]
+        owned.attempt_history = history
+        owned.finished_at = None if retryable else now
+        owned.lease_owner = None
+        owned.lease_expires_at = None
+        owned.provider_call_started_at = None
+        owned.updated_at = now
+        self.session.commit()
 
     def confirm_lab(self, task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         task = self.owned(task_id)

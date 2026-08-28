@@ -25,7 +25,7 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.CheckConstraint(
             "current_step IN ('basic', 'cycle', 'medications', 'complete')",
-            name="ck_onboarding_draft_onboarding_draft_current_step",
+            name="onboarding_draft_current_step",
         ),
         sa.ForeignKeyConstraint(["account_uid"], ["user_account.uid"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),

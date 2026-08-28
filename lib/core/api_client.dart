@@ -222,6 +222,7 @@ class ApiClient {
     'INVALID_CREDENTIALS' => '账号或密码错误',
     'AUTHENTICATION_REQUIRED' => '登录状态已失效，请重新登录',
     'ACCOUNT_NAME_TAKEN' => '该账号已存在，请直接登录或更换账号名',
+    'PHONE_NUMBER_TAKEN' => '该手机号已注册，请直接登录',
     'VALIDATION_ERROR' => '账号或密码格式不符合要求，请检查后重试',
     'AUTH_RATE_LIMITED' when retryAfter != null => '请求过于频繁，请在 $retryAfter 秒后重试',
     'AUTH_RATE_LIMITED' => '请求过于频繁，请稍后重试',
@@ -271,20 +272,76 @@ class SmokeApiClient extends ApiClient {
     if (path == '/api/patient/profile') return Map.of(_profile);
     if (path == '/api/weights') return _copyList(_weights);
     if (path == '/api/cycles') return _copyList(_cycles);
-    if (path == '/api/medications') return _copyList(_medications);
-    if (path == '/api/dashboard') {
+    if (path == '/api/medications') {
       return {
-        'profile': Map.of(_profile),
-        'medications': _copyList(_medications),
-        'latest_weight': _weights.isEmpty ? null : Map.of(_weights.last),
-        'latest_cycle': _cycles.isEmpty ? null : Map.of(_cycles.last),
-        'documents': {'confirmed': 0, 'total': 0},
+        'server_date': DateTime.now().toIso8601String().substring(0, 10),
+        'items': _copyList(_medications),
+        'groups': <String, dynamic>{},
+        'next_cursor': null,
+        'has_more': false,
+      };
+    }
+    if (path == '/api/dashboard') {
+      final today =
+          _medications
+              .where((item) => item['current_status'] == 'active')
+              .map(
+                (item) => {
+                  'medication_id': item['id'],
+                  'drug_name': item['drug_name'],
+                  'specification': item['specification'],
+                  'dosage_text': item['specification'],
+                  'frequency': item['frequency'],
+                  'intake_status': item['today_status'] ?? 'unrecorded',
+                  'recorded_at': null,
+                },
+              )
+              .toList();
+      return {
+        'server_date': DateTime.now().toIso8601String().substring(0, 10),
+        'data_as_of': DateTime.now().toUtc().toIso8601String(),
+        'follow_up': {'status': 'empty', 'data': null, 'error_code': null},
+        'today_medications': {
+          'status': today.isEmpty ? 'empty' : 'ok',
+          'data': today,
+          'error_code': null,
+        },
+        'monthly_medication_summary': {
+          'status': 'ok',
+          'data': {
+            'month': DateTime.now().toIso8601String().substring(0, 7),
+            'taken_count': 0,
+            'missed_count': 0,
+            'unrecorded_count': today.length,
+          },
+          'error_code': null,
+        },
+        'tracking_summary': {
+          'status': 'ok',
+          'data': {
+            'latest_weight': _weights.isEmpty ? null : Map.of(_weights.last),
+            'latest_cycle': _cycles.isEmpty ? null : Map.of(_cycles.last),
+          },
+          'error_code': null,
+        },
+        'document_summary': {
+          'status': 'ok',
+          'data': {'confirmed': 0, 'total': 0},
+          'error_code': null,
+        },
+        'latest_report': {'status': 'empty', 'data': null, 'error_code': null},
       };
     }
     if (path == '/api/documents') {
       return {'items': <Map<String, dynamic>>[], 'total': 0};
     }
-    if (path == '/api/reports') return <Map<String, dynamic>>[];
+    if (path == '/api/reports') {
+      return {
+        'items': <Map<String, dynamic>>[],
+        'next_cursor': null,
+        'has_more': false,
+      };
+    }
     if (path.startsWith('/api/ocr/tasks/')) {
       if (path.endsWith('/result')) {
         return {'result_source': 'smoke', 'draft': <String, dynamic>{}};
@@ -333,23 +390,12 @@ class SmokeApiClient extends ApiClient {
     if (path == '/api/medications') {
       final item = {
         'id': _id('medication'),
-        'today_status': 'not_recorded',
+        'current_status': 'active',
+        'today_status': 'unrecorded',
         ...values,
       };
       _medications.add(item);
       return Map.of(item);
-    }
-    final dailyStatus = RegExp(
-      r'^/api/medications/([^/]+)/daily-status$',
-    ).firstMatch(path);
-    if (dailyStatus != null) {
-      final id = dailyStatus.group(1);
-      final medicine =
-          _medications.where((item) => item['id'] == id).firstOrNull;
-      if (medicine != null) {
-        medicine['today_status'] = values['status'] ?? 'not_recorded';
-        return Map.of(medicine);
-      }
     }
     if (path == '/api/ocr/tasks') {
       return {'id': 'smoke-ocr', 'task_status': 'queued'};
@@ -367,6 +413,23 @@ class SmokeApiClient extends ApiClient {
     if (path == '/api/patient/profile') {
       _profile.addAll(values);
       return Map.of(_profile);
+    }
+    final dailyStatus = RegExp(
+      r'^/api/medications/([^/]+)/daily-status$',
+    ).firstMatch(path);
+    if (dailyStatus != null) {
+      final id = dailyStatus.group(1);
+      final medicine =
+          _medications.where((item) => item['id'] == id).firstOrNull;
+      if (medicine != null) {
+        medicine['today_status'] = values['intake_status'] ?? 'unrecorded';
+      }
+      return {
+        'id': _id('daily'),
+        'medication_id': id,
+        'record_date': values['record_date'],
+        'intake_status': values['intake_status'] ?? 'unrecorded',
+      };
     }
     return {'id': _id('smoke'), ...values};
   }
@@ -399,6 +462,14 @@ class SmokeApiClient extends ApiClient {
     required String consentVersion,
     required String idempotencyKey,
   }) async => {
+    'task_id': 'smoke-ocr',
+    'result_id': 'smoke-result',
+    'document_id': 'smoke-document',
+    'document_revision_id': 'smoke-revision',
+    'material_type': materialType,
+    'status': 'pending_confirmation',
+    'result_source': 'smoke',
+    'draft': _smokeOcrDraft(materialType),
     'hospital': '演示医院',
     'department': '妇科',
     'visit_date': DateTime.now().toIso8601String().substring(0, 10),
@@ -408,6 +479,41 @@ class SmokeApiClient extends ApiClient {
     'medication_suggestions': <Map<String, dynamic>>[],
     'original_file_name': file.uri.pathSegments.last,
   };
+
+  static Map<String, dynamic> _smokeOcrDraft(String materialType) =>
+      switch (materialType) {
+        'lab_report' => {
+          'hospital_name': '演示医院',
+          'sample_date': DateTime.now().toIso8601String().substring(0, 10),
+          'report_date': DateTime.now().toIso8601String().substring(0, 10),
+          'items': <Map<String, dynamic>>[],
+        },
+        'medical_order' => {
+          'hospital_name': '演示医院',
+          'department_name': '妇科',
+          'prescribed_at': DateTime.now().toIso8601String().substring(0, 10),
+          'orders': <Map<String, dynamic>>[],
+        },
+        'imaging_text_report' => {
+          'examination_name': '演示检查',
+          'body_part': null,
+          'examination_method': null,
+          'findings_text': '演示所见，请对照原件。',
+          'conclusion_text': '演示结论，请由医生复核。',
+          'examined_at': null,
+          'reported_at': null,
+        },
+        _ => {
+          'hospital_name': '演示医院',
+          'department_name': '妇科',
+          'doctor_name': null,
+          'visit_date': DateTime.now().toIso8601String().substring(0, 10),
+          'chief_complaint': null,
+          'diagnosis_summary': '多囊卵巢综合征',
+          'treatment_plan': null,
+          'medical_advice': '请携带原件与医生复核。',
+        },
+      };
 
   @override
   Future<List<int>> download(String path) async => <int>[];
