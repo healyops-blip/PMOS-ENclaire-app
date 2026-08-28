@@ -350,7 +350,14 @@ def replace_logo(image, logo_path, logo_bbox=None, clean_mode="safe", clean_pad=
 
     # 4) 粘贴 logo：
     if keep_alpha and logo.mode == "RGBA":
-        image.paste(logo, (offset_x, offset_y), mask=logo.split()[3])
+        try:
+            image.paste(logo, (offset_x, offset_y), mask=logo.split()[3])
+        except Exception:
+            # 部分 Pillow 版本在 paste RGBA + mask 时可能抛出类型错误，退化为 alpha 合成
+            bg = Image.new("RGBA", image.size)
+            bg.paste(image, (0, 0))
+            bg.alpha_composite(logo, (offset_x, offset_y))
+            image = bg.convert("RGB")
     else:
         # 去 alpha，避免透明区透出旧底色
         if logo.mode in ("RGBA", "LA"):
