@@ -1310,10 +1310,12 @@ class _ReportSummaryLayer extends StatelessWidget {
         style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
       ),
       const SizedBox(height: 8),
-      const PomiGlassCard(
+      PomiGlassCard(
         padding: EdgeInsets.all(15),
         child: Text(
-          '已确诊 PCOS · 当前健康信息已汇总\n最近记录与就诊资料可在下方查看',
+          '${(summary['profile'] as Map?)?['nickname'] ?? '未设置姓名'}\n'
+          '身高：${(summary['profile'] as Map?)?['height_cm'] ?? '—'} cm\n'
+          '体重：${(summary['profile'] as Map?)?['weight_kg'] ?? '—'} kg',
           style: TextStyle(height: 1.6),
         ),
       ),
