@@ -1247,6 +1247,17 @@ class _ReportViewerState extends ConsumerState<ReportViewer> {
       backgroundColor: Colors.white,
       body: Column(
         children: [
+          SafeArea(
+            bottom: false,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: IconButton(
+                tooltip: '返回',
+                onPressed: () => Navigator.of(context).maybePop(),
+                icon: const Icon(Icons.arrow_back_rounded),
+              ),
+            ),
+          ),
           Expanded(
             child: IndexedStack(
               index: _layer,
