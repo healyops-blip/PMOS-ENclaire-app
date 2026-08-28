@@ -53,7 +53,7 @@ name.
 
 | Environment | Generate/poll | Auth download | Save | Share | Print | Failure/retry | Result |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Android emulator | NOT_RUN | NOT_RUN | NOT_RUN | NOT_RUN | NOT_RUN | NOT_RUN | **NOT_RUN — no emulator session was available to this agent** |
+| Android 16 / API 36 emulator | NOT_RUN | NOT_RUN | NOT_RUN | NOT_RUN | NOT_RUN | NOT_RUN | **PARTIAL — APK from code head `8633e7f` installed; cold launch completed in 1.542 s, `MainActivity` remained resumed, and no AndroidRuntime fatal crash was found. The complete PDF path remains NOT_RUN.** |
 | Android physical device | NOT_RUN | NOT_RUN | NOT_RUN | NOT_RUN | NOT_RUN | NOT_RUN | **NOT_RUN — no physical Android device was connected to this agent** |
 
 Before release, repeat the following on both targets with a signed-in account
