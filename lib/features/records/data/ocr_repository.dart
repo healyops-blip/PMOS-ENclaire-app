@@ -350,8 +350,10 @@ class FastApiOcrRepository implements OcrRepository, MedicalOrderGateway {
   @override
   Future<void> confirmMedicalOrder(
     String taskId,
+    String resultId,
+    String expectedRevisionId,
     List<MedicalOrderDraft> items,
-  ) => _orders.confirmMedicalOrder(taskId, items);
+  ) => _orders.confirmMedicalOrder(taskId, resultId, expectedRevisionId, items);
 
   @override
   Future<MedicationReconciliationDraft> createReconciliation(String taskId) =>
@@ -600,6 +602,8 @@ class DemoOcrRepository implements OcrRepository, MedicalOrderGateway {
   @override
   Future<void> confirmMedicalOrder(
     String taskId,
+    String resultId,
+    String expectedRevisionId,
     List<MedicalOrderDraft> items,
   ) async {}
 

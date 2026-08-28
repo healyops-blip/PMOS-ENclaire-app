@@ -14,7 +14,7 @@ from pomi_backend.api.dependencies import (
 from pomi_backend.schemas.clinical_text import ClinicalTextConfirmRequest
 from pomi_backend.schemas.orders import MedicalOrderConfirmation
 from pomi_backend.services.ocr import task_data
-from pomi_backend.services.orders import medical_order_data
+from pomi_backend.services.orders import medical_order_data, medical_order_p0
 
 router = APIRouter(prefix="/api/ocr/tasks", tags=["ocr"])
 
@@ -89,7 +89,11 @@ def confirm_ocr_lab(
         orders, created = order_service.confirm(task_id, payload)
         return success(
             request,
-            {"items": [medical_order_data(order) for order in orders], "reused": not created},
+            {
+                "items": [medical_order_data(order) for order in orders],
+                "reused": not created,
+                "p0_evaluation": medical_order_p0(orders),
+            },
         )
     return success(
         request,

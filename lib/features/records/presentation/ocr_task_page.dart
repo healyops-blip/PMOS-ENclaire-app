@@ -220,26 +220,30 @@ class OcrPendingConfirmationPage extends StatelessWidget {
       return ClinicalTextConfirmationPage(repository: repository, task: task);
     }
     return FutureBuilder<OcrTaskResult>(
-    future: repository.result(task.id),
-    builder: (context, snapshot) {
-      if (!snapshot.hasData) {
-        if (snapshot.hasError) {
-          return Scaffold(body: Center(child: Text(snapshot.error.toString())));
+      future: repository.result(task.id),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          if (snapshot.hasError) {
+            return Scaffold(
+              body: Center(child: Text(snapshot.error.toString())),
+            );
+          }
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
-        return const Scaffold(body: Center(child: CircularProgressIndicator()));
-      }
-      if (task.materialType == 'medical_order' &&
-          repository is MedicalOrderGateway) {
-        return MedicalOrderReviewPage(
-          gateway: repository as MedicalOrderGateway,
-          task: task,
-          result: snapshot.data!,
-          document: document,
-          documentRepository: documentRepository,
-        );
-      }
-      return _genericPage(snapshot.data!);
-    },
+        if (task.materialType == 'medical_order' &&
+            repository is MedicalOrderGateway) {
+          return MedicalOrderReviewPage(
+            gateway: repository as MedicalOrderGateway,
+            task: task,
+            result: snapshot.data!,
+            document: document,
+            documentRepository: documentRepository,
+          );
+        }
+        return _genericPage(snapshot.data!);
+      },
     );
   }
 

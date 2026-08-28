@@ -216,7 +216,13 @@ def test_lab_confirmation_contract_matches_runtime_and_traceability() -> None:
     assert request_refs == {
         "#/components/schemas/LabConfirmRequest",
         "#/components/schemas/ClinicalTextConfirmRequest",
+        "#/components/schemas/MedicalOrderConfirmRequest",
     }
+    order_request = schemas["MedicalOrderConfirmRequest"]
+    assert set(order_request["required"]) == {"result_id", "expected_revision_id", "items"}
+    order_item = schemas["MedicalOrderConfirmationItem"]
+    assert {"source_index", "source_text", "prescribed_at"} <= set(order_item["required"])
+    assert "p0_evaluation" in schemas["MedicalOrderConfirmationResult"]["required"]
     assert {"401", "404", "409", "422"} <= set(confirmation["responses"])
     assert "Idempotency-Key" not in str(confirmation.get("parameters", []))
 

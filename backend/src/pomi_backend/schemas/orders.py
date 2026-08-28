@@ -10,29 +10,31 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 class MedicalOrderConfirmationItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    index: int = Field(ge=0)
+    source_index: int = Field(ge=0)
     confirmed: Literal[True]
+    source_text: str = Field(min_length=1, max_length=10000)
     drug_name: str = Field(min_length=1, max_length=200)
     specification: str | None = Field(default=None, max_length=200)
     dosage_value: Decimal = Field(gt=0, le=100000)
     dosage_unit: str = Field(min_length=1, max_length=32)
     frequency: str = Field(min_length=1, max_length=200)
-    course: str | None = Field(default=None, max_length=200)
+    duration: str | None = Field(default=None, max_length=200)
     route: str | None = Field(default=None, max_length=80)
-    instructions: str | None = Field(default=None, max_length=2000)
-    order_date: date
-    raw_order_text: str = Field(min_length=1, max_length=10000)
+    instruction: str | None = Field(default=None, max_length=2000)
+    prescribed_at: date
     explicitly_stopped: bool = False
 
 
 class MedicalOrderConfirmation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    result_id: str = Field(min_length=1, max_length=36)
+    expected_revision_id: str = Field(min_length=1, max_length=36)
     items: list[MedicalOrderConfirmationItem] = Field(min_length=1, max_length=100)
 
     @model_validator(mode="after")
     def unique_indexes(self) -> "MedicalOrderConfirmation":
-        indexes = [item.index for item in self.items]
+        indexes = [item.source_index for item in self.items]
         if len(indexes) != len(set(indexes)):
             raise ValueError("each medication index must be confirmed once")
         return self

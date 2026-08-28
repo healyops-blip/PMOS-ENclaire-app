@@ -5,8 +5,12 @@ from sqlalchemy.orm import Session
 
 from pomi_backend.db.models import (
     MedicalOrder,
+    Medication,
     MedicationReconciliation,
     MedicationReconciliationItem,
+    OCRResult,
+    OCRTask,
+    PatientProfile,
 )
 
 
@@ -29,6 +33,26 @@ class MedicalOrderRepository:
     def add(self, order: MedicalOrder) -> MedicalOrder:
         if order.patient_id != self.patient_id:
             raise ValueError("medical order is outside repository scope")
+        lineage = self.session.execute(
+            select(
+                OCRTask.patient_id,
+                OCRTask.document_id,
+                OCRTask.document_revision_id,
+                OCRTask.id,
+                PatientProfile.account_uid,
+            )
+            .join(OCRResult, OCRResult.task_id == OCRTask.id)
+            .join(PatientProfile, PatientProfile.patient_id == OCRTask.patient_id)
+            .where(OCRResult.id == order.ocr_result_id)
+        ).one_or_none()
+        if lineage != (
+            order.patient_id,
+            order.document_id,
+            order.document_revision_id,
+            order.ocr_task_id,
+            order.confirmed_by_uid,
+        ):
+            raise ValueError("medical order lineage does not match its OCR result")
         self.session.add(order)
         self.session.flush()
         return order
@@ -74,6 +98,34 @@ class ReconciliationRepository:
             item.patient_id != self.patient_id for item in items
         ):
             raise ValueError("reconciliation is outside repository scope")
+        task_patient = self.session.scalar(
+            select(OCRTask.patient_id).where(OCRTask.id == reconciliation.ocr_task_id)
+        )
+        if task_patient != self.patient_id:
+            raise ValueError("reconciliation task is outside repository scope")
+        for item in items:
+            old_patient = (
+                self.session.scalar(
+                    select(Medication.patient_id).where(Medication.id == item.old_medication_id)
+                )
+                if item.old_medication_id
+                else self.patient_id
+            )
+            order_patient = (
+                self.session.scalar(
+                    select(MedicalOrder.patient_id).where(
+                        MedicalOrder.id == item.new_medical_order_id
+                    )
+                )
+                if item.new_medical_order_id
+                else self.patient_id
+            )
+            if (
+                item.reconciliation_id != reconciliation.id
+                or old_patient != self.patient_id
+                or order_patient != self.patient_id
+            ):
+                raise ValueError("reconciliation item lineage is outside repository scope")
         self.session.add(reconciliation)
         self.session.flush()
         self.session.add_all(items)

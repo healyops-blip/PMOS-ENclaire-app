@@ -115,18 +115,22 @@ OCRTaskServiceDependency = Annotated[OCRTaskService, Depends(get_ocr_task_servic
 
 
 def get_medical_order_service(
-    session: DatabaseSession, account: CurrentAccount
+    request: Request, session: DatabaseSession, account: CurrentAccount
 ) -> MedicalOrderService:
-    return MedicalOrderService(session, account)
+    return MedicalOrderService(
+        session, account, business_date=request.app.state.business_date_provider()
+    )
 
 
 MedicalOrderServiceDependency = Annotated[MedicalOrderService, Depends(get_medical_order_service)]
 
 
 def get_reconciliation_service(
-    session: DatabaseSession, account: CurrentAccount
+    request: Request, session: DatabaseSession, account: CurrentAccount
 ) -> ReconciliationService:
-    return ReconciliationService(session, account)
+    return ReconciliationService(
+        session, account, business_date=request.app.state.business_date_provider()
+    )
 
 
 ReconciliationServiceDependency = Annotated[

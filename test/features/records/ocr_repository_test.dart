@@ -111,109 +111,130 @@ void main() {
     expect(messages, hasLength(categories.length));
   });
 
-  test('confirms each order item then creates and executes reconciliation', () async {
-    final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api'));
-    final requests = <RequestOptions>[];
-    dio.interceptors.add(
-      InterceptorsWrapper(
-        onRequest: (options, handler) {
-          requests.add(options);
-          final payload = options.path.contains('medication-reconciliations')
-              ? {
-                  ..._reconciliation,
-                  'status': options.method == 'PUT' ? 'executed' : 'draft',
-                }
-              : {'items': <Object>[], 'reused': false};
-          handler.resolve(
-            Response<Map<String, dynamic>>(
-              requestOptions: options,
-              statusCode: options.method == 'POST' ? 201 : 200,
-              data: {'success': true, 'data': payload, 'error': null},
-            ),
-          );
-        },
-      ),
-    );
-    final repository = FastApiOcrRepository(PomiApiClient(dio: dio));
-    final item = MedicalOrderDraft(
-      index: 0,
-      drugName: 'Metformin',
-      specification: '500 mg',
-      dosageValue: '500',
-      dosageUnit: 'mg',
-      frequency: 'twice daily',
-      course: '30 days',
-      route: 'oral',
-      instructions: 'after meals',
-      rawOrderText: 'Metformin 500 mg twice daily',
-      orderDate: '2026-08-27',
-      confirmed: true,
-    );
+  test(
+    'confirms each order item then creates and executes reconciliation',
+    () async {
+      final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api'));
+      final requests = <RequestOptions>[];
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            requests.add(options);
+            final payload = options.path.contains('medication-reconciliations')
+                ? {
+                    ..._reconciliation,
+                    'status': options.method == 'PUT' ? 'executed' : 'draft',
+                  }
+                : {'items': <Object>[], 'reused': false};
+            handler.resolve(
+              Response<Map<String, dynamic>>(
+                requestOptions: options,
+                statusCode: options.method == 'POST' ? 201 : 200,
+                data: {'success': true, 'data': payload, 'error': null},
+              ),
+            );
+          },
+        ),
+      );
+      final repository = FastApiOcrRepository(PomiApiClient(dio: dio));
+      final item = MedicalOrderDraft(
+        index: 0,
+        drugName: 'Metformin',
+        specification: '500 mg',
+        dosageValue: '500',
+        dosageUnit: 'mg',
+        frequency: 'twice daily',
+        course: '30 days',
+        route: 'oral',
+        instructions: 'after meals',
+        rawOrderText: 'Metformin 500 mg twice daily',
+        orderDate: '2026-08-27',
+        confirmed: true,
+      );
 
-    await repository.confirmMedicalOrder('task-order', [item]);
-    final reconciliation = await repository.createReconciliation('task-order');
-    reconciliation.items.single.decision = 'keep_current';
-    final executed = await repository.executeReconciliation(reconciliation);
+      await repository.confirmMedicalOrder(
+        'task-order',
+        'result-order',
+        'rev-order',
+        [item],
+      );
+      final reconciliation = await repository.createReconciliation(
+        'task-order',
+      );
+      reconciliation.items.single.decision = 'keep_current';
+      final executed = await repository.executeReconciliation(reconciliation);
 
-    expect(executed.status, 'executed');
-    expect(requests.map((request) => request.path), [
-      '/ocr/tasks/task-order/confirm',
-      '/medication-reconciliations',
-      '/medication-reconciliations/rec-1',
-    ]);
-    expect((requests.first.data as Map)['items'][0]['confirmed'], isTrue);
-    expect((requests.last.data as Map)['decisions'][0]['decision'], 'keep_current');
-  });
+      expect(executed.status, 'executed');
+      expect(requests.map((request) => request.path), [
+        '/ocr/tasks/task-order/confirm',
+        '/medication-reconciliations',
+        '/medication-reconciliations/rec-1',
+      ]);
+      expect((requests.first.data as Map)['result_id'], 'result-order');
+      expect((requests.first.data as Map)['expected_revision_id'], 'rev-order');
+      expect((requests.first.data as Map)['items'][0]['confirmed'], isTrue);
+      expect(
+        (requests.last.data as Map)['decisions'][0]['decision'],
+        'keep_current',
+      );
+    },
+  );
 
-  test('clinical confirmation pins result and revision with idempotency', () async {
-    final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api'));
-    RequestOptions? request;
-    dio.interceptors.add(
-      InterceptorsWrapper(
-        onRequest: (options, handler) {
-          request = options;
-          handler.resolve(
-            Response<Map<String, dynamic>>(
-              requestOptions: options,
-              statusCode: 200,
-              data: {
-                'success': true,
-                'data': {
-                  'record_id': 'imaging-1',
-                  'material_type': 'imaging_text_report',
-                  'document_revision_id': 'rev-1',
-                  'summary': {'findings_text': 'verbatim'},
-                  'reused': false,
+  test(
+    'clinical confirmation pins result and revision with idempotency',
+    () async {
+      final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api'));
+      RequestOptions? request;
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            request = options;
+            handler.resolve(
+              Response<Map<String, dynamic>>(
+                requestOptions: options,
+                statusCode: 200,
+                data: {
+                  'success': true,
+                  'data': {
+                    'record_id': 'imaging-1',
+                    'material_type': 'imaging_text_report',
+                    'document_revision_id': 'rev-1',
+                    'summary': {'findings_text': 'verbatim'},
+                    'reused': false,
+                  },
                 },
-              },
-            ),
-          );
-        },
-      ),
-    );
-    final repository = FastApiOcrRepository(PomiApiClient(dio: dio));
-    final task = OcrTask.fromJson({..._task, 'material_type': 'imaging_text_report'});
+              ),
+            );
+          },
+        ),
+      );
+      final repository = FastApiOcrRepository(PomiApiClient(dio: dio));
+      final task = OcrTask.fromJson({
+        ..._task,
+        'material_type': 'imaging_text_report',
+      });
 
-    final result = await repository.confirmClinical(
-      task: task,
-      resultId: 'result-1',
-      confirmedData: {'findings_text': 'verbatim'},
-      fieldConfirmations: const [
-        {
-          'field_path': 'findings_text',
-          'user_value': 'verbatim',
-          'confirmation_status': 'confirmed',
-        },
-      ],
-    );
+      final result = await repository.confirmClinical(
+        task: task,
+        resultId: 'result-1',
+        confirmedData: {'findings_text': 'verbatim'},
+        fieldConfirmations: const [
+          {
+            'field_path': 'findings_text',
+            'user_value': 'verbatim',
+            'confirmation_status': 'confirmed',
+          },
+        ],
+      );
 
-    expect(result.recordId, 'imaging-1');
-    expect(request!.path, '/ocr/tasks/task-1/confirm');
-    expect(request!.headers['Idempotency-Key'], isNull);
-    expect(request!.data['result_id'], 'result-1');
-    expect(request!.data['expected_revision_id'], 'rev-1');
-    expect(request!.data['document_type'], 'imaging_text_report');
-  });
+      expect(result.recordId, 'imaging-1');
+      expect(request!.path, '/ocr/tasks/task-1/confirm');
+      expect(request!.headers['Idempotency-Key'], isNull);
+      expect(request!.data['result_id'], 'result-1');
+      expect(request!.data['expected_revision_id'], 'rev-1');
+      expect(request!.data['document_type'], 'imaging_text_report');
+    },
+  );
 }
 
 final _task = <String, dynamic>{

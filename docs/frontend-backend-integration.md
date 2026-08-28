@@ -118,7 +118,7 @@ Authorization: Bearer <session_id>
 
 ### 3.4 幂等和并发
 
-- 下列创建请求必须携带 `Idempotency-Key`：文件上传、对账创建、报告生成、PDF 生成。当前 OCR 创建/重试按服务端 UID、文件哈希、材料类型和 Prompt 配置幂等，不接收该 Header；注册接口也不要求。
+- 下列创建请求必须携带 `Idempotency-Key`：文件上传、报告生成、PDF 生成。当前 OCR 创建/重试以及用药对账创建均由服务端业务键幂等，不接收该 Header；注册接口也不要求。
 - 服务端对同一会话和幂等键返回同一资源，不重复写入。
 - 更新接口携带 `updated_at` 或 `expected_revision_id`；版本不一致返回 `409 RESOURCE_VERSION_CONFLICT`。
 - Flutter 按钮提交期间禁用；每日用药可乐观更新，失败必须回滚。
@@ -155,7 +155,7 @@ Authorization: Bearer <session_id>
 | OCR 创建 | `POST /api/ocr/tasks` | 上传完成后 | 异步任务 |
 | OCR 状态 | `GET /api/ocr/tasks/{task_id}` | 2 秒轮询 | 状态、错误、进度 |
 | OCR 草稿 | `GET /api/ocr/tasks/{task_id}/result` | 四类确认页 | 字段级草稿 |
-| 化验 OCR 确认 | `POST /api/ocr/tasks/{task_id}/confirm` | 化验确认页 | 已实现；其他三类材料尚不可复用该 payload |
+| OCR 确认 | `POST /api/ocr/tasks/{task_id}/confirm` | 四类材料确认页 | 按请求 Schema 区分化验、医嘱、影像和门诊确认 |
 | 正式化验数据 | `GET /api/lab-observations`、`GET /api/lab-observations/{id}` | 化验历史/详情 | 仅返回当前 UID 已确认且可追溯的数据 |
 | OCR 重试 | `POST /api/ocr/tasks/{task_id}/retry` | 失败页 | 新任务 |
 | 用药对账 | `POST /api/medication-reconciliations` | 医嘱确认后 | 对账草稿 |
@@ -336,6 +336,8 @@ PUT 允许分步部分更新。请求中的 `complete_onboarding=true` 只有在
 
 已实现的化验确认使用 `POST /api/ocr/tasks/{task_id}/confirm`，请求必须携带 `result_id`、`expected_revision_id` 和修改后的 `items[]`，报告级四类日期可为空。原草稿项目携带稳定的 `source_index`，删除项目会把其字段标记为 `rejected`，新增项目使用 `source_index=null`，避免列表删项后错误关联原字段。响应返回 `created_resource_ids[]`、`confirmed_at`、`observations[]`、`p0_evaluation` 和 `reused`。P0 `name/value/unit` 错误时返回 `error.details.fields[]`，Flutter 必须按 `path` 高亮并保留表单。
 
+医嘱确认使用同一路径，请求为 `result_id`、`expected_revision_id` 和 `items[]`。每个 item 必须携带稳定的 `source_index`、`confirmed=true`、原文 `source_text`、药名、正剂量、单位、频率和 `prescribed_at`；可选字段为规格、疗程、途径、用法和明确停药标记。所有草稿药物必须逐项确认。响应返回正式 `medical_order`、`reused` 和药名/剂量/频率的 `p0_evaluation`；确认阶段不会修改 `medication`。未知药名不猜测标准 ID，而是返回 `review_required=true`。
+
 `lab_observation` 只保存用户确认成功的数据，并强制关联明确材料、修订和 OCR 结果。指标别名未命中时 `mapping_status=needs_manual_review`；异常状态由材料参考范围确定性计算；趋势日期优先级为采样、检查、报告、就诊。正式数据读取接口为 `GET /api/lab-observations` 和 `GET /api/lab-observations/{id}`，均按当前 UID 隔离。
 
 影像与门诊确认由 #24 落到独立正式表：
@@ -352,16 +354,15 @@ PUT 允许分步部分更新。请求中的 `complete_onboarding=true` 只有在
 
 ### 5.8 用药对账
 
-创建请求：`source_document_id`、可选 `medical_order_ids[]`。
+`POST /api/medication-reconciliations` 请求 `{"ocr_task_id":"..."}`，按患者和 OCR 任务幂等创建；任务必须是已确认的医嘱。响应对象字段为 `id`、`ocr_task_id`、`rule_version`、`status`、`executed_at` 和 `items[]`。
 
-对账对象：`id`、`source_document_id`、`status`、`summary`、`items[]`、`created_at`、`confirmed_at`。
+item 字段：`id`、`position`、`old_medication`、`new_medical_order`、`match_basis`、`suggestion`、`user_decision`、`decision_note`、`stop_date`、`stop_source`、`execution_result`。
 
-item 字段：`id`、`existing_medication_id`、`new_medical_order_id`、`medication_concept_id`、`drug_name`、`comparison_type`、`old_instruction`、`new_instruction`、`differences`、`user_decision`、`decision_note`。
-
-- `comparison_type`：`unchanged/adjusted/added/stopped/uncertain/manual_review`。
-- `user_decision`：`accept/keep_existing/confirm_stopped/needs_review`。
-- `confirm_stopped` 必须提供 `stop_date` 和 `stop_source`。
-- 所有 item 有决策后才能把对账状态改为 `confirmed`；写入当前用药和事件链必须在同一事务完成。
+- `suggestion`：`unchanged/adjusted/added/stopped/uncertain/manual_review`。
+- `user_decision`：`accept/keep_current/reject`；每一项均必须提交决定。
+- 旧药未出现在新医嘱时只能是 `uncertain`，接受该项也不自动停药。
+- `manual_review` 不能自动接受；明确 `stopped` 的接受决定必须同时提供 `stop_date` 和 `stop_source`。
+- `PUT /api/medication-reconciliations/{id}` 原子写入用药版本与事件。相同决策重放返回现有执行结果，不同决策重放返回 `409 RECONCILIATION_ALREADY_EXECUTED`。
 
 ### 5.9 患者自述、报告与 PDF
 
