@@ -729,7 +729,8 @@ def generate_case(
                 logo_path = p
                 break
 
-        if logo_path and report_type != "医嘱_处方":
+        # 为贴近 EMR 老版观感：“门诊病历_就诊记录”不再贴医院 Logo（仅保留标题中的医院名文字），避免右上角额外面板感
+        if logo_path and report_type not in ("医嘱_处方", "门诊病历_就诊记录"):
             image = replace_logo(image, logo_path, logo_bbox)
         elif report_type == "医嘱_处方":
             # 医嘱_处方样本是移动端病历/处方页面，右上角应保留小程序菜单胶囊，
