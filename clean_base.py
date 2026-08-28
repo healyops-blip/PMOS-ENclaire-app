@@ -63,28 +63,29 @@ def build_clean_base_image(input_path, report_type, logo_bbox, fill_mode="sample
     返回 PIL.Image 对象
     """
     image = Image.open(input_path).convert("RGB")
-    # 1) 清理 logo 区域
-    # 选用清理策略：safe=仅扩展 logo 框；detect=检测并集；none=仅 logo 框
-    if logo_clean_mode == "detect":
-        clean_bbox = _compute_clean_logo_union_bbox(image, logo_bbox)
-    elif logo_clean_mode == "none":
-        clean_bbox = list(logo_bbox)
-    else:  # safe
-        x1, y1, x2, y2 = logo_bbox
-        W, H = image.size
-        pad = int(logo_clean_pad) if isinstance(logo_clean_pad, (int, float)) else 6
-        clean_bbox = [
-            max(0, x1 - pad),
-            max(0, y1 - pad),
-            min(W, x2 + pad),
-            min(H, y2 + pad)
-        ]
-    if fill_mode == "white":
-        ImageDraw.Draw(image).rectangle(clean_bbox, fill=(255, 255, 255))
-    elif fill_mode == "gray":
-        ImageDraw.Draw(image).rectangle(clean_bbox, fill=(245, 245, 245))
-    else:
-        _fill_rect_with_sampled_color(image, clean_bbox)
+    # 1) 清理 logo 区域：仅对非 EMR 类型保留原策略；EMR 跳过，避免顶部出现容器背景矩形。
+    if report_type != "门诊病历_就诊记录":
+        # 选用清理策略：safe=仅扩展 logo 框；detect=检测并集；none=仅 logo 框
+        if logo_clean_mode == "detect":
+            clean_bbox = _compute_clean_logo_union_bbox(image, logo_bbox)
+        elif logo_clean_mode == "none":
+            clean_bbox = list(logo_bbox)
+        else:  # safe
+            x1, y1, x2, y2 = logo_bbox
+            W, H = image.size
+            pad = int(logo_clean_pad) if isinstance(logo_clean_pad, (int, float)) else 6
+            clean_bbox = [
+                max(0, x1 - pad),
+                max(0, y1 - pad),
+                min(W, x2 + pad),
+                min(H, y2 + pad)
+            ]
+        if fill_mode == "white":
+            ImageDraw.Draw(image).rectangle(clean_bbox, fill=(255, 255, 255))
+        elif fill_mode == "gray":
+            ImageDraw.Draw(image).rectangle(clean_bbox, fill=(245, 245, 245))
+        else:
+            _fill_rect_with_sampled_color(image, clean_bbox)
 
     # 2) 清理字段区域
     module = get_report_type(report_type)
@@ -146,10 +147,7 @@ def build_clean_base_image(input_path, report_type, logo_bbox, fill_mode="sample
             else:
                 _fill_rect_with_sampled_color(image, bx)
 
-    # 4) 统一清理顶端整条“页眉带”（防止模板差异在顶部残留旧Logo/英文名/性别列等）
-    #    这里直接用纯白填充，再由后续渲染完整覆盖字段内容，避免任何残影。
-    # 顶部页眉带清理：对 EMR（门诊病历_就诊记录）改为邻域采样色，避免在偏灰/泛黄页眉上出现突兀的纯白带；
-    # 其他类型保持白底清理，便于统一重绘模板壳。
+    # 4) 顶部页眉带清理（收窄带高，避免大面积灰/白色块；EMR 默认跳过）
     header_band_by_type = {
         "影像文字报告": 320,
         "化验_检测报告": 360,
@@ -158,10 +156,8 @@ def build_clean_base_image(input_path, report_type, logo_bbox, fill_mode="sample
     }
     hb = header_band_by_type.get(report_type, 300)
     header_box = (0, 0, W, min(H, hb))
-    if report_type == "门诊病历_就诊记录":
-        # 完全跳过 EMR 顶部页眉带统一清理，保持模板原貌；由逐字段清理覆盖必要区域
-        pass
-    else:
+    if report_type != "门诊病历_就诊记录":
+        # 非 EMR 仍做顶部清理，但后续不再贴 overlay 图层，直接由模板壳（引擎或 shell 函数）绘制 Header
         ImageDraw.Draw(image).rectangle(header_box, fill=(255, 255, 255))
 
     return image

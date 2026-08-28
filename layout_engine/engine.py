@@ -76,13 +76,12 @@ def _draw_header(draw: ImageDraw.ImageDraw, page: Dict[str, Any], schema: Dict[s
     f_hosp = fonts["hosp"]
     f_title = fonts["title"]
     f_small = fonts["small"]
-
     if header == "HEADER_01":
         # Center hospital name, then report title under it
         _text(draw, (left, y, W - right, y + 44), hospital, f_hosp, align="center")
         y += 44
         _text(draw, (left, y, W - right, y + 30), title, f_title, align="center")
-        y += 30 + 8
+        y += 30
     elif header == "HEADER_02":
         # Logo left (optional), hospital centered, type under hospital
         logo_w = 96
@@ -96,7 +95,8 @@ def _draw_header(draw: ImageDraw.ImageDraw, page: Dict[str, Any], schema: Dict[s
                 pass
         _text(draw, (left, y, W - right, y + 44), hospital, f_hosp, align="center")
         y += 44
-        _text(draw, (left, y, W - right, y + 28), title, f_title, align="center")
+        _text(draw, (left, y, W - right, y + 30), title, f_title, align="center")
+        y += 30
         y += 28 + 8
     elif header == "HEADER_03":
         # Hospital left, date right, underline

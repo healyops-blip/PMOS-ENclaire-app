@@ -121,7 +121,6 @@ def main():
         args.pcos_only = False
     else:
         args.pcos_only = True
-            config = {
     # 榛樿閰嶇疆
     config = {
         "font_path": args.font_path,
@@ -129,11 +128,9 @@ def main():
         "brightness_range": [0.95, 1.05],
         "contrast_range": [0.95, 1.05],
         "blur_probability": 0.2,
-                "jpeg_quality_min": 85,
-                "jpeg_quality_max": 100,
-                "skip_logo": bool(args.no_logo),
         "jpeg_quality_min": 85,
-        "jpeg_quality_max": 100
+        "jpeg_quality_max": 100,
+        "skip_logo": bool(args.no_logo),
     }
 
     # 鑾峰彇鑴氭湰鐩綍
@@ -151,7 +148,7 @@ def main():
     # 鏁板€煎熀绾跨紦瀛橈細姣忎釜绫诲瀷浠呭湪棣栨鏍锋湰鏃惰褰?
     baselines = {}
 
-    for report_type in REPORT_TYPES:
+    for idx, report_type in enumerate(REPORT_TYPES):
         print(f"\n{'='*60}")
         print(f"鐢熸垚绫诲瀷 [{idx+1}/{total_types}]: {report_type}")
         print(f"{'='*60}")
@@ -230,10 +227,10 @@ def main():
 
             # 缁熶竴骞剁‘淇濈梾鍘嗗彿锛坧atient_id锛夊叏灞€鍞竴锛氫娇鐢ㄧ被鍨嬪墠缂€ + 鍏ㄥ眬璁℃暟
             prefix_map = {
-                "褰卞儚鏂囧瓧鎶ュ憡": "P",
-                "鍖栭獙_妫€娴嬫姤鍛?: "LA",
-                "鍖诲槺_澶勬柟": "PR",
-                "闂ㄨ瘖鐥呭巻_灏辫瘖璁板綍": "MR",
+                "影像文字报告": "P",
+                "化验_检测报告": "LA",
+                "医嘱_处方": "PR",
+                "门诊病历_就诊记录": "MR",
             }
             pid_prefix = prefix_map.get(report_type, "ID")
             data["patient_id"] = f"{pid_prefix}{global_counter:05d}"
@@ -241,91 +238,89 @@ def main():
                 # 浠匬COS鐩稿叧锛氳鐩栧嵃璞?寤鸿/璇婃柇/鐥囩姸绛夋枃鏈负澶氬泭鍗靛发鐩稿叧鍐呭
             if args.pcos_only:
                 # 缁熶竴绉戝鍒颁笌PCOS鐩稿叧
-                data["department"] = "鐢熸畺绉?
-                if report_type == "褰卞儚鏂囧瓧鎶ュ憡":
+                data["department"] = "生殖科"
+                if report_type == "影像文字报告":
                     # 褰卞儚鏂囧瓧鎶ュ憡蹇呴』鏁村彞瑕嗙洊娴嬮噺鐩稿叧琛岋細鏁板瓧浠嶇敱 data 鐢熸垚锛?
                     # 浣嗕笉鍏佽鏁板瓧绾ц创鐗囷紝閬垮厤鏃у彞娈嬬暀鍜岄敊浣嶃€?
-                    data["pelvic_effusion"] = "鏃?
-                    data["pelvic_effusion_line"] = "瀛愬鐩磋偁闄风獫绉恫锛氭棤"
-                elif report_type == "闂ㄨ瘖鐥呭巻_灏辫瘖璁板綍":
+                    data["pelvic_effusion"] = "无"
+                    data["pelvic_effusion_line"] = "宫腔内未见异常回声，提示：无"
+                elif report_type == "门诊病历_就诊记录":
                     # 甯歌PCOS鐩稿叧鐥囩姸
-                    data["symptom1"] = "鏈堢粡涓嶈皟"
-                    data["symptom2"] = "鐥ょ柈"
-                    data["symptom3"] = "澶氭瘺"
-                    data["symptom4"] = "浣撻噸澧炲姞"
-                    data["symptom5"] = "鍗靛发澶氬泭鏍锋敼鍙?
-                    data["diagnosis"] = "澶氬泭鍗靛发缁煎悎寰?
-                    data["treatment"] = "鐢熸椿鏂瑰紡骞查锛屽繀瑕佹椂鑽墿娌荤枟"
-                    data["advice"] = "寤鸿鍐呭垎娉岃瘎浼颁笌闅忚锛屾帶鍒朵綋閲嶏紝瑙勫緥浣滄伅"
-                elif report_type == "鍖诲槺_澶勬柟":
-                    data["diagnosis"] = "澶氬泭鍗靛发缁煎悎寰?
-                elif report_type == "鍖栭獙_妫€娴嬫姤鍛?:
-                    # 鍖栭獙鍗曟棤璇婃柇/鍗拌薄/寤鸿瀛楁锛屼繚鎸佹暟鍊煎彉鍔?
+                    data["symptom1"] = "月经不调"
+                    data["symptom2"] = "不孕"
+                    data["symptom3"] = "多毛"
+                    data["symptom4"] = "体重增加"
+                    data["symptom5"] = "胰岛素抵抗"
+                    data["diagnosis"] = "多囊卵巢综合征"
+                    data["treatment"] = "生活方式干预与随访"
+                    data["advice"] = "建议记录周期与症状变化，按计划复诊"
+                elif report_type == "医嘱_处方":
+                    # 化验单生成参考范围/建议字段由模板控制
                     pass
 
             # 浠呬慨鏀规暟鍊硷細鍐荤粨闈炴暟鍊兼枃鏈负鍥哄畾PCOS鐩稿叧甯搁噺
             if args.numeric_only:
                 # 閫氱敤鍥哄畾椤?
-                data["name"] = "寮犱笁"
-                data["doctor"] = "寮犲尰鐢?
-                data["department"] = "鐢熸畺绉?
+                data["name"] = "张三"
+                data["doctor"] = "王医生"
+                data["department"] = "生殖科"
                 data["exam_date"] = "2026-08-01"
 
                 # 鍚勭被鍨婸COS鐩稿叧鍥哄畾鏂囨湰
-                if report_type == "褰卞儚鏂囧瓧鎶ュ憡":
+                if report_type == "影像文字报告":
                     # numeric-only 瀵瑰奖鍍忔姤鍛婅〃绀衡€滃彧鏀瑰彉鍙ュ唴鏁板€尖€濓紝浣嗘覆鏌撲粛鎸夋暣鍙ヨ鐩栥€?
-                    data["pelvic_effusion"] = "鏃?
-                    data["pelvic_effusion_line"] = "瀛愬鐩磋偁闄风獫绉恫锛氭棤"
-                elif report_type == "鍖栭獙_妫€娴嬫姤鍛?:
+                    data["pelvic_effusion"] = "无"
+                    data["pelvic_effusion_line"] = "宫腔内未见异常回声，提示：无"
+                elif report_type == "化验_检测报告":
                     # 鏍囬/妯℃澘瀛楁鏈韩鍥哄畾锛屼繚鎸佹暟鍊奸殢鏈?
                     pass
-                elif report_type == "闂ㄨ瘖鐥呭巻_灏辫瘖璁板綍":
-                    data["symptom1"] = "鏈堢粡涓嶈皟"
-                    data["symptom2"] = "鐥ょ柈"
-                    data["symptom3"] = "澶氭瘺"
-                    data["symptom4"] = "浣撻噸澧炲姞"
-                    data["symptom5"] = "鍗靛发澶氬泭鏍锋敼鍙?
-                    data["diagnosis"] = "澶氬泭鍗靛发缁煎悎寰?
-                    data["treatment"] = "鐢熸椿鏂瑰紡骞查锛屽繀瑕佹椂鑽墿娌荤枟"
-                    data["advice"] = "寤鸿鍐呭垎娉岃瘎浼颁笌闅忚锛屾帶鍒朵綋閲嶏紝瑙勫緥浣滄伅"
-                elif report_type == "鍖诲槺_澶勬柟":
-                    data["diagnosis"] = "澶氬泭鍗靛发缁煎悎寰?
+                elif report_type == "门诊病历_就诊记录":
+                    data["symptom1"] = "月经不调"
+                    data["symptom2"] = "不孕"
+                    data["symptom3"] = "多毛"
+                    data["symptom4"] = "体重增加"
+                    data["symptom5"] = "胰岛素抵抗"
+                    data["diagnosis"] = "多囊卵巢综合征"
+                    data["treatment"] = "生活方式干预与随访"
+                    data["advice"] = "建议记录周期与症状变化，按计划复诊"
+                elif report_type == "医嘱_处方":
+                    data["diagnosis"] = "多囊卵巢综合征"
                     # 鍥哄畾澶勬柟涓?涓狿COS甯哥敤鑽?琛ュ厖鍓傦紝濉弧妯℃澘3涓嵂浣嶏紝閬垮厤 clean base 鍚庡嚭鐜扮┖鐧借嵂妲姐€?
-                    data["med1_name"] = "鐩愰吀浜岀敳鍙岃儘"
+                    data["med1_name"] = "二甲双胍片"
                     data["med1_spec"] = "0.5g"
-                    data["med1_freq"] = "姣忔棩3娆?
-                    data["med1_days"] = "闀挎湡"
-                    data["med1_usage"] = "鍙ｆ湇"
-                    data["med1_display"] = "鐩愰吀浜岀敳鍙岃儘鐗囷紙鏍煎崕姝級 0.5g*20鐗?
-                    data["med1_form"] = "鐗囧墏"
-                    data["med1_dose"] = "姣忔1鐗?
-                    data["med1_total"] = "20鐗?
-                    data["med2_name"] = "鐐旈泴閱囩幆涓欏瓡閰墖"
-                    data["med2_spec"] = "鐐旈泴閱?.035mg+閱嬮吀鐜笝瀛曢叜2mg"
-                    data["med2_freq"] = "姣忔棩1娆?
-                    data["med2_days"] = "鎸夊懆鏈?
-                    data["med2_usage"] = "鍙ｆ湇"
-                    data["med2_display"] = "鐐旈泴閱囩幆涓欏瓡閰墖锛堣揪鑻?35锛?21鐗?
-                    data["med2_form"] = "鐗囧墏"
-                    data["med2_dose"] = "姣忔1鐗?
-                    data["med2_total"] = "21鐗?
-                    data["med3_name"] = "鑲岄唶"
+                    data["med1_freq"] = "每日3次"
+                    data["med1_days"] = "长期"
+                    data["med1_usage"] = "口服"
+                    data["med1_display"] = "二甲双胍片（某制药） 0.5g*20片"
+                    data["med1_form"] = "片剂"
+                    data["med1_dose"] = "每次1片"
+                    data["med1_total"] = "20片"
+                    data["med2_name"] = "炔雌醇环丙孕酮片"
+                    data["med2_spec"] = "炔雌醇0.035mg+环丙孕酮2mg"
+                    data["med2_freq"] = "每日1次"
+                    data["med2_days"] = "按周期"
+                    data["med2_usage"] = "口服"
+                    data["med2_display"] = "炔雌醇环丙孕酮片（21片装）"
+                    data["med2_form"] = "片剂"
+                    data["med2_dose"] = "每次1片"
+                    data["med2_total"] = "21片"
+                    data["med3_name"] = "氯雷他定"
                     data["med3_spec"] = "2g"
-                    data["med3_freq"] = "姣忔棩2娆?
-                    data["med3_days"] = "闀挎湡"
-                    data["med3_usage"] = "鍙ｆ湇"
-                    data["med3_display"] = "鑲岄唶绮夊墏 2g*30琚?
-                    data["med3_form"] = "绮夊墏"
-                    data["med3_dose"] = "姣忔1琚?
-                    data["med3_total"] = "30琚?
-                    data["usage"] = "鍙ｆ湇"
-                    data["treatment_plan"] = "鎺у埗浣撻噸锛岃皟鏁存湀缁忓懆鏈燂紝瑙勫緥澶嶈瘖璇勪及"
+                    data["med3_freq"] = "每日2次"
+                    data["med3_days"] = "长期"
+                    data["med3_usage"] = "口服"
+                    data["med3_display"] = "氯雷他定片 2g*30片"
+                    data["med3_form"] = "片剂"
+                    data["med3_dose"] = "每次1片"
+                    data["med3_total"] = "30片"
+                    data["usage"] = "口服"
+                    data["treatment_plan"] = "控制体重，调整月经周期，规律复诊"
 
             # 鍦ㄨ繖閲屾寜闇€闄愬埗鏁板€间粎鍦眏itter鑼冨洿鍐呭彉鍔?
             if args.jitter_mode != "off":
                 def get_specs(rt):
                     # 杩斿洖鍚勭被鍨嬫暟鍊煎瓧娈佃鏍硷紙绫诲瀷銆佽寖鍥淬€佷繚鐣欏皬鏁颁綅锛?
-                    if rt == "褰卞儚鏂囧瓧鎶ュ憡":
+                    if rt == "影像文字报告":
                         return {
                             # 鍗靛发灏哄锛氭绫筹紝鏁存暟
                             "right_ovary_length": {"type": "int", "min": 25, "max": 40},
@@ -338,7 +333,7 @@ def main():
                             "follicle_count_right": {"type": "int", "min": 5, "max": 30},
                             "follicle_count_left": {"type": "int", "min": 5, "max": 30},
                         }
-                    elif rt == "鍖栭獙_妫€娴嬫姤鍛?:
+                    elif rt == "化验_检测报告":
                         return {
                             "wbc": {"type": "int", "min": 4, "max": 12},
                             "rbc": {"type": "int", "min": 4, "max": 6},
@@ -483,13 +478,13 @@ def main():
     with open(master_truth_path, "w", encoding="utf-8") as f:
         json.dump(master_truth, f, ensure_ascii=False, indent=2)
 
-    print(f"\n{'='*60}")
-    print(f"鍏ㄩ儴瀹屾垚锛?)
-    print(f"鎬荤敓鎴愭暟閲? {global_counter - 1} 涓梾渚?)
-    print(f"鎶ュ憡绫诲瀷: {', '.join(REPORT_TYPES)}")
-    print(f"杈撳嚭鐩綍: {os.path.abspath(out_root)}")
-    print(f"Master truth 鏄犲皠: {master_truth_path}")
-    print(f"{'='*60}")
+    print("\n" + "="*60)
+    print("全部完成！")
+    print(f"总共生成: {global_counter - 1} 个病例")
+    print(f"报告类型: {', '.join(REPORT_TYPES)}")
+    print(f"输出目录: {os.path.abspath(out_root)}")
+    print(f"Master truth 映射: {master_truth_path}")
+    print("="*60)
 
 
 if __name__ == "__main__":

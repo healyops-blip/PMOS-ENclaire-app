@@ -298,14 +298,26 @@ def replace_logo(image, logo_path, logo_bbox=None, clean_mode="safe", clean_pad=
             avg = (255, 255, 255)
         draw_clear.rectangle(clean_bbox, fill=avg)
 
-    # 2) 读取并准备 logo
+    # 2) 读取并准备 logo（严格使用实际像素尺寸，禁止拉伸到页面级；仅在 bounding box 内按 contain 等比缩放）
     logo = Image.open(logo_path)
     # 保留原始 alpha（如果存在）；若 keep_alpha=False 且 logo 不含 alpha，则转换为不透明 RGB
     if logo.mode != "RGBA":
         logo = logo.convert("RGBA")
 
+    # 目标粘贴盒：来自调用方传入的逻辑 box；如果上游错误地给了过大的 box，这里再做一次保险：
+    # - 限制目标盒最大不超过整页宽高的 35%（宽）和 15%（高），确保 logo 永远只是小元素。
+    Wp, Hp = image.size
     target_w = max(1, x2 - x1)
     target_h = max(1, y2 - y1)
+    max_w = int(Wp * 0.35)
+    max_h = int(Hp * 0.15)
+    if target_w > max_w:
+        # 收缩到右对齐的小盒子，保持贴近右上角区域
+        x2 = x2 - (target_w - max_w)
+        target_w = max_w
+    if target_h > max_h:
+        y2 = y1 + max_h
+        target_h = max_h
 
     # 自动留边距（防止贴边显得拥挤）
     margin = max(4, min(target_w, target_h) // 10)
@@ -323,8 +335,9 @@ def replace_logo(image, logo_path, logo_bbox=None, clean_mode="safe", clean_pad=
     offset_x = x1 + (target_w - new_w) // 2
     offset_y = y1 + (target_h - new_h) // 2
 
-    # 3) 可选：在粘贴区域铺一层背板；影像/化验在白底壳上不需要背板，直接 alpha 贴更自然
-    if not no_backplate:
+    # 3) 可选：在粘贴区域铺一层背板；影像/化验在白底壳上不需要背板，直接 alpha 贴更自然。
+    #    对 EMR（门诊病历_就诊记录）强制不铺背板，避免出现浅灰矩形（由 alpha 直接贴）。
+    if not no_backplate and os.environ.get("REPORT_TYPE_FOR_LOGO") not in ("门诊病历_就诊记录",):
         draw = ImageDraw.Draw(image)
         back_x1 = max(0, offset_x - 2)
         back_y1 = max(0, offset_y - 2)
@@ -367,7 +380,7 @@ def replace_logo(image, logo_path, logo_bbox=None, clean_mode="safe", clean_pad=
         else:
             logo_opaque = logo.convert("RGB")
         image.paste(logo_opaque, (offset_x, offset_y))
-    if not no_backplate:
+    if not no_backplate and os.environ.get("REPORT_TYPE_FOR_LOGO") not in ("门诊病历_就诊记录",):
         try:
             bleed = 1
             from PIL import ImageDraw as _ImageDraw
@@ -378,11 +391,6 @@ def replace_logo(image, logo_path, logo_bbox=None, clean_mode="safe", clean_pad=
             d2.rectangle([back_x2, back_y1, min(image.size[0], back_x2+1), back_y2], fill=back_color)
         except Exception:
             pass
-    except Exception:
-        pass
-
-    return image
-
     return image
 
 
@@ -651,7 +659,12 @@ def generate_case(
     truth_data,
     data
 ):
-    image = Image.open(input_path).convert("RGB")
+    # Renderer 起点：根据类型决定是否使用空白画布（禁止把原始病例图片作为底图）。
+    if report_type == "门诊病历_就诊记录":
+        # 从纯空白画布开始（A4 竖版约 1240x1754 像素；白底）
+        image = Image.new("RGB", (1240, 1754), (255, 255, 255))
+    else:
+        image = Image.open(input_path).convert("RGB")
     layout_mode = config.get("layout", "default")
     if layout_mode == "default":
         if report_type == "医嘱_处方":
@@ -673,8 +686,51 @@ def generate_case(
     else:
         fields = module.get_fields()
 
-    # 替换字段
+    # 0) EMR Header：极简版（不绘制 Logo），仅医院名 + 门诊病历 标题，然后再绘制后续字段
+    if report_type == "门诊病历_就诊记录" and layout_mode != "plain_horizontal":
+        W, H = image.size
+        from PIL import ImageDraw as _ImageDraw
+        draw = _ImageDraw.Draw(image)
+        # 选择字体（与字段绘制一致的字体路径）
+        font_path = config.get("font_path")
+        hosp_font = load_font(font_path, 30)  # 医院名称字号（可按需微调）
+        title_font = load_font(font_path, 26) # 文档标题字号（可按需微调）
+
+        # 读取医院名
+        hosp_name = data.get("hospital", "") or hospital_info.get("name", "")
+
+        # Header 顶部起点
+        y = 16
+        center_x = W // 2
+
+        # 1) 绘制医院名称（居中）
+        hosp_bbox = draw.textbbox((0, 0), hosp_name, font=hosp_font)
+        hosp_w = hosp_bbox[2] - hosp_bbox[0]
+        hosp_h = hosp_bbox[3] - hosp_bbox[1]
+        draw.text((center_x - hosp_w // 2, y), hosp_name, font=hosp_font, fill=(0, 0, 0))
+        y += hosp_h + 4
+
+        # 2) 绘制“门诊病历”标题（居中）
+        title_text = "门诊病历"
+        title_bbox = draw.textbbox((0, 0), title_text, font=title_font)
+        title_w = title_bbox[2] - title_bbox[0]
+        title_h = title_bbox[3] - title_bbox[1]
+        draw.text((center_x - title_w // 2, y), title_text, font=title_font, fill=(0, 0, 0))
+        y += title_h + 10
+
+        # 4) 将后续字段整体下移，且在渲染字段时跳过 header 里的 hospital_name 与 title 两个字段，避免重复
+        min_field_top = min(b["bbox"][1] for b in fields) if fields else y
+        dy = max(0, y - min_field_top)
+        if dy > 0:
+            for f in fields:
+                b = f["bbox"]
+                f["bbox"] = [b[0], b[1] + dy, b[2], b[3] + dy]
+
+    # 2) 替换字段
     for field in fields:
+        # 在 EMR 中，Header 已布局渲染，跳过 hospital_name 与 title 两个字段，避免重复与残影
+        if report_type == "门诊病历_就诊记录" and field.get("name") in ("hospital_name", "title"):
+            continue
         bbox = field["bbox"]
         template = field["template"]
         value = render_value(template, data)
@@ -683,7 +739,8 @@ def generate_case(
         if layout_mode == "plain_horizontal":
             draw_method = "none"
         elif report_type == "门诊病历_就诊记录":
-            draw_method = field.get("method", "sample")
+            # EMR：完全从空白画布渲染，禁止采样/覆盖原底——直接按纯写字绘制
+            draw_method = "none"
         elif report_type == "影像文字报告":
             # 影像报告改为白底重绘报告壳，所有文字直接写在空白/表单区域上，不再做原图采样覆盖。
             draw_method = "none"
@@ -704,8 +761,8 @@ def generate_case(
             align=field.get("align", "left")
         )
 
-    # Logo 替换（可通过 config.skip_logo 关闭） - 使用脚本所在目录
-    if layout_mode != "plain_horizontal" and not config.get("skip_logo", False):
+    # 3) Logo 替换：仅对非 EMR 类型保留原有贴图逻辑；EMR 已在 Header 组件内渲染，禁止二次贴图。
+    if layout_mode != "plain_horizontal" and not config.get("skip_logo", False) and report_type != "门诊病历_就诊记录":
         script_dir = os.path.dirname(os.path.abspath(__file__))
         logo_dir = os.path.join(script_dir, "logo")
         # 优先使用配置中的 logo 文件名
@@ -725,10 +782,21 @@ def generate_case(
                 logo_path = p
                 break
 
-        # 为贴近 EMR 老版观感：“门诊病历_就诊记录”不再贴医院 Logo（仅保留标题中的医院名文字），避免右上角额外面板感
-        if logo_path and report_type not in ("医嘱_处方", "门诊病历_就诊记录"):
-            # 对于影像/化验：白底壳上直接用 alpha 贴图，不铺背板，避免边缘拼接痕迹
-            image = replace_logo(image, logo_path, logo_bbox, clean_mode="safe", keep_alpha=True, no_backplate=True)
+        if logo_path and report_type not in ("医嘱_处方",):
+            # 控制粘贴盒大小：80~160px 宽，等比缩放，高度自适应；位置固定在右上角预估框内居中。
+            x1, y1, x2, y2 = logo_bbox
+            Wp, Hp = image.size
+            # 重新计算一个稳健的 header logo 区域（不依赖传入的可能过大的 logo_bbox）
+            box_w = max(80, min(160, int(Wp * 0.12)))
+            box_h = max(40, min(120, int(Hp * 0.08)))
+            rx2 = min(Wp - 24, x2)
+            rx1 = max(0, rx2 - box_w)
+            ry1 = max(16, y1)
+            ry2 = ry1 + box_h
+            safe_box = [rx1, ry1, rx2, ry2]
+
+            # 非 EMR：保持原逻辑（白底壳），alpha 贴，不铺背板。
+            image = replace_logo(image, logo_path, safe_box, clean_mode="safe", keep_alpha=True, no_backplate=True)
         elif report_type == "医嘱_处方":
             # 医嘱_处方样本是移动端病历/处方页面，右上角应保留小程序菜单胶囊，
             # 不贴医院 logo，否则会变成传统纸质处方笺，布局与 sample_input 不一致。

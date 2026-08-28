@@ -1,35 +1,27 @@
-__pycache__/
-*.py[cod]
-*.pyo
-*.DS_Store
-.idea/
-.vscode/
-.env
-.env.*
-!.env.example
-
-# Generated outputs
+# Ignore result outputs and evaluation artifacts
 /result/
-result*/
-outputs/
-outputs*/
-_debug*/
-_regen*/
-_imaging_crop_probe/
-.ssh/
+/result_decoupled/
 
-# Temp work dirs
-_tmp*/
-_tmp_out_mr/
-.ssh/
+# Evaluation JSONs and reports
+ocr_eval_*.json
+field_accuracy_report.txt
+truth_mapping.json
+manifest_by_type.txt
+ocr_eval_latest_*.json
 
-# Logs and temp
-*.log
-tmp/
-temp/
-~$*
-tmp_check/*
-tmp_check_mono/*
-tmp_demo/*
-tmp_demo_mono/*
-tmp_demo/化验_检测报告/case_00001.jpg
+# Clean bases and intermediate assets
+/_clean_bases/
+**/_clean_bases/
+
+# Python cache and env
+__pycache__/
+*.pyc
+.env
+
+# IDE/editor
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+Desktop.ini
