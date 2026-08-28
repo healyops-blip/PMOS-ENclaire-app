@@ -310,95 +310,104 @@ class _LatestVisitStatusCard extends StatelessWidget {
   Widget build(BuildContext context) => PomiGlassCard(
     onTap: onTap,
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-    child: Row(
+    child: Column(
       children: [
-        Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-            color: pomiPurple.withValues(alpha: .08),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: const Icon(
-            Icons.description_outlined,
-            color: pomiPurple,
-            size: 21,
-          ),
-        ),
-        const SizedBox(width: 10),
-        const Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '激素六项化验单',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: pomiInk,
-                  fontSize: 15,
-                  height: 21 / 15,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              SizedBox(height: 3),
-              Text(
-                '仁和医院 · 2026-08-25',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: pomiSecondaryText,
-                  fontSize: 11,
-                  height: 16 / 11,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-              SizedBox(height: 3),
-              Text(
-                '区块链技术支持',
-                style: TextStyle(
-                  color: pomiPurple,
-                  fontSize: 10,
-                  height: 14 / 10,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
+        Row(
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+              width: 42,
+              height: 42,
               decoration: BoxDecoration(
-                color: const Color(0x143B86C8),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: const Color(0x333B86C8)),
+                color: pomiPurple.withValues(alpha: .08),
+                borderRadius: BorderRadius.circular(14),
               ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
+              child: const Icon(
+                Icons.description_outlined,
+                color: pomiPurple,
+                size: 21,
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.schedule_outlined,
-                    color: Color(0xFF337EBB),
-                    size: 14,
-                  ),
-                  SizedBox(width: 4),
                   Text(
-                    '未核验',
+                    '激素六项化验单',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: Color(0xFF337EBB),
+                      color: pomiInk,
+                      fontSize: 15,
+                      height: 21 / 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  SizedBox(height: 3),
+                  Text(
+                    '仁和医院 · 2026-08-25',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: pomiSecondaryText,
                       fontSize: 11,
                       height: 16 / 11,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w400,
                     ),
                   ),
                 ],
               ),
             ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0x143B86C8),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: const Color(0x333B86C8)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.schedule_outlined,
+                        color: Color(0xFF337EBB),
+                        size: 14,
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        '未核验',
+                        style: TextStyle(
+                          color: Color(0xFF337EBB),
+                          fontSize: 11,
+                          height: 16 / 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ],
+        ),
+        const SizedBox(height: 6),
+        const Center(
+          child: Text(
+            '区块链技术支持',
+            style: TextStyle(
+              color: pomiPurple,
+              fontSize: 10,
+              height: 14 / 10,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
       ],
     ),

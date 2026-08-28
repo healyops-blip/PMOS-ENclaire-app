@@ -439,13 +439,16 @@ class _VisitRecordCard extends StatelessWidget {
                       const SizedBox(height: 3),
                       _VisitMetadataFields(value: visit.hospital),
                       const SizedBox(height: 3),
-                      const Text(
-                        '区块链技术支持',
-                        style: TextStyle(
-                          color: pomiPurple,
-                          fontSize: 10,
-                          height: 14 / 10,
-                          fontWeight: FontWeight.w600,
+                      const Align(
+                        alignment: Alignment.center,
+                        child: Text(
+                          '区块链技术支持',
+                          style: TextStyle(
+                            color: pomiPurple,
+                            fontSize: 10,
+                            height: 14 / 10,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ],
