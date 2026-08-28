@@ -1658,6 +1658,7 @@ class _BmiPainter extends CustomPainter {
     }
     canvas.drawPath(path, line);
     for (var i = 0; i < values.length; i++) {
+      if (i.isOdd && i != values.length - 1) continue;
       final x = chart.left + chart.width * i / (values.length - 1);
       _drawText(
         canvas,
