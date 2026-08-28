@@ -1373,7 +1373,20 @@ class _ReportSummaryLayer extends StatelessWidget {
       ),
       const SizedBox(height: 14),
       const Text(
-        '月经记录 & BMI趋势',
+        '月经记录',
+        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+      ),
+      const SizedBox(height: 8),
+      PomiGlassCard(
+        padding: const EdgeInsets.all(15),
+        child: Text(
+          cycleCount == 0 ? '暂无经期记录' : '共 $cycleCount 个周期记录',
+          style: const TextStyle(height: 1.6),
+        ),
+      ),
+      const SizedBox(height: 18),
+      const Text(
+        'BMI趋势',
         style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
       ),
       const SizedBox(height: 8),
