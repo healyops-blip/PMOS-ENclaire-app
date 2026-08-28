@@ -61,18 +61,6 @@ class VisitClinicalField {
   final String value;
 }
 
-class VisitEvidenceItem {
-  const VisitEvidenceItem({
-    required this.label,
-    required this.value,
-    this.copyable = false,
-  });
-
-  final String label;
-  final String value;
-  final bool copyable;
-}
-
 class VisitRecordDetailData {
   const VisitRecordDetailData({
     required this.id,
@@ -85,7 +73,6 @@ class VisitRecordDetailData {
     required this.verificationTitle,
     required this.verificationDetail,
     required this.summaryItems,
-    required this.evidence,
     this.contextLabel,
     this.historyNote,
     this.clinicalFields = const [],
@@ -109,7 +96,6 @@ class VisitRecordDetailData {
   final List<VisitClinicalField> clinicalFields;
   final List<VisitLabResult> labs;
   final List<VisitOrderItem> orders;
-  final List<VisitEvidenceItem> evidence;
   final String? sampleDate;
 
   String get facilityLine => [
@@ -199,15 +185,6 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
         change: VisitOrderChange.pending,
       ),
     ],
-    evidence: [
-      VisitEvidenceItem(label: '文件版本', value: '化验单 V2 · 医嘱 V1'),
-      VisitEvidenceItem(
-        label: 'SHA-256',
-        value: '8c3d…f1a9 / 7a3f…b2e1',
-        copyable: true,
-      ),
-      VisitEvidenceItem(label: '来源签署', value: '已记录｜模拟'),
-    ],
   ),
   VisitRecordDetailData(
     id: 'visit-20260712',
@@ -244,11 +221,6 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
         frequency: '复诊前完成',
         change: VisitOrderChange.added,
       ),
-    ],
-    evidence: [
-      VisitEvidenceItem(label: '文件版本', value: '门诊病历 V1 · 医嘱 V1'),
-      VisitEvidenceItem(label: '核验申请', value: 'REQ-20260712-021'),
-      VisitEvidenceItem(label: '当前状态', value: '医院核验处理中'),
     ],
   ),
   VisitRecordDetailData(
@@ -293,11 +265,6 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
         status: VisitLabStatus.normal,
       ),
     ],
-    evidence: [
-      VisitEvidenceItem(label: '文件版本', value: '激素检测单 V1'),
-      VisitEvidenceItem(label: 'SHA-256', value: '61ab…9c20', copyable: true),
-      VisitEvidenceItem(label: '来源签署', value: '未取得'),
-    ],
   ),
   VisitRecordDetailData(
     id: 'visit-20260208',
@@ -320,11 +287,6 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
       VisitClinicalField(label: '主诉', value: '月经周期不规律'),
       VisitClinicalField(label: '记录摘要', value: '建议记录周期变化并按计划复诊。'),
       VisitClinicalField(label: '随访建议', value: '如症状变化，提前就医'),
-    ],
-    evidence: [
-      VisitEvidenceItem(label: '文件版本', value: '门诊病历 V1'),
-      VisitEvidenceItem(label: '归档时间', value: '2026-02-08 16:40'),
-      VisitEvidenceItem(label: '材料状态', value: '患者确认｜模拟'),
     ],
   ),
   VisitRecordDetailData(
@@ -368,11 +330,6 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
         reference: '0.27–4.2 mIU/L',
         status: VisitLabStatus.normal,
       ),
-    ],
-    evidence: [
-      VisitEvidenceItem(label: '文件版本', value: '内分泌检测单 V1'),
-      VisitEvidenceItem(label: 'SHA-256', value: '32de…84b7', copyable: true),
-      VisitEvidenceItem(label: '材料状态', value: '历史归档｜模拟'),
     ],
   ),
 ];
@@ -440,8 +397,6 @@ class VisitRecordDetailScreen extends StatelessWidget {
                         const SizedBox(height: 22),
                         _OrderSection(items: visit.orders),
                       ],
-                      const SizedBox(height: 22),
-                      _EvidenceSection(items: visit.evidence),
                       const SizedBox(height: 18),
                       const _MedicalDisclaimer(),
                     ],
@@ -463,64 +418,57 @@ class _VisitHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isVerified =
+        visit.verificationState == VisitVerificationState.verified;
     return PomiGlassCard(
       borderRadius: 26,
       backgroundOpacity: .30,
       padding: const EdgeInsets.all(20),
       child: Stack(
         children: [
-          Positioned(
-            right: -24,
-            top: -30,
-            child: Container(
-              width: 112,
-              height: 112,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: pomiPurple.withValues(alpha: .07),
-              ),
-            ),
-          ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 46,
-                    height: 46,
-                    decoration: BoxDecoration(
-                      color: pomiPurple.withValues(alpha: .11),
-                      borderRadius: BorderRadius.circular(15),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: .68),
+              Padding(
+                padding: EdgeInsets.only(right: isVerified ? 88 : 0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: pomiPurple.withValues(alpha: .11),
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: .68),
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.event_note_rounded,
+                        color: pomiPurple,
+                        size: 24,
                       ),
                     ),
-                    child: const Icon(
-                      Icons.event_note_rounded,
-                      color: pomiPurple,
-                      size: 24,
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            visit.date,
+                            style: Theme.of(context).textTheme.headlineMedium,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '就诊记录 · 演示数据',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          visit.date,
-                          style: Theme.of(context).textTheme.headlineMedium,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '就诊记录 · 演示数据',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               const SizedBox(height: 18),
               Text(
@@ -549,6 +497,25 @@ class _VisitHeroCard extends StatelessWidget {
               ),
             ],
           ),
+          if (isVerified)
+            Positioned(
+              right: 0,
+              top: 0,
+              child: Semantics(
+                image: true,
+                label: '该报告已核验',
+                child: Opacity(
+                  opacity: .88,
+                  child: Image.asset(
+                    'assets/images/pomi_verified_stamp.png',
+                    key: const ValueKey('pomi-verified-stamp'),
+                    width: 80,
+                    height: 80,
+                    filterQuality: FilterQuality.high,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -1010,73 +977,6 @@ class _OrderRow extends StatelessWidget {
       ),
     );
   }
-}
-
-class _EvidenceSection extends StatelessWidget {
-  const _EvidenceSection({required this.items});
-
-  final List<VisitEvidenceItem> items;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      const _SectionTitle(
-        icon: Icons.shield_outlined,
-        title: '材料存证',
-        caption: '来源与版本',
-      ),
-      PomiGlassCard(
-        borderRadius: 22,
-        backgroundOpacity: .30,
-        padding: const EdgeInsets.symmetric(horizontal: 17),
-        child: Column(
-          children: [
-            for (var index = 0; index < items.length; index++) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    SizedBox(
-                      width: 76,
-                      child: Text(
-                        items[index].label,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        items[index].value,
-                        textAlign: TextAlign.end,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: items[index].copyable ? pomiPurple : pomiInk,
-                          fontWeight:
-                              items[index].copyable
-                                  ? FontWeight.w600
-                                  : FontWeight.w400,
-                        ),
-                      ),
-                    ),
-                    if (items[index].copyable) ...[
-                      const SizedBox(width: 5),
-                      const Icon(
-                        Icons.copy_rounded,
-                        size: 15,
-                        color: pomiPurple,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              if (index != items.length - 1)
-                Divider(color: pomiLine.withValues(alpha: .75), height: 1),
-            ],
-          ],
-        ),
-      ),
-    ],
-  );
 }
 
 class _MedicalDisclaimer extends StatelessWidget {

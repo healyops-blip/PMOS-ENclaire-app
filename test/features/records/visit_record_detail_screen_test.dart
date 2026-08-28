@@ -24,9 +24,7 @@ void main() {
       hasLength(5),
     );
     expect(
-      smokeVisitRecordDetails.every(
-        (visit) => visit.summaryItems.isNotEmpty && visit.evidence.isNotEmpty,
-      ),
+      smokeVisitRecordDetails.every((visit) => visit.summaryItems.isNotEmpty),
       isTrue,
     );
   });
@@ -43,6 +41,13 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('visit-record-visit-20260826')));
     await tester.pumpAndSettle();
+    await tester.runAsync(
+      () => precacheImage(
+        const AssetImage('assets/images/pomi_verified_stamp.png'),
+        tester.element(find.byType(VisitRecordDetailScreen)),
+      ),
+    );
+    await tester.pump();
 
     expect(
       find.byKey(const ValueKey('visit-record-detail-screen')),
@@ -50,6 +55,8 @@ void main() {
     );
     expect(find.text('模拟医院 B'), findsOneWidget);
     expect(find.text('就诊记录快照 · 上传后版本'), findsOneWidget);
+    expect(find.byKey(const ValueKey('pomi-verified-stamp')), findsOneWidget);
+    expect(find.text('材料存证'), findsNothing);
 
     await tester.scrollUntilVisible(
       find.text('总睾酮'),
