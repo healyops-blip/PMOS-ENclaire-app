@@ -235,7 +235,7 @@ def replace_text(
     return image
 
 
-def replace_logo(image, logo_path, logo_bbox=None, clean_mode="safe", clean_pad=6):
+def replace_logo(image, logo_path, logo_bbox=None, clean_mode="safe", clean_pad=6, keep_alpha=False, no_backplate=False):
     """
     将 logo 粘贴到指定区域，要求100%覆盖原有医院名/标识：
     - 自动检测右上角旧院名区域，取与目标框的并集作为清理框
@@ -254,57 +254,54 @@ def replace_logo(image, logo_path, logo_bbox=None, clean_mode="safe", clean_pad=
 
     x1, y1, x2, y2 = logo_bbox
 
-    # 计算清理区域（默认严格：仅在给定 logo 框内；可选 safe/detect）
-    if clean_mode == "safe":
-        W, H = image.size
-        pad = int(clean_pad) if isinstance(clean_pad, (int, float)) else 0
-        clean_bbox = [max(0, x1 - pad), max(0, y1 - pad), min(W, x2 + pad), min(H, y2 + pad)]
-    elif clean_mode == "detect":
-        try:
+    # 计算清理区域（默认严格：仅在给定 logo 框内；可选 safe/detect；none=不清理）
+    if clean_mode != "none":
+        if clean_mode == "safe":
             W, H = image.size
-            search = (int(W * 0.2), 0, W, int(H * 0.28))
-            crop = image.crop(search).convert("L")
-            arr = np.array(crop)
-            _, bw = cv2.threshold(arr, 240, 255, cv2.THRESH_BINARY_INV)
-            bw = cv2.morphologyEx(bw, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8), iterations=2)
-            contours, _ = cv2.findContours(bw, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            if contours:
-                cnt = max(contours, key=cv2.contourArea)
-                dx, dy, dw, dh = cv2.boundingRect(cnt)
-                cx1 = max(0, search[0] + dx - 8)
-                cy1 = max(0, search[1] + dy - 8)
-                cx2 = min(W, search[0] + dx + dw + 8)
-                cy2 = min(H, search[1] + dy + dh + 16)
-                clean_bbox = [min(x1, cx1), min(y1, cy1), max(x2, cx2), max(y2, cy2)]
-            else:
+            pad = int(clean_pad) if isinstance(clean_pad, (int, float)) else 0
+            clean_bbox = [max(0, x1 - pad), max(0, y1 - pad), min(W, x2 + pad), min(H, y2 + pad)]
+        elif clean_mode == "detect":
+            try:
+                W, H = image.size
+                search = (int(W * 0.2), 0, W, int(H * 0.28))
+                crop = image.crop(search).convert("L")
+                arr = np.array(crop)
+                _, bw = cv2.threshold(arr, 240, 255, cv2.THRESH_BINARY_INV)
+                bw = cv2.morphologyEx(bw, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8), iterations=2)
+                contours, _ = cv2.findContours(bw, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                if contours:
+                    cnt = max(contours, key=cv2.contourArea)
+                    dx, dy, dw, dh = cv2.boundingRect(cnt)
+                    cx1 = max(0, search[0] + dx - 8)
+                    cy1 = max(0, search[1] + dy - 8)
+                    cx2 = min(W, search[0] + dx + dw + 8)
+                    cy2 = min(H, search[1] + dy + dh + 16)
+                    clean_bbox = [min(x1, cx1), min(y1, cy1), max(x2, cx2), max(y2, cy2)]
+                else:
+                    clean_bbox = [x1, y1, x2, y2]
+            except Exception:
                 clean_bbox = [x1, y1, x2, y2]
-        except Exception:
-            clean_bbox = [x1, y1, x2, y2]
-    else:
-        clean_bbox = [x1, y1, x2, y2]
-
-    # 1) 用邻近底色“实心填充”清理区域（不做 inpaint、不做模糊，保证100%覆盖）
-    draw_clear = ImageDraw.Draw(image)
-    try:
-        sample_band = image.crop((clean_bbox[0], max(0, clean_bbox[1]-4), clean_bbox[2], clean_bbox[1]))
-        if sample_band.size[0] and sample_band.size[1]:
-            avg = tuple(int(v) for v in np.array(sample_band).reshape(-1, 3).mean(axis=0))
         else:
-            # 退化：从清理框右侧采样
-            band2 = image.crop((clean_bbox[2], clean_bbox[1], min(image.size[0], clean_bbox[2]+6), clean_bbox[3]))
-            avg = tuple(int(v) for v in np.array(band2).reshape(-1, 3).mean(axis=0)) if band2.size[0] and band2.size[1] else (255, 255, 255)
-    except Exception:
-        avg = (255, 255, 255)
-    draw_clear.rectangle(clean_bbox, fill=avg)
+            clean_bbox = [x1, y1, x2, y2]
+
+        # 1) 用邻近底色“实心填充”清理区域（不做 inpaint、不做模糊，保证100%覆盖）
+        draw_clear = ImageDraw.Draw(image)
+        try:
+            sample_band = image.crop((clean_bbox[0], max(0, clean_bbox[1]-4), clean_bbox[2], clean_bbox[1]))
+            if sample_band.size[0] and sample_band.size[1]:
+                avg = tuple(int(v) for v in np.array(sample_band).reshape(-1, 3).mean(axis=0))
+            else:
+                # 退化：从清理框右侧采样
+                band2 = image.crop((clean_bbox[2], clean_bbox[1], min(image.size[0], clean_bbox[2]+6), clean_bbox[3]))
+                avg = tuple(int(v) for v in np.array(band2).reshape(-1, 3).mean(axis=0)) if band2.size[0] and band2.size[1] else (255, 255, 255)
+        except Exception:
+            avg = (255, 255, 255)
+        draw_clear.rectangle(clean_bbox, fill=avg)
 
     # 2) 读取并准备 logo
     logo = Image.open(logo_path)
+    # 保留原始 alpha（如果存在）；若 keep_alpha=False 且 logo 不含 alpha，则转换为不透明 RGB
     if logo.mode != "RGBA":
-        # 若无透明通道，假定白底，转为带 alpha 的 RGBA
-        rgb = logo.convert("RGB")
-        alpha = Image.new("L", rgb.size, 255)
-        logo = Image.merge("RGBA", (*rgb.split(), alpha))
-    else:
         logo = logo.convert("RGBA")
 
     target_w = max(1, x2 - x1)
@@ -326,62 +323,54 @@ def replace_logo(image, logo_path, logo_bbox=None, clean_mode="safe", clean_pad=
     offset_x = x1 + (target_w - new_w) // 2
     offset_y = y1 + (target_h - new_h) // 2
 
-    # 3) 在粘贴区域铺一层不透明的“背板”，防止半透明 logo 下透出旧文字；
-    #    背板颜色优先取自目标区域邻域的采样均值，避免在非纯白页眉上出现白色块感。
-    #    同时在目标框四周各扩 1px 再覆盖一层，减少边缘拼接痕迹。
-    draw = ImageDraw.Draw(image)
-    back_x1 = max(0, offset_x - 2)
-    back_y1 = max(0, offset_y - 2)
-    back_x2 = min(image.size[0], offset_x + new_w + 2)
-    back_y2 = min(image.size[1], offset_y + new_h + 2)
-    # 采样邻域颜色作为背板色（若采样失败则回退纯白）
-    try:
-        band = image.crop((back_x1, max(0, back_y1 - 4), back_x2, back_y1))
-        if band.size[0] and band.size[1]:
-            back_color = tuple(int(v) for v in np.array(band).reshape(-1, 3).mean(axis=0))
-        else:
-            band2 = image.crop((back_x2, back_y1, min(image.size[0], back_x2 + 6), back_y2))
-            back_color = tuple(int(v) for v in np.array(band2).reshape(-1, 3).mean(axis=0)) if band2.size[0] and band2.size[1] else (255, 255, 255)
-    except Exception:
-        back_color = (255, 255, 255)
-    draw.rectangle([back_x1, back_y1, back_x2, back_y2], fill=back_color)
-    # 额外一层轻微扩展覆盖，压暗线性插值造成的边缘锯齿
-    pad2 = 1
-    draw.rectangle([
-        max(0, back_x1 - pad2), max(0, back_y1 - pad2),
-        min(image.size[0], back_x2 + pad2), min(image.size[1], back_y2 + pad2)
-    ], fill=back_color)
+    # 3) 可选：在粘贴区域铺一层背板；影像/化验在白底壳上不需要背板，直接 alpha 贴更自然
+    if not no_backplate:
+        draw = ImageDraw.Draw(image)
+        back_x1 = max(0, offset_x - 2)
+        back_y1 = max(0, offset_y - 2)
+        back_x2 = min(image.size[0], offset_x + new_w + 2)
+        back_y2 = min(image.size[1], offset_y + new_h + 2)
+        # 采样邻域颜色作为背板色（若采样失败则回退纯白）
+        try:
+            band = image.crop((back_x1, max(0, back_y1 - 4), back_x2, back_y1))
+            if band.size[0] and band.size[1]:
+                back_color = tuple(int(v) for v in np.array(band).reshape(-1, 3).mean(axis=0))
+            else:
+                band2 = image.crop((back_x2, back_y1, min(image.size[0], back_x2 + 6), back_y2))
+                back_color = tuple(int(v) for v in np.array(band2).reshape(-1, 3).mean(axis=0)) if band2.size[0] and band2.size[1] else (255, 255, 255)
+        except Exception:
+            back_color = (255, 255, 255)
+        draw.rectangle([back_x1, back_y1, back_x2, back_y2], fill=back_color)
+        # 额外一层轻微扩展覆盖，压暗线性插值造成的边缘锯齿
+        pad2 = 1
+        draw.rectangle([
+            max(0, back_x1 - pad2), max(0, back_y1 - pad2),
+            min(image.size[0], back_x2 + pad2), min(image.size[1], back_y2 + pad2)
+        ], fill=back_color)
 
-    # 4) 将 logo 转换为完全不透明（去alpha），避免半透明区透出底色；再直接粘贴
-    if logo.mode in ("RGBA", "LA"):
-        bg = Image.new("RGBA", logo.size, (255, 255, 255, 255))
-        bg.alpha_composite(logo)
-        logo_opaque = bg.convert("RGB")
+    # 4) 粘贴 logo：
+    if keep_alpha and logo.mode == "RGBA":
+        image.paste(logo, (offset_x, offset_y), mask=logo.split()[3])
     else:
-        logo_opaque = logo.convert("RGB")
-    image.paste(logo_opaque, (offset_x, offset_y))
-
-    # 5) 细边缘羽化：对背板边缘做一次极轻微的周边采样填充，进一步减轻拼接感
-    try:
-        bleed = 1
-        _fill_rect_with_sampled_color = None  # 占位避免未引用警告
-        band_top = (back_x1, max(0, back_y1 - bleed), back_x2, back_y1)
-        band_bottom = (back_x1, back_y2, back_x2, min(image.size[1], back_y2 + bleed))
-        band_left = (max(0, back_x1 - bleed), back_y1, back_x1, back_y2)
-        band_right = (back_x2, back_y1, min(image.size[0], back_x2 + bleed), back_y2)
-        # 取相邻带的均值涂抹到背板外一圈像素
-        def _avg(crop_box):
-            c = image.crop(crop_box)
-            import numpy as _np
-            arr = _np.array(c)
-            return tuple(int(v) for v in arr.reshape(-1, 3).mean(axis=0)) if arr.size else avg
-        edge_color = _avg((back_x1, max(0, back_y1 - 2), back_x2, back_y1))
-        from PIL import ImageDraw as _ImageDraw
-        d2 = _ImageDraw.Draw(image)
-        d2.rectangle([max(0, back_x1-1), max(0, back_y1-1), back_x2+1, back_y1], fill=edge_color)
-        d2.rectangle([max(0, back_x1-1), back_y2, back_x2+1, min(image.size[1], back_y2+1)], fill=edge_color)
-        d2.rectangle([max(0, back_x1-1), back_y1, back_x1, back_y2], fill=edge_color)
-        d2.rectangle([back_x2, back_y1, min(image.size[0], back_x2+1), back_y2], fill=edge_color)
+        # 去 alpha，避免透明区透出旧底色
+        if logo.mode in ("RGBA", "LA"):
+            bg = Image.new("RGBA", logo.size, (255, 255, 255, 255))
+            bg.alpha_composite(logo)
+            logo_opaque = bg.convert("RGB")
+        else:
+            logo_opaque = logo.convert("RGB")
+        image.paste(logo_opaque, (offset_x, offset_y))
+    if not no_backplate:
+        try:
+            bleed = 1
+            from PIL import ImageDraw as _ImageDraw
+            d2 = _ImageDraw.Draw(image)
+            d2.rectangle([max(0, back_x1-1), max(0, back_y1-1), back_x2+1, back_y1], fill=back_color)
+            d2.rectangle([max(0, back_x1-1), back_y2, back_x2+1, min(image.size[1], back_y2+1)], fill=back_color)
+            d2.rectangle([max(0, back_x1-1), back_y1, back_x1, back_y2], fill=back_color)
+            d2.rectangle([back_x2, back_y1, min(image.size[0], back_x2+1), back_y2], fill=back_color)
+        except Exception:
+            pass
     except Exception:
         pass
 
@@ -731,7 +720,8 @@ def generate_case(
 
         # 为贴近 EMR 老版观感：“门诊病历_就诊记录”不再贴医院 Logo（仅保留标题中的医院名文字），避免右上角额外面板感
         if logo_path and report_type not in ("医嘱_处方", "门诊病历_就诊记录"):
-            image = replace_logo(image, logo_path, logo_bbox)
+            # 对于影像/化验：白底壳上直接用 alpha 贴图，不铺背板，避免边缘拼接痕迹
+            image = replace_logo(image, logo_path, logo_bbox, clean_mode="safe", keep_alpha=True, no_backplate=True)
         elif report_type == "医嘱_处方":
             # 医嘱_处方样本是移动端病历/处方页面，右上角应保留小程序菜单胶囊，
             # 不贴医院 logo，否则会变成传统纸质处方笺，布局与 sample_input 不一致。
