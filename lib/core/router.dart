@@ -7,10 +7,10 @@ import '../features/auth/onboarding_screen.dart';
 import '../features/home/app_shell.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final auth = ref.watch(authControllerProvider);
-  return GoRouter(
+  final router = GoRouter(
     initialLocation: '/login',
     redirect: (context, state) {
+      final auth = ref.read(authControllerProvider);
       if (auth.isLoading) return null;
       final session = auth.value;
       final onAuthPage = state.matchedLocation == '/login';
@@ -29,4 +29,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/home', builder: (context, state) => const AppShell()),
     ],
   );
+
+  ref.listen(authControllerProvider, (_, _) => router.refresh());
+  ref.onDispose(router.dispose);
+  return router;
 });
