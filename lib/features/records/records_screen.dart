@@ -72,7 +72,52 @@ const _smokeDashboardReport = <String, dynamic>{
       'current_medications': [],
     },
     'trends': {
-      'labs': [],
+      'labs': [
+        {
+          'item_name': '空腹血糖',
+          'points': [
+            {
+              'original_item_name': '空腹血糖',
+              'date': '2026-08-25',
+              'raw_value': 5.6,
+              'raw_unit': 'mmol/L',
+            },
+          ],
+        },
+        {
+          'item_name': 'HbA1c',
+          'points': [
+            {
+              'original_item_name': 'HbA1c',
+              'date': '2026-08-25',
+              'raw_value': 5.5,
+              'raw_unit': '%',
+            },
+          ],
+        },
+        {
+          'item_name': '总睾酮',
+          'points': [
+            {
+              'original_item_name': '总睾酮',
+              'date': '2026-08-24',
+              'raw_value': 0.9,
+              'raw_unit': 'ng/mL',
+            },
+          ],
+        },
+        {
+          'item_name': '甘油三酯',
+          'points': [
+            {
+              'original_item_name': '甘油三酯',
+              'date': '2026-06-20',
+              'raw_value': 1.4,
+              'raw_unit': 'mmol/L',
+            },
+          ],
+        },
+      ],
       'weights': [
         {'record_date': '2026-08-02', 'weight_kg': 68.5},
         {'record_date': '2026-08-08', 'weight_kg': 67.2},
