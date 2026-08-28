@@ -1332,6 +1332,11 @@ class _ReportSummaryLayer extends StatelessWidget {
         ),
       ),
       const SizedBox(height: 18),
+      const Text(
+        '患者自述',
+        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+      ),
+      const SizedBox(height: 8),
       PomiGlassCard(
         onTap:
             () => showDialog<void>(
@@ -1359,11 +1364,6 @@ class _ReportSummaryLayer extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              '患者自述',
-              style: TextStyle(color: pomiInk, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 7),
             Text(
               summary['patient_statement']?.toString() ?? '未填写',
               style: const TextStyle(height: 1.55),
