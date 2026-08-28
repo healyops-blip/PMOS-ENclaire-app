@@ -1131,21 +1131,10 @@ class _MedicationProgressCard extends StatelessWidget {
                     minimumSize: const Size(0, 40),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '用药管理',
-                        style: TextStyle(
-                          color: pomiInk,
-                          fontSize: 12,
-                          height: 17 / 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      SizedBox(width: 2),
-                      Icon(Icons.chevron_right, color: pomiInk, size: 16),
-                    ],
+                  child: const Icon(
+                    Icons.chevron_right,
+                    color: pomiInk,
+                    size: 18,
                   ),
                 ),
               ],
