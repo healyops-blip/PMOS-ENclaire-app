@@ -7,16 +7,15 @@ import 'package:pmos_enclaire/features/reports/data/report_pdf_repository.dart';
 enum _PdfAction { save, share, print }
 
 class ReportPdfPanel extends StatefulWidget {
-  ReportPdfPanel({
+  const ReportPdfPanel({
     required this.reportId,
     required this.repository,
-    ReportPdfCache? cache,
+    required this.cache,
     ReportPdfSystemActions? systemActions,
     this.pollingInterval = const Duration(milliseconds: 800),
     this.maxPolls = 45,
     super.key,
-  }) : cache = cache ?? ReportPdfCache(),
-       systemActions = systemActions ?? const AndroidReportPdfSystemActions();
+  }) : systemActions = systemActions ?? const AndroidReportPdfSystemActions();
 
   final String reportId;
   final ReportPdfRepository repository;
@@ -96,6 +95,7 @@ class _ReportPdfPanelState extends State<ReportPdfPanel> {
         setState(() => _status = ReportPdfGenerationStatus.succeeded);
       }
       final bytes = await widget.repository.download(widget.reportId);
+      if (!mounted) return;
       final cached = await widget.cache.store(
         reportId: widget.reportId,
         bytes: bytes,

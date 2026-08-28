@@ -228,7 +228,9 @@ class _DashboardPageState extends State<DashboardPage> {
                     documentRepository: widget.documentRepository,
                     reportPdfRepository:
                         widget.reportPdfRepository ?? DemoReportPdfRepository(),
-                    reportPdfCache: widget.reportPdfCache,
+                    reportPdfCache:
+                        widget.reportPdfCache ??
+                        ReportPdfCache(accountScope: widget.account.uid),
                   ),
                 ),
               ),

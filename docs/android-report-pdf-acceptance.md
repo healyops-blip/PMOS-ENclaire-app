@@ -28,13 +28,16 @@ Recorded: 2026-08-28
 ## Private cache policy
 
 `ReportPdfCache` writes into the application temporary directory under
-`pomi-report-pdf-cache/` using an atomic `.part` file and a sanitized file
-name.
+`pomi-report-pdf-cache/<account-scope>/` using an atomic `.part` file and a
+sanitized file name. A signed-in account cannot enumerate another account's
+cache directory.
 
 - Maximum age: 24 hours.
 - Maximum retained files: 4, newest first.
 - Cleanup: before and after each completed download; stale partial files are
   deleted as well.
+- Logout, a rejected restored session, and any authenticated HTTP 401 clear all
+  report PDF cache scopes before the App returns to signed-out state.
 - This cache is an implementation detail, not a public sharing location.
   Users who choose **Save PDF** select the destination through Android.
 

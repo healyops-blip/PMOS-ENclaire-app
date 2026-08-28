@@ -21,7 +21,7 @@ class ReportGeneratorPage extends StatefulWidget {
     super.key,
   }) : reportRepository = reportRepository ?? DemoReportRepository(),
        reportPdfRepository = reportPdfRepository ?? DemoReportPdfRepository(),
-       reportPdfCache = reportPdfCache ?? ReportPdfCache(),
+       reportPdfCache = reportPdfCache ?? ReportPdfCache(accountScope: 'demo'),
        documentRepository = documentRepository ?? DemoDocumentRepository(),
        certificationRepository =
            certificationRepository ?? LocalCertificationRepository();

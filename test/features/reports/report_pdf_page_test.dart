@@ -194,7 +194,11 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() predicate) async {
 }
 
 class _TestCache extends ReportPdfCache {
-  _TestCache(this.file) : super(directoryProvider: () async => file.parent);
+  _TestCache(this.file)
+    : super(
+        accountScope: 'widget-test',
+        directoryProvider: () async => file.parent,
+      );
 
   final File file;
 

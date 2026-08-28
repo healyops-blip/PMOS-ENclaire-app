@@ -172,12 +172,19 @@ class DemoReportPdfRepository implements ReportPdfRepository {
 typedef CacheDirectoryProvider = Future<Directory> Function();
 
 class ReportPdfCache {
+  static int _sessionGeneration = 0;
+
   ReportPdfCache({
+    required String accountScope,
     CacheDirectoryProvider? directoryProvider,
     this.maxAge = const Duration(hours: 24),
     this.maxFiles = 4,
-  }) : _directoryProvider = directoryProvider ?? getTemporaryDirectory;
+  }) : accountScope = _safeScope(accountScope),
+       _createdGeneration = _sessionGeneration,
+       _directoryProvider = directoryProvider ?? getTemporaryDirectory;
 
+  final String accountScope;
+  final int _createdGeneration;
   final CacheDirectoryProvider _directoryProvider;
   final Duration maxAge;
   final int maxFiles;
@@ -187,6 +194,7 @@ class ReportPdfCache {
     required Uint8List bytes,
     String? suggestedName,
   }) async {
+    _ensureActive();
     final directory = await _cacheDirectory();
     await cleanup(directory: directory);
     final safeName = _safeName(
@@ -195,6 +203,10 @@ class ReportPdfCache {
     final target = File('${directory.path}${Platform.pathSeparator}$safeName');
     final temporary = File('${target.path}.part');
     await temporary.writeAsBytes(bytes, flush: true);
+    if (_createdGeneration != _sessionGeneration) {
+      await temporary.delete();
+      throw StateError('report PDF cache belongs to a cleared session');
+    }
     if (await target.exists()) await target.delete();
     await temporary.rename(target.path);
     await target.setLastModified(DateTime.now());
@@ -230,23 +242,57 @@ class ReportPdfCache {
     }
   }
 
-  Future<void> clear() async {
-    final root = await _directoryProvider();
-    final directory = Directory(
-      '${root.path}${Platform.pathSeparator}pomi-report-pdf-cache',
-    );
-    if (await directory.exists()) {
+  Future<void> clearAll() async {
+    _sessionGeneration += 1;
+    final directory = await _cacheDirectory(create: false);
+    if (!await directory.exists()) return;
+    try {
       await directory.delete(recursive: true);
+    } on FileSystemException {
+      if (await directory.exists()) rethrow;
     }
   }
 
-  Future<Directory> _cacheDirectory() async {
-    final root = await _directoryProvider();
+  static Future<void> clearAllAccounts({
+    CacheDirectoryProvider? directoryProvider,
+  }) async {
+    _sessionGeneration += 1;
+    final root = await (directoryProvider ?? getTemporaryDirectory)();
     final directory = Directory(
       '${root.path}${Platform.pathSeparator}pomi-report-pdf-cache',
     );
-    if (!await directory.exists()) await directory.create(recursive: true);
+    if (!await directory.exists()) return;
+    try {
+      await directory.delete(recursive: true);
+    } on FileSystemException {
+      if (await directory.exists()) rethrow;
+    }
+  }
+
+  Future<Directory> _cacheDirectory({bool create = true}) async {
+    final root = await _directoryProvider();
+    final directory = Directory(
+      '${root.path}${Platform.pathSeparator}pomi-report-pdf-cache'
+      '${Platform.pathSeparator}$accountScope',
+    );
+    if (create && !await directory.exists()) {
+      await directory.create(recursive: true);
+    }
     return directory;
+  }
+
+  static String _safeScope(String value) {
+    final sanitized = value.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+    if (sanitized.isEmpty) {
+      throw ArgumentError.value(value, 'accountScope', 'must not be empty');
+    }
+    return sanitized;
+  }
+
+  void _ensureActive() {
+    if (_createdGeneration != _sessionGeneration) {
+      throw StateError('report PDF cache belongs to a cleared session');
+    }
   }
 
   String _safeName(String value) {

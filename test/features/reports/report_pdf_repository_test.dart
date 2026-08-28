@@ -143,6 +143,7 @@ void main() {
         if (await root.exists()) await root.delete(recursive: true);
       });
       final cache = ReportPdfCache(
+        accountScope: 'patient-a',
         directoryProvider: () async => root,
         maxAge: const Duration(hours: 1),
         maxFiles: 2,
@@ -154,7 +155,7 @@ void main() {
         bytes: bytes,
         suggestedName: '../../private clinical report.pdf',
       );
-      expect(first.parent.parent.path, root.path);
+      expect(first.parent.parent.parent.path, root.path);
       expect(first.path, isNot(contains('..')));
       await first.setLastModified(
         DateTime.now().subtract(const Duration(hours: 2)),
@@ -175,8 +176,55 @@ void main() {
       expect(files, hasLength(2));
       expect(files.any((file) => file.path.endsWith('.part')), isFalse);
 
-      await cache.clear();
+      await cache.clearAll();
       expect(await first.parent.exists(), isFalse);
+    },
+  );
+
+  test(
+    'isolates account caches and supports scoped and global clearing',
+    () async {
+      final root = await Directory.systemTemp.createTemp(
+        'pomi-pdf-account-cache-test-',
+      );
+      addTearDown(() async {
+        if (await root.exists()) await root.delete(recursive: true);
+      });
+      Future<Directory> directoryProvider() async => root;
+      final accountA = ReportPdfCache(
+        accountScope: 'account-a',
+        directoryProvider: directoryProvider,
+      );
+      final accountB = ReportPdfCache(
+        accountScope: 'account-b',
+        directoryProvider: directoryProvider,
+      );
+      final bytes = Uint8List.fromList('%PDF-1.7\nprivate'.codeUnits);
+
+      final fileA = await accountA.store(reportId: 'report-a', bytes: bytes);
+      final fileB = await accountB.store(reportId: 'report-b', bytes: bytes);
+
+      expect(fileA.parent.path, isNot(fileB.parent.path));
+      expect(
+        await fileB.parent.list().any(
+          (entity) => entity.path.endsWith('pomi-report-report-a.pdf'),
+        ),
+        isFalse,
+        reason: 'account B must never enumerate account A cache entries',
+      );
+
+      await accountA.clearAll();
+      expect(await fileA.exists(), isFalse);
+      expect(await fileB.exists(), isTrue);
+      await expectLater(
+        accountB.store(reportId: 'late-report', bytes: bytes),
+        throwsStateError,
+      );
+
+      await ReportPdfCache.clearAllAccounts(
+        directoryProvider: directoryProvider,
+      );
+      expect(await fileB.exists(), isFalse);
     },
   );
 }

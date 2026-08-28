@@ -450,13 +450,14 @@ class _RetryPatientNoteRepository extends DemoPatientNoteRepository {
 }
 
 class _TrackingReportPdfCache extends ReportPdfCache {
-  _TrackingReportPdfCache({this.failOnClear = false});
+  _TrackingReportPdfCache({this.failOnClear = false})
+    : super(accountScope: 'main-app-test');
 
   final bool failOnClear;
   int clearCalls = 0;
 
   @override
-  Future<void> clear() async {
+  Future<void> clearAll() async {
     clearCalls += 1;
     if (failOnClear) throw StateError('simulated cache cleanup failure');
   }

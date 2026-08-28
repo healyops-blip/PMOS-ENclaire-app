@@ -68,7 +68,11 @@ class _PomiAppState extends State<PomiApp> {
   late final PomiApiClient _apiClient = widget.apiClient ?? PomiApiClient();
   late final AuthRepository _authRepository =
       widget.authRepository ??
-      FastApiAuthRepository(_apiClient, SecureSessionStore());
+      FastApiAuthRepository(
+        _apiClient,
+        SecureSessionStore(),
+        onSessionCleared: _clearPrivateSessionData,
+      );
   late final PatientProfileRepository _profileRepository =
       widget.profileRepository ??
       (widget.authRepository is DemoAuthRepository
@@ -117,29 +121,47 @@ class _PomiAppState extends State<PomiApp> {
       (widget.authRepository is DemoAuthRepository
           ? null
           : FastApiMedicationRepository(_apiClient));
-  late final ReportPdfCache _reportPdfCache =
-      widget.reportPdfCache ?? ReportPdfCache();
   String? _activeUid;
 
-  Future<void> _clearActiveDashboardCache() async {
+  Future<void> _clearPrivateSessionData() async {
     final uid = _activeUid;
     _activeUid = null;
+    if (mounted) _router.go(PomiRoutes.login);
     try {
       if (uid != null) await _dashboardRepository.clear(uid);
-    } catch (_) {
-      // Cache cleanup must not prevent local Session removal or navigation.
+    } on Object {
+      // One private cache failing must not prevent the others being purged.
     }
     try {
-      await _reportPdfCache.clear();
-    } catch (_) {
-      // Best effort: stale temporary PDFs remain subject to startup expiry.
+      await widget.reportPdfCache?.clearAll();
+    } on Object {
+      // Continue with the global cache purge and signed-out routing.
+    }
+    try {
+      await ReportPdfCache.clearAllAccounts();
+    } on Object {
+      // Session removal and signed-out routing remain mandatory.
     }
   }
 
   Future<void> _activateUid(String uid) async {
     final previous = _activeUid;
     if (previous != null && previous != uid) {
-      await _clearActiveDashboardCache();
+      try {
+        await _dashboardRepository.clear(previous);
+      } on Object {
+        // Continue clearing other account-scoped private data.
+      }
+      try {
+        final injectedCache = widget.reportPdfCache;
+        if (injectedCache == null) {
+          await ReportPdfCache(accountScope: previous).clearAll();
+        } else {
+          await injectedCache.clearAll();
+        }
+      } on Object {
+        // A stale temporary file must not strand a successful new login.
+      }
     }
     _activeUid = uid;
   }
@@ -167,7 +189,6 @@ class _PomiAppState extends State<PomiApp> {
                     accountName: submission.accountName,
                     password: submission.password,
                   );
-            if (!context.mounted) return;
             final account = session.account.toPresentationAccount();
             await _activateUid(account.uid);
             if (!context.mounted) return;
@@ -210,14 +231,16 @@ class _PomiAppState extends State<PomiApp> {
               try {
                 await _authRepository.logout();
               } finally {
-                await _clearActiveDashboardCache();
+                await _clearPrivateSessionData();
                 if (context.mounted) context.go(PomiRoutes.login);
               }
             },
             patientNoteRepository: _patientNoteRepository,
             reportRepository: _reportRepository,
             reportPdfRepository: _reportPdfRepository,
-            reportPdfCache: _reportPdfCache,
+            reportPdfCache:
+                widget.reportPdfCache ??
+                ReportPdfCache(accountScope: account.uid),
             documentRepository: _documentRepository,
             ocrRepository: _ocrRepository,
             weightRepository: _weightRepository,
@@ -241,7 +264,7 @@ class _PomiAppState extends State<PomiApp> {
       final account = await _authRepository.restore();
       if (!mounted) return;
       if (account == null) {
-        await _clearActiveDashboardCache();
+        await _clearPrivateSessionData();
         return;
       }
       final presentation = account.toPresentationAccount();

@@ -26,7 +26,7 @@ class ReportViewerPage extends StatefulWidget {
     this.pdfMaxPolls = 45,
     super.key,
   }) : pdfRepository = pdfRepository ?? DemoReportPdfRepository(),
-       pdfCache = pdfCache ?? ReportPdfCache(),
+       pdfCache = pdfCache ?? ReportPdfCache(accountScope: 'demo'),
        pdfSystemActions =
            pdfSystemActions ?? const AndroidReportPdfSystemActions();
 
