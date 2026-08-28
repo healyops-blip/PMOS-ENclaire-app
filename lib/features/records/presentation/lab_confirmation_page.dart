@@ -41,6 +41,7 @@ class _LabConfirmationPageState extends State<LabConfirmationPage> {
         _items.add(
           _LabItemEditor.fromDraft(
             Map<String, dynamic>.from(raw),
+            sourceIndex: index,
             confidence: _confidence(result.fields, index),
           ),
         );
@@ -64,13 +65,16 @@ class _LabConfirmationPageState extends State<LabConfirmationPage> {
     super.dispose();
   }
 
-  void _addItem() => setState(() => _items.add(_LabItemEditor.empty()));
+  void _addItem() => setState(() {
+    _items.add(_LabItemEditor.empty());
+    _errors.clear();
+  });
 
   void _removeItem(int index) {
     setState(() {
       final item = _items.removeAt(index);
       item.dispose();
-      _errors.removeWhere((path, _) => path.startsWith('items.$index.'));
+      _errors.clear();
     });
   }
 
@@ -113,6 +117,7 @@ class _LabConfirmationPageState extends State<LabConfirmationPage> {
         resultId: _result!.resultId,
         expectedRevisionId: widget.task.documentRevisionId,
         items: _items.map((item) => item.value).toList(),
+        sampleDate: _text(_result!.draft['sample_date']),
         reportDate: _text(_result!.draft['report_date']),
       );
       if (!mounted) return;
@@ -143,10 +148,13 @@ class _LabConfirmationPageState extends State<LabConfirmationPage> {
       if (item.name.text.trim().isEmpty) {
         errors['items.$index.name'] = '项目名称不能为空';
       }
-      if (double.tryParse(item.valueController.text.trim()) == null) {
+      if (double.tryParse(
+            item.valueController.text.trim().replaceAll(',', ''),
+          ) ==
+          null) {
         errors['items.$index.value'] = '请输入可解析的数值';
       }
-      if (!_allowedUnits.contains(item.unit.text.trim())) {
+      if (!_allowedUnits.contains(_unitKey(item.unit.text))) {
         errors['items.$index.unit'] = '单位不在允许范围内';
       }
       for (final entry in {
@@ -411,18 +419,21 @@ class _LabConfirmationPageState extends State<LabConfirmationPage> {
               trailing: Text('${item.value} ${item.unit}'),
             ),
           const SizedBox(height: 12),
-          CertificationEntryCard(
-            documentId: widget.task.documentId,
-            revisionId: widget.task.documentRevisionId,
-            materialLabel: '化验／检测报告',
-            ocrConfirmed: true,
-          ),
+          if (widget.documentRepository != null)
+            CertificationEntryCard(
+              documentId: widget.task.documentId,
+              revisionId: widget.task.documentRevisionId,
+              materialLabel: '化验／检测报告',
+              ocrConfirmed: _confirmed != null,
+              documentRepository: widget.documentRepository!,
+            ),
         ],
       );
 }
 
 class _LabItemEditor {
   _LabItemEditor({
+    required this.sourceIndex,
     required this.name,
     required this.valueController,
     required this.unit,
@@ -437,13 +448,25 @@ class _LabItemEditor {
 
   factory _LabItemEditor.fromDraft(
     Map<String, dynamic> draft, {
+    int? sourceIndex,
     required double confidence,
   }) => _LabItemEditor(
-    name: TextEditingController(text: _text(draft['name'])),
-    valueController: TextEditingController(text: _text(draft['value'])),
-    unit: TextEditingController(text: _text(draft['unit'])),
+    sourceIndex: sourceIndex,
+    name: TextEditingController(
+      text: _text(draft['item_name'] ?? draft['name']),
+    ),
+    valueController: TextEditingController(
+      text: _text(
+        draft['raw_value'] ?? draft['numeric_value'] ?? draft['value'],
+      ),
+    ),
+    unit: TextEditingController(
+      text: _text(
+        draft['raw_unit'] ?? draft['normalized_unit'] ?? draft['unit'],
+      ),
+    ),
     referenceRange: TextEditingController(
-      text: _text(draft['reference_range']),
+      text: _text(draft['reference_range_text'] ?? draft['reference_range']),
     ),
     sampleDate: TextEditingController(text: _text(draft['sample_date'])),
     examDate: TextEditingController(text: _text(draft['exam_date'])),
@@ -454,8 +477,9 @@ class _LabItemEditor {
   );
 
   factory _LabItemEditor.empty() =>
-      _LabItemEditor.fromDraft(const {}, confidence: 0);
+      _LabItemEditor.fromDraft(const {}, sourceIndex: null, confidence: 0);
 
+  final int? sourceIndex;
   final TextEditingController name;
   final TextEditingController valueController;
   final TextEditingController unit;
@@ -468,6 +492,7 @@ class _LabItemEditor {
   final double confidence;
 
   LabConfirmationItem get value => LabConfirmationItem(
+    sourceIndex: sourceIndex,
     name: name.text.trim(),
     value: valueController.text.trim(),
     unit: unit.text.trim(),
@@ -514,21 +539,28 @@ bool _validDate(String value) {
   return date.year == year && date.month == month && date.day == day;
 }
 
+String _unitKey(String value) =>
+    value.trim().replaceAll(' ', '').replaceAll('µ', 'μ').toLowerCase();
+
 const _allowedUnits = {
-  'mmol/L',
-  'mg/dL',
-  'μIU/mL',
-  'mIU/L',
-  'mIU/mL',
-  'IU/L',
-  'nmol/L',
-  'ng/dL',
-  'ng/mL',
-  'pmol/L',
+  'mmol/l',
+  'mg/dl',
+  'μiu/ml',
+  'miu/l',
+  'miu/ml',
+  'iu/l',
+  'nmol/l',
+  'ng/dl',
+  'ng/ml',
+  'pmol/l',
   '%',
-  'g/L',
-  'mg/L',
-  'U/L',
-  '10^9/L',
-  '10^12/L',
+  'g/l',
+  'mg/l',
+  'u/l',
+  '10^9/l',
+  '10*9/l',
+  '10⁹/l',
+  '10^12/l',
+  '10*12/l',
+  '10¹²/l',
 };

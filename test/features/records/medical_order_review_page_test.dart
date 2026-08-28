@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:pmos_enclaire/features/records/data/order_reconciliation_repository.dart';
 import 'package:pmos_enclaire/features/records/presentation/ocr_task_page.dart';
@@ -9,11 +10,15 @@ void main() {
   testWidgets(
     'requires per-drug confirmation then requires every reconciliation decision',
     (tester) async {
-      final gateway = _Gateway();
+      final gateway = _Gateway(twoOrders: true);
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp(
-            home: OcrPendingConfirmationPage(repository: gateway, task: _task),
+            home: OcrPendingConfirmationPage(
+              repository: gateway,
+              task: _task,
+              documentRepository: _CurrentDocumentRepository(),
+            ),
           ),
         ),
       );
@@ -31,6 +36,14 @@ void main() {
       await tester.drag(find.byType(ListView), const Offset(0, -700));
       await tester.pumpAndSettle();
       await tester.tap(confirm);
+      await tester.pump();
+      submit = tester.widget(
+        find.byKey(const Key('confirm-all-medical-orders')),
+      );
+      expect(submit.onPressed, isNull);
+      final secondConfirm = find.byKey(const Key('confirm-medical-order-1'));
+      await tester.ensureVisible(secondConfirm);
+      tester.widget<CheckboxListTile>(secondConfirm).onChanged!(true);
       await tester.pump();
       submit = tester.widget(
         find.byKey(const Key('confirm-all-medical-orders')),
@@ -70,7 +83,7 @@ void main() {
   testWidgets('keeps edited medical-order fields when submission fails', (
     tester,
   ) async {
-    final gateway = _Gateway(failConfirm: true);
+    final gateway = _Gateway(failConfirm: true, fieldError: true);
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(
@@ -94,8 +107,22 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('medical-order-submit-error')), findsOneWidget);
+    expect(find.text('开具日期不能晚于服务器业务日期'), findsOneWidget);
     expect(find.text('盐酸二甲双胍'), findsOneWidget);
   });
+}
+
+class _CurrentDocumentRepository extends DemoDocumentRepository {
+  @override
+  Future<MedicalDocument> get(String id) async => MedicalDocument(
+    id: id,
+    documentType: 'medical_order',
+    originalFileName: 'order.png',
+    mimeType: 'image/png',
+    fileSizeBytes: 1,
+    currentRevisionId: 'rev-order',
+    uploadedAt: DateTime.utc(2026, 8, 27),
+  );
 }
 
 const _task = OcrTask(
@@ -109,8 +136,14 @@ const _task = OcrTask(
 );
 
 class _Gateway implements OcrRepository, MedicalOrderGateway {
-  _Gateway({this.failConfirm = false});
+  _Gateway({
+    this.failConfirm = false,
+    this.fieldError = false,
+    this.twoOrders = false,
+  });
   final bool failConfirm;
+  final bool fieldError;
+  final bool twoOrders;
   int confirmCalls = 0;
   int executeCalls = 0;
 
@@ -139,10 +172,19 @@ class _Gateway implements OcrRepository, MedicalOrderGateway {
   @override
   Future<void> confirmMedicalOrder(
     String taskId,
+    String resultId,
+    String expectedRevisionId,
     List<MedicalOrderDraft> items,
   ) async {
     confirmCalls += 1;
-    if (failConfirm) throw const OrderReviewException('server unavailable');
+    if (failConfirm) {
+      throw OrderReviewException(
+        'server unavailable',
+        fieldErrors: fieldError
+            ? const {'items.0.prescribed_at': '开具日期不能晚于服务器业务日期'}
+            : const {},
+      );
+    }
   }
 
   @override
@@ -167,20 +209,32 @@ class _Gateway implements OcrRepository, MedicalOrderGateway {
   Future<OcrTaskResult> result(String taskId) async => OcrTaskResult(
     resultId: 'result-order',
     taskId: taskId,
-    draft: const {
-      'order_date': '2026-08-27',
-      'medications': [
+    draft: {
+      'prescribed_at': '2026-08-27',
+      'orders': [
         {
+          'source_text': 'Metformin 500 mg twice daily',
           'drug_name': 'Metformin',
           'specification': '500 mg',
           'dosage_value': 500,
           'dosage_unit': 'mg',
           'frequency': 'twice daily',
-          'course': '30 days',
+          'duration': '30 days',
           'route': 'oral',
-          'instructions': 'after meals',
-          'raw_order_text': 'Metformin 500 mg twice daily',
+          'instruction': 'after meals',
         },
+        if (twoOrders)
+          {
+            'source_text': '优思明 1 tablet once daily',
+            'drug_name': '优思明',
+            'specification': '1 tablet',
+            'dosage_value': 1,
+            'dosage_unit': 'tablet',
+            'frequency': 'once daily',
+            'duration': '21 days',
+            'route': 'oral',
+            'instruction': '',
+          },
       ],
     },
     fields: const [],
@@ -197,6 +251,17 @@ class _Gateway implements OcrRepository, MedicalOrderGateway {
   Future<OcrTask> retry(String taskId) async => _task;
 
   @override
+  Future<List<int>> sourceFile(OcrTask task) async => const [];
+
+  @override
+  Future<ClinicalConfirmationResult> confirmClinical({
+    required OcrTask task,
+    required String resultId,
+    required Map<String, dynamic> confirmedData,
+    required List<Map<String, dynamic>> fieldConfirmations,
+  }) => throw UnimplementedError();
+
+  @override
   Future<LabConfirmationResult> confirmLab({
     required String taskId,
     required String resultId,
@@ -206,16 +271,5 @@ class _Gateway implements OcrRepository, MedicalOrderGateway {
     String? examDate,
     String? reportDate,
     String? visitDate,
-  }) => throw UnimplementedError();
-
-  @override
-  Future<List<int>> sourceFile(OcrTask task) async => const [];
-
-  @override
-  Future<ClinicalConfirmationResult> confirmClinical({
-    required OcrTask task,
-    required String resultId,
-    required Map<String, dynamic> confirmedData,
-    required List<Map<String, dynamic>> fieldConfirmations,
   }) => throw UnimplementedError();
 }

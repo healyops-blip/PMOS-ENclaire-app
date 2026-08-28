@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Annotated
-
-from fastapi import APIRouter, Header, Request, Response, status
+from fastapi import APIRouter, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 
-from pomi_backend.api.business import BusinessError, success
+from pomi_backend.api.business import success
 from pomi_backend.api.dependencies import (
     ClinicalTextConfirmationServiceDependency,
     MedicalOrderServiceDependency,
@@ -16,13 +14,9 @@ from pomi_backend.api.dependencies import (
 from pomi_backend.schemas.clinical_text import ClinicalTextConfirmRequest
 from pomi_backend.schemas.orders import MedicalOrderConfirmation
 from pomi_backend.services.ocr import task_data
-from pomi_backend.services.orders import medical_order_data
+from pomi_backend.services.orders import medical_order_data, medical_order_p0
 
 router = APIRouter(prefix="/api/ocr/tasks", tags=["ocr"])
-IdempotencyKey = Annotated[
-    str | None,
-    Header(alias="Idempotency-Key", min_length=8, max_length=128),
-]
 
 
 class CreateOCRTaskRequest(BaseModel):
@@ -35,6 +29,7 @@ class CreateOCRTaskRequest(BaseModel):
 class LabConfirmationItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    source_index: int | None = Field(default=None, ge=0)
     name: str | None = None
     value: str | int | float | None = None
     unit: str | None = None
@@ -56,7 +51,7 @@ class ConfirmLabRequest(BaseModel):
     exam_date: str | None = None
     report_date: str | None = None
     visit_date: str | None = None
-    items: list[LabConfirmationItem] = Field(max_length=500)
+    items: list[LabConfirmationItem] = Field(max_length=200)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -80,46 +75,29 @@ def get_ocr_result(task_id: str, request: Request, service: OCRTaskServiceDepend
 
 
 @router.post("/{task_id}/confirm")
-def confirm_ocr_result(
+def confirm_ocr_lab(
     task_id: str,
-    payload: ConfirmLabRequest | MedicalOrderConfirmation | ClinicalTextConfirmRequest,
+    payload: ConfirmLabRequest | ClinicalTextConfirmRequest | MedicalOrderConfirmation,
     request: Request,
-    response: Response,
-    ocr_service: OCRTaskServiceDependency,
-    order_service: MedicalOrderServiceDependency,
+    lab_service: OCRTaskServiceDependency,
     clinical_service: ClinicalTextConfirmationServiceDependency,
-    idempotency_key: IdempotencyKey = None,
+    order_service: MedicalOrderServiceDependency,
 ) -> dict:
-    task = ocr_service.owned(task_id)
-    if task.material_type == "lab_report" and isinstance(payload, ConfirmLabRequest):
-        return success(
-            request,
-            ocr_service.confirm_lab(task_id, payload.model_dump(mode="json")),
-        )
-    if task.material_type == "medical_order" and isinstance(payload, MedicalOrderConfirmation):
-        response.status_code = status.HTTP_201_CREATED
+    if isinstance(payload, ClinicalTextConfirmRequest):
+        return success(request, clinical_service.confirm(task_id, payload))
+    if isinstance(payload, MedicalOrderConfirmation):
         orders, created = order_service.confirm(task_id, payload)
         return success(
             request,
             {
                 "items": [medical_order_data(order) for order in orders],
                 "reused": not created,
+                "p0_evaluation": medical_order_p0(orders),
             },
         )
-    if task.material_type in {"imaging_text_report", "outpatient_record"} and isinstance(
-        payload, ClinicalTextConfirmRequest
-    ):
-        if idempotency_key is None:
-            raise BusinessError(
-                "IDEMPOTENCY_KEY_REQUIRED",
-                "Idempotency-Key is required for clinical text confirmation.",
-                422,
-            )
-        return success(request, clinical_service.confirm(task_id, payload))
-    raise BusinessError(
-        "OCR_CONFIRM_TYPE_MISMATCH",
-        "Confirmation payload does not match the OCR material type.",
-        422,
+    return success(
+        request,
+        lab_service.confirm_lab(task_id, payload.model_dump(mode="json")),
     )
 
 

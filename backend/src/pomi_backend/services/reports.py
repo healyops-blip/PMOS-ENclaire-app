@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from calendar import monthrange
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -32,6 +33,7 @@ from pomi_backend.db.models import (
 )
 from pomi_backend.db.models.health import new_uuid
 from pomi_backend.repositories import (
+    DocumentRepository,
     PatientNoteRepository,
     PatientRepository,
     ReportSnapshotRepository,
@@ -65,14 +67,20 @@ def _digest(value: Any) -> str:
 
 
 def _freshness(value: date, as_of: date) -> str:
-    age = (as_of - value).days
-    if age <= 92:
+    if value >= _months_before(as_of, 3):
         return "current"
-    if age <= 183:
+    if value >= _months_before(as_of, 6):
         return "caution"
-    if age <= 366:
+    if value >= _months_before(as_of, 12):
         return "stale"
     return "archived"
+
+
+def _months_before(value: date, months: int) -> date:
+    month_index = value.year * 12 + value.month - 1 - months
+    year, zero_based_month = divmod(month_index, 12)
+    month = zero_based_month + 1
+    return date(year, month, min(value.day, monthrange(year, month)[1]))
 
 
 @dataclass(frozen=True)
@@ -97,6 +105,7 @@ class ReportSnapshotService:
         self.business_date = business_date
         self.profile = PatientRepository(session).get_or_create(account.uid)
         self.notes = PatientNoteRepository(session, self.profile.patient_id)
+        self.documents = DocumentRepository(session, self.profile.patient_id)
         self.reports = ReportSnapshotRepository(session, self.profile.patient_id)
         self.sources = ReportSourceRepository(session, self.reports)
 
@@ -112,7 +121,7 @@ class ReportSnapshotService:
                 details={"missing_sections": missing},
             )
 
-        source_digest = self._source_digest(state, sections)
+        source_digest = self._source_digest(state, sections, source_drafts)
         existing = self.reports.find_by_source_digest(source_digest)
         if existing is not None and existing.report_status == "succeeded":
             return self._list_item(existing, has_updates=False, reused=True), True
@@ -174,8 +183,8 @@ class ReportSnapshotService:
         for report in self.reports.list_succeeded():
             snapshot = report.snapshot_json or {}
             sections = list(snapshot.get("metadata", {}).get("include_sections", []))
-            state, _, _ = self._collect(eligible, sections)
-            current_digest = self._source_digest(state, sections)
+            state, _, source_drafts = self._collect(eligible, sections)
+            current_digest = self._source_digest(state, sections, source_drafts)
             items.append(
                 self._list_item(
                     report,
@@ -184,6 +193,162 @@ class ReportSnapshotService:
                 )
             )
         return items
+
+    def detail(self, report_id: str) -> dict[str, Any]:
+        """Return one successful immutable snapshot with traceable source metadata."""
+        report = self.reports.get(report_id)
+        if report is None or report.report_status != "succeeded" or report.snapshot_json is None:
+            raise BusinessError("RESOURCE_NOT_FOUND", "Report was not found.", 404)
+
+        snapshot = report.snapshot_json
+        source_rows = {source.id: source for source in self.sources.list_for_report(report.id)}
+        source_records = self._snapshot_records(snapshot)
+        source_nodes = []
+        for stored in snapshot.get("sources", []):
+            node_id = stored.get("node_id")
+            row = source_rows.get(node_id)
+            if row is None:
+                continue
+            record = source_records.get(row.source_record_id, {})
+            if not record and row.source_type == "patient_note":
+                record = {
+                    "id": row.source_record_id,
+                    "text": snapshot.get("summary", {}).get("patient_note_text"),
+                    "empty_state": snapshot.get("summary", {}).get("patient_note_empty_state"),
+                }
+            elif not record and row.source_type == "patient_profile":
+                record = snapshot.get("summary", {}).get("profile", {})
+            source_nodes.append(self._source_detail(stored, row, record))
+
+        detail = self._list_item(
+            report,
+            has_updates=self._has_updates(report),
+            reused=False,
+        )
+        detail.update(
+            {
+                "metadata": snapshot.get("metadata", {}),
+                "summary": snapshot.get("summary", {}),
+                "trends": snapshot.get("trends", {}),
+                "records": snapshot.get("records", {}),
+                "sources": source_nodes,
+                "data_freshness": report.freshness_result_json or {},
+            }
+        )
+        return detail
+
+    def _has_updates(self, report: ReportSnapshot) -> bool:
+        snapshot = report.snapshot_json or {}
+        sections = list(snapshot.get("metadata", {}).get("include_sections", []))
+        state, _, source_drafts = self._collect(self._latest_eligible_note(), sections)
+        return self._source_digest(state, sections, source_drafts) != report.source_digest
+
+    @staticmethod
+    def _snapshot_records(snapshot: dict[str, Any]) -> dict[str, dict[str, Any]]:
+        records: dict[str, dict[str, Any]] = {}
+
+        def visit(value: Any) -> None:
+            if isinstance(value, dict):
+                record_id = value.get("id")
+                if isinstance(record_id, str):
+                    records[record_id] = value
+                for key, nested in value.items():
+                    if key != "sources":
+                        visit(nested)
+            elif isinstance(value, list):
+                for nested in value:
+                    visit(nested)
+
+        visit(snapshot)
+        return records
+
+    def _source_detail(
+        self,
+        stored: dict[str, Any],
+        source: ReportSource,
+        record: dict[str, Any],
+    ) -> dict[str, Any]:
+        original_value = next(
+            (
+                record[key]
+                for key in (
+                    "raw_value",
+                    "weight_kg",
+                    "intake_status",
+                    "start_date",
+                    "text",
+                    "drug_name",
+                    "findings",
+                    "diagnosis_summary",
+                )
+                if record.get(key) is not None
+            ),
+            None,
+        )
+        reference = record.get("reference_range_raw")
+        if reference is None and (
+            record.get("reference_lower") is not None or record.get("reference_upper") is not None
+        ):
+            reference = f"{record.get('reference_lower', '')}–{record.get('reference_upper', '')}"
+
+        return {
+            "node_id": source.id,
+            "source_number": stored.get("source_number"),
+            "source_type": source.source_type,
+            "source_record_id": source.source_record_id,
+            "origin_kind": source.origin_kind,
+            "document_id": source.document_id,
+            "document_revision_id": source.document_revision_id,
+            "rule_execution_id": source.rule_execution_id,
+            "original_value": None if original_value is None else str(original_value),
+            "original_unit": record.get("original_unit"),
+            "normalized_value": record.get("normalized_value", record.get("numeric_value")),
+            "normalized_unit": record.get("normalized_unit", record.get("standard_unit")),
+            "reference_range_text": reference,
+            "material_date": record.get("date"),
+            "date_source": record.get("date_source"),
+            "freshness": record.get("freshness", "unknown"),
+            "comparability": record.get("comparability", "not_applicable"),
+            "exclusion_reason": record.get("exclusion_reason"),
+            "snapshot_record": record,
+            "file": self._source_file(source),
+        }
+
+    def _source_file(self, source: ReportSource) -> dict[str, Any] | None:
+        if source.document_id is None or source.document_revision_id is None:
+            return None
+        document = self.documents.get(source.document_id, include_deleted=True)
+        revision = self.documents.revision(source.document_id, source.document_revision_id)
+        if document is None or revision is None:
+            return {
+                "status": "unavailable",
+                "url": None,
+                "error_code": "SOURCE_FILE_NOT_FOUND",
+                "error_message": "原始文件暂时不可用，快照中的结构化原值仍可查看。",
+            }
+        if document.deleted_at is not None or document.upload_status != "ready":
+            return {
+                "status": "unavailable",
+                "url": None,
+                "mime_type": revision.mime_type,
+                "file_name": document.original_file_name,
+                "revision_number": revision.revision_number,
+                "file_hash": revision.file_hash,
+                "error_code": "SOURCE_FILE_UNAVAILABLE",
+                "error_message": "原始文件暂时不可用，快照中的结构化原值仍可查看。",
+            }
+        return {
+            "status": "available",
+            "url": (
+                f"/api/documents/{source.document_id}/revisions/{source.document_revision_id}/file"
+            ),
+            "mime_type": revision.mime_type,
+            "file_name": document.original_file_name,
+            "revision_number": revision.revision_number,
+            "file_hash": revision.file_hash,
+            "error_code": None,
+            "error_message": None,
+        }
 
     def preflight(self, payload: ReportCreate) -> dict[str, Any]:
         sections = sorted(set(payload.include_sections))
@@ -265,24 +430,33 @@ class ReportSnapshotService:
         labs = list(
             self.session.scalars(
                 select(LabObservation)
-                .where(LabObservation.patient_id == patient_id)
+                .where(
+                    LabObservation.patient_id == patient_id,
+                    LabObservation.confirmed_by_uid == self.account.uid,
+                )
                 .order_by(LabObservation.trend_date, LabObservation.item_index, LabObservation.id)
             )
         )
         medical_orders = list(
             self.session.scalars(
                 select(MedicalOrder)
-                .where(MedicalOrder.patient_id == patient_id)
+                .where(
+                    MedicalOrder.patient_id == patient_id,
+                    MedicalOrder.confirmed_by_uid == self.account.uid,
+                )
                 .order_by(MedicalOrder.order_date, MedicalOrder.medication_index, MedicalOrder.id)
             )
         )
         imaging = list(
             self.session.scalars(
                 select(ImagingReport)
-                .where(ImagingReport.patient_id == patient_id)
+                .where(
+                    ImagingReport.patient_id == patient_id,
+                    ImagingReport.confirmed_by_uid == self.account.uid,
+                )
                 .order_by(
-                    ImagingReport.examination_date,
-                    ImagingReport.report_date,
+                    ImagingReport.examined_at,
+                    ImagingReport.reported_at,
                     ImagingReport.id,
                 )
             )
@@ -290,7 +464,10 @@ class ReportSnapshotService:
         outpatient = list(
             self.session.scalars(
                 select(OutpatientRecord)
-                .where(OutpatientRecord.patient_id == patient_id)
+                .where(
+                    OutpatientRecord.patient_id == patient_id,
+                    OutpatientRecord.confirmed_by_uid == self.account.uid,
+                )
                 .order_by(OutpatientRecord.visit_date, OutpatientRecord.id)
             )
         )
@@ -427,7 +604,12 @@ class ReportSnapshotService:
             )
         return state, missing, source_drafts
 
-    def _source_digest(self, state: dict[str, Any], sections: list[str]) -> str:
+    def _source_digest(
+        self,
+        state: dict[str, Any],
+        sections: list[str],
+        source_drafts: list[_SourceDraft],
+    ) -> str:
         selected = {
             "profile": state["profile"] if "profile" in sections else None,
             "patient_note": state["patient_note"] if "patient_note" in sections else None,
@@ -439,6 +621,16 @@ class ReportSnapshotService:
                 and "medications" in sections
             },
             "include_sections": sections,
+            "sources": [
+                {
+                    "source_type": item.source_type,
+                    "source_record_id": item.source_record_id,
+                    "origin_kind": item.origin_kind,
+                    "document_id": item.document_id,
+                    "document_revision_id": item.document_revision_id,
+                }
+                for item in source_drafts
+            ],
             "rule_version": RULE_VERSION,
             "template_version": TEMPLATE_VERSION,
         }
@@ -469,6 +661,7 @@ class ReportSnapshotService:
                     "origin_kind": source.origin_kind,
                     "document_id": source.document_id,
                     "document_revision_id": source.document_revision_id,
+                    "rule_execution_id": source.rule_execution_id,
                 }
             )
         return nodes
@@ -483,6 +676,10 @@ class ReportSnapshotService:
     ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
         collections = state["collections"]
         source_by_record = {item["source_record_id"]: item for item in source_nodes}
+        rule_source = next(
+            (item for item in source_nodes if item["source_type"] == "rule_execution"),
+            None,
+        )
         date_sources: dict[str, Any] = {}
         freshness: dict[str, Any] = {}
 
@@ -517,9 +714,26 @@ class ReportSnapshotService:
             for item in collections["medication_daily"]
             if "medications" in sections
         ]
-        active_medications = [
-            item for item in collections["medications"] if item["status"] == "active"
-        ]
+
+        def sourced_record(item: dict[str, Any]) -> dict[str, Any]:
+            source = source_by_record[item["id"]]
+            return {
+                **item,
+                "node_id": source["node_id"],
+                "source_number": source["source_number"],
+            }
+
+        medication_history = (
+            [sourced_record(item) for item in collections["medications"]]
+            if "medications" in sections
+            else []
+        )
+        medication_events = (
+            [sourced_record(item) for item in collections["medication_events"]]
+            if "medications" in sections
+            else []
+        )
+        active_medications = [item for item in medication_history if item["status"] == "active"]
         lab_trends: list[dict[str, Any]] = []
         lab_groups: dict[str, list[dict[str, Any]]] = {}
         for item in collections["labs"] if "labs" in sections else []:
@@ -658,6 +872,7 @@ class ReportSnapshotService:
                 "generated_at": generated_at.isoformat(),
                 "include_sections": sections,
                 "simulated_data": True,
+                "rule_execution_node_id": rule_source["node_id"] if rule_source else None,
             },
             "summary": {
                 "profile": state["profile"] if "profile" in sections else {},
@@ -685,12 +900,8 @@ class ReportSnapshotService:
                 "labs": lab_trends if "labs" in sections else [],
             },
             "records": {
-                "medication_history": collections["medications"]
-                if "medications" in sections
-                else [],
-                "medication_events": collections["medication_events"]
-                if "medications" in sections
-                else [],
+                "medication_history": medication_history if "medications" in sections else [],
+                "medication_events": medication_events if "medications" in sections else [],
                 "medical_orders": order_records if "medications" in sections else [],
                 "imaging": imaging_records if "imaging" in sections else [],
                 "outpatient": outpatient_records if "outpatient" in sections else [],
@@ -817,12 +1028,11 @@ class ReportSnapshotService:
         return {
             "id": item.id,
             "ocr_result_id": item.ocr_result_id,
-            "facility": item.facility,
             "examination_name": item.examination_name,
             "body_part": item.body_part,
-            "modality": item.modality,
-            "examination_date": _json_value(item.examination_date),
-            "report_date": _json_value(item.report_date),
+            "examination_method": item.examination_method,
+            "examination_date": _json_value(item.examined_at),
+            "report_date": _json_value(item.reported_at),
             "findings": item.findings_text,
             "impression": item.conclusion_text,
         }
@@ -832,8 +1042,8 @@ class ReportSnapshotService:
         return {
             "id": item.id,
             "ocr_result_id": item.ocr_result_id,
-            "facility": item.facility,
-            "department": item.department,
+            "facility": item.hospital_name,
+            "department": item.department_name,
             "doctor_name": item.doctor_name,
             "visit_date": item.visit_date.isoformat(),
             "chief_complaint": item.chief_complaint,

@@ -6,178 +6,28 @@ import 'package:pmos_enclaire/core/widgets/pomi_surfaces.dart';
 import 'package:pmos_enclaire/features/cycle/data/cycle_repository.dart';
 import 'package:pmos_enclaire/features/cycle/domain/menstrual_cycle.dart';
 import 'package:pmos_enclaire/features/weight/application/weight_controller.dart';
-import 'package:pmos_enclaire/features/weight/data/weight_repository.dart';
-import 'package:pmos_enclaire/features/weight/domain/weight_input_validator.dart';
-import 'package:pmos_enclaire/features/weight/domain/weight_record.dart';
+import 'package:pmos_enclaire/features/weight/presentation/weight_section.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 class CyclePage extends StatefulWidget {
-  const CyclePage({this.weightController, this.repository, super.key});
+  const CyclePage({
+    this.repository,
+    this.weightController,
+    this.now,
+    this.writesEnabled = true,
+    super.key,
+  });
 
-  final WeightController? weightController;
   final CycleRepository? repository;
+  final WeightController? weightController;
+  final DateTime Function()? now;
+  final bool writesEnabled;
 
   @override
   State<CyclePage> createState() => _CyclePageState();
 }
 
-class _WeightSection extends StatelessWidget {
-  const _WeightSection({
-    required this.controller,
-    required this.selectedDate,
-    required this.existing,
-    required this.onRecord,
-  });
-
-  final WeightController controller;
-  final DateTime selectedDate;
-  final WeightRecord? existing;
-  final VoidCallback onRecord;
-
-  @override
-  Widget build(BuildContext context) {
-    final records = controller.records;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            const Expanded(child: PomiSectionTitle(title: '体重趋势')),
-            SizedBox(
-              width: 148,
-              child: FilledButton.icon(
-                key: const Key('record-weight-button'),
-                onPressed: controller.isLoading ? null : onRecord,
-                icon: const Icon(Icons.monitor_weight_outlined),
-                label: Text(existing == null ? '记录体重' : '修改体重'),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        if (controller.isLoading && records.isEmpty)
-          const PomiSectionCard(
-            child: Center(
-              child: CircularProgressIndicator(key: Key('weight-loading')),
-            ),
-          )
-        else if (records.isEmpty)
-          PomiSectionCard(
-            child: Padding(
-              key: const Key('weight-empty-state'),
-              padding: const EdgeInsets.symmetric(vertical: 22),
-              child: Column(
-                children: [
-                  const Icon(
-                    Icons.monitor_weight_outlined,
-                    color: PomiColors.primary,
-                    size: 34,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(controller.errorMessage ?? '还没有体重记录'),
-                  const SizedBox(height: 4),
-                  Text(
-                    controller.errorMessage == null
-                        ? '选择日期，记录第一条体重'
-                        : '检查网络后重新加载',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  if (controller.errorMessage != null)
-                    TextButton(
-                      onPressed: controller.load,
-                      child: const Text('重试'),
-                    ),
-                ],
-              ),
-            ),
-          )
-        else
-          PomiSectionCard(
-            key: const Key('weight-trend-card'),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${records.last.weightKg.toStringAsFixed(1)} kg',
-                  key: const Key('weight-latest-value'),
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-                const SizedBox(height: 12),
-                PomiLineChart(
-                  values: [for (final record in records) record.weightKg],
-                  labels: [
-                    for (final record in records)
-                      '${record.recordDate.month}/${record.recordDate.day}',
-                  ],
-                  color: PomiColors.glowPink,
-                ),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _WeightEntryDialog extends StatefulWidget {
-  const _WeightEntryDialog({this.initialWeight});
-
-  final double? initialWeight;
-
-  @override
-  State<_WeightEntryDialog> createState() => _WeightEntryDialogState();
-}
-
-class _WeightEntryDialogState extends State<_WeightEntryDialog> {
-  late final TextEditingController _controller = TextEditingController(
-    text: widget.initialWeight?.toStringAsFixed(1) ?? '',
-  );
-  String? _error;
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _save() {
-    final error = validateWeightInput(_controller.text);
-    if (error != null) {
-      setState(() => _error = error);
-      return;
-    }
-    Navigator.pop(context, double.parse(_controller.text.trim()));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.initialWeight == null ? '记录体重' : '修改体重'),
-      content: TextField(
-        key: const Key('weight-input'),
-        controller: _controller,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        decoration: InputDecoration(suffixText: 'kg', errorText: _error),
-        onSubmitted: (_) => _save(),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
-        ),
-        FilledButton(
-          key: const Key('save-weight-button'),
-          onPressed: _save,
-          child: const Text('保存'),
-        ),
-      ],
-    );
-  }
-}
-
 class _CyclePageState extends State<CyclePage> {
-  late WeightController _weightController;
-  late bool _ownsWeightController;
   late CycleRepository _repository;
   List<MenstrualCycle>? _cycles;
   Object? _loadError;
@@ -189,11 +39,6 @@ class _CyclePageState extends State<CyclePage> {
   void initState() {
     super.initState();
     _repository = widget.repository ?? DemoCycleRepository();
-    _ownsWeightController = widget.weightController == null;
-    _weightController =
-        widget.weightController ?? WeightController(MemoryWeightRepository());
-    _weightController.addListener(_onWeightChanged);
-    if (_ownsWeightController) _weightController.load();
     _load();
   }
 
@@ -205,58 +50,6 @@ class _CyclePageState extends State<CyclePage> {
       _repository = widget.repository!;
       _load();
     }
-    if (oldWidget.weightController != widget.weightController) {
-      _weightController.removeListener(_onWeightChanged);
-      if (_ownsWeightController) _weightController.dispose();
-      _ownsWeightController = widget.weightController == null;
-      _weightController =
-          widget.weightController ?? WeightController(MemoryWeightRepository());
-      _weightController.addListener(_onWeightChanged);
-      if (_ownsWeightController) _weightController.load();
-    }
-  }
-
-  void _onWeightChanged() {
-    if (mounted) setState(() {});
-  }
-
-  @override
-  void dispose() {
-    _weightController.removeListener(_onWeightChanged);
-    if (_ownsWeightController) _weightController.dispose();
-    super.dispose();
-  }
-
-  WeightRecord? _weightFor(DateTime day) {
-    for (final record in _weightController.records) {
-      if (record.recordDate.year == day.year &&
-          record.recordDate.month == day.month &&
-          record.recordDate.day == day.day) {
-        return record;
-      }
-    }
-    return null;
-  }
-
-  Future<void> _recordWeight() async {
-    final existing = _weightFor(_selectedDay);
-    final value = await showDialog<double>(
-      context: context,
-      builder: (_) => _WeightEntryDialog(initialWeight: existing?.weightKg),
-    );
-    if (value == null || !mounted) return;
-    final saved = await _weightController.save(
-      recordDate: _selectedDay,
-      weightKg: value,
-    );
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          saved ? '体重已保存' : _weightController.errorMessage ?? '保存失败',
-        ),
-      ),
-    );
   }
 
   Future<void> _load() async {
@@ -275,30 +68,30 @@ class _CyclePageState extends State<CyclePage> {
   }
 
   Future<void> _openEditor([MenstrualCycle? cycle]) async {
-    final draft = await showDialog<CycleDraft>(
+    final saved = await showDialog<bool>(
       context: context,
-      builder: (_) => _CycleEditorDialog(initial: cycle),
+      builder: (_) => _CycleEditorDialog(
+        initial: cycle,
+        onSave: (draft) async {
+          setState(() => _saving = true);
+          try {
+            if (cycle == null) {
+              await _repository.create(draft);
+            } else {
+              await _repository.update(cycle.id, draft);
+            }
+          } finally {
+            if (mounted) setState(() => _saving = false);
+          }
+        },
+      ),
     );
-    if (draft == null || !mounted) return;
-    setState(() => _saving = true);
-    try {
-      if (cycle == null) {
-        await _repository.create(draft);
-      } else {
-        await _repository.update(cycle.id, draft);
-      }
-      await _load();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(cycle == null ? '经期记录已添加' : '经期记录已更新')),
-      );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(error.toString())));
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
+    if (saved != true || !mounted) return;
+    await _load();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(cycle == null ? '经期记录已添加' : '经期记录已更新')),
+    );
   }
 
   Future<void> _delete(MenstrualCycle cycle) async {
@@ -350,7 +143,9 @@ class _CyclePageState extends State<CyclePage> {
               subtitle: '记录真实发生的经期，回顾周期变化',
               trailing: FilledButton.icon(
                 key: const Key('add-cycle-button'),
-                onPressed: _saving ? null : () => _openEditor(),
+                onPressed: _saving || !widget.writesEnabled
+                    ? null
+                    : () => _openEditor(),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size(0, 40),
                   padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -362,20 +157,7 @@ class _CyclePageState extends State<CyclePage> {
           ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 126),
-            sliver: SliverToBoxAdapter(
-              child: Column(
-                children: [
-                  _content(),
-                  const SizedBox(height: 20),
-                  _WeightSection(
-                    controller: _weightController,
-                    selectedDate: _selectedDay,
-                    existing: _weightFor(_selectedDay),
-                    onRecord: _recordWeight,
-                  ),
-                ],
-              ),
-            ),
+            sliver: SliverToBoxAdapter(child: _content()),
           ),
         ],
       ),
@@ -384,31 +166,36 @@ class _CyclePageState extends State<CyclePage> {
 
   Widget _content() {
     if (_loadError != null) {
-      return PomiSectionCard(
-        key: const Key('cycle-error-state'),
-        child: Column(
-          children: [
-            const Icon(
-              Icons.cloud_off_rounded,
-              color: PomiColors.primary,
-              size: 42,
+      return Column(
+        children: [
+          PomiSectionCard(
+            key: const Key('cycle-error-state'),
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.cloud_off_rounded,
+                  color: PomiColors.primary,
+                  size: 42,
+                ),
+                const SizedBox(height: 10),
+                const Text('经期记录加载失败'),
+                const SizedBox(height: 4),
+                Text(
+                  _loadError.toString(),
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton(
+                  key: const Key('retry-cycle-button'),
+                  onPressed: _load,
+                  child: const Text('重新加载'),
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
-            const Text('经期记录加载失败'),
-            const SizedBox(height: 4),
-            Text(
-              _loadError.toString(),
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton(
-              key: const Key('retry-cycle-button'),
-              onPressed: _load,
-              child: const Text('重新加载'),
-            ),
-          ],
-        ),
+          ),
+          _weightSection(),
+        ],
       );
     }
     final cycles = _cycles;
@@ -420,23 +207,28 @@ class _CyclePageState extends State<CyclePage> {
       );
     }
     if (cycles.isEmpty) {
-      return PomiSectionCard(
-        key: const Key('cycle-empty-state'),
-        child: Column(
-          children: [
-            const PomiEmptyState(
-              icon: Icons.calendar_month_outlined,
-              title: '还没有经期记录',
-              description: '从最近一次经期开始日期记起，结束日期可以稍后补录。',
+      return Column(
+        children: [
+          PomiSectionCard(
+            key: const Key('cycle-empty-state'),
+            child: Column(
+              children: [
+                const PomiEmptyState(
+                  icon: Icons.calendar_month_outlined,
+                  title: '还没有经期记录',
+                  description: '从最近一次经期开始日期记起，结束日期可以稍后补录。',
+                ),
+                FilledButton.icon(
+                  key: const Key('empty-add-cycle-button'),
+                  onPressed: widget.writesEnabled ? () => _openEditor() : null,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('添加第一条记录'),
+                ),
+              ],
             ),
-            FilledButton.icon(
-              key: const Key('empty-add-cycle-button'),
-              onPressed: () => _openEditor(),
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('添加第一条记录'),
-            ),
-          ],
-        ),
+          ),
+          _weightSection(),
+        ],
       );
     }
     final lengths = cycles
@@ -466,7 +258,9 @@ class _CyclePageState extends State<CyclePage> {
                 ),
                 TextButton(
                   key: const Key('complete-cycle-button'),
-                  onPressed: () => _openEditor(ongoing),
+                  onPressed: widget.writesEnabled
+                      ? () => _openEditor(ongoing)
+                      : null,
                   child: const Text('补录'),
                 ),
               ],
@@ -511,7 +305,18 @@ class _CyclePageState extends State<CyclePage> {
           _historyCard(cycle),
           const SizedBox(height: 10),
         ],
+        _weightSection(),
       ],
+    );
+  }
+
+  Widget _weightSection() {
+    final controller = widget.weightController;
+    if (controller == null) return const SizedBox.shrink();
+    return WeightSection(
+      controller: controller,
+      now: widget.now,
+      writesEnabled: widget.writesEnabled,
     );
   }
 
@@ -618,13 +423,17 @@ class _CyclePageState extends State<CyclePage> {
           IconButton(
             key: Key('edit-cycle-${cycle.id}'),
             tooltip: '编辑',
-            onPressed: _saving ? null : () => _openEditor(cycle),
+            onPressed: _saving || !widget.writesEnabled
+                ? null
+                : () => _openEditor(cycle),
             icon: const Icon(Icons.edit_outlined),
           ),
           IconButton(
             key: Key('delete-cycle-${cycle.id}'),
             tooltip: '删除',
-            onPressed: _saving ? null : () => _delete(cycle),
+            onPressed: _saving || !widget.writesEnabled
+                ? null
+                : () => _delete(cycle),
             icon: const Icon(Icons.delete_outline_rounded),
           ),
         ],
@@ -637,9 +446,10 @@ class _CyclePageState extends State<CyclePage> {
 }
 
 class _CycleEditorDialog extends StatefulWidget {
-  const _CycleEditorDialog({this.initial});
+  const _CycleEditorDialog({required this.onSave, this.initial});
 
   final MenstrualCycle? initial;
+  final Future<void> Function(CycleDraft draft) onSave;
 
   @override
   State<_CycleEditorDialog> createState() => _CycleEditorDialogState();
@@ -653,6 +463,7 @@ class _CycleEditorDialogState extends State<_CycleEditorDialog> {
     text: widget.initial?.note,
   );
   String? _error;
+  bool _saving = false;
 
   @override
   void dispose() {
@@ -686,21 +497,32 @@ class _CycleEditorDialogState extends State<_CycleEditorDialog> {
     if (value != null) setState(() => _endDate = value);
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (_endDate != null && _endDate!.isBefore(_startDate)) {
       setState(() => _error = '开始日期不能晚于结束日期');
       return;
     }
-    Navigator.pop(
-      context,
-      CycleDraft(
-        startDate: _startDate,
-        endDate: _endDate,
-        flowLevel: _flowLevel,
-        note: _note.text.trim().isEmpty ? null : _note.text.trim(),
-        updatedAt: widget.initial?.updatedAt,
-      ),
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    final draft = CycleDraft(
+      startDate: _startDate,
+      endDate: _endDate,
+      flowLevel: _flowLevel,
+      note: _note.text.trim().isEmpty ? null : _note.text.trim(),
+      updatedAt: widget.initial?.updatedAt,
     );
+    try {
+      await widget.onSave(draft);
+      if (mounted) Navigator.pop(context, true);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = error.toString();
+      });
+    }
   }
 
   @override
@@ -769,13 +591,13 @@ class _CycleEditorDialogState extends State<_CycleEditorDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: _saving ? null : () => Navigator.pop(context),
           child: const Text('取消'),
         ),
         FilledButton(
           key: const Key('save-cycle-button'),
-          onPressed: _save,
-          child: const Text('保存'),
+          onPressed: _saving ? null : _save,
+          child: Text(_saving ? '保存中…' : '保存'),
         ),
       ],
     );

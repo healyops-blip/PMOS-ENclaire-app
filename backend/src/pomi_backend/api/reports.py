@@ -42,3 +42,12 @@ def list_reports(request: Request, service: ReportSnapshotServiceDependency) -> 
             "has_more": False,
         },
     )
+
+
+@router.get("/{report_id}")
+def get_report(
+    report_id: str,
+    request: Request,
+    service: ReportSnapshotServiceDependency,
+) -> dict:
+    return success(request, service.detail(report_id))

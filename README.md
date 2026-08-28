@@ -48,10 +48,14 @@ The current Flutter UI uses local demo data and includes:
 
 The cycle screen now has a repository boundary and the authenticated FastAPI cycle
 history API is implemented; the demo shell injects local cycle data until Flutter
-authentication owns a live Session. Remaining demo-only paths are explicitly
-labelled. The certification interaction is local and revision-scoped: it does not
+authentication owns a live Session. Other Flutter screens still use local demo
+data. Real OCR, identity providers, blockchain nodes, and PDF export remain
+unimplemented. The
+certification interaction is explicitly a local UI demo: it does not represent
+a hospital, doctor, signature, credential, or blockchain transaction.
+
+The certification interaction is explicitly a local UI demo: it does not
 represent a hospital, doctor, signature, credential, or blockchain transaction.
-Identity providers, blockchain nodes, and server PDF export remain unimplemented.
 
 ## Quality checks
 

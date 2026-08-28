@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:pmos_enclaire/features/certification/presentation/certification_page.dart';
+import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:printing/printing.dart';
 
@@ -9,11 +10,13 @@ class ClinicalTextConfirmationPage extends StatefulWidget {
   const ClinicalTextConfirmationPage({
     required this.repository,
     required this.task,
+    this.documentRepository,
     super.key,
   });
 
   final OcrRepository repository;
   final OcrTask task;
+  final DocumentRepository? documentRepository;
 
   @override
   State<ClinicalTextConfirmationPage> createState() =>
@@ -28,24 +31,34 @@ class _ClinicalTextConfirmationPageState
   Uint8List? _source;
   ClinicalConfirmationResult? _confirmed;
   String? _error;
+  final Map<String, String> _serverErrors = {};
   bool _submitting = false;
 
   bool get _imaging => widget.task.materialType == 'imaging_text_report';
 
   List<_ClinicalField> get _fields => _imaging
       ? const [
-          _ClinicalField('facility', '医院／机构'),
           _ClinicalField('examination_name', '检查名称'),
           _ClinicalField('body_part', '检查部位'),
-          _ClinicalField('modality', '检查方式'),
-          _ClinicalField('examination_date', '检查日期（YYYY-MM-DD）'),
-          _ClinicalField('report_date', '报告日期（YYYY-MM-DD）'),
-          _ClinicalField('findings', '所见原文', critical: true, longText: true),
-          _ClinicalField('impression', '结论原文', critical: true, longText: true),
+          _ClinicalField('examination_method', '检查方式'),
+          _ClinicalField('examined_at', '检查日期（YYYY-MM-DD）'),
+          _ClinicalField('reported_at', '报告日期（YYYY-MM-DD）'),
+          _ClinicalField(
+            'findings_text',
+            '所见原文',
+            critical: true,
+            longText: true,
+          ),
+          _ClinicalField(
+            'conclusion_text',
+            '结论原文',
+            critical: true,
+            longText: true,
+          ),
         ]
       : const [
-          _ClinicalField('facility', '医院／机构'),
-          _ClinicalField('department', '科室'),
+          _ClinicalField('hospital_name', '医院／机构'),
+          _ClinicalField('department_name', '科室'),
           _ClinicalField('doctor_name', '医生姓名'),
           _ClinicalField('visit_date', '就诊日期（YYYY-MM-DD）', critical: true),
           _ClinicalField('chief_complaint', '主诉原文', longText: true),
@@ -112,9 +125,16 @@ class _ClinicalTextConfirmationPageState
   String? _clientError(_ClinicalField field) {
     final value = _controllers[field.key]!.text.trim();
     if (field.critical && value.isEmpty) return '关键原文不能为空';
-    if (field.key.endsWith('_date') && value.isNotEmpty) {
+    if ((field.key.endsWith('_date') || field.key.endsWith('_at')) &&
+        value.isNotEmpty) {
+      final datePattern = RegExp(r'^\d{4}-\d{2}-\d{2}$');
       final parsed = DateTime.tryParse(value);
-      if (parsed == null || parsed.isAfter(DateTime.now())) return '日期格式或范围不合理';
+      if (!datePattern.hasMatch(value) ||
+          parsed == null ||
+          parsed.year < 1900 ||
+          parsed.isAfter(DateTime.now())) {
+        return '日期格式或范围不合理';
+      }
     }
     return null;
   }
@@ -122,6 +142,7 @@ class _ClinicalTextConfirmationPageState
   Future<void> _confirm() async {
     setState(() {
       _error = null;
+      _serverErrors.clear();
       _submitting = true;
     });
     final errors = _fields.map(_clientError).whereType<String>();
@@ -136,7 +157,7 @@ class _ClinicalTextConfirmationPageState
       for (final field in _fields)
         field.key: _controllers[field.key]!.text.trim().isEmpty
             ? null
-            : _controllers[field.key]!.text.trim(),
+            : _controllers[field.key]!.text,
     };
     final decisions = [
       for (final field in _fields)
@@ -158,8 +179,19 @@ class _ClinicalTextConfirmationPageState
         fieldConfirmations: decisions,
       );
       if (mounted) setState(() => _confirmed = result);
-    } on Object catch (error) {
-      if (mounted) setState(() => _error = error.toString());
+    } on OcrException catch (error) {
+      if (mounted) {
+        setState(() {
+          for (final field in error.fieldErrors) {
+            _serverErrors[field.path] = field.message;
+          }
+          _error = error.fieldErrors.isEmpty ? error.message : '请先解决所有高亮字段';
+        });
+      }
+    } on Object catch (_) {
+      if (mounted) {
+        setState(() => _error = '提交失败，已保留全部编辑内容，请检查网络后重试。');
+      }
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -232,12 +264,14 @@ class _ClinicalTextConfirmationPageState
                       ),
                     ),
                     const SizedBox(height: 12),
-                    CertificationEntryCard(
-                      documentId: widget.task.documentId,
-                      revisionId: widget.task.documentRevisionId,
-                      materialLabel: _imaging ? '影像文字报告' : '门诊病历／就诊记录',
-                      ocrConfirmed: true,
-                    ),
+                    if (widget.documentRepository != null)
+                      CertificationEntryCard(
+                        documentId: widget.task.documentId,
+                        revisionId: widget.task.documentRevisionId,
+                        materialLabel: _imaging ? '影像文字报告' : '门诊病历／就诊记录',
+                        ocrConfirmed: _confirmed != null,
+                        documentRepository: widget.documentRepository!,
+                      ),
                   ],
                 ),
             ],
@@ -258,11 +292,12 @@ class _ClinicalTextConfirmationPageState
         controller: _controllers[field.key],
         minLines: field.longText ? 4 : 1,
         maxLines: field.longText ? 10 : 1,
-        onChanged: (_) => setState(() {}),
+        onChanged: (_) => setState(() => _serverErrors.remove(field.key)),
         decoration: InputDecoration(
           labelText: field.label,
           errorText:
               _clientError(field) ??
+              _serverErrors[field.key] ??
               (uncertain ? draft?.uncertaintyReason ?? '低置信度／缺失，请重点核对' : null),
           helperText: draft?.sourceText == null
               ? null

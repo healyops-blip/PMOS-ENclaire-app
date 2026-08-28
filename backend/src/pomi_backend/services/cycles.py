@@ -111,7 +111,6 @@ class CycleService:
             flow_level=payload.flow_level,
             note=payload.note,
             source_type=payload.source_type,
-            updated_at=datetime.now(UTC),
         )
         self._session.commit()
         return self._current_response(cycle.id)

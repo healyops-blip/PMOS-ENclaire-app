@@ -29,7 +29,9 @@ class _MedicalOrderReviewPageState extends State<MedicalOrderReviewPage> {
     widget.result.draft,
   );
   bool _submitting = false;
+  bool _ocrConfirmed = false;
   Object? _error;
+  Map<String, String> _fieldErrors = const {};
 
   bool get _ready =>
       _items.isNotEmpty &&
@@ -39,9 +41,16 @@ class _MedicalOrderReviewPageState extends State<MedicalOrderReviewPage> {
     setState(() {
       _submitting = true;
       _error = null;
+      _fieldErrors = const {};
     });
     try {
-      await widget.gateway.confirmMedicalOrder(widget.task.id, _items);
+      await widget.gateway.confirmMedicalOrder(
+        widget.task.id,
+        widget.result.resultId,
+        widget.task.documentRevisionId,
+        _items,
+      );
+      _ocrConfirmed = true;
       final reconciliation = await widget.gateway.createReconciliation(
         widget.task.id,
       );
@@ -53,6 +62,8 @@ class _MedicalOrderReviewPageState extends State<MedicalOrderReviewPage> {
             reconciliation: reconciliation,
             documentId: widget.task.documentId,
             revisionId: widget.task.documentRevisionId,
+            documentRepository: widget.documentRepository,
+            ocrConfirmed: _ocrConfirmed,
           ),
         ),
       );
@@ -60,6 +71,9 @@ class _MedicalOrderReviewPageState extends State<MedicalOrderReviewPage> {
       if (!mounted) return;
       setState(() {
         _error = error;
+        _fieldErrors = error is OrderReviewException
+            ? error.fieldErrors
+            : const {};
         _submitting = false;
       });
     }
@@ -86,6 +100,7 @@ class _MedicalOrderReviewPageState extends State<MedicalOrderReviewPage> {
           _OrderItemCard(
             key: Key('medical-order-item-${item.index}'),
             item: item,
+            errors: _fieldErrors,
             onChanged: () => setState(() {}),
           ),
         if (_error != null) ...[
@@ -165,10 +180,12 @@ class _OriginalDocumentPreview extends StatelessWidget {
 class _OrderItemCard extends StatelessWidget {
   const _OrderItemCard({
     required this.item,
+    required this.errors,
     required this.onChanged,
     super.key,
   });
   final MedicalOrderDraft item;
+  final Map<String, String> errors;
   final VoidCallback onChanged;
 
   @override
@@ -196,9 +213,15 @@ class _OrderItemCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          _field('药名 *', item.drugName, (value) => item.drugName = value),
+          _field(
+            '药名 *',
+            'drug_name',
+            item.drugName,
+            (value) => item.drugName = value,
+          ),
           _field(
             '规格',
+            'specification',
             item.specification,
             (value) => item.specification = value,
           ),
@@ -207,6 +230,7 @@ class _OrderItemCard extends StatelessWidget {
               Expanded(
                 child: _field(
                   '单次剂量 *',
+                  'dosage_value',
                   item.dosageValue,
                   (value) => item.dosageValue = value,
                   number: true,
@@ -216,17 +240,33 @@ class _OrderItemCard extends StatelessWidget {
               Expanded(
                 child: _field(
                   '剂量单位 *',
+                  'dosage_unit',
                   item.dosageUnit,
                   (value) => item.dosageUnit = value,
                 ),
               ),
             ],
           ),
-          _field('频率 *', item.frequency, (value) => item.frequency = value),
-          _field('疗程', item.course, (value) => item.course = value),
-          _field('途径', item.route, (value) => item.route = value),
-          _field('用法', item.instructions, (value) => item.instructions = value),
-          _field('开具日期 *', item.orderDate, (value) => item.orderDate = value),
+          _field(
+            '频率 *',
+            'frequency',
+            item.frequency,
+            (value) => item.frequency = value,
+          ),
+          _field('疗程', 'duration', item.course, (value) => item.course = value),
+          _field('途径', 'route', item.route, (value) => item.route = value),
+          _field(
+            '用法',
+            'instruction',
+            item.instructions,
+            (value) => item.instructions = value,
+          ),
+          _field(
+            '开具日期 *',
+            'prescribed_at',
+            item.orderDate,
+            (value) => item.orderDate = value,
+          ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('原文明确写明停药'),
@@ -257,6 +297,7 @@ class _OrderItemCard extends StatelessWidget {
 
   Widget _field(
     String label,
+    String field,
     String value,
     ValueChanged<String> changed, {
     bool number = false,
@@ -269,6 +310,7 @@ class _OrderItemCard extends StatelessWidget {
           : null,
       decoration: InputDecoration(
         labelText: label,
+        errorText: errors['items.${item.index}.$field'],
         border: const OutlineInputBorder(),
       ),
       onChanged: (value) {
@@ -284,14 +326,18 @@ class MedicationReconciliationPage extends StatefulWidget {
   const MedicationReconciliationPage({
     required this.gateway,
     required this.reconciliation,
+    required this.ocrConfirmed,
     this.documentId,
     this.revisionId,
+    this.documentRepository,
     super.key,
   });
   final MedicalOrderGateway gateway;
   final MedicationReconciliationDraft reconciliation;
+  final bool ocrConfirmed;
   final String? documentId;
   final String? revisionId;
+  final DocumentRepository? documentRepository;
 
   @override
   State<MedicationReconciliationPage> createState() =>
@@ -339,12 +385,15 @@ class _MedicationReconciliationPageState
         Text('规则版本：${_reconciliation.ruleVersion}'),
         const Text('旧药未在新医嘱出现只会标记为“不确定”，不会自动停药。请逐项决定。'),
         const SizedBox(height: 12),
-        if (widget.documentId != null && widget.revisionId != null) ...[
+        if (widget.documentId != null &&
+            widget.revisionId != null &&
+            widget.documentRepository != null) ...[
           CertificationEntryCard(
             documentId: widget.documentId!,
             revisionId: widget.revisionId!,
             materialLabel: '医嘱／处方',
-            ocrConfirmed: true,
+            ocrConfirmed: widget.ocrConfirmed,
+            documentRepository: widget.documentRepository!,
           ),
           const SizedBox(height: 12),
         ],

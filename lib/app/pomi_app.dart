@@ -6,14 +6,18 @@ import 'package:pmos_enclaire/features/auth/data/auth_repository.dart';
 import 'package:pmos_enclaire/features/auth/data/session_store.dart';
 import 'package:pmos_enclaire/features/auth/domain/demo_account.dart';
 import 'package:pmos_enclaire/features/auth/presentation/login_page.dart';
+import 'package:pmos_enclaire/features/cycle/data/cycle_repository.dart';
 import 'package:pmos_enclaire/features/dashboard/presentation/dashboard_page.dart';
+import 'package:pmos_enclaire/features/dashboard/data/dashboard_cache_store.dart';
+import 'package:pmos_enclaire/features/dashboard/data/dashboard_repository.dart';
+import 'package:pmos_enclaire/features/medications/data/medication_repository.dart';
 import 'package:pmos_enclaire/features/onboarding/presentation/onboarding_page.dart';
 import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
 import 'package:pmos_enclaire/features/reports/data/patient_note_repository.dart';
 import 'package:pmos_enclaire/features/reports/data/report_repository.dart';
-import 'package:pmos_enclaire/features/weight/data/weight_repository.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
+import 'package:pmos_enclaire/features/weight/data/weight_repository.dart';
 
 abstract final class PomiRoutes {
   static const login = '/login';
@@ -25,36 +29,58 @@ class PomiApp extends StatefulWidget {
   const PomiApp({
     this.authRepository,
     this.profileRepository,
+    this.dashboardRepository,
     this.patientNoteRepository,
     this.reportRepository,
-    this.weightRepository,
     this.documentRepository,
     this.ocrRepository,
+    this.weightRepository,
+    this.apiClient,
+    this.now,
+    this.cycleRepository,
+    this.medicationRepository,
     super.key,
   });
 
   final AuthRepository? authRepository;
   final PatientProfileRepository? profileRepository;
+  final DashboardRepository? dashboardRepository;
   final PatientNoteRepository? patientNoteRepository;
   final ReportRepository? reportRepository;
-  final WeightRepository? weightRepository;
   final DocumentRepository? documentRepository;
   final OcrRepository? ocrRepository;
+  final WeightRepository? weightRepository;
+  final PomiApiClient? apiClient;
+  final DateTime Function()? now;
+  final CycleRepository? cycleRepository;
+  final MedicationRepository? medicationRepository;
 
   @override
   State<PomiApp> createState() => _PomiAppState();
 }
 
 class _PomiAppState extends State<PomiApp> {
-  late final PomiApiClient _apiClient = PomiApiClient();
+  late final PomiApiClient _apiClient = widget.apiClient ?? PomiApiClient();
   late final AuthRepository _authRepository =
       widget.authRepository ??
-      FastApiAuthRepository(_apiClient, SecureSessionStore());
+      FastApiAuthRepository(
+        _apiClient,
+        SecureSessionStore(),
+        onLogout: _clearActiveDashboardCache,
+      );
   late final PatientProfileRepository _profileRepository =
       widget.profileRepository ??
       (widget.authRepository is DemoAuthRepository
           ? DemoPatientProfileRepository()
           : FastApiPatientProfileRepository(_apiClient));
+  late final DashboardRepository _dashboardRepository =
+      widget.dashboardRepository ??
+      (widget.authRepository is DemoAuthRepository
+          ? const DemoDashboardRepository()
+          : FastApiDashboardRepository(
+              _apiClient,
+              SecureDashboardCacheStore(),
+            ));
   late final PatientNoteRepository _patientNoteRepository =
       widget.patientNoteRepository ??
       (widget.authRepository is DemoAuthRepository
@@ -75,6 +101,36 @@ class _PomiAppState extends State<PomiApp> {
       (widget.authRepository is DemoAuthRepository
           ? DemoReportRepository()
           : FastApiReportRepository(_apiClient));
+  late final WeightRepository _weightRepository =
+      widget.weightRepository ??
+      (widget.authRepository is DemoAuthRepository
+          ? MemoryWeightRepository.seeded()
+          : ApiWeightRepository(_apiClient));
+  late final CycleRepository? _cycleRepository =
+      widget.cycleRepository ??
+      (widget.authRepository is DemoAuthRepository
+          ? null
+          : FastApiCycleRepository(_apiClient));
+  late final MedicationRepository? _medicationRepository =
+      widget.medicationRepository ??
+      (widget.authRepository is DemoAuthRepository
+          ? null
+          : FastApiMedicationRepository(_apiClient));
+  String? _activeUid;
+
+  Future<void> _clearActiveDashboardCache() async {
+    final uid = _activeUid;
+    if (uid != null) await _dashboardRepository.clear(uid);
+    _activeUid = null;
+  }
+
+  Future<void> _activateUid(String uid) async {
+    final previous = _activeUid;
+    if (previous != null && previous != uid) {
+      await _dashboardRepository.clear(previous);
+    }
+    _activeUid = uid;
+  }
 
   late final GoRouter _router = GoRouter(
     initialLocation: PomiRoutes.login,
@@ -95,6 +151,8 @@ class _PomiAppState extends State<PomiApp> {
                   );
             if (!context.mounted) return;
             final account = session.account.toPresentationAccount();
+            await _activateUid(account.uid);
+            if (!context.mounted) return;
             final route = account.onboardingRequired
                 ? PomiRoutes.onboarding
                 : PomiRoutes.dashboard;
@@ -129,11 +187,22 @@ class _PomiAppState extends State<PomiApp> {
           return DashboardPage(
             account: account,
             profileRepository: _profileRepository,
+            dashboardRepository: _dashboardRepository,
+            onLogout: () async {
+              try {
+                await _authRepository.logout();
+              } finally {
+                if (context.mounted) context.go(PomiRoutes.login);
+              }
+            },
             patientNoteRepository: _patientNoteRepository,
             reportRepository: _reportRepository,
-            weightRepository: widget.weightRepository,
             documentRepository: _documentRepository,
             ocrRepository: _ocrRepository,
+            weightRepository: _weightRepository,
+            now: widget.now,
+            cycleRepository: _cycleRepository,
+            medicationRepository: _medicationRepository,
           );
         },
       ),
@@ -151,6 +220,8 @@ class _PomiAppState extends State<PomiApp> {
       final account = await _authRepository.restore();
       if (!mounted || account == null) return;
       final presentation = account.toPresentationAccount();
+      await _activateUid(presentation.uid);
+      if (!mounted) return;
       _router.go(
         presentation.onboardingRequired
             ? PomiRoutes.onboarding
@@ -172,6 +243,7 @@ class _PomiAppState extends State<PomiApp> {
   Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'Pomi',
+      restorationScopeId: 'pomi-app',
       debugShowCheckedModeBanner: false,
       theme: PomiTheme.light,
       routerConfig: _router,

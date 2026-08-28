@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine, func, select
 
 from pomi_backend.db import build_session_factory
 from pomi_backend.db.models import (
@@ -23,9 +24,21 @@ from pomi_backend.db.models import (
     OutpatientRecord,
     PatientProfile,
     ReportSnapshot,
+    ReportSource,
     UserAccount,
     WeightRecord,
 )
+from pomi_backend.services.reports import ReportSnapshotService, _freshness
+
+
+def test_report_freshness_uses_calendar_month_boundaries() -> None:
+    as_of = date(2026, 8, 31)
+    assert _freshness(date(2026, 5, 31), as_of) == "current"
+    assert _freshness(date(2026, 5, 30), as_of) == "caution"
+    assert _freshness(date(2026, 2, 28), as_of) == "caution"
+    assert _freshness(date(2026, 2, 27), as_of) == "stale"
+    assert _freshness(date(2025, 8, 31), as_of) == "stale"
+    assert _freshness(date(2025, 8, 30), as_of) == "archived"
 
 
 def _auth(client: TestClient, account_name: str) -> dict[str, str]:
@@ -284,6 +297,8 @@ def _seed_confirmed_ocr_data(engine: Engine, account_name: str) -> None:
                     dosage_unit="mg",
                     frequency="once daily",
                     order_date=date(2026, 8, 25),
+                    original_item_data={},
+                    confirmed_item_data={},
                     confirmed_by_uid=account.uid,
                 ),
                 ImagingReport(
@@ -292,9 +307,10 @@ def _seed_confirmed_ocr_data(engine: Engine, account_name: str) -> None:
                     document_revision_id=image_rev.id,
                     ocr_result_id=image_result.id,
                     examination_name="Pelvic ultrasound text",
-                    examination_date=date(2026, 8, 24),
+                    examined_at=date(2026, 8, 24),
                     findings_text="Original findings text.",
                     conclusion_text="Original conclusion text.",
+                    original_payload={},
                     confirmed_payload={},
                     confirmed_by_uid=account.uid,
                 ),
@@ -306,6 +322,7 @@ def _seed_confirmed_ocr_data(engine: Engine, account_name: str) -> None:
                     visit_date=date(2026, 8, 23),
                     diagnosis_summary="Confirmed diagnosis text.",
                     medical_advice="Confirmed disposition text.",
+                    original_payload={},
                     confirmed_payload={},
                     confirmed_by_uid=account.uid,
                 ),
@@ -343,6 +360,13 @@ def test_report_preflight_idempotency_immutability_and_update_detection(
     first_data = first.json()["data"]
     assert first_data["reused"] is False
     assert first_data["previous_report_id"] is None
+    detail = api_client.get(f"/api/reports/{first_data['report_id']}", headers=headers)
+    assert detail.status_code == 200
+    detail_data = detail.json()["data"]
+    assert detail_data["snapshot_hash"] == first_data["snapshot_hash"]
+    assert detail_data["summary"]["patient_note_text"] == (
+        "Discuss the original symptoms without rewriting."
+    )
 
     repeated = api_client.post("/api/reports", headers=headers, json=payload)
     assert repeated.status_code == 201
@@ -380,6 +404,36 @@ def test_report_preflight_idempotency_immutability_and_update_detection(
         assert frozen.snapshot_json["trends"]["cycles"][0]["freshness"] == "archived"
         assert frozen.snapshot_json["trends"]["cycles"][0]["default_collapsed"] is True
         assert "用药调整" in frozen.snapshot_json["summary"]["disclaimers"][2]
+
+
+def test_report_generation_rolls_back_snapshot_and_sources_together(
+    api_client: TestClient,
+    api_engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    headers = _auth(api_client, "report-rollback")
+    note_id = _confirmed_note(api_client, headers)
+    _seed_confirmed_health_data(api_engine, "report-rollback")
+
+    def fail_source_persistence(*_args: object, **_kwargs: object) -> list[dict[str, object]]:
+        raise RuntimeError("forced provenance failure")
+
+    monkeypatch.setattr(
+        ReportSnapshotService,
+        "_persist_sources",
+        fail_source_persistence,
+    )
+    with pytest.raises(RuntimeError, match="forced provenance failure"):
+        api_client.post(
+            "/api/reports",
+            headers=headers,
+            json={"patient_note_id": note_id, "include_sections": ["profile"]},
+        )
+
+    session_factory = build_session_factory(api_engine)
+    with session_factory() as session:
+        assert session.scalar(select(func.count()).select_from(ReportSnapshot)) == 0
+        assert session.scalar(select(func.count()).select_from(ReportSource)) == 0
 
 
 def test_report_requires_missing_data_confirmation_and_rejects_cross_uid_note(
@@ -447,11 +501,51 @@ def test_report_uses_only_confirmed_ocr_records_with_revision_level_sources(
         assert snapshot["records"]["outpatient"][0]["medical_advice"] == (
             "Confirmed disposition text."
         )
+        source_nodes = {source["node_id"]: source for source in snapshot["sources"]}
+        current_medication = snapshot["summary"]["current_medications"][0]
+        assert source_nodes[current_medication["node_id"]]["source_type"] == "medication"
+        medication_event = snapshot["records"]["medication_events"][0]
+        assert source_nodes[medication_event["node_id"]]["source_type"] == ("medication_event")
+        rule_node = source_nodes[snapshot["metadata"]["rule_execution_node_id"]]
+        assert rule_node["rule_execution_id"] == rule_node["source_record_id"]
         medical_sources = [
             source for source in snapshot["sources"] if source["origin_kind"] == "medical_document"
         ]
         assert len(medical_sources) == 7
         assert all(source["document_revision_id"] for source in medical_sources)
+
+        first_lab = session.scalar(
+            select(LabObservation)
+            .where(LabObservation.standard_metric_id == "glucose")
+            .order_by(LabObservation.trend_date)
+        )
+        assert first_lab is not None
+        document = session.get(Document, first_lab.document_id)
+        assert document is not None
+        replacement_revision = DocumentRevision(
+            document_id=document.id,
+            revision_number=2,
+            storage_path="lab_report/revision-2.png",
+            file_hash=uuid4().hex * 2,
+            file_size_bytes=11,
+            mime_type="image/png",
+            page_count=1,
+            created_by_uid=first_lab.confirmed_by_uid,
+        )
+        session.add(replacement_revision)
+        session.flush()
+        document.current_revision_id = replacement_revision.id
+        first_lab.document_revision_id = replacement_revision.id
+        session.commit()
+
+    revised = api_client.post(
+        "/api/reports",
+        headers=headers,
+        json={"patient_note_id": note_id, "confirm_incomplete": True},
+    )
+    assert revised.status_code == 201, revised.text
+    assert revised.json()["data"]["report_id"] != report_id
+    assert revised.json()["data"]["previous_report_id"] == report_id
 
     labs_only = api_client.post(
         "/api/reports",
@@ -466,3 +560,68 @@ def test_report_uses_only_confirmed_ocr_records_with_revision_level_sources(
             "lab_observation",
             "rule_execution",
         }
+
+
+def test_report_detail_is_snapshot_only_traceable_and_patient_scoped(
+    api_client: TestClient,
+    api_engine: Engine,
+) -> None:
+    owner = _auth(api_client, "report-viewer-owner")
+    stranger = _auth(api_client, "report-viewer-stranger")
+    note_id = _confirmed_note(api_client, owner)
+    _seed_confirmed_health_data(api_engine, "report-viewer-owner")
+    _seed_confirmed_ocr_data(api_engine, "report-viewer-owner")
+    created = api_client.post(
+        "/api/reports",
+        headers=owner,
+        json={"patient_note_id": note_id, "confirm_incomplete": True},
+    )
+    assert created.status_code == 201, created.text
+    report_id = created.json()["data"]["report_id"]
+
+    detail = api_client.get(f"/api/reports/{report_id}", headers=owner)
+    assert detail.status_code == 200, detail.text
+    data = detail.json()["data"]
+    assert data["report_id"] == report_id
+    assert data["summary"]["patient_note_text"].startswith("Discuss the original")
+    assert set(data["trends"]) == {"weights", "cycles", "medication_daily", "labs"}
+    glucose = next(item for item in data["trends"]["labs"] if item["metric_id"] == "glucose")
+    assert glucose["display_mode"] == "trend"
+    point = next(item for item in glucose["points"] if item["raw_value"] == "126")
+    source = next(item for item in data["sources"] if item["node_id"] == point["node_id"])
+    assert source["source_number"] == point["source_number"]
+    assert source["original_value"] == "126"
+    assert source["normalized_value"] == 126
+    assert source["original_unit"] == "mg/dL"
+    assert source["date_source"] == "sample_date"
+    assert source["origin_kind"] == "medical_document"
+    assert source["file"]["status"] == "available"
+    assert source["file"]["url"].endswith(f"/{source['document_revision_id']}/file")
+
+    manual = next(item for item in data["sources"] if item["source_type"] == "weight_record")
+    assert manual["origin_kind"] == "patient_manual"
+    assert manual["file"] is None
+
+    session_factory = build_session_factory(api_engine)
+    with session_factory() as session:
+        observation = session.get(LabObservation, source["source_record_id"])
+        document = session.get(Document, source["document_id"])
+        assert observation is not None and document is not None
+        observation.raw_value = "999"
+        observation.numeric_value = Decimal("999")
+        document.upload_status = "deleted"
+        document.deleted_at = datetime.now(UTC)
+        session.commit()
+
+    frozen = api_client.get(f"/api/reports/{report_id}", headers=owner).json()["data"]
+    frozen_source = next(item for item in frozen["sources"] if item["node_id"] == point["node_id"])
+    assert frozen_source["original_value"] == "126"
+    assert frozen_source["normalized_value"] == 126
+    assert frozen_source["file"]["status"] == "unavailable"
+    assert frozen_source["file"]["url"] is None
+    assert "结构化原值" in frozen_source["file"]["error_message"]
+
+    denied = api_client.get(f"/api/reports/{report_id}", headers=stranger)
+    assert denied.status_code == 404
+    file_denied = api_client.get(source["file"]["url"], headers=stranger)
+    assert file_denied.status_code == 404

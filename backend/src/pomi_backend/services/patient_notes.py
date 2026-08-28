@@ -21,6 +21,7 @@ def patient_note_data(note: PatientNote) -> dict[str, Any]:
         "original_text": note.original_text,
         "confirmed_text": note.confirmed_text,
         "status": note.status,
+        "confirmed_by_uid": note.confirmed_by_uid,
         "confirmed_at": note.confirmed_at.isoformat() if note.confirmed_at else None,
         "source_note_id": note.source_note_id,
         "consumed_at": note.consumed_at.isoformat() if note.consumed_at else None,
@@ -90,14 +91,17 @@ class PatientNoteService:
                 "PATIENT_NOTE_EMPTY", "Use skip when there is no patient statement.", 409
             )
         now = utc_now()
-        self.repository.update(
+        note = self.repository.decide(
             note,
-            confirmed_text=note.original_text,
-            confirmed_by_uid=self.account.uid,
-            confirmed_at=now,
-            status="confirmed",
-            updated_at=now,
+            target_status="confirmed",
+            account_uid=self.account.uid,
+            decided_at=now,
         )
+        if note.status == "consumed":
+            self.session.rollback()
+            raise BusinessError(
+                "PATIENT_NOTE_IMMUTABLE", "Consumed patient notes cannot be reconfirmed.", 409
+            )
         self.session.commit()
         self.session.refresh(note)
         return note
@@ -111,14 +115,17 @@ class PatientNoteService:
                 "PATIENT_NOTE_IMMUTABLE", "Consumed patient notes cannot be skipped.", 409
             )
         now = utc_now()
-        self.repository.update(
+        note = self.repository.decide(
             note,
-            confirmed_text=None,
-            confirmed_by_uid=self.account.uid,
-            confirmed_at=now,
-            status="skipped",
-            updated_at=now,
+            target_status="skipped",
+            account_uid=self.account.uid,
+            decided_at=now,
         )
+        if note.status == "consumed":
+            self.session.rollback()
+            raise BusinessError(
+                "PATIENT_NOTE_IMMUTABLE", "Consumed patient notes cannot be skipped.", 409
+            )
         self.session.commit()
         self.session.refresh(note)
         return note

@@ -1,6 +1,12 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier, Lock
+
 from fastapi.testclient import TestClient
+from pytest import LogCaptureFixture, MonkeyPatch
+
+from pomi_backend.services.patient_notes import PatientNoteService
 
 
 def auth_headers(client: TestClient, account_name: str) -> dict[str, str]:
@@ -40,6 +46,7 @@ def test_patient_note_draft_confirm_edit_reconfirm_skip_and_copy(api_client: Tes
     assert confirmed["status"] == "confirmed"
     assert repeated["confirmed_at"] == confirmed["confirmed_at"]
     assert confirmed["confirmed_text"] == "I want to discuss fatigue."
+    assert confirmed["confirmed_by_uid"] is not None
 
     edited = value(
         api_client.put(
@@ -74,7 +81,7 @@ def test_patient_note_draft_confirm_edit_reconfirm_skip_and_copy(api_client: Tes
 
 
 def test_empty_confirmation_and_cross_patient_access_are_rejected(
-    api_client: TestClient,
+    api_client: TestClient, caplog: LogCaptureFixture
 ) -> None:
     owner = auth_headers(api_client, "note-first")
     stranger = auth_headers(api_client, "note-second")
@@ -86,14 +93,59 @@ def test_empty_confirmation_and_cross_patient_access_are_rejected(
         ),
         201,
     )
+    missing = api_client.post("/api/patient-notes", headers=owner, json={})
+    assert missing.status_code == 422
     empty = api_client.post(f"/api/patient-notes/{note['id']}/confirm", headers=owner)
     assert empty.status_code == 409
     assert empty.json()["error"]["code"] == "PATIENT_NOTE_EMPTY"
-    assert (
-        api_client.put(
-            f"/api/patient-notes/{note['id']}",
-            headers=stranger,
-            json={"original_text": "changed"},
-        ).status_code
-        == 404
+    requests = (
+        ("put", f"/api/patient-notes/{note['id']}", {"original_text": "changed"}),
+        ("post", f"/api/patient-notes/{note['id']}/confirm", None),
+        ("post", f"/api/patient-notes/{note['id']}/skip", None),
+        ("post", f"/api/patient-notes/{note['id']}/copy", {}),
     )
+    for method, path, payload in requests:
+        assert api_client.request(method, path, headers=stranger, json=payload).status_code == 404
+    assert value(api_client.get("/api/patient-notes/latest", headers=stranger)) is None
+    assert "changed" not in caplog.text
+
+
+def test_concurrent_confirmation_is_idempotent(
+    api_client: TestClient, monkeypatch: MonkeyPatch
+) -> None:
+    headers = auth_headers(api_client, "note-concurrent")
+    note = value(
+        api_client.post(
+            "/api/patient-notes",
+            headers=headers,
+            json={"original_text": "Keep this exact text."},
+        ),
+        201,
+    )
+    barrier = Barrier(2)
+    lock = Lock()
+    calls = 0
+    original = PatientNoteService.owned
+
+    def synchronized_owned(service: PatientNoteService, note_id: str):
+        nonlocal calls
+        owned = original(service, note_id)
+        with lock:
+            calls += 1
+            synchronize = calls <= 2
+        if synchronize:
+            barrier.wait(timeout=5)
+        return owned
+
+    monkeypatch.setattr(PatientNoteService, "owned", synchronized_owned)
+
+    def confirm(_: int):
+        return api_client.post(f"/api/patient-notes/{note['id']}/confirm", headers=headers)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        responses = list(executor.map(confirm, (1, 2)))
+
+    decisions = [value(response) for response in responses]
+    assert {decision["status"] for decision in decisions} == {"confirmed"}
+    assert len({decision["confirmed_at"] for decision in decisions}) == 1
+    assert {decision["confirmed_text"] for decision in decisions} == {"Keep this exact text."}

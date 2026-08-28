@@ -45,7 +45,18 @@ void main() {
         ),
         documentType: 'lab_report',
         consentVersion: documentProcessingNoticeVersion,
+        idempotencyKey: 'stable-upload-retry-key',
         onProgress: (_, _) => progressCalled = true,
+      );
+      await repository.upload(
+        file: SelectedDocumentFile(
+          name: 'lab.png',
+          bytes: Uint8List.fromList([1, 2, 3]),
+        ),
+        documentType: 'lab_report',
+        consentVersion: documentProcessingNoticeVersion,
+        idempotencyKey: 'stable-upload-retry-key',
+        onProgress: (_, _) {},
       );
       final listed = await repository.list(documentType: 'lab_report');
       final revisions = await repository.revisions(uploaded.id);
@@ -53,7 +64,8 @@ void main() {
       expect(uploaded.id, 'doc-1');
       expect(listed.single.originalFileName, 'lab.png');
       expect(revisions.single.revisionNumber, 1);
-      expect(requests.first.headers['Idempotency-Key'], startsWith('flutter-'));
+      expect(requests[0].headers['Idempotency-Key'], 'stable-upload-retry-key');
+      expect(requests[1].headers['Idempotency-Key'], 'stable-upload-retry-key');
       final form = requests.first.data as FormData;
       expect(
         Map<String, String>.fromEntries(
@@ -95,6 +107,50 @@ void main() {
       ),
     );
   });
+
+  test(
+    'demo replacement updates current content and remains idempotent',
+    () async {
+      final repository = DemoDocumentRepository();
+      final original = await repository.upload(
+        file: SelectedDocumentFile(
+          name: 'original.png',
+          bytes: Uint8List.fromList([1]),
+        ),
+        documentType: 'lab_report',
+        consentVersion: documentProcessingNoticeVersion,
+        idempotencyKey: 'demo-original-upload',
+        onProgress: (_, _) {},
+      );
+      final replacementFile = SelectedDocumentFile(
+        name: 'clearer.png',
+        bytes: Uint8List.fromList([2, 3]),
+      );
+      final first = await repository.replace(
+        documentId: original.id,
+        expectedRevisionId: original.currentRevisionId,
+        reason: 'clearer scan',
+        file: replacementFile,
+        idempotencyKey: 'stable-replacement-key',
+        onProgress: (_, _) {},
+      );
+      final repeated = await repository.replace(
+        documentId: original.id,
+        expectedRevisionId: original.currentRevisionId,
+        reason: 'clearer scan',
+        file: replacementFile,
+        idempotencyKey: 'stable-replacement-key',
+        onProgress: (_, _) {},
+      );
+
+      final current = await repository.get(original.id);
+      expect(repeated.id, first.id);
+      expect(current.currentRevisionId, first.id);
+      expect(current.originalFileName, 'clearer.png');
+      expect(await repository.revisions(original.id), hasLength(2));
+      expect(await repository.download(original.id, first.id), [2, 3]);
+    },
+  );
 }
 
 final _document = <String, dynamic>{

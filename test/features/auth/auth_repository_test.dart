@@ -64,6 +64,35 @@ void main() {
       expect(calls, ['/auth/register', '/auth/login', '/auth/me']);
     },
   );
+
+  test(
+    'logout clears the active account cache even when API is unauthorized',
+    () async {
+      final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api'));
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) => handler.reject(
+            DioException(
+              requestOptions: options,
+              response: Response(requestOptions: options, statusCode: 401),
+            ),
+          ),
+        ),
+      );
+      var cacheCleared = false;
+      final store = _MemorySessionStore()..value = 'session';
+      final repository = FastApiAuthRepository(
+        PomiApiClient(dio: dio),
+        store,
+        onLogout: () async => cacheCleared = true,
+      );
+
+      await repository.logout();
+
+      expect(cacheCleared, isTrue);
+      expect(store.value, isNull);
+    },
+  );
 }
 
 const _account = <String, dynamic>{

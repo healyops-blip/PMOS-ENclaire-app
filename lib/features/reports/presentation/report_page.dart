@@ -7,8 +7,11 @@ import 'package:pmos_enclaire/core/theme/pomi_theme.dart';
 import 'package:pmos_enclaire/core/widgets/demo_badge.dart';
 import 'package:pmos_enclaire/core/widgets/pomi_line_chart.dart';
 import 'package:pmos_enclaire/core/widgets/pomi_surfaces.dart';
+import 'package:pmos_enclaire/features/certification/data/certification_repository.dart';
 import 'package:pmos_enclaire/features/reports/data/patient_note_repository.dart';
 import 'package:pmos_enclaire/features/reports/data/report_repository.dart';
+import 'package:pmos_enclaire/features/reports/presentation/report_viewer_page.dart';
+import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:printing/printing.dart';
 
 enum _PdfAction { save, share, print }
@@ -17,11 +20,18 @@ class ReportGeneratorPage extends StatefulWidget {
   ReportGeneratorPage({
     required this.repository,
     ReportRepository? reportRepository,
+    DocumentRepository? documentRepository,
+    CertificationRepository? certificationRepository,
     super.key,
-  }) : reportRepository = reportRepository ?? DemoReportRepository();
+  }) : reportRepository = reportRepository ?? DemoReportRepository(),
+       documentRepository = documentRepository ?? DemoDocumentRepository(),
+       certificationRepository =
+           certificationRepository ?? LocalCertificationRepository();
 
   final PatientNoteRepository repository;
   final ReportRepository reportRepository;
+  final DocumentRepository documentRepository;
+  final CertificationRepository certificationRepository;
 
   @override
   State<ReportGeneratorPage> createState() => _ReportGeneratorPageState();
@@ -113,6 +123,7 @@ class _ReportGeneratorPageState extends State<ReportGeneratorPage> {
   });
 
   Future<void> _generate() async {
+    if (_busy) return;
     setState(() {
       _busy = true;
       _error = null;
@@ -153,7 +164,38 @@ class _ReportGeneratorPageState extends State<ReportGeneratorPage> {
       if (!mounted) return;
       setState(() => _reports = reports);
       await Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(builder: (_) => ReportPage(report: report)),
+        MaterialPageRoute<void>(
+          builder: (_) => ReportViewerPage(
+            report: report,
+            repository: widget.reportRepository,
+            documentRepository: widget.documentRepository,
+            certificationRepository: widget.certificationRepository,
+          ),
+        ),
+      );
+    } on Exception catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _openReport(ReportSnapshotItem report) async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => ReportViewerPage(
+            report: report,
+            repository: widget.reportRepository,
+            documentRepository: widget.documentRepository,
+            certificationRepository: widget.certificationRepository,
+          ),
+        ),
       );
     } on Exception catch (error) {
       if (mounted) setState(() => _error = error.toString());
@@ -333,11 +375,7 @@ class _ReportGeneratorPageState extends State<ReportGeneratorPage> {
                   trailing: report.hasUpdates
                       ? const Icon(Icons.update_rounded)
                       : const Icon(Icons.lock_outline_rounded),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => ReportPage(report: report),
-                    ),
-                  ),
+                  onTap: _busy ? null : () => _openReport(report),
                 ),
               ),
             const SizedBox(height: 10),
@@ -536,6 +574,53 @@ class _ReportPageState extends State<ReportPage> {
 
   @override
   Widget build(BuildContext context) {
+    final snapshot = widget.report?.snapshot;
+    if (snapshot != null) {
+      return Scaffold(
+        key: const Key('report-page'),
+        appBar: AppBar(title: const Text('复诊报告')),
+        backgroundColor: PomiColors.surfaceMuted,
+        body: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+              color: Colors.white,
+              child: Row(
+                children: [
+                  _LayerChip(
+                    index: 0,
+                    current: _layer,
+                    label: '1 · 摘要',
+                    onTap: _setLayer,
+                  ),
+                  const SizedBox(width: 7),
+                  _LayerChip(
+                    index: 1,
+                    current: _layer,
+                    label: '2 · 趋势',
+                    onTap: _setLayer,
+                  ),
+                  const SizedBox(width: 7),
+                  _LayerChip(
+                    index: 2,
+                    current: _layer,
+                    label: '3 · 来源',
+                    onTap: _setLayer,
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: switch (_layer) {
+                0 => _SnapshotSummaryLayer(snapshot: snapshot),
+                1 => _SnapshotTrendLayer(snapshot: snapshot),
+                _ => _SnapshotSourceLayer(snapshot: snapshot),
+              },
+            ),
+          ],
+        ),
+      );
+    }
     return Scaffold(
       key: const Key('report-page'),
       appBar: AppBar(
@@ -635,6 +720,214 @@ class _ReportPageState extends State<ReportPage> {
   }
 
   void _setLayer(int value) => setState(() => _layer = value);
+}
+
+Map<String, dynamic> _reportMap(Object? value) =>
+    value is Map ? Map<String, dynamic>.from(value) : const <String, dynamic>{};
+
+List<dynamic> _reportList(Object? value) => value is List ? value : const [];
+
+class _SnapshotSummaryLayer extends StatelessWidget {
+  const _SnapshotSummaryLayer({required this.snapshot});
+
+  final Map<String, dynamic> snapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    final summary = _reportMap(snapshot['summary']);
+    final note = summary['patient_note_text'] as String?;
+    final medications = _reportList(summary['current_medications']);
+    final observations = _reportList(summary['latest_observations']);
+    final missing = _reportList(summary['missing_sections']);
+    final disclaimers = _reportList(summary['disclaimers']);
+    return ListView(
+      key: const Key('snapshot-report-summary'),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
+      children: [
+        const PomiSectionTitle(title: '患者自述原文'),
+        const SizedBox(height: 8),
+        PomiSectionCard(
+          child: Text(
+            note ??
+                (summary['patient_note_empty_state'] == 'explicitly_skipped'
+                    ? '本次已明确跳过'
+                    : '未提供'),
+          ),
+        ),
+        const SizedBox(height: 14),
+        const PomiSectionTitle(title: '当前用药'),
+        const SizedBox(height: 8),
+        PomiSectionCard(
+          child: medications.isEmpty
+              ? const Text('暂无已确认用药')
+              : Column(
+                  children: [
+                    for (final value in medications)
+                      Builder(
+                        builder: (_) {
+                          final item = _reportMap(value);
+                          return ListTile(
+                            dense: true,
+                            title: Text(
+                              item['drug_name']?.toString() ?? '未命名用药',
+                            ),
+                            subtitle: Text(
+                              [
+                                item['dosage_value'],
+                                item['dosage_unit'],
+                                item['frequency'],
+                              ].where((value) => value != null).join(' '),
+                            ),
+                          );
+                        },
+                      ),
+                  ],
+                ),
+        ),
+        const SizedBox(height: 14),
+        const PomiSectionTitle(title: '最新已确认指标'),
+        const SizedBox(height: 8),
+        PomiSectionCard(
+          child: observations.isEmpty
+              ? const Text('暂无已确认指标')
+              : Column(
+                  children: [
+                    for (final value in observations)
+                      Builder(
+                        builder: (_) {
+                          final item = _reportMap(value);
+                          return ListTile(
+                            dense: true,
+                            title: Text(
+                              item['original_item_name']?.toString() ?? '指标',
+                            ),
+                            subtitle: Text(
+                              '${item['raw_value'] ?? ''} ${item['original_unit'] ?? ''} · ${item['abnormal_status'] ?? 'unknown'}',
+                            ),
+                          );
+                        },
+                      ),
+                  ],
+                ),
+        ),
+        if (missing.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          PomiSectionCard(
+            color: PomiColors.primaryPale,
+            child: Text('缺失资料：${missing.join('、')}（使用固定空状态）'),
+          ),
+        ],
+        const SizedBox(height: 14),
+        for (final disclaimer in disclaimers)
+          Text(
+            disclaimer.toString(),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+      ],
+    );
+  }
+}
+
+class _SnapshotTrendLayer extends StatelessWidget {
+  const _SnapshotTrendLayer({required this.snapshot});
+
+  final Map<String, dynamic> snapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    final trends = _reportMap(snapshot['trends']);
+    final labs = _reportList(trends['labs']);
+    return ListView(
+      key: const Key('snapshot-report-trends'),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
+      children: [
+        PomiSectionCard(
+          child: Text(
+            '体重 ${_reportList(trends['weights']).length} 点 · 经期 ${_reportList(trends['cycles']).length} 条 · 本月用药 ${_reportList(trends['medication_daily']).length} 条',
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (labs.isEmpty)
+          const PomiSectionCard(child: Text('暂无可展示的化验结果'))
+        else
+          for (final value in labs) ...[
+            Builder(
+              builder: (_) {
+                final trend = _reportMap(value);
+                final points = _reportList(trend['points']);
+                return PomiSectionCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        trend['metric_name']?.toString() ?? '化验指标',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      Text(
+                        '${trend['display_mode']} · ${trend['comparability']}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      for (final pointValue in points)
+                        Builder(
+                          builder: (_) {
+                            final point = _reportMap(pointValue);
+                            return ListTile(
+                              dense: true,
+                              title: Text(
+                                '${point['date'] ?? '日期缺失'} · ${point['raw_value']} ${point['original_unit'] ?? ''}',
+                              ),
+                              subtitle: Text(
+                                point['exclusion_reason']?.toString() ??
+                                    '${point['freshness']} · ${point['abnormal_status']}',
+                              ),
+                            );
+                          },
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+          ],
+      ],
+    );
+  }
+}
+
+class _SnapshotSourceLayer extends StatelessWidget {
+  const _SnapshotSourceLayer({required this.snapshot});
+
+  final Map<String, dynamic> snapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    final sources = _reportList(snapshot['sources']);
+    return ListView(
+      key: const Key('snapshot-report-sources'),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
+      children: [
+        for (final value in sources)
+          Builder(
+            builder: (_) {
+              final source = _reportMap(value);
+              return Card(
+                child: ListTile(
+                  title: Text(
+                    '#${source['source_number']} ${source['source_type']}',
+                  ),
+                  subtitle: Text(
+                    source['document_revision_id'] == null
+                        ? source['origin_kind']?.toString() ?? '来源未知'
+                        : '${source['origin_kind']} · revision ${source['document_revision_id']}',
+                  ),
+                ),
+              );
+            },
+          ),
+      ],
+    );
+  }
 }
 
 class _SummaryLayer extends StatelessWidget {

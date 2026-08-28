@@ -1,6 +1,10 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:pmos_enclaire/features/records/presentation/lab_confirmation_page.dart';
 
@@ -14,7 +18,11 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp(
-            home: LabConfirmationPage(repository: repository, task: _task),
+            home: LabConfirmationPage(
+              repository: repository,
+              task: _task,
+              documentRepository: _CurrentDocumentRepository('doc-1', 'rev-1'),
+            ),
           ),
         ),
       );
@@ -22,6 +30,13 @@ void main() {
 
       expect(find.byKey(const Key('lab-source-document')), findsOneWidget);
       expect(find.textContaining('需重点核对'), findsOneWidget);
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const Key('lab-name-0')))
+            .controller
+            ?.text,
+        '血糖',
+      );
       await tester.ensureVisible(
         find.byKey(const Key('confirm-all-lab-items')),
       );
@@ -78,6 +93,30 @@ void main() {
   );
 }
 
+class _CurrentDocumentRepository extends DemoDocumentRepository {
+  _CurrentDocumentRepository(this.documentId, this.revisionId);
+
+  final String documentId;
+  final String revisionId;
+
+  @override
+  Future<MedicalDocument> get(String id) async => MedicalDocument(
+    id: documentId,
+    documentType: 'lab_report',
+    originalFileName: 'lab.png',
+    mimeType: 'image/png',
+    fileSizeBytes: 1,
+    currentRevisionId: revisionId,
+    uploadedAt: DateTime.utc(2026, 8, 27),
+  );
+
+  @override
+  Future<Uint8List> download(String documentId, String revisionId) async =>
+      base64Decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      );
+}
+
 const _task = OcrTask(
   id: 'task-1',
   documentId: 'doc-1',
@@ -96,20 +135,26 @@ class _LabRepository implements OcrRepository {
     resultId: 'result-1',
     taskId: 'task-1',
     draft: {
+      'hospital_name': 'Pomi Hospital',
+      'sample_date': '2026-08-18',
       'report_date': '2026-08-20',
       'items': [
         {
-          'name': '血糖',
-          'value': 'bad',
-          'unit': 'banana',
-          'reference_range': '',
-          'sample_date': 'bad-date',
+          'item_name': '血糖',
+          'item_code': 'GLU',
+          'raw_value': 'bad',
+          'numeric_value': null,
+          'raw_unit': 'banana',
+          'normalized_unit': null,
+          'reference_range_text': '',
+          'reference_low': null,
+          'reference_high': null,
         },
       ],
     },
     fields: [
       OcrFieldDraft(
-        path: 'items.0.value',
+        path: 'items.0.raw_value',
         value: 'bad',
         confidence: 0.45,
         sourceText: 'S.2',
@@ -151,7 +196,9 @@ class _LabRepository implements OcrRepository {
       );
     }
     expect(items.single.value, '5.2');
+    expect(items.single.sourceIndex, 0);
     expect(items.single.referenceRange, '3.9-6.1');
+    expect(sampleDate, '2026-08-18');
     return LabConfirmationResult(
       taskId: taskId,
       reused: false,

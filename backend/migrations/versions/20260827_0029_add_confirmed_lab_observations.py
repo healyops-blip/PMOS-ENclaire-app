@@ -1,7 +1,7 @@
 """add confirmed lab observations
 
-Revision ID: 20260827_0022_lab
-Revises: 20260827_0021
+Revision ID: 20260827_0029
+Revises: 20260827_0028
 Create Date: 2026-08-27 21:15:00.322585
 """
 
@@ -12,8 +12,8 @@ from alembic import op
 
 import pomi_backend.db.types
 
-revision: str = "20260827_0022_lab"
-down_revision: str | None = "20260827_0021"
+revision: str = "20260827_0029"
+down_revision: str | None = "20260827_0028"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
@@ -56,8 +56,22 @@ def upgrade() -> None:
             name=op.f("ck_lab_observation_lab_observation_abnormal_status"),
         ),
         sa.CheckConstraint(
+            "item_index >= 0",
+            name=op.f("ck_lab_observation_lab_observation_item_index"),
+        ),
+        sa.CheckConstraint(
             "mapping_status IN ('mapped', 'needs_manual_review')",
             name=op.f("ck_lab_observation_lab_observation_mapping_status"),
+        ),
+        sa.CheckConstraint(
+            "(mapping_status = 'mapped' AND standard_metric_id IS NOT NULL) OR "
+            "(mapping_status = 'needs_manual_review' AND standard_metric_id IS NULL)",
+            name=op.f("ck_lab_observation_lab_observation_metric_mapping"),
+        ),
+        sa.CheckConstraint(
+            "(trend_date IS NULL AND trend_date_source IS NULL) OR "
+            "(trend_date IS NOT NULL AND trend_date_source IS NOT NULL)",
+            name=op.f("ck_lab_observation_lab_observation_trend_date_pair"),
         ),
         sa.CheckConstraint(
             "trend_date_source IS NULL OR trend_date_source IN "

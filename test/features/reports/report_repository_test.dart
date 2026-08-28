@@ -21,12 +21,14 @@ void main() {
               'can_generate': false,
               'confirmed_source_count': 4,
             };
-          } else if (options.method == 'GET') {
+          } else if (options.method == 'GET' && options.path == '/reports') {
             data = {
               'items': [_report],
               'next_cursor': null,
               'has_more': false,
             };
+          } else if (options.method == 'GET') {
+            data = _reportDetail;
           } else {
             data = _report;
           }
@@ -45,14 +47,17 @@ void main() {
     final preflight = await repository.preflight('note-1');
     final created = await repository.create('note-1', confirmIncomplete: true);
     final listed = await repository.list();
+    final detail = await repository.get('report-1');
 
     expect(preflight.missingSections, ['labs']);
     expect(created.reportId, 'report-1');
     expect(listed.single.snapshotHash, 'a' * 64);
+    expect(detail.item.reportId, 'report-1');
     expect(requests.map((request) => request.path), [
       '/reports/preflight',
       '/reports',
       '/reports',
+      '/reports/report-1',
     ]);
     expect((requests[1].data as Map)['confirm_incomplete'], isTrue);
     expect(requests[1].headers['Idempotency-Key'], contains('note-1'));
@@ -161,6 +166,10 @@ class _FlakyReportRepository implements ReportRepository {
   Future<List<ReportSnapshotItem>> list() async => const [];
 
   @override
+  Future<ReportDetail> get(String reportId) async =>
+      ReportDetail.fromJson(_reportDetail);
+
+  @override
   Future<ReportPreflight> preflight(String? patientNoteId) async =>
       const ReportPreflight(
         missingSections: [],
@@ -181,4 +190,45 @@ const _report = <String, dynamic>{
   'has_updates': false,
   'reused': false,
   'missing_sections': ['labs'],
+  'snapshot': {
+    'summary': {
+      'patient_note_text': 'Confirmed statement returned verbatim.',
+      'patient_note_empty_state': null,
+      'current_medications': <dynamic>[],
+      'latest_observations': <dynamic>[],
+      'missing_sections': ['labs'],
+      'disclaimers': ['Deterministic confirmed data only.'],
+    },
+    'trends': {
+      'weights': <dynamic>[],
+      'cycles': <dynamic>[],
+      'medication_daily': <dynamic>[],
+      'labs': <dynamic>[],
+    },
+    'sources': <dynamic>[],
+  },
+  'date_sources': <String, dynamic>{},
+  'data_freshness': <String, dynamic>{},
+};
+
+final _reportDetail = <String, dynamic>{..._report, ..._demoDetailForTest};
+
+const _demoDetailForTest = <String, dynamic>{
+  'metadata': <String, dynamic>{},
+  'summary': <String, dynamic>{
+    'profile': <String, dynamic>{},
+    'current_medications': <dynamic>[],
+    'latest_observations': <dynamic>[],
+    'missing_sections': <String>[],
+    'disclaimers': <String>[],
+  },
+  'trends': <String, dynamic>{
+    'labs': <dynamic>[],
+    'weights': <dynamic>[],
+    'cycles': <dynamic>[],
+    'medication_daily': <dynamic>[],
+  },
+  'records': <String, dynamic>{},
+  'sources': <dynamic>[],
+  'data_freshness': <String, dynamic>{},
 };

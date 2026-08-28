@@ -148,9 +148,12 @@ class DemoPatientNoteRepository implements PatientNoteRepository {
             confirmedAt: DateTime(2026, 8, 27),
             createdAt: DateTime(2026, 8, 27),
             updatedAt: DateTime(2026, 8, 27),
-          );
+          ) {
+    _notes[_note!.id] = _note!;
+  }
 
   static const _sample = '最近两个月经期仍不规律，体重略有下降。二甲双胍偶尔因胃部不适漏服，希望复诊时讨论剂量。';
+  final Map<String, PatientNote> _notes = {};
   PatientNote? _note;
   int _nextId = 2;
 
@@ -160,6 +163,7 @@ class DemoPatientNoteRepository implements PatientNoteRepository {
   @override
   Future<PatientNote> create(String text, {String? visitContext}) async {
     _note = _make(text, visitContext: visitContext);
+    _notes[_note!.id] = _note!;
     return _note!;
   }
 
@@ -169,46 +173,78 @@ class DemoPatientNoteRepository implements PatientNoteRepository {
     String text, {
     String? visitContext,
   }) async {
+    final current = _notes[id];
+    if (current == null) {
+      throw const PatientNoteFailure('自述不存在');
+    }
+    if (current.status == PatientNoteStatus.consumed) {
+      throw const PatientNoteFailure('已用于报告的自述只能复制为新草稿');
+    }
     _note = _make(text, id: id, visitContext: visitContext);
+    _notes[id] = _note!;
     return _note!;
   }
 
   @override
   Future<PatientNote> confirm(String id) async {
-    final current = _note!;
+    final current = _notes[id]!;
+    if (current.status == PatientNoteStatus.confirmed) return current;
+    if (current.status == PatientNoteStatus.consumed) {
+      throw const PatientNoteFailure('已用于报告的自述不能重新确认');
+    }
+    if (current.originalText.trim().isEmpty) {
+      throw const PatientNoteFailure('自述为空时请明确跳过');
+    }
     _note = PatientNote(
       id: current.id,
       originalText: current.originalText,
       confirmedText: current.originalText,
       status: PatientNoteStatus.confirmed,
       confirmedAt: DateTime.now(),
+      visitContext: current.visitContext,
+      sourceNoteId: current.sourceNoteId,
       createdAt: current.createdAt,
       updatedAt: DateTime.now(),
     );
+    _notes[id] = _note!;
     return _note!;
   }
 
   @override
   Future<PatientNote> skip(String id) async {
-    final current = _note!;
+    final current = _notes[id]!;
+    if (current.status == PatientNoteStatus.skipped) return current;
+    if (current.status == PatientNoteStatus.consumed) {
+      throw const PatientNoteFailure('已用于报告的自述不能跳过');
+    }
     _note = PatientNote(
       id: current.id,
       originalText: current.originalText,
       status: PatientNoteStatus.skipped,
       confirmedAt: DateTime.now(),
+      visitContext: current.visitContext,
+      sourceNoteId: current.sourceNoteId,
       createdAt: current.createdAt,
       updatedAt: DateTime.now(),
     );
+    _notes[id] = _note!;
     return _note!;
   }
 
   @override
   Future<PatientNote> copy(String id, {String? visitContext}) async {
+    final source = _notes[id];
+    if (source == null ||
+        (source.status != PatientNoteStatus.confirmed &&
+            source.status != PatientNoteStatus.consumed)) {
+      throw const PatientNoteFailure('只能复制已确认的历史自述');
+    }
     _note = _make(
-      _note!.confirmedText ?? _note!.originalText,
+      source.confirmedText ?? source.originalText,
       visitContext: visitContext,
       sourceNoteId: id,
     );
+    _notes[_note!.id] = _note!;
     return _note!;
   }
 

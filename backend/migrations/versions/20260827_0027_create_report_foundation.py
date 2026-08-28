@@ -1,7 +1,7 @@
 """create report foundation
 
 Revision ID: 20260827_0027
-Revises: 20260827_0013
+Revises: 20260827_0020
 Create Date: 2026-08-27 20:57:45.784029
 """
 
@@ -13,10 +13,7 @@ from alembic import op
 import pomi_backend.db.types
 
 revision: str = "20260827_0027"
-down_revision: str | tuple[str, str] | None = (
-    "20260827_0015",
-    "20260827_0024_merge",
-)
+down_revision: str | None = "20260827_0020"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
@@ -88,6 +85,12 @@ def upgrade() -> None:
             "report_status IN ('pending', 'succeeded', 'failed')",
             name=op.f("ck_report_snapshot_report_snapshot_status"),
         ),
+        sa.CheckConstraint(
+            "report_status != 'succeeded' OR "
+            "(snapshot_json IS NOT NULL AND snapshot_hash IS NOT NULL "
+            "AND report_generated_at IS NOT NULL)",
+            name=op.f("ck_report_snapshot_successful_report_complete"),
+        ),
         sa.ForeignKeyConstraint(
             ["generated_by_uid"],
             ["user_account.uid"],
@@ -139,11 +142,35 @@ def upgrade() -> None:
             name=op.f("ck_report_source_report_source_origin_kind"),
         ),
         sa.CheckConstraint(
+            "(origin_kind = 'medical_document' AND document_id IS NOT NULL "
+            "AND document_revision_id IS NOT NULL) OR "
+            "(origin_kind != 'medical_document' AND document_id IS NULL "
+            "AND document_revision_id IS NULL)",
+            name=op.f("ck_report_source_report_source_document_identity"),
+        ),
+        sa.CheckConstraint(
+            "(origin_kind = 'rule_execution' AND rule_execution_id IS NOT NULL) OR "
+            "(origin_kind != 'rule_execution' AND rule_execution_id IS NULL)",
+            name=op.f("ck_report_source_report_source_rule_identity"),
+        ),
+        sa.CheckConstraint(
             "source_type IN ('patient_profile', 'patient_note', 'medication', "
             "'medication_event', 'medication_daily', 'menstrual_cycle', "
             "'weight_record', 'lab_observation', 'medical_order', "
             "'imaging_report', 'outpatient_record', 'rule_execution')",
             name=op.f("ck_report_source_report_source_type"),
+        ),
+        sa.ForeignKeyConstraint(
+            ["document_id"],
+            ["document.id"],
+            name=op.f("fk_report_source_document_id_document"),
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["document_revision_id"],
+            ["document_revision.id"],
+            name=op.f("fk_report_source_document_revision_id_document_revision"),
+            ondelete="RESTRICT",
         ),
         sa.ForeignKeyConstraint(
             ["report_id"],

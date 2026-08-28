@@ -32,9 +32,9 @@ __all__ = [
     "MenstrualCycleRepository",
     "OCRRepository",
     "PatientRepository",
+    "ReconciliationRepository",
     "PatientNoteRepository",
     "ReportSnapshotRepository",
     "ReportSourceRepository",
-    "ReconciliationRepository",
     "WeightRepository",
 ]

@@ -31,6 +31,13 @@ class MedicalOrder(Base):
     __tablename__ = "medical_order"
     __table_args__ = (
         UniqueConstraint("ocr_result_id", "medication_index", name="uq_medical_order_result_item"),
+        CheckConstraint(
+            "length(trim(raw_order_text)) > 0", name="ck_medical_order_source_nonblank"
+        ),
+        CheckConstraint("length(trim(drug_name)) > 0", name="ck_medical_order_drug_nonblank"),
+        CheckConstraint("dosage_value > 0", name="ck_medical_order_dosage_positive"),
+        CheckConstraint("length(trim(dosage_unit)) > 0", name="ck_medical_order_unit_nonblank"),
+        CheckConstraint("length(trim(frequency)) > 0", name="ck_medical_order_frequency_nonblank"),
         Index("ix_medical_order_patient_confirmed", "patient_id", "confirmed_at"),
     )
 
@@ -64,6 +71,8 @@ class MedicalOrder(Base):
     order_date: Mapped[date] = mapped_column(Date, nullable=False)
     explicitly_stopped: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     review_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    original_item_data: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    confirmed_item_data: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     confirmed_by_uid: Mapped[str] = mapped_column(
         String(36), ForeignKey("user_account.uid", ondelete="RESTRICT"), nullable=False
     )
@@ -73,7 +82,10 @@ class MedicalOrder(Base):
 class MedicationReconciliation(Base):
     __tablename__ = "medication_reconciliation"
     __table_args__ = (
-        CheckConstraint("status IN ('draft', 'executed')", name="medication_reconciliation_status"),
+        CheckConstraint(
+            "status IN ('draft', 'executing', 'executed')",
+            name="medication_reconciliation_status",
+        ),
         UniqueConstraint("patient_id", "ocr_task_id", name="uq_reconciliation_patient_task"),
     )
 
@@ -93,6 +105,7 @@ class MedicationReconciliation(Base):
         String(36), ForeignKey("user_account.uid", ondelete="RESTRICT")
     )
     executed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    execution_payload: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         UTCDateTime, nullable=False, default=utc_now, onupdate=utc_now
@@ -110,6 +123,10 @@ class MedicationReconciliationItem(Base):
         CheckConstraint(
             "user_decision IS NULL OR user_decision IN ('accept', 'keep_current', 'reject')",
             name="medication_reconciliation_item_decision",
+        ),
+        CheckConstraint(
+            "old_medication_id IS NOT NULL OR new_medical_order_id IS NOT NULL",
+            name="ck_reconciliation_item_has_source",
         ),
         UniqueConstraint("reconciliation_id", "position", name="uq_reconciliation_item_position"),
     )

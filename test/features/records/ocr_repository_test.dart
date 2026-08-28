@@ -48,7 +48,12 @@ void main() {
         resultId: 'result-1',
         expectedRevisionId: 'rev-1',
         items: const [
-          LabConfirmationItem(name: '血糖', value: '5.2', unit: 'mmol/L'),
+          LabConfirmationItem(
+            sourceIndex: 0,
+            name: '血糖',
+            value: '5.2',
+            unit: 'mmol/L',
+          ),
         ],
       );
 
@@ -67,6 +72,20 @@ void main() {
         '/ocr/tasks/task-1/result',
         '/ocr/tasks/task-1/retry',
         '/ocr/tasks/task-1/confirm',
+      ]);
+      expect((requests.last.data as Map)['items'], [
+        {
+          'source_index': 0,
+          'name': '血糖',
+          'value': '5.2',
+          'unit': 'mmol/L',
+          'reference_range': null,
+          'sample_date': null,
+          'exam_date': null,
+          'report_date': null,
+          'visit_date': null,
+          'note': null,
+        },
       ]);
     },
   );
@@ -133,7 +152,12 @@ void main() {
         confirmed: true,
       );
 
-      await repository.confirmMedicalOrder('task-order', [item]);
+      await repository.confirmMedicalOrder(
+        'task-order',
+        'result-order',
+        'rev-order',
+        [item],
+      );
       final reconciliation = await repository.createReconciliation(
         'task-order',
       );
@@ -146,6 +170,8 @@ void main() {
         '/medication-reconciliations',
         '/medication-reconciliations/rec-1',
       ]);
+      expect((requests.first.data as Map)['result_id'], 'result-order');
+      expect((requests.first.data as Map)['expected_revision_id'], 'rev-order');
       expect((requests.first.data as Map)['items'][0]['confirmed'], isTrue);
       expect(
         (requests.last.data as Map)['decisions'][0]['decision'],
@@ -173,7 +199,7 @@ void main() {
                     'record_id': 'imaging-1',
                     'material_type': 'imaging_text_report',
                     'document_revision_id': 'rev-1',
-                    'summary': {'findings': 'verbatim'},
+                    'summary': {'findings_text': 'verbatim'},
                     'reused': false,
                   },
                 },
@@ -187,13 +213,14 @@ void main() {
         ..._task,
         'material_type': 'imaging_text_report',
       });
+
       final result = await repository.confirmClinical(
         task: task,
         resultId: 'result-1',
-        confirmedData: {'findings': 'verbatim'},
+        confirmedData: {'findings_text': 'verbatim'},
         fieldConfirmations: const [
           {
-            'field_path': 'findings',
+            'field_path': 'findings_text',
             'user_value': 'verbatim',
             'confirmation_status': 'confirmed',
           },
@@ -202,10 +229,7 @@ void main() {
 
       expect(result.recordId, 'imaging-1');
       expect(request!.path, '/ocr/tasks/task-1/confirm');
-      expect(
-        request!.headers['Idempotency-Key'],
-        startsWith('flutter-confirm-'),
-      );
+      expect(request!.headers['Idempotency-Key'], isNull);
       expect(request!.data['result_id'], 'result-1');
       expect(request!.data['expected_revision_id'], 'rev-1');
       expect(request!.data['document_type'], 'imaging_text_report');

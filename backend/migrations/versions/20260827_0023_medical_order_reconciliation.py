@@ -1,7 +1,7 @@
 """Add confirmed medical orders and medication reconciliations.
 
-Revision ID: 20260827_0023
-Revises: 20260827_0022
+Revision ID: 20260827_0031
+Revises: 20260827_0030
 Create Date: 2026-08-27
 """
 
@@ -12,8 +12,8 @@ from alembic import op
 
 import pomi_backend.db.types
 
-revision: str = "20260827_0023"
-down_revision: str | None = "20260827_0022"
+revision: str = "20260827_0031"
+down_revision: str | None = "20260827_0030"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
@@ -44,6 +44,8 @@ def upgrade() -> None:
         sa.Column("order_date", sa.Date(), nullable=False),
         sa.Column("explicitly_stopped", sa.Boolean(), nullable=False),
         sa.Column("review_required", sa.Boolean(), nullable=False),
+        sa.Column("original_item_data", sa.JSON(), nullable=False),
+        sa.Column("confirmed_item_data", sa.JSON(), nullable=False),
         sa.Column("confirmed_by_uid", sa.String(length=36), nullable=False),
         sa.Column("confirmed_at", pomi_backend.db.types.UTCDateTime(), nullable=False),
         sa.ForeignKeyConstraint(["confirmed_by_uid"], ["user_account.uid"], ondelete="RESTRICT"),
@@ -55,6 +57,15 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["ocr_task_id"], ["ocr_task.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["patient_id"], ["patient_profile.patient_id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
+        sa.CheckConstraint(
+            "length(trim(raw_order_text)) > 0", name="ck_medical_order_source_nonblank"
+        ),
+        sa.CheckConstraint("length(trim(drug_name)) > 0", name="ck_medical_order_drug_nonblank"),
+        sa.CheckConstraint("dosage_value > 0", name="ck_medical_order_dosage_positive"),
+        sa.CheckConstraint("length(trim(dosage_unit)) > 0", name="ck_medical_order_unit_nonblank"),
+        sa.CheckConstraint(
+            "length(trim(frequency)) > 0", name="ck_medical_order_frequency_nonblank"
+        ),
         sa.UniqueConstraint(
             "ocr_result_id", "medication_index", name="uq_medical_order_result_item"
         ),
@@ -73,10 +84,12 @@ def upgrade() -> None:
         sa.Column("created_by_uid", sa.String(length=36), nullable=False),
         sa.Column("executed_by_uid", sa.String(length=36), nullable=True),
         sa.Column("executed_at", pomi_backend.db.types.UTCDateTime(), nullable=True),
+        sa.Column("execution_payload", sa.JSON(), nullable=True),
         sa.Column("created_at", pomi_backend.db.types.UTCDateTime(), nullable=False),
         sa.Column("updated_at", pomi_backend.db.types.UTCDateTime(), nullable=False),
         sa.CheckConstraint(
-            "status IN ('draft', 'executed')", name="medication_reconciliation_status"
+            "status IN ('draft', 'executing', 'executed')",
+            name="medication_reconciliation_status",
         ),
         sa.ForeignKeyConstraint(["created_by_uid"], ["user_account.uid"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["executed_by_uid"], ["user_account.uid"], ondelete="RESTRICT"),
@@ -108,6 +121,10 @@ def upgrade() -> None:
         sa.CheckConstraint(
             "user_decision IS NULL OR user_decision IN ('accept', 'keep_current', 'reject')",
             name="medication_reconciliation_item_decision",
+        ),
+        sa.CheckConstraint(
+            "old_medication_id IS NOT NULL OR new_medical_order_id IS NOT NULL",
+            name="ck_reconciliation_item_has_source",
         ),
         sa.ForeignKeyConstraint(
             ["new_medical_order_id"], ["medical_order.id"], ondelete="RESTRICT"
