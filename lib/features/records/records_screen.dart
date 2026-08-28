@@ -1145,12 +1145,6 @@ class ReportViewer extends ConsumerStatefulWidget {
 class _ReportViewerState extends ConsumerState<ReportViewer> {
   int _layer = 0;
 
-  void _share() {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('PDF 导出正在开发，当前可先在应用内查看报告')));
-  }
-
   @override
   Widget build(BuildContext context) {
     final snapshot = Map<String, dynamic>.from(
@@ -1205,32 +1199,8 @@ class _ReportViewerState extends ConsumerState<ReportViewer> {
       ),
     };
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('指标看板'),
-        actions: [
-          IconButton(
-            tooltip: '分享 PDF',
-            onPressed: _share,
-            icon: const Icon(Icons.ios_share_outlined),
-          ),
-        ],
-      ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
-            child: SegmentedButton<int>(
-              showSelectedIcon: false,
-              segments: const [
-                ButtonSegment(value: 0, label: Text('① 摘要')),
-                ButtonSegment(value: 1, label: Text('② 趋势')),
-                ButtonSegment(value: 2, label: Text('③ 原始数据')),
-              ],
-              selected: {_layer},
-              onSelectionChanged:
-                  (value) => setState(() => _layer = value.first),
-            ),
-          ),
           Expanded(
             child: IndexedStack(
               index: _layer,
