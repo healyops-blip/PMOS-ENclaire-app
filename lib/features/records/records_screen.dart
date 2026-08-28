@@ -1683,6 +1683,21 @@ class _ReportTrendLayer extends StatelessWidget {
                 .toList(),
         onTap: onOpenSources,
       ),
+      const SizedBox(height: 10),
+      _TrendCard(
+        icon: Icons.water_drop_outlined,
+        title: '空腹血糖趋势',
+        subtitle: '参考 3.9 – 6.1 mmol/L · 6 个数据点 · 含 1 次跨单位',
+        values: const [
+          '24–08  5.4 mmol/L',
+          '25–04  5.2 mmol/L',
+          '25–08  5.0 mmol/L',
+          '25–12  5.1 mmol/L · 92 mg/dL',
+          '26–06  5.3 mmol/L',
+          '26–08  5.6 mmol/L',
+        ],
+        onTap: onOpenSources,
+      ),
     ],
   );
 }
