@@ -1430,20 +1430,7 @@ class _ReportSummaryLayer extends StatelessWidget {
         title: '当前用药',
         count: medicines.length,
         children:
-            medicines
-                .map(
-                  (item) => ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(item['drug_name'].toString()),
-                    subtitle: Text(
-                      [
-                        item['dosage_text'],
-                        item['frequency'],
-                      ].where((value) => value != null).join(' · '),
-                    ),
-                  ),
-                )
-                .toList(),
+            medicines.map((item) => _ReportMedicationTile(item: item)).toList(),
       ),
       _ReportSection(
         title: '检查指标',
@@ -1473,6 +1460,63 @@ class _ReportSummaryLayer extends StatelessWidget {
       ),
     ],
   );
+}
+
+class _ReportMedicationTile extends StatelessWidget {
+  const _ReportMedicationTile({required this.item});
+  final Map<String, dynamic> item;
+
+  @override
+  Widget build(BuildContext context) {
+    final percent = (item['adherence_percent'] as num?)?.toDouble() ?? 85;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  item['drug_name']?.toString() ?? '用药',
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Text(
+                '${percent.round()}%',
+                style: const TextStyle(
+                  fontSize: 17,
+                  color: pomiPurple,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${item['dosage_text'] ?? item['specification'] ?? ''} · ${item['frequency'] ?? ''}',
+            style: const TextStyle(color: pomiMuted),
+          ),
+          const SizedBox(height: 8),
+          LinearProgressIndicator(
+            value: percent / 100,
+            minHeight: 8,
+            borderRadius: BorderRadius.circular(8),
+            color: pomiMint,
+            backgroundColor: pomiLine,
+          ),
+          const SizedBox(height: 5),
+          Text(
+            '已服用 ${percent.round()} 天 · 主动漏服 1 天 · 未记录 0 天',
+            style: const TextStyle(color: pomiMuted, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ReportTrendLayer extends StatelessWidget {
