@@ -30,6 +30,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _diagnosisYear = TextEditingController(text: '2023');
   final _lastPeriod = TextEditingController();
   final _nextVisit = TextEditingController();
+  final _medicationSearch = TextEditingController();
   final Set<String> _medications = {};
   final List<String> _customCycleRanges = [];
   final List<String> _customMedicationOptions = [];
@@ -113,6 +114,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       _diagnosisYear,
       _lastPeriod,
       _nextVisit,
+      _medicationSearch,
     ]) {
       controller.dispose();
     }
@@ -594,11 +596,26 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     showFrame: false,
     padding: _onboardingContentPadding,
     children: [
+      TextFormField(
+        controller: _medicationSearch,
+        decoration: const InputDecoration(
+          labelText: '搜索并添加药品',
+          hintText: '例如搜索「优思明」或「二甲双胍」',
+          prefixIcon: Icon(Icons.search_rounded),
+        ),
+        onChanged: (_) => setState(() {}),
+      ),
+      const SizedBox(height: 14),
       Wrap(
         spacing: _onboardingLabelGap,
         runSpacing: _onboardingLabelGap,
         children:
             [..._medicationOptions.keys, ..._customMedicationOptions]
+                .where(
+                  (name) => name.toLowerCase().contains(
+                    _medicationSearch.text.trim().toLowerCase(),
+                  ),
+                )
                 .map<Widget>(
                   (name) => FilterChip(
                     label: Text(name),
