@@ -55,6 +55,8 @@ class OcrTask {
     required this.providerAttempts,
     this.parentTaskId,
     this.error,
+    this.resultSource,
+    this.fallback,
     this.reused = false,
   });
 
@@ -67,7 +69,11 @@ class OcrTask {
   final int providerAttempts;
   final String? parentTaskId;
   final OcrTaskFailure? error;
+  final String? resultSource;
+  final OcrFallbackAudit? fallback;
   final bool reused;
+
+  bool get isFallback => resultSource == 'fallback';
 
   factory OcrTask.fromJson(Map<String, dynamic> json) {
     final error = json['error'];
@@ -87,9 +93,55 @@ class OcrTask {
               message: error['message']?.toString() ?? '',
             )
           : null,
+      resultSource: json['result_source'] as String?,
+      fallback: json['fallback'] is Map
+          ? OcrFallbackAudit.fromJson(
+              Map<String, dynamic>.from(json['fallback'] as Map),
+            )
+          : null,
       reused: json['reused'] as bool? ?? false,
     );
   }
+}
+
+class OcrFallbackAudit {
+  const OcrFallbackAudit({
+    required this.dataVersion,
+    required this.triggerCategory,
+    required this.triggerCode,
+  });
+
+  final String dataVersion;
+  final String triggerCategory;
+  final String triggerCode;
+
+  factory OcrFallbackAudit.fromJson(Map<String, dynamic> json) {
+    final reason = Map<String, dynamic>.from(json['trigger_reason'] as Map);
+    return OcrFallbackAudit(
+      dataVersion: json['data_version'] as String,
+      triggerCategory: reason['category'] as String,
+      triggerCode: reason['code'] as String,
+    );
+  }
+}
+
+class OcrFallbackEligibility {
+  const OcrFallbackEligibility({
+    required this.eligible,
+    required this.reason,
+    this.dataVersion,
+  });
+
+  final bool eligible;
+  final String? dataVersion;
+  final String reason;
+
+  factory OcrFallbackEligibility.fromJson(Map<String, dynamic> json) =>
+      OcrFallbackEligibility(
+        eligible: json['eligible'] as bool,
+        dataVersion: json['data_version'] as String?,
+        reason: json['reason'] as String,
+      );
 }
 
 class OcrFieldDraft {
@@ -329,6 +381,12 @@ abstract interface class OcrRepository {
     required Map<String, dynamic> confirmedData,
     required List<Map<String, dynamic>> fieldConfirmations,
   });
+  Future<OcrFallbackEligibility> fallbackEligibility(String taskId);
+  Future<OcrTask> useFallback(
+    String taskId, {
+    required bool accept,
+    required String dataVersion,
+  });
   Future<LabConfirmationResult> confirmLab({
     required String taskId,
     required String resultId,
@@ -395,6 +453,30 @@ class FastApiOcrRepository implements OcrRepository, MedicalOrderGateway {
   @override
   Future<OcrTask> retry(String taskId) => _taskRequest(
     () => client.dio.post<Map<String, dynamic>>('/ocr/tasks/$taskId/retry'),
+  );
+
+  @override
+  Future<OcrFallbackEligibility> fallbackEligibility(String taskId) async {
+    try {
+      final response = await client.dio.get<Map<String, dynamic>>(
+        '/ocr/tasks/$taskId/fallback',
+      );
+      return OcrFallbackEligibility.fromJson(_data(response.data!));
+    } on DioException catch (error) {
+      throw _failure(error);
+    }
+  }
+
+  @override
+  Future<OcrTask> useFallback(
+    String taskId, {
+    required bool accept,
+    required String dataVersion,
+  }) => _taskRequest(
+    () => client.dio.post<Map<String, dynamic>>(
+      '/ocr/tasks/$taskId/fallback',
+      data: {'accept': accept, 'data_version': dataVersion},
+    ),
   );
 
   @override
@@ -559,6 +641,8 @@ class DemoOcrRepository implements OcrRepository, MedicalOrderGateway {
           : OcrTaskStatus.processing,
       attemptNumber: current.attemptNumber,
       providerAttempts: polls,
+      resultSource: current.resultSource,
+      fallback: current.fallback,
     );
     _tasks[taskId] = updated;
     return updated;
@@ -598,6 +682,17 @@ class DemoOcrRepository implements OcrRepository, MedicalOrderGateway {
 
   @override
   Future<OcrTask> retry(String taskId) async => _tasks[taskId]!;
+
+  @override
+  Future<OcrFallbackEligibility> fallbackEligibility(String taskId) async =>
+      const OcrFallbackEligibility(eligible: false, reason: 'demo_repository');
+
+  @override
+  Future<OcrTask> useFallback(
+    String taskId, {
+    required bool accept,
+    required String dataVersion,
+  }) async => _tasks[taskId]!;
 
   @override
   Future<void> confirmMedicalOrder(

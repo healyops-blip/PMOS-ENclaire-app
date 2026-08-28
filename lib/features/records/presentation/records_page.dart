@@ -9,6 +9,7 @@ import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:pmos_enclaire/features/records/presentation/upload_flow.dart';
 import 'package:pmos_enclaire/features/records/presentation/ocr_task_page.dart';
+import 'package:pmos_enclaire/features/records/presentation/ocr_fallback_badge.dart';
 import 'package:printing/printing.dart';
 
 class RecordsPage extends StatefulWidget {
@@ -330,6 +331,10 @@ class _DocumentDetailPageState extends State<DocumentDetailPage> {
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 30),
           children: [
+            if (document.usesOcrFallback) ...[
+              const OcrFallbackBadge(),
+              const SizedBox(height: 12),
+            ],
             SizedBox(
               height: 360,
               child: document.isPdf
@@ -380,15 +385,18 @@ class _DocumentDetailPageState extends State<DocumentDetailPage> {
             const SizedBox(height: 8),
             FilledButton.icon(
               key: const Key('start-document-ocr-button'),
-              onPressed: () => Navigator.of(context).push<void>(
-                MaterialPageRoute(
-                  builder: (_) => OcrTaskPage(
-                    repository: widget.ocrRepository,
-                    document: document,
-                    documentRepository: widget.repository,
+              onPressed: () async {
+                await Navigator.of(context).push<void>(
+                  MaterialPageRoute(
+                    builder: (_) => OcrTaskPage(
+                      repository: widget.ocrRepository,
+                      document: document,
+                      documentRepository: widget.repository,
+                    ),
                   ),
-                ),
-              ),
+                );
+                if (mounted) _reload();
+              },
               icon: const Icon(Icons.document_scanner_outlined),
               label: const Text('开始或查看文字识别'),
             ),

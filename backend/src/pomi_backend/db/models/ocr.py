@@ -130,3 +130,40 @@ class OCRFieldResult(Base):
     updated_at: Mapped[datetime] = mapped_column(
         UTCDateTime, nullable=False, default=utc_now, onupdate=utc_now
     )
+
+
+class OCRFallbackUse(Base):
+    """Explicit, auditable use of an exact-match synthetic demo result."""
+
+    __tablename__ = "ocr_fallback_use"
+    __table_args__ = (
+        UniqueConstraint("task_id", name="uq_ocr_fallback_use_task"),
+        Index("ix_ocr_fallback_use_patient_selected", "patient_id", "selected_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    task_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("ocr_task.id", ondelete="CASCADE"), nullable=False
+    )
+    patient_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("patient_profile.patient_id", ondelete="CASCADE"), nullable=False
+    )
+    document_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("document.id", ondelete="RESTRICT"), nullable=False
+    )
+    document_revision_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("document_revision.id", ondelete="RESTRICT"), nullable=False
+    )
+    file_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    material_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    data_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    trigger_category: Mapped[str] = mapped_column(String(40), nullable=False)
+    trigger_code: Mapped[str] = mapped_column(String(80), nullable=False)
+    selected_by_uid: Mapped[str] = mapped_column(
+        String(36), ForeignKey("user_account.uid", ondelete="RESTRICT"), nullable=False
+    )
+    selected_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, default=utc_now)
+    confirmed_by_uid: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("user_account.uid", ondelete="RESTRICT")
+    )
+    confirmed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)

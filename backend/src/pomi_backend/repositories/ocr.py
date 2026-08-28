@@ -8,7 +8,7 @@ from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from pomi_backend.db.models.documents import Document
-from pomi_backend.db.models.ocr import OCRFieldResult, OCRResult, OCRTask
+from pomi_backend.db.models.ocr import OCRFallbackUse, OCRFieldResult, OCRResult, OCRTask
 
 
 class OCRRepository:
@@ -48,6 +48,12 @@ class OCRRepository:
                 .order_by(OCRFieldResult.field_path)
             )
         )
+
+    def fallback_use(self, task_id: str) -> OCRFallbackUse | None:
+        statement = select(OCRFallbackUse).where(OCRFallbackUse.task_id == task_id)
+        if self.patient_id is not None:
+            statement = statement.where(OCRFallbackUse.patient_id == self.patient_id)
+        return self.session.scalar(statement)
 
     def add_task(self, task: OCRTask) -> None:
         if self.patient_id is not None and task.patient_id != self.patient_id:

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:pmos_enclaire/features/records/data/order_reconciliation_repository.dart';
+import 'package:pmos_enclaire/features/records/presentation/ocr_fallback_badge.dart';
 
 class MedicalOrderReviewPage extends StatefulWidget {
   const MedicalOrderReviewPage({
@@ -79,6 +80,10 @@ class _MedicalOrderReviewPageState extends State<MedicalOrderReviewPage> {
     body: ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
       children: [
+        if (widget.task.isFallback) ...[
+          const OcrFallbackBadge(),
+          const SizedBox(height: 12),
+        ],
         const Text('请对照原件逐种核对。药名、剂量、单位或频率缺失时不能确认，识别草稿不会直接修改当前用药。'),
         const SizedBox(height: 12),
         if (widget.document != null && widget.documentRepository != null) ...[

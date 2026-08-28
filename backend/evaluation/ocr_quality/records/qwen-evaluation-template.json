@@ -1,0 +1,28 @@
+{
+  "status": "NOT_RUN",
+  "reason": "Requires an authorized server-side POMI_OCR_API_KEY and release-review window.",
+  "executed_at": null,
+  "executed_by": null,
+  "model": null,
+  "prompt_version": "pomi-ocr-v1",
+  "schema_version": "pomi-ocr-schema-v1",
+  "dataset_manifest_sha256": null,
+  "report_path": null,
+  "records_path": null,
+  "metrics": {
+    "dataset_sample_count": null,
+    "qwen_sample_count": null,
+    "schema_pass_rate": null,
+    "p0_accuracy": null,
+    "p1_accuracy": null,
+    "p2_accuracy": null,
+    "critical_failure_count": null,
+    "latency_p50_ms": null,
+    "latency_p95_ms": null,
+    "per_material_type": null,
+    "error_distribution": null,
+    "fallback_records_excluded": null
+  },
+  "reviewer": null,
+  "notes": []
+}

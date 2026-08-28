@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
+import 'package:pmos_enclaire/features/records/presentation/ocr_fallback_badge.dart';
 import 'package:printing/printing.dart';
 
 class ClinicalTextConfirmationPage extends StatefulWidget {
@@ -214,6 +215,10 @@ class _ClinicalTextConfirmationPageState
             controller: _scrollController,
             padding: const EdgeInsets.all(16),
             children: [
+              if (widget.task.isFallback) ...[
+                const OcrFallbackBadge(),
+                const SizedBox(height: 12),
+              ],
               _SourcePreview(bytes: _source ?? Uint8List(0)),
               const SizedBox(height: 12),
               const Text('请对照原件逐字段核对。模型结果始终是草稿，确认后才进入正式数据。'),

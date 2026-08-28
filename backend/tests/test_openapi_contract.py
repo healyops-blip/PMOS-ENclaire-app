@@ -186,7 +186,7 @@ def test_ocr_contract_matches_worker_status_and_material_schemas() -> None:
         "failed",
         "timed_out",
     ]
-    assert schemas["OcrResultSource"]["enum"] == ["qwen3-vl"]
+    assert schemas["OcrResultSource"]["enum"] == ["qwen3-vl", "fallback"]
     field = schemas["OcrFieldResult"]
     assert {"path", "source_text", "parsed_value", "confidence"} <= set(field["required"])
     draft_refs = schemas["OcrDraftResult"]["properties"]["validated_draft"]["oneOf"]
