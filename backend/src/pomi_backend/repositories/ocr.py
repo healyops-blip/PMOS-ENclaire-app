@@ -40,6 +40,16 @@ class OCRRepository:
             return None
         return self.session.scalar(select(OCRResult).where(OCRResult.task_id == task.id))
 
+    def result_by_id(self, result_id: str) -> OCRResult | None:
+        statement = (
+            select(OCRResult)
+            .join(OCRTask, OCRTask.id == OCRResult.task_id)
+            .where(OCRResult.id == result_id)
+        )
+        if self.patient_id is not None:
+            statement = statement.where(OCRTask.patient_id == self.patient_id)
+        return self.session.scalar(statement)
+
     def fields(self, result_id: str) -> list[OCRFieldResult]:
         return list(
             self.session.scalars(

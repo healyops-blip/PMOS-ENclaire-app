@@ -534,7 +534,7 @@ class MedicationService:
             elif event.event_type in {"paused", "stopped"}:
                 active = False
             elif event.event_type == "adjusted":
-                active = (event.new_instruction or {}).get("status") == "active"
+                active = (event.new_instruction or {}).get("current_status") == "active"
         return active
 
 

@@ -1,0 +1,234 @@
+from __future__ import annotations
+
+from datetime import date
+from io import BytesIO
+
+from fastapi.testclient import TestClient
+from PIL import Image
+from pytest import MonkeyPatch
+from sqlalchemy import func, select
+
+from pomi_backend.db.models import LabObservation, Medication, MedicationEvent, OCRResult, OCRTask
+from pomi_backend.services.ocr_provider import OCRProviderResponse
+
+
+def _headers(client: TestClient, name: str) -> dict[str, str]:
+    password = "SyncOcrPass123"
+    registered = client.post(
+        "/api/auth/register", json={"account_name": name, "password": password}
+    )
+    assert registered.status_code == 201
+    login = client.post("/api/auth/login", json={"account_name": name, "password": password})
+    assert login.status_code == 200
+    return {"Authorization": f"Bearer {login.json()['session_id']}"}
+
+
+def _image() -> bytes:
+    output = BytesIO()
+    Image.new("RGB", (32, 24), "white").save(output, format="PNG")
+    return output.getvalue()
+
+
+def _data(response, status_code: int = 200):
+    assert response.status_code == status_code, response.text
+    return response.json()["data"]
+
+
+class FakeProvider:
+    calls = 0
+
+    def __init__(self, **_: object) -> None:
+        pass
+
+    def recognize(self, request) -> OCRProviderResponse:
+        type(self).calls += 1
+        payload = {
+            "hospital": "南京市妇幼保健院",
+            "department": "妇科",
+            "visit_date": "2026-08-26",
+            "diagnosis_summary": "多囊卵巢综合征",
+            "medical_advice": "二甲双胍 500mg 每日两次",
+            "examinations": [
+                {
+                    "item_name": "空腹血糖",
+                    "value": "5.2",
+                    "unit": "mmol/L",
+                    "reference_range": "3.9-6.1",
+                    "abnormal": False,
+                }
+            ],
+            "medication_suggestions": [
+                {
+                    "drug_name": "二甲双胍",
+                    "dosage": "500mg",
+                    "frequency": "每日两次",
+                    "duration": None,
+                    "instruction": "每日两次",
+                    "source_text": "二甲双胍 500mg 每日两次",
+                }
+            ],
+            "original_file_name": request.file_name,
+        }
+        return OCRProviderResponse(
+            raw_response={"provider": "fake"}, payload=payload, source="fake-qwen"
+        )
+
+
+def _recognize(
+    client: TestClient,
+    headers: dict[str, str],
+    *,
+    key: str = "sync-ocr-001",
+) -> dict:
+    return _data(
+        client.post(
+            "/api/ocr/recognize",
+            headers={
+                **headers,
+                "Idempotency-Key": key,
+                "X-External-Processing-Consent-Version": "external-ocr-v1",
+            },
+            data={"material_type": "outpatient_record", "prompt_version": "pomi-ocr-v1"},
+            files={"file": ("visit.png", _image(), "image/png")},
+        )
+    )
+
+
+def _confirmation(*, drug_name: str = "二甲双胍", dosage: str = "500mg") -> dict:
+    return {
+        "visit_date": "2026-08-26",
+        "examinations": [
+            {
+                "source_index": 0,
+                "item_name": "空腹血糖",
+                "value": "5.2",
+                "unit": "mmol/L",
+                "reference_range": "3.9-6.1",
+            }
+        ],
+        "medication_suggestions": [
+            {
+                "source_index": 0,
+                "drug_name": drug_name,
+                "dosage": dosage,
+                "frequency": "每日两次",
+                "instruction": "每日两次",
+                "source_text": f"{drug_name} {dosage} 每日两次",
+            }
+        ],
+    }
+
+
+def test_sync_recognize_persists_result_and_reuses_idempotency_key(
+    api_client: TestClient, monkeypatch: MonkeyPatch
+) -> None:
+    monkeypatch.setattr("pomi_backend.api.ocr.Qwen3VLOCRProvider", FakeProvider)
+    FakeProvider.calls = 0
+    owner = _headers(api_client, "sync-ocr-owner")
+
+    first = _recognize(api_client, owner)
+    repeated = _recognize(api_client, owner)
+
+    assert repeated == first
+    assert FakeProvider.calls == 1
+    with api_client.app.state.session_factory() as session:
+        assert session.scalar(select(func.count()).select_from(OCRTask)) == 1
+        assert session.scalar(select(func.count()).select_from(OCRResult)) == 1
+        task = session.get(OCRTask, first["ocr_task_id"])
+        assert task is not None
+        assert task.status == "pending_confirmation"
+        assert task.result_source == "fake-qwen"
+
+    second_owner = _headers(api_client, "sync-ocr-other-owner")
+    other = _recognize(api_client, second_owner)
+    assert other["ocr_task_id"] != first["ocr_task_id"]
+    assert FakeProvider.calls == 2
+
+
+def test_sync_confirmation_is_atomic_idempotent_and_owned(
+    api_client: TestClient, monkeypatch: MonkeyPatch
+) -> None:
+    monkeypatch.setattr("pomi_backend.api.ocr.Qwen3VLOCRProvider", FakeProvider)
+    api_client.app.state.business_date_provider = lambda: date(2026, 8, 28)
+    owner = _headers(api_client, "sync-confirm-owner")
+    outsider = _headers(api_client, "sync-confirm-outsider")
+    recognized = _recognize(api_client, owner, key="sync-confirm-001")
+    endpoint = f"/api/ocr/results/{recognized['ocr_result_id']}/confirm"
+
+    hidden = api_client.post(endpoint, headers=outsider, json=_confirmation())
+    assert hidden.status_code == 404
+
+    created = _data(api_client.post(endpoint, headers=owner, json=_confirmation()))
+    assert created["status"] == "confirmed"
+    assert created["reused"] is False
+    assert created["observations"][0]["standard_metric_id"] == "glucose"
+    assert created["medications"][0]["standard_drug_id"] == "rxnorm:metformin"
+
+    repeated = _data(api_client.post(endpoint, headers=owner, json=_confirmation()))
+    assert repeated["reused"] is True
+    assert repeated["medications"] == created["medications"]
+
+    changed = _confirmation()
+    changed["examinations"][0]["value"] = "5.3"
+    conflict = api_client.post(endpoint, headers=owner, json=changed)
+    assert conflict.status_code == 409
+    assert conflict.json()["error"]["code"] == "OCR_ALREADY_CONFIRMED"
+
+    with api_client.app.state.session_factory() as session:
+        assert session.scalar(select(func.count()).select_from(LabObservation)) == 1
+        assert session.scalar(select(func.count()).select_from(Medication)) == 1
+        event = session.scalar(select(MedicationEvent))
+        assert event is not None
+        assert event.event_date == date(2026, 8, 26)
+        assert session.get(OCRTask, recognized["ocr_task_id"]).status == "confirmed"
+
+
+def test_sync_confirmation_rejects_invalid_items_without_partial_writes(
+    api_client: TestClient, monkeypatch: MonkeyPatch
+) -> None:
+    monkeypatch.setattr("pomi_backend.api.ocr.Qwen3VLOCRProvider", FakeProvider)
+    owner = _headers(api_client, "sync-confirm-invalid")
+    recognized = _recognize(api_client, owner, key="sync-confirm-invalid-001")
+    endpoint = f"/api/ocr/results/{recognized['ocr_result_id']}/confirm"
+
+    unknown = api_client.post(
+        endpoint,
+        headers=owner,
+        json=_confirmation(drug_name="未知药品"),
+    )
+    assert unknown.status_code == 422
+    assert unknown.json()["error"]["code"] == "OCR_CONFIRMATION_INVALID"
+    assert unknown.json()["error"]["details"]["fields"][0]["code"] == "DRUG_MAPPING_REQUIRED"
+
+    invalid_dosage = api_client.post(
+        endpoint,
+        headers=owner,
+        json=_confirmation(dosage="一片"),
+    )
+    assert invalid_dosage.status_code == 422
+    assert invalid_dosage.json()["error"]["details"]["fields"][0]["code"] == "DOSAGE_INVALID"
+
+    invalid_lab = _confirmation()
+    invalid_lab["examinations"][0]["value"] = "not-a-number"
+    rejected = api_client.post(endpoint, headers=owner, json=invalid_lab)
+    assert rejected.status_code == 422
+    assert rejected.json()["error"]["code"] == "OCR_CONFIRMATION_INVALID"
+
+    duplicate = _confirmation()
+    duplicate["examinations"].append(dict(duplicate["examinations"][0]))
+    duplicate_response = api_client.post(endpoint, headers=owner, json=duplicate)
+    assert duplicate_response.status_code == 422
+
+    empty = api_client.post(
+        endpoint,
+        headers=owner,
+        json={"examinations": [], "medication_suggestions": []},
+    )
+    assert empty.status_code == 422
+    assert empty.json()["error"]["code"] == "OCR_CONFIRMATION_EMPTY"
+
+    with api_client.app.state.session_factory() as session:
+        assert session.scalar(select(func.count()).select_from(LabObservation)) == 0
+        assert session.scalar(select(func.count()).select_from(Medication)) == 0
+        assert session.scalar(select(func.count()).select_from(MedicationEvent)) == 0
+        assert session.get(OCRTask, recognized["ocr_task_id"]).status == "pending_confirmation"

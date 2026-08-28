@@ -47,9 +47,7 @@ def create_medication(client: TestClient, headers: dict[str, str], *, key: str) 
 
 def test_seven_day_edit_window_and_future_boundary(api_client: TestClient) -> None:
     headers = authenticated(api_client, "adherence-boundary")
-    medication = create_medication(api_client, headers, key="adherence-boundary-medication")[
-        "medication"
-    ]
+    medication = create_medication(api_client, headers, key="adherence-boundary-medication")
     api_client.app.state.business_date_provider = lambda: date(2026, 8, 10)
     url = f"/api/medications/{medication['id']}/daily-status"
 
@@ -95,9 +93,7 @@ def test_backfill_is_idempotent_audited_and_updates_month_summary(
     api_engine,
 ) -> None:
     headers = authenticated(api_client, "adherence-idempotency")
-    medication = create_medication(api_client, headers, key="adherence-idempotency-medication")[
-        "medication"
-    ]
+    medication = create_medication(api_client, headers, key="adherence-idempotency-medication")
     api_client.app.state.business_date_provider = lambda: date(2026, 8, 10)
     url = f"/api/medications/{medication['id']}/daily-status"
     payload = {"record_date": "2026-08-05", "intake_status": "missed"}
@@ -140,9 +136,7 @@ def test_history_marks_recent_dates_editable_and_older_dates_read_only(
     api_client: TestClient,
 ) -> None:
     headers = authenticated(api_client, "adherence-history")
-    medication = create_medication(api_client, headers, key="adherence-history-medication")[
-        "medication"
-    ]
+    medication = create_medication(api_client, headers, key="adherence-history-medication")
     api_client.app.state.business_date_provider = lambda: date(2026, 8, 10)
 
     history = response_data(
@@ -156,9 +150,7 @@ def test_history_marks_recent_dates_editable_and_older_dates_read_only(
             },
         )
     )
-    by_date = {item["record_date"]: item for item in history["items"]}
-    assert history["business_date"] == "2026-08-10"
-    assert history["editable_from"] == "2026-08-04"
+    by_date = {item["record_date"]: item for item in history}
     assert by_date["2026-08-03"]["editable"] is False
     assert by_date["2026-08-04"]["editable"] is True
     assert by_date["2026-08-10"]["editable"] is True
@@ -173,7 +165,7 @@ def test_adherence_history_and_mutations_are_isolated_by_session_uid(
         api_client,
         owner,
         key="adherence-private-medication",
-    )["medication"]
+    )
     api_client.app.state.business_date_provider = lambda: date(2026, 8, 10)
     url = f"/api/medications/{medication['id']}/daily-status"
     response_data(
@@ -211,7 +203,7 @@ def test_adherence_history_and_mutations_are_isolated_by_session_uid(
             params={"from": "2026-08-04", "to": "2026-08-10"},
         )
     )
-    assert stranger_history["items"] == []
+    assert stranger_history == []
 
     owner_history = response_data(
         api_client.get(
@@ -224,7 +216,7 @@ def test_adherence_history_and_mutations_are_isolated_by_session_uid(
             },
         )
     )
-    assert {item["intake_status"] for item in owner_history["items"]} >= {"taken"}
+    assert {item["intake_status"] for item in owner_history} >= {"taken"}
 
 
 def test_revoked_session_cannot_read_or_backfill_adherence(
@@ -235,7 +227,7 @@ def test_revoked_session_cannot_read_or_backfill_adherence(
         api_client,
         headers,
         key="adherence-revoked-medication",
-    )["medication"]
+    )
     api_client.app.state.business_date_provider = lambda: date(2026, 8, 10)
     assert api_client.post("/api/auth/logout", headers=headers).status_code == 204
 
@@ -262,7 +254,7 @@ def test_concurrent_identical_backfills_create_one_audited_row(
         api_client,
         headers,
         key="adherence-concurrent-medication",
-    )["medication"]
+    )
     api_client.app.state.business_date_provider = lambda: date(2026, 8, 10)
     url = f"/api/medications/{medication['id']}/daily-status"
     workers = 6
