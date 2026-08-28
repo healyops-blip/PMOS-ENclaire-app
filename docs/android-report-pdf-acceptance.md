@@ -44,7 +44,7 @@ name.
   succeeded polling, and authenticated byte download.
 - Backward-compatible parsing of the old `pending` status.
 - PDF signature rejection, safe cache naming, expiry, file-count cap, and
-  partial-file cleanup.
+  partial-file cleanup, plus full private-cache removal on logout/account switch.
 - Report-page status, retry, cached system share/print dispatch, and continued
   visibility of the three-layer App report after failure.
 - `flutter build apk --debug --no-pub` completed successfully on 2026-08-28.

@@ -174,6 +174,9 @@ void main() {
       );
       expect(files, hasLength(2));
       expect(files.any((file) => file.path.endsWith('.part')), isFalse);
+
+      await cache.clear();
+      expect(await first.parent.exists(), isFalse);
     },
   );
 }

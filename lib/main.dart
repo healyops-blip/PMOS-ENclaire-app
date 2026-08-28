@@ -25,6 +25,7 @@ class MainApp extends StatelessWidget {
     this.patientNoteRepository,
     this.reportRepository,
     this.reportPdfRepository,
+    this.reportPdfCache,
     this.documentRepository,
     this.weightRepository,
     this.apiClient,
@@ -40,6 +41,7 @@ class MainApp extends StatelessWidget {
   final PatientNoteRepository? patientNoteRepository;
   final ReportRepository? reportRepository;
   final ReportPdfRepository? reportPdfRepository;
+  final ReportPdfCache? reportPdfCache;
   final DocumentRepository? documentRepository;
   final WeightRepository? weightRepository;
   final PomiApiClient? apiClient;
@@ -57,6 +59,7 @@ class MainApp extends StatelessWidget {
         patientNoteRepository: patientNoteRepository,
         reportRepository: reportRepository,
         reportPdfRepository: reportPdfRepository,
+        reportPdfCache: reportPdfCache,
         documentRepository: documentRepository,
         weightRepository: weightRepository,
         apiClient: apiClient,

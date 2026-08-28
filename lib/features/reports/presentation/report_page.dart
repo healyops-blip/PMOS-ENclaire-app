@@ -1,8 +1,4 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
 import 'package:pmos_enclaire/core/theme/pomi_theme.dart';
 import 'package:pmos_enclaire/core/widgets/demo_badge.dart';
 import 'package:pmos_enclaire/core/widgets/pomi_line_chart.dart';
@@ -13,20 +9,19 @@ import 'package:pmos_enclaire/features/reports/data/report_pdf_repository.dart';
 import 'package:pmos_enclaire/features/reports/data/report_repository.dart';
 import 'package:pmos_enclaire/features/reports/presentation/report_viewer_page.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
-import 'package:printing/printing.dart';
-
-enum _PdfAction { save, share, print }
 
 class ReportGeneratorPage extends StatefulWidget {
   ReportGeneratorPage({
     required this.repository,
     ReportRepository? reportRepository,
     ReportPdfRepository? reportPdfRepository,
+    ReportPdfCache? reportPdfCache,
     DocumentRepository? documentRepository,
     CertificationRepository? certificationRepository,
     super.key,
   }) : reportRepository = reportRepository ?? DemoReportRepository(),
        reportPdfRepository = reportPdfRepository ?? DemoReportPdfRepository(),
+       reportPdfCache = reportPdfCache ?? ReportPdfCache(),
        documentRepository = documentRepository ?? DemoDocumentRepository(),
        certificationRepository =
            certificationRepository ?? LocalCertificationRepository();
@@ -34,6 +29,7 @@ class ReportGeneratorPage extends StatefulWidget {
   final PatientNoteRepository repository;
   final ReportRepository reportRepository;
   final ReportPdfRepository reportPdfRepository;
+  final ReportPdfCache reportPdfCache;
   final DocumentRepository documentRepository;
   final CertificationRepository certificationRepository;
 
@@ -175,6 +171,7 @@ class _ReportGeneratorPageState extends State<ReportGeneratorPage> {
             documentRepository: widget.documentRepository,
             certificationRepository: widget.certificationRepository,
             pdfRepository: widget.reportPdfRepository,
+            pdfCache: widget.reportPdfCache,
           ),
         ),
       );
@@ -200,6 +197,7 @@ class _ReportGeneratorPageState extends State<ReportGeneratorPage> {
             documentRepository: widget.documentRepository,
             certificationRepository: widget.certificationRepository,
             pdfRepository: widget.reportPdfRepository,
+            pdfCache: widget.reportPdfCache,
           ),
         ),
       );
@@ -458,126 +456,6 @@ class _ReportPageState extends State<ReportPage> {
     ),
   };
 
-  Future<Uint8List> _buildPdf() async {
-    final logoData = await rootBundle.load('assets/images/pomi_logo.png');
-    final logo = pw.MemoryImage(logoData.buffer.asUint8List());
-    final document = pw.Document(
-      title: 'POMI PCOS Visit Preparation Report',
-      author: 'POMI',
-    );
-    document.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(36),
-        build: (context) => [
-          pw.Row(
-            children: [
-              pw.Image(logo, width: 56, height: 56, fit: pw.BoxFit.cover),
-              pw.SizedBox(width: 14),
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text(
-                    'POMI PCOS VISIT REPORT',
-                    style: pw.TextStyle(
-                      fontSize: 20,
-                      fontWeight: pw.FontWeight.bold,
-                      color: PdfColor.fromHex('#6A4C93'),
-                    ),
-                  ),
-                  pw.Text('Demo patient / Generated 2026-08-27'),
-                ],
-              ),
-            ],
-          ),
-          pw.SizedBox(height: 24),
-          pw.Container(
-            padding: const pw.EdgeInsets.all(12),
-            color: PdfColor.fromHex('#F5F0F9'),
-            child: pw.Text(
-              'Patient statement (verbatim): Irregular menstrual cycles during the past two months. Occasional missed metformin doses due to stomach discomfort.',
-            ),
-          ),
-          pw.SizedBox(height: 18),
-          pw.Text(
-            'Latest confirmed indicators',
-            style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold),
-          ),
-          pw.SizedBox(height: 8),
-          pw.TableHelper.fromTextArray(
-            headers: const ['Indicator', 'Value', 'Reference / status'],
-            data: const [
-              ['Fasting glucose', '5.6 mmol/L', '3.9 - 6.1'],
-              ['HbA1c', '5.5 %', '4.0 - 6.0'],
-              ['Total testosterone', '0.9 ng/mL', 'Above 0.8'],
-              ['Triglycerides', '1.4 mmol/L', '0.45 - 1.70'],
-            ],
-            headerDecoration: pw.BoxDecoration(
-              color: PdfColor.fromHex('#EDE5F3'),
-            ),
-          ),
-          pw.SizedBox(height: 18),
-          pw.Text(
-            'Current medications',
-            style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold),
-          ),
-          pw.Bullet(text: 'Metformin XR 850 mg / once daily'),
-          pw.Bullet(text: 'Folic acid 0.4 mg / once daily'),
-          pw.Bullet(text: 'Vitamin D3 1000 IU / once daily'),
-          pw.SizedBox(height: 22),
-          pw.Divider(),
-          pw.Text(
-            'Demo data only. Patient-reported information is for visit preparation and does not constitute diagnosis, treatment advice, or an official medical record.',
-            style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
-          ),
-        ],
-      ),
-    );
-    return document.save();
-  }
-
-  Future<void> _handlePdf(_PdfAction action) async {
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(const SnackBar(content: Text('正在生成 PDF…')));
-    try {
-      final bytes = await _buildPdf();
-      switch (action) {
-        case _PdfAction.save:
-          await FilePicker.platform.saveFile(
-            fileName: 'pomi-visit-report-20260827.pdf',
-            bytes: bytes,
-            type: FileType.custom,
-            allowedExtensions: const ['pdf'],
-          );
-        case _PdfAction.share:
-          await Printing.sharePdf(
-            bytes: bytes,
-            filename: 'pomi-visit-report-20260827.pdf',
-            subject: 'POMI 复诊准备报告',
-          );
-        case _PdfAction.print:
-          await Printing.layoutPdf(onLayout: (_) async => bytes);
-      }
-      if (mounted) {
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(switch (action) {
-              _PdfAction.save => 'PDF 已生成',
-              _PdfAction.share => '已打开系统分享面板',
-              _PdfAction.print => '已打开系统打印面板',
-            }),
-          ),
-        );
-      }
-    } on Exception {
-      if (mounted) {
-        messenger.showSnackBar(
-          const SnackBar(content: Text('PDF 操作失败，但 App 内报告不受影响')),
-        );
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final snapshot = widget.report?.snapshot;
@@ -629,40 +507,7 @@ class _ReportPageState extends State<ReportPage> {
     }
     return Scaffold(
       key: const Key('report-page'),
-      appBar: AppBar(
-        title: const Text('复诊报告'),
-        actions: [
-          PopupMenuButton<_PdfAction>(
-            key: const Key('report-pdf-menu'),
-            tooltip: 'PDF 操作',
-            onSelected: _handlePdf,
-            itemBuilder: (context) => const [
-              PopupMenuItem(
-                value: _PdfAction.save,
-                child: ListTile(
-                  leading: Icon(Icons.download_outlined),
-                  title: Text('保存 PDF'),
-                ),
-              ),
-              PopupMenuItem(
-                value: _PdfAction.share,
-                child: ListTile(
-                  leading: Icon(Icons.ios_share_outlined),
-                  title: Text('分享 PDF'),
-                ),
-              ),
-              PopupMenuItem(
-                value: _PdfAction.print,
-                child: ListTile(
-                  leading: Icon(Icons.print_outlined),
-                  title: Text('打印 PDF'),
-                ),
-              ),
-            ],
-            icon: const Icon(Icons.picture_as_pdf_outlined),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('复诊报告')),
       backgroundColor: PomiColors.surfaceMuted,
       body: Column(
         children: [

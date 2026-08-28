@@ -34,6 +34,7 @@ class PomiApp extends StatefulWidget {
     this.patientNoteRepository,
     this.reportRepository,
     this.reportPdfRepository,
+    this.reportPdfCache,
     this.documentRepository,
     this.ocrRepository,
     this.weightRepository,
@@ -50,6 +51,7 @@ class PomiApp extends StatefulWidget {
   final PatientNoteRepository? patientNoteRepository;
   final ReportRepository? reportRepository;
   final ReportPdfRepository? reportPdfRepository;
+  final ReportPdfCache? reportPdfCache;
   final DocumentRepository? documentRepository;
   final OcrRepository? ocrRepository;
   final WeightRepository? weightRepository;
@@ -66,11 +68,7 @@ class _PomiAppState extends State<PomiApp> {
   late final PomiApiClient _apiClient = widget.apiClient ?? PomiApiClient();
   late final AuthRepository _authRepository =
       widget.authRepository ??
-      FastApiAuthRepository(
-        _apiClient,
-        SecureSessionStore(),
-        onLogout: _clearActiveDashboardCache,
-      );
+      FastApiAuthRepository(_apiClient, SecureSessionStore());
   late final PatientProfileRepository _profileRepository =
       widget.profileRepository ??
       (widget.authRepository is DemoAuthRepository
@@ -119,18 +117,29 @@ class _PomiAppState extends State<PomiApp> {
       (widget.authRepository is DemoAuthRepository
           ? null
           : FastApiMedicationRepository(_apiClient));
+  late final ReportPdfCache _reportPdfCache =
+      widget.reportPdfCache ?? ReportPdfCache();
   String? _activeUid;
 
   Future<void> _clearActiveDashboardCache() async {
     final uid = _activeUid;
-    if (uid != null) await _dashboardRepository.clear(uid);
     _activeUid = null;
+    try {
+      if (uid != null) await _dashboardRepository.clear(uid);
+    } catch (_) {
+      // Cache cleanup must not prevent local Session removal or navigation.
+    }
+    try {
+      await _reportPdfCache.clear();
+    } catch (_) {
+      // Best effort: stale temporary PDFs remain subject to startup expiry.
+    }
   }
 
   Future<void> _activateUid(String uid) async {
     final previous = _activeUid;
     if (previous != null && previous != uid) {
-      await _dashboardRepository.clear(previous);
+      await _clearActiveDashboardCache();
     }
     _activeUid = uid;
   }
@@ -201,12 +210,14 @@ class _PomiAppState extends State<PomiApp> {
               try {
                 await _authRepository.logout();
               } finally {
+                await _clearActiveDashboardCache();
                 if (context.mounted) context.go(PomiRoutes.login);
               }
             },
             patientNoteRepository: _patientNoteRepository,
             reportRepository: _reportRepository,
             reportPdfRepository: _reportPdfRepository,
+            reportPdfCache: _reportPdfCache,
             documentRepository: _documentRepository,
             ocrRepository: _ocrRepository,
             weightRepository: _weightRepository,
@@ -228,7 +239,11 @@ class _PomiAppState extends State<PomiApp> {
   Future<void> _restoreSession() async {
     try {
       final account = await _authRepository.restore();
-      if (!mounted || account == null) return;
+      if (!mounted) return;
+      if (account == null) {
+        await _clearActiveDashboardCache();
+        return;
+      }
       final presentation = account.toPresentationAccount();
       await _activateUid(presentation.uid);
       if (!mounted) return;

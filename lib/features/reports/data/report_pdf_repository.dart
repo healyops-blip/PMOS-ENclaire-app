@@ -230,6 +230,16 @@ class ReportPdfCache {
     }
   }
 
+  Future<void> clear() async {
+    final root = await _directoryProvider();
+    final directory = Directory(
+      '${root.path}${Platform.pathSeparator}pomi-report-pdf-cache',
+    );
+    if (await directory.exists()) {
+      await directory.delete(recursive: true);
+    }
+  }
+
   Future<Directory> _cacheDirectory() async {
     final root = await _directoryProvider();
     final directory = Directory(

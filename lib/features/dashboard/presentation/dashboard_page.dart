@@ -35,6 +35,7 @@ class DashboardPage extends StatefulWidget {
     required this.weightRepository,
     this.reportRepository,
     this.reportPdfRepository,
+    this.reportPdfCache,
     this.ocrRepository,
     this.dashboardRepository,
     this.onLogout,
@@ -50,6 +51,7 @@ class DashboardPage extends StatefulWidget {
   final DocumentRepository documentRepository;
   final ReportRepository? reportRepository;
   final ReportPdfRepository? reportPdfRepository;
+  final ReportPdfCache? reportPdfCache;
   final OcrRepository? ocrRepository;
   final WeightRepository weightRepository;
   final DashboardRepository? dashboardRepository;
@@ -226,6 +228,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     documentRepository: widget.documentRepository,
                     reportPdfRepository:
                         widget.reportPdfRepository ?? DemoReportPdfRepository(),
+                    reportPdfCache: widget.reportPdfCache,
                   ),
                 ),
               ),

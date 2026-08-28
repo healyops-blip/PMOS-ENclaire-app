@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pmos_enclaire/features/auth/data/auth_repository.dart';
 import 'package:pmos_enclaire/features/reports/data/patient_note_repository.dart';
+import 'package:pmos_enclaire/features/reports/data/report_pdf_repository.dart';
 import 'package:pmos_enclaire/features/reports/presentation/report_page.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/main.dart';
@@ -167,6 +168,48 @@ void main() {
     expect(find.byKey(const Key('profile-page')), findsOneWidget);
     expect(find.byKey(const Key('certification-entry')), findsNothing);
   });
+
+  testWidgets(
+    'logout attempts private PDF cleanup without blocking Session exit',
+    (tester) async {
+      _setPhoneViewport(tester);
+      final cache = _TrackingReportPdfCache(failOnClear: true);
+      await tester.pumpWidget(
+        MainApp(
+          authRepository: const DemoAuthRepository(),
+          reportPdfCache: cache,
+        ),
+      );
+      await tester.tap(find.byKey(const Key('demo-login-button')));
+      await tester.pumpAndSettle();
+      final clearCallsBeforeLogout = cache.clearCalls;
+
+      await tester.tap(find.byKey(const Key('nav-我的')));
+      await tester.pumpAndSettle();
+      final logout = find.byKey(const Key('logout-button'));
+      await tester.scrollUntilVisible(
+        logout,
+        300,
+        scrollable: find.descendant(
+          of: find.byKey(const Key('profile-page')),
+          matching: find.byType(Scrollable),
+        ),
+      );
+      await tester.drag(
+        find.descendant(
+          of: find.byKey(const Key('profile-page')),
+          matching: find.byType(ListView),
+        ),
+        const Offset(0, -100),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(logout);
+      await tester.pumpAndSettle();
+
+      expect(cache.clearCalls, clearCallsBeforeLogout + 1);
+      expect(find.byKey(const Key('login-page')), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'document upload requires preview and external-processing consent',
@@ -403,5 +446,18 @@ class _RetryPatientNoteRepository extends DemoPatientNoteRepository {
       throw const PatientNoteFailure('模拟网络失败');
     }
     return super.update(id, text, visitContext: visitContext);
+  }
+}
+
+class _TrackingReportPdfCache extends ReportPdfCache {
+  _TrackingReportPdfCache({this.failOnClear = false});
+
+  final bool failOnClear;
+  int clearCalls = 0;
+
+  @override
+  Future<void> clear() async {
+    clearCalls += 1;
+    if (failOnClear) throw StateError('simulated cache cleanup failure');
   }
 }

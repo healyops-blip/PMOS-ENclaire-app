@@ -388,6 +388,7 @@ def test_repository_scope_and_atomic_claim_are_patient_safe(db_session) -> None:
             source_digest=str(index) * 64,
             snapshot_hash=hashlib.sha256(str(index).encode()).hexdigest(),
             generated_by_uid=account.uid,
+            report_generated_at=datetime.now(UTC),
         )
         db_session.add(report)
         reports.append(report)
