@@ -1262,19 +1262,6 @@ class _ReportSummaryLayer extends StatelessWidget {
         style: const TextStyle(color: pomiMuted),
       ),
       const SizedBox(height: 16),
-      const PomiGlassCard(
-        padding: EdgeInsets.all(14),
-        child: Text(
-          '仅整理已确认记录 · 不构成诊断或治疗建议',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: pomiSecondaryText,
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
-      const SizedBox(height: 14),
       PomiGlassCard(
         onTap:
             () => showDialog<void>(
