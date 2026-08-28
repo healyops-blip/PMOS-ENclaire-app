@@ -16,6 +16,7 @@ class WeightInput(BaseModel):
 
     record_date: date
     weight_kg: Decimal = Field(ge=Decimal("20.0"), le=Decimal("300.0"), multiple_of=0.1)
+    updated_at: datetime | None = None
 
 
 class WeightResponse(BaseModel):

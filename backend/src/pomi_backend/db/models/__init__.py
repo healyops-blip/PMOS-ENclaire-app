@@ -9,6 +9,7 @@ from pomi_backend.db.models.health import (
     MedicationEvent,
     MenstrualCycle,
     PatientProfile,
+    OnboardingDraft,
     WeightRecord,
 )
 from pomi_backend.db.models.labs import LabObservation
@@ -38,6 +39,7 @@ __all__ = [
     "OutpatientRecord",
     "PatientNote",
     "PatientProfile",
+    "OnboardingDraft",
     "ReportSnapshot",
     "ReportSource",
     "UserAccount",

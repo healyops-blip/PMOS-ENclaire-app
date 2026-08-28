@@ -7,7 +7,7 @@ plugins {
 android {
     namespace = "com.healyops.pmos_enclaire"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = "30.0.16138531"
+    ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

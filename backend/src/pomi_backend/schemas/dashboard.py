@@ -16,14 +16,18 @@ class DashboardSectionError(BaseModel):
 class DashboardSection(BaseModel):
     status: Literal["ok", "empty", "error"]
     data: Any = None
+    error_code: str | None = None
     error: DashboardSectionError | None = None
 
 
 class DashboardData(BaseModel):
-    business_date: str
+    server_date: str
+    data_as_of: str
     follow_up: DashboardSection
     today_medications: DashboardSection
     monthly_medication_summary: DashboardSection
+    tracking_summary: DashboardSection
+    document_summary: DashboardSection
     latest_report: DashboardSection
 
 

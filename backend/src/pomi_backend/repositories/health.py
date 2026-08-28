@@ -26,6 +26,7 @@ class PatientRepository:
     update_fields = frozenset(
         {
             "nickname",
+            "birth_year",
             "birth_date",
             "gender",
             "height_cm",

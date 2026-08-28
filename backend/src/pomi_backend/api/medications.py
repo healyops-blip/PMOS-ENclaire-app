@@ -50,11 +50,8 @@ def create_medication(
     service: MedicationServiceDependency,
     idempotency_key: IdempotencyKey,
 ) -> dict:
-    medication, event = service.create(payload, idempotency_key)
-    return success(
-        request,
-        {"medication": medication_data(medication), "event": event_data(event)},
-    )
+    medication, _event = service.create(payload, idempotency_key)
+    return success(request, medication_data(medication))
 
 
 @router.put("/medications/{medication_id}")
@@ -64,11 +61,8 @@ def update_medication(
     request: Request,
     service: MedicationServiceDependency,
 ) -> dict:
-    medication, event = service.update(medication_id, payload)
-    return success(
-        request,
-        {"medication": medication_data(medication), "event": event_data(event)},
-    )
+    medication, _event = service.update(medication_id, payload)
+    return success(request, medication_data(medication))
 
 
 @router.get("/medications/{medication_id}/events")
@@ -90,7 +84,8 @@ def set_daily_status(
     request: Request,
     service: MedicationServiceDependency,
 ) -> dict:
-    return success(request, service.set_daily_status(medication_id, payload))
+    daily = service.set_daily_status(medication_id, payload)
+    return success(request, daily)
 
 
 @router.get("/medication-daily")
@@ -101,4 +96,4 @@ def list_daily_records(
     to_date: Annotated[date, Query(alias="to")],
     medication_id: str | None = None,
 ) -> dict:
-    return success(request, service.daily_range(from_date, to_date, medication_id))
+    return success(request, service.daily_range(from_date, to_date, medication_id)["items"])

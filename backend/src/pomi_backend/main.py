@@ -26,7 +26,8 @@ from pomi_backend.api.health import router as health_router
 from pomi_backend.api.labs import router as labs_router
 from pomi_backend.api.medications import router as medications_router
 from pomi_backend.api.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
-from pomi_backend.api.ocr import router as ocr_router
+from pomi_backend.api.ocr import router as ocr_router, sync_router as ocr_sync_router
+from pomi_backend.api.onboarding import router as onboarding_router
 from pomi_backend.api.patient import router as patient_router
 from pomi_backend.api.patient_notes import router as patient_notes_router
 from pomi_backend.api.reconciliations import router as reconciliations_router
@@ -88,6 +89,8 @@ def create_app(*, settings: Settings | None = None, engine: Engine | None = None
     app.include_router(reports_router)
     app.include_router(documents_router)
     app.include_router(ocr_router)
+    app.include_router(ocr_sync_router)
+    app.include_router(onboarding_router)
     app.include_router(reconciliations_router)
     app.include_router(labs_router)
     return app

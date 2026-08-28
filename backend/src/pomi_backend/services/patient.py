@@ -15,13 +15,13 @@ from pomi_backend.schemas.patient import PatientProfileUpdate
 
 def profile_data(profile: PatientProfile) -> dict[str, Any]:
     return {
-        "patient_id": profile.patient_id,
+        "id": profile.patient_id,
         "nickname": profile.nickname,
-        "birth_date": profile.birth_date.isoformat() if profile.birth_date else None,
-        "gender": profile.gender,
+        "birth_year": profile.birth_year,
         "height_cm": float(profile.height_cm) if profile.height_cm is not None else None,
         "diagnosis_year": profile.diagnosis_year,
-        "primary_condition": profile.primary_condition,
+        "usual_cycle_min_days": profile.usual_cycle_min_days,
+        "usual_cycle_max_days": profile.usual_cycle_max_days,
         "next_visit_date": profile.next_visit_date.isoformat() if profile.next_visit_date else None,
         "health_goal": profile.health_goal,
         "onboarding_completed": profile.onboarding_completed,
@@ -47,7 +47,7 @@ class PatientProfileService:
 
     def update(self, payload: PatientProfileUpdate) -> PatientProfile:
         profile = self.repository.get_or_create(self.account.uid)
-        if payload.updated_at is not None and payload.updated_at != profile.updated_at:
+        if payload.updated_at != profile.updated_at:
             raise BusinessError(
                 "RESOURCE_VERSION_CONFLICT", "The patient profile has changed.", 409
             )
@@ -55,10 +55,13 @@ class PatientProfileService:
             field: getattr(payload, field)
             for field in (
                 "nickname",
+                "birth_year",
                 "birth_date",
                 "gender",
                 "height_cm",
                 "diagnosis_year",
+                "usual_cycle_min_days",
+                "usual_cycle_max_days",
                 "primary_condition",
                 "next_visit_date",
                 "health_goal",
