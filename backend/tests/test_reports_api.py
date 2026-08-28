@@ -204,7 +204,7 @@ def _seed_confirmed_ocr_data(engine: Engine, account_name: str) -> None:
                 document_id=image_doc.id,
                 document_revision_id=image_rev.id,
                 asset_type="pomi_watermarked_display",
-                watermark_version="pomi-watermark-v1",
+                watermark_version="pomi-watermark-v2",
                 status="ready",
                 storage_path=f"derivatives/{image_doc.id}/{image_rev.id}/pomi.png",
                 file_hash="d" * 64,

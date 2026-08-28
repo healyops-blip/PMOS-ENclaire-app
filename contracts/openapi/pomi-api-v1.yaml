@@ -2522,7 +2522,7 @@ components:
           const: pomi_watermarked_display
         watermark_version:
           type: string
-          const: pomi-watermark-v1
+          const: pomi-watermark-v2
         status:
           type: string
           enum: [processing, ready, failed, unsupported, purged]

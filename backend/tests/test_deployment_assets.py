@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import re
 from importlib.resources import files
+from io import BytesIO
 from pathlib import Path
+
+from PIL import Image
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
@@ -92,7 +95,12 @@ def test_backup_logrotate_and_runbook_are_present() -> None:
         assert section in runbook
 
 
-def test_watermark_font_is_packaged_and_kept_small() -> None:
-    font = files("pomi_backend.assets").joinpath("PomiWatermarkSubset.ttf")
-    assert font.is_file()
-    assert 1_000 < len(font.read_bytes()) < 100_000
+def test_watermark_template_is_packaged_transparent_and_kept_small() -> None:
+    asset = files("pomi_backend.assets").joinpath("PomiWatermarkV2.png")
+    assert asset.is_file()
+    content = asset.read_bytes()
+    assert 10_000 < len(content) < 200_000
+    with Image.open(BytesIO(content)) as image:
+        assert image.mode == "RGBA"
+        assert image.size == (774, 1286)
+        assert image.getchannel("A").getextrema() == (0, 255)

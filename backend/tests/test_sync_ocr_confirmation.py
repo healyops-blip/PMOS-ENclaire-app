@@ -140,7 +140,7 @@ def test_sync_recognize_persists_result_and_reuses_idempotency_key(
     assert FakeProvider.calls == 1
     display = first["display_asset"]
     assert display["status"] == "ready"
-    assert display["watermark_version"] == "pomi-watermark-v1"
+    assert display["watermark_version"] == "pomi-watermark-v2"
     assert display["pixel_width"] == 320
     assert display["pixel_height"] == 240
     watermarked = api_client.get(display["file_endpoint"], headers=owner)

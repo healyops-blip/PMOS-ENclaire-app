@@ -387,6 +387,8 @@ OCR 和人工核对始终使用无水印的 `source_document.file_endpoint` 原�
 
 仅 JPEG、PNG 在 OCR 成功并通过结构校验后自动生成水印展示副本。PDF 返回
 `unsupported`，不会影响 OCR 结果。水印生成失败也不会把 OCR 任务改成失败。
+当前 `pomi-watermark-v2` 使用项目正式 SVG 渲染出的透明渐变 Logo 模板，居中显示，
+宽度约为图片的 34%，透明度为 17%；不再手绘 Logo，也不额外叠加说明文字或阴影。
 
 ```http
 GET /api/documents/{document_id}/revisions/{revision_id}/display

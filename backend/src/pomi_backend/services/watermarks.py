@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 from uuid import uuid4
 
-from PIL import Image, ImageDraw, ImageFont, ImageOps
+from PIL import Image, ImageOps
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -26,10 +26,11 @@ from pomi_backend.services.document_storage import private_path
 logger = logging.getLogger("pomi.document.watermark")
 
 ASSET_TYPE = "pomi_watermarked_display"
-WATERMARK_VERSION = "pomi-watermark-v1"
-_WATERMARK_OPACITY = 56
-_WATERMARK_SHADOW = (105, 78, 153, 48)
-_FONT_PATH = Path(__file__).resolve().parents[1] / "assets" / "PomiWatermarkSubset.ttf"
+WATERMARK_VERSION = "pomi-watermark-v2"
+_WATERMARK_OPACITY = 0.17
+_WATERMARK_WIDTH_RATIO = 0.34
+_WATERMARK_HEIGHT_LIMIT = 0.72
+_WATERMARK_PATH = Path(__file__).resolve().parents[1] / "assets" / "PomiWatermarkV2.png"
 
 
 def display_asset_data(asset: DocumentDisplayAsset | None) -> dict | None:
@@ -258,45 +259,29 @@ def _render_watermarked_image(
     with Image.open(source) as opened:
         image = ImageOps.exif_transpose(opened).convert("RGBA")
     width, height = image.size
+    with Image.open(_WATERMARK_PATH) as opened:
+        watermark = opened.convert("RGBA")
+    scale = min(
+        width * _WATERMARK_WIDTH_RATIO / watermark.width,
+        height * _WATERMARK_HEIGHT_LIMIT / watermark.height,
+    )
+    watermark = watermark.resize(
+        (
+            max(1, round(watermark.width * scale)),
+            max(1, round(watermark.height * scale)),
+        ),
+        Image.Resampling.LANCZOS,
+    )
+    watermark.putalpha(
+        watermark.getchannel("A").point(lambda alpha: round(alpha * _WATERMARK_OPACITY))
+    )
     overlay = Image.new("RGBA", image.size, (255, 255, 255, 0))
-    draw = ImageDraw.Draw(overlay)
-    mark_width, mark_height = _draw_pomi_mark(draw, width, height)
-
-    font_size = max(1, round(mark_width * 0.20))
-    tagline_size = max(1, round(mark_width * 0.075))
-    brand_font = ImageFont.truetype(_FONT_PATH, font_size)
-    tagline_font = ImageFont.truetype(_FONT_PATH, tagline_size)
-    mark_top = (height - mark_height) / 2 - mark_height * 0.10
-    mark_bottom = mark_top + mark_height
-    brand_y = mark_bottom + max(1, mark_width * 0.025)
-    draw.text(
-        (width / 2 + max(1, mark_width * 0.012), brand_y + max(1, mark_width * 0.012)),
-        "POMI",
-        font=brand_font,
-        anchor="ma",
-        fill=_WATERMARK_SHADOW,
-    )
-    draw.text(
-        (width / 2, brand_y),
-        "POMI",
-        font=brand_font,
-        anchor="ma",
-        fill=(255, 255, 255, _WATERMARK_OPACITY),
-    )
-    tagline_y = brand_y + font_size * 1.15
-    draw.text(
-        (width / 2 + max(1, mark_width * 0.009), tagline_y + max(1, mark_width * 0.009)),
-        "由 POMI 识别整理",
-        font=tagline_font,
-        anchor="ma",
-        fill=_WATERMARK_SHADOW,
-    )
-    draw.text(
-        (width / 2, tagline_y),
-        "由 POMI 识别整理",
-        font=tagline_font,
-        anchor="ma",
-        fill=(255, 255, 255, _WATERMARK_OPACITY),
+    overlay.alpha_composite(
+        watermark,
+        (
+            (width - watermark.width) // 2,
+            (height - watermark.height) // 2,
+        ),
     )
     rendered = Image.alpha_composite(image, overlay)
     if mime_type == "image/jpeg":
@@ -304,90 +289,6 @@ def _render_watermarked_image(
     else:
         rendered.save(destination, format="PNG", optimize=True)
     return width, height
-
-
-def _draw_pomi_mark(draw: ImageDraw.ImageDraw, width: int, height: int) -> tuple[float, float]:
-    natural_width = 453.0
-    natural_height = 604.0
-    scale = min(width * 0.45 / natural_width, height * 0.50 / natural_height)
-    mark_width = natural_width * scale
-    mark_height = natural_height * scale
-    left = (width - mark_width) / 2
-    top = (height - mark_height) / 2 - mark_height * 0.10
-
-    def point(
-        value: tuple[float, float],
-        offset: float = 0,
-    ) -> tuple[float, float]:
-        return (
-            left + (value[0] - 409) * scale + offset,
-            top + (value[1] - 256) * scale + offset,
-        )
-
-    def polygon(values: list[tuple[float, float]]) -> None:
-        shadow_offset = max(1, mark_width * 0.012)
-        draw.polygon(
-            [point(value, shadow_offset) for value in values],
-            fill=_WATERMARK_SHADOW,
-        )
-        draw.polygon(
-            [point(value) for value in values],
-            fill=(255, 255, 255, _WATERMARK_OPACITY),
-        )
-
-    main = [(409.0, 860.0), (409.0, 483.0)]
-    _cubic(main, (409, 355), (509, 256), (636, 256))
-    _cubic(main, (762, 256), (862, 355), (862, 483))
-    _cubic(main, (862, 617), (765, 722), (638, 722))
-    main.append((572, 722))
-    _cubic(main, (586, 672), (620, 627), (673, 597))
-    _cubic(main, (743, 558), (789, 532), (804, 474))
-    _cubic(main, (810, 452), (805, 444), (790, 440))
-    _cubic(main, (772, 436), (763, 431), (756, 416))
-    _cubic(main, (735, 380), (691, 365), (644, 365))
-    _cubic(main, (567, 365), (510, 416), (510, 490))
-    main.extend(((510, 802), (444, 860)))
-    polygon(main)
-
-    ear = [(570.0, 462.0)]
-    _cubic(ear, (575, 445), (592, 438), (606, 444))
-    _cubic(ear, (612, 447), (617, 452), (620, 457))
-    ear.append((587, 493))
-    _cubic(ear, (577, 483), (567, 473), (570, 462))
-    polygon(ear)
-
-    eye = [(688.0, 456.0)]
-    _cubic(eye, (688, 440), (698, 431), (713, 431))
-    _cubic(eye, (730, 431), (739, 442), (739, 458))
-    _cubic(eye, (739, 465), (735, 471), (737, 477))
-    _cubic(eye, (733, 483), (724, 485), (716, 483))
-    _cubic(eye, (699, 483), (688, 473), (688, 456))
-    polygon(eye)
-    return mark_width, mark_height
-
-
-def _cubic(
-    points: list[tuple[float, float]],
-    control_a: tuple[float, float],
-    control_b: tuple[float, float],
-    end: tuple[float, float],
-) -> None:
-    start = points[-1]
-    for index in range(1, 17):
-        t = index / 16
-        inverse = 1 - t
-        points.append(
-            (
-                inverse**3 * start[0]
-                + 3 * inverse**2 * t * control_a[0]
-                + 3 * inverse * t**2 * control_b[0]
-                + t**3 * end[0],
-                inverse**3 * start[1]
-                + 3 * inverse**2 * t * control_a[1]
-                + 3 * inverse * t**2 * control_b[1]
-                + t**3 * end[1],
-            )
-        )
 
 
 def _sha256(path: Path) -> str:
