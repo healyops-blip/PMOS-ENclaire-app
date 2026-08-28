@@ -146,24 +146,6 @@ class _VisitRecordsPage extends StatelessWidget {
           child: Row(
             children: [
               Text('就诊记录', style: Theme.of(context).textTheme.headlineMedium),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: pomiPurple.withValues(alpha: .08),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  '模拟数据',
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: pomiPurple,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
             ],
           ),
         ),
