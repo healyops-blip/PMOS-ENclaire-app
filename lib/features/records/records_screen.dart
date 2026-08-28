@@ -1034,7 +1034,7 @@ class _ReportsList extends ConsumerWidget {
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 6),
-                const Text('报告会原样保留你确认的文字。'),
+                const Text('可补充患者自述；指标看板会自动汇总已上传的检验单和其他资料。'),
                 const SizedBox(height: 16),
                 TextField(
                   controller: statement,
@@ -1047,11 +1047,7 @@ class _ReportsList extends ConsumerWidget {
                 ),
                 const SizedBox(height: 16),
                 FilledButton(
-                  onPressed:
-                      () => Navigator.pop(
-                        sheetContext,
-                        statement.text.trim().isNotEmpty,
-                      ),
+                  onPressed: () => Navigator.pop(sheetContext, true),
                   child: const Text('确认自述并生成'),
                 ),
               ],
@@ -1064,14 +1060,22 @@ class _ReportsList extends ConsumerWidget {
     }
     try {
       final api = ref.read(apiClientProvider);
-      final note = await api.post(
-        '/api/patient-notes',
-        data: {'original_text': statement.text.trim()},
-      );
-      await api.post('/api/patient-notes/${note['id']}/confirm');
+      final text = statement.text.trim();
+      String? noteId;
+      if (text.isNotEmpty) {
+        final note = await api.post(
+          '/api/patient-notes',
+          data: {'original_text': text},
+        );
+        await api.post('/api/patient-notes/${note['id']}/confirm');
+        noteId = note['id']?.toString();
+      }
       final report = await api.post(
         '/api/reports',
-        data: {'patient_note_id': note['id'], 'confirm_incomplete': true},
+        data: {
+          if (noteId != null) 'patient_note_id': noteId,
+          'confirm_incomplete': true,
+        },
       );
       ref.invalidate(recordsProvider);
       if (context.mounted) {
