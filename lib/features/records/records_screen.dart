@@ -1257,11 +1257,6 @@ class _ReportSummaryLayer extends StatelessWidget {
   Widget build(BuildContext context) => ListView(
     padding: const EdgeInsets.fromLTRB(18, 10, 18, 32),
     children: [
-      Text(
-        '生成于 ${report['generated_at']}',
-        style: const TextStyle(color: pomiMuted),
-      ),
-      const SizedBox(height: 16),
       PomiGlassCard(
         onTap:
             () => showDialog<void>(
