@@ -1210,6 +1210,9 @@ class _ReportViewerState extends ConsumerState<ReportViewer> {
                   summary: summary,
                   medicines: medicines,
                   labs: labs,
+                  cycleCount: cycles.length,
+                  weightCount: weights.length,
+                  sourceCount: sourceGroups['报告来源']!.length,
                   medicalBoundary: (summary['disclaimers'] as List? ?? const [])
                       .join('\n'),
                 ),
@@ -1235,6 +1238,9 @@ class _ReportSummaryLayer extends StatelessWidget {
     required this.summary,
     required this.medicines,
     required this.labs,
+    required this.cycleCount,
+    required this.weightCount,
+    required this.sourceCount,
     required this.medicalBoundary,
   });
   final Map<String, dynamic> report;
@@ -1242,6 +1248,9 @@ class _ReportSummaryLayer extends StatelessWidget {
   final List<Map<String, dynamic>> medicines;
   final List<Map<String, dynamic>> labs;
   final String medicalBoundary;
+  final int cycleCount;
+  final int weightCount;
+  final int sourceCount;
 
   @override
   Widget build(BuildContext context) => ListView(
@@ -1284,6 +1293,24 @@ class _ReportSummaryLayer extends StatelessWidget {
               summary['patient_statement']?.toString() ?? '未填写',
               style: const TextStyle(height: 1.55),
             ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 14),
+      PomiGlassCard(
+        padding: const EdgeInsets.all(15),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '报告数据来源（自动汇总）',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            Text('化验单：${labs.length} 份'),
+            Text('经期记录：$cycleCount 次 · 体重记录：$weightCount 个点'),
+            Text('用药记录：当前 ${medicines.length} 项'),
+            Text('就诊记录：$sourceCount 次历史 + 1 次当前'),
           ],
         ),
       ),
