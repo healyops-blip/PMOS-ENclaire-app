@@ -210,7 +210,7 @@ class _DashboardBody extends ConsumerWidget {
                       ),
                       icon: const Icon(Icons.article_outlined, size: 20),
                       label: const Text(
-                        '生成就诊报告',
+                        '指标看板',
                         maxLines: 1,
                         style: TextStyle(
                           color: Colors.white,
