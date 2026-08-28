@@ -377,7 +377,7 @@ class _LatestVisitStatusCard extends StatelessWidget {
                   ),
                   SizedBox(width: 4),
                   Text(
-                    '签署申请中',
+                    '未核验',
                     style: TextStyle(
                       color: Color(0xFF337EBB),
                       fontSize: 11,

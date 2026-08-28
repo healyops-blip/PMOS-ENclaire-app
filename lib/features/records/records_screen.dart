@@ -95,7 +95,7 @@ class _VisitRecordsPage extends StatelessWidget {
   static const visits = [
     _VisitRecordData(
       date: '2026-08-26',
-      status: '来源签署已记录｜模拟',
+      status: '已核验',
       statusTone: _VisitStatusTone.purple,
       hospital: '模拟医院 B · 生殖内分泌科 · 陈医生',
       rows: [
@@ -115,7 +115,7 @@ class _VisitRecordsPage extends StatelessWidget {
     ),
     _VisitRecordData(
       date: '2026-07-12',
-      status: '来源核验申请中',
+      status: '未核验',
       statusTone: _VisitStatusTone.blue,
       hospital: '模拟医院 A · 妇科 · 李医生',
       rows: [
@@ -133,7 +133,7 @@ class _VisitRecordsPage extends StatelessWidget {
     ),
     _VisitRecordData(
       date: '2026-06-20',
-      status: '患者上传｜来源未核验',
+      status: '未核验',
       statusTone: _VisitStatusTone.gray,
       hospital: '模拟医院 A · 妇科 · 李医生 · 就诊前检测',
       rows: [
