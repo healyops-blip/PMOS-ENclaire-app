@@ -47,7 +47,12 @@ class RecordsScreen extends ConsumerWidget {
               (item) => Map<String, dynamic>.from(item as Map),
             ),
           );
-          if (initialTab == 1) return _ReportsList(reports: reports);
+          if (initialTab == 1) {
+            if (smokeMode) {
+              return ReportViewer(report: _smokeDashboardReport);
+            }
+            return _ReportsList(reports: reports);
+          }
           if (smokeMode) return const _VisitRecordsPage();
           return _DocumentsList(documents: documents);
         },
@@ -55,6 +60,30 @@ class RecordsScreen extends ConsumerWidget {
     );
   }
 }
+
+const _smokeDashboardReport = <String, dynamic>{
+  'report_id': 'smoke-report',
+  'generated_at': '2026-08-28T08:30:00Z',
+  'summary': {
+    'patient_name': '林晓晴',
+    'patient_note_text': '近 3 个月月经周期不规律，最近间隔达 51 天。',
+    'disclaimers': ['仅供参考，不构成诊断或治疗建议'],
+  },
+  'trends': {
+    'weights': [
+      {'record_date': '2026-08-02', 'weight_kg': 68.5},
+      {'record_date': '2026-08-08', 'weight_kg': 67.2},
+      {'record_date': '2026-08-15', 'weight_kg': 66.5},
+      {'record_date': '2026-08-22', 'weight_kg': 67.3},
+      {'record_date': '2026-08-28', 'weight_kg': 67.5},
+    ],
+    'cycles': [
+      {'start_date': '2026-08-06', 'end_date': '2026-08-09'},
+      {'start_date': '2026-07-01', 'end_date': '2026-07-05'},
+    ],
+  },
+  'sources': [],
+};
 
 class _VisitRecordsPage extends StatelessWidget {
   const _VisitRecordsPage();
