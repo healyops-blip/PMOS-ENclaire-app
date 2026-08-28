@@ -42,7 +42,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ? null
                   : DateTime.now().year - diagnosisYear;
           final profileSummary = [
-            if (smokeMode) '模拟患者',
             if (age != null) '$age 岁',
             if (diagnosedYears != null) '已确诊 PCOS $diagnosedYears 年',
           ];
@@ -99,9 +98,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ),
                     const SizedBox(height: 3),
                     if (profileSummary.isNotEmpty)
-                      Text(
-                        profileSummary.join(' · '),
-                        style: Theme.of(context).textTheme.bodySmall,
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 12,
+                        children:
+                            profileSummary
+                                .map(
+                                  (item) => Text(
+                                    item,
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                )
+                                .toList(),
                       ),
                   ],
                 ),
