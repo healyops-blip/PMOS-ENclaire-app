@@ -553,7 +553,6 @@ class _HorizontalCycleCalendarState extends State<_HorizontalCycleCalendar> {
               ),
             ),
             const SizedBox(height: 4),
-            const Icon(Icons.arrow_drop_down_rounded, color: pomiInk, size: 25),
             SizedBox(
               height: 116,
               child: ListView.separated(
