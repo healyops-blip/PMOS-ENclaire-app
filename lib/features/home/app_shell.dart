@@ -151,7 +151,7 @@ class _PomiBottomNav extends StatelessWidget {
                           ],
                         ),
                         child: const Icon(
-                          Icons.add_rounded,
+                          Icons.camera_alt_rounded,
                           color: Colors.white,
                           size: 28,
                         ),
