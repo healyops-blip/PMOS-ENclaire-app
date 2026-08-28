@@ -13,6 +13,7 @@ from sqlalchemy import (
     CheckConstraint,
     Date,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     Numeric,
@@ -80,6 +81,13 @@ class Medication(Base):
             "end_date IS NULL OR start_date IS NULL OR end_date >= start_date",
             name="medication_date_order",
         ),
+        ForeignKeyConstraint(
+            ["patient_id", "replaces_medication_id"],
+            ["medication.patient_id", "medication.id"],
+            name="fk_medication_replacement_same_patient",
+            ondelete="RESTRICT",
+        ),
+        UniqueConstraint("patient_id", "id", name="uq_medication_patient_id"),
         Index("ix_medication_patient_status", "patient_id", "status"),
         UniqueConstraint("patient_id", "idempotency_key", name="uq_medication_patient_idempotency"),
     )
@@ -99,9 +107,7 @@ class Medication(Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="active")
     start_date: Mapped[date | None] = mapped_column(Date)
     end_date: Mapped[date | None] = mapped_column(Date)
-    replaces_medication_id: Mapped[str | None] = mapped_column(
-        String(36), ForeignKey("medication.id", ondelete="SET NULL")
-    )
+    replaces_medication_id: Mapped[str | None] = mapped_column(String(36))
     idempotency_key: Mapped[str | None] = mapped_column(String(128))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
@@ -116,6 +122,12 @@ class MedicationEvent(Base):
             "event_type IN ('created', 'adjusted', 'paused', 'resumed', 'stopped')",
             name="medication_event_type",
         ),
+        ForeignKeyConstraint(
+            ["patient_id", "medication_id"],
+            ["medication.patient_id", "medication.id"],
+            name="fk_medication_event_medication_same_patient",
+            ondelete="CASCADE",
+        ),
         Index("ix_medication_event_medication_date", "medication_id", "event_date"),
     )
 
@@ -123,9 +135,7 @@ class MedicationEvent(Base):
     patient_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("patient_profile.patient_id", ondelete="CASCADE"), nullable=False
     )
-    medication_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("medication.id", ondelete="CASCADE"), nullable=False
-    )
+    medication_id: Mapped[str] = mapped_column(String(36), nullable=False)
     event_type: Mapped[str] = mapped_column(String(16), nullable=False)
     event_date: Mapped[date] = mapped_column(Date, nullable=False)
     old_instruction: Mapped[dict[str, Any] | None] = mapped_column(JSON)
@@ -147,6 +157,12 @@ class MedicationDaily(Base):
             "intake_status IN ('taken', 'missed')",
             name="medication_daily_status",
         ),
+        ForeignKeyConstraint(
+            ["patient_id", "medication_id"],
+            ["medication.patient_id", "medication.id"],
+            name="fk_medication_daily_medication_same_patient",
+            ondelete="CASCADE",
+        ),
         UniqueConstraint("medication_id", "record_date", name="uq_medication_daily_date"),
         Index("ix_medication_daily_patient_date", "patient_id", "record_date"),
     )
@@ -155,9 +171,7 @@ class MedicationDaily(Base):
     patient_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("patient_profile.patient_id", ondelete="CASCADE"), nullable=False
     )
-    medication_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("medication.id", ondelete="CASCADE"), nullable=False
-    )
+    medication_id: Mapped[str] = mapped_column(String(36), nullable=False)
     record_date: Mapped[date] = mapped_column(Date, nullable=False)
     intake_status: Mapped[str] = mapped_column(String(16), nullable=False)
     recorded_by_uid: Mapped[str] = mapped_column(
@@ -173,6 +187,14 @@ class MenstrualCycle(Base):
             "end_date IS NULL OR end_date >= start_date",
             name="menstrual_cycle_date_order",
         ),
+        CheckConstraint(
+            "flow_level IS NULL OR flow_level IN ('light', 'medium', 'heavy', 'unknown')",
+            name="menstrual_cycle_flow_level",
+        ),
+        CheckConstraint(
+            "source_type IN ('manual', 'imported')",
+            name="menstrual_cycle_source_type",
+        ),
         Index("ix_menstrual_cycle_patient_start", "patient_id", "start_date"),
     )
 
@@ -182,7 +204,9 @@ class MenstrualCycle(Base):
     )
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date | None] = mapped_column(Date)
+    flow_level: Mapped[str | None] = mapped_column(String(16))
     note: Mapped[str | None] = mapped_column(Text)
+    source_type: Mapped[str] = mapped_column(String(16), nullable=False, default="manual")
     deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(

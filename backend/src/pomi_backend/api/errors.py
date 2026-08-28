@@ -6,8 +6,7 @@ from fastapi import Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from pomi_backend.api.business import BusinessError
-from pomi_backend.api.business import error_content as business_error_content
+from pomi_backend.api.business import BusinessError, business_error_content
 from pomi_backend.services.auth import AuthError
 from pomi_backend.services.rate_limit import RateLimitExceeded
 
@@ -19,12 +18,14 @@ def error_content(code: str, message: str) -> dict[str, dict[str, str]]:
 async def auth_error_handler(request: Request, error: AuthError) -> JSONResponse:
     headers = {"WWW-Authenticate": "Bearer"} if error.status_code == 401 else None
     if not request.url.path.startswith("/api/auth/"):
-        business_error = BusinessError(
-            "AUTHENTICATION_REQUIRED", "Authentication is required.", error.status_code
-        )
         return JSONResponse(
             status_code=error.status_code,
-            content=business_error_content(request, business_error),
+            content=business_error_content(
+                request,
+                BusinessError(
+                    "AUTHENTICATION_REQUIRED", "Authentication is required.", error.status_code
+                ),
+            ),
             headers=headers,
         )
     return JSONResponse(
@@ -46,8 +47,13 @@ async def rate_limit_error_handler(_: Request, error: RateLimitExceeded) -> JSON
 
 async def validation_error_handler(request: Request, __: RequestValidationError) -> JSONResponse:
     if not request.url.path.startswith("/api/auth/"):
-        error = BusinessError("VALIDATION_ERROR", "The request contains invalid fields.", 422)
-        return JSONResponse(status_code=422, content=business_error_content(request, error))
+        return JSONResponse(
+            status_code=422,
+            content=business_error_content(
+                request,
+                BusinessError("VALIDATION_ERROR", "The request contains invalid fields.", 422),
+            ),
+        )
     return JSONResponse(
         status_code=422,
         content=error_content("VALIDATION_ERROR", "The request contains invalid fields."),

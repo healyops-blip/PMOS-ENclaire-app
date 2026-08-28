@@ -57,11 +57,26 @@ def test_profile_onboarding_and_nullable_visit_date_are_persistent(
     assert updated["next_visit_date"] is None
     assert updated["onboarding_completed_at"] is not None
 
+    completed_at = updated["onboarding_completed_at"]
+    edited = data(
+        api_client.put(
+            "/api/patient/profile",
+            headers=headers,
+            json={
+                "nickname": "Pomi User Edited",
+                "complete_onboarding": True,
+                "updated_at": updated["updated_at"],
+            },
+        )
+    )
+    assert edited["onboarding_completed"] is True
+    assert edited["onboarding_completed_at"] == completed_at
+
     account = api_client.get("/api/auth/me", headers=headers)
     assert account.status_code == 200
     assert account.json()["onboarding_completed"] is True
     restored = data(api_client.get("/api/patient/profile", headers=headers))
-    assert restored["nickname"] == "Pomi User"
+    assert restored["nickname"] == "Pomi User Edited"
 
 
 def test_profile_scope_conflict_and_validation(api_client: TestClient) -> None:

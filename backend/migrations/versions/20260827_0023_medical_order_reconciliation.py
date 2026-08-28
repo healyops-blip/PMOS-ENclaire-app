@@ -1,7 +1,7 @@
 """Add confirmed medical orders and medication reconciliations.
 
-Revision ID: 20260827_0023
-Revises: 20260827_0022
+Revision ID: 20260827_0031
+Revises: 20260827_0030
 Create Date: 2026-08-27
 """
 
@@ -12,8 +12,8 @@ from alembic import op
 
 import pomi_backend.db.types
 
-revision: str = "20260827_0023"
-down_revision: str | None = "20260827_0022"
+revision: str = "20260827_0031"
+down_revision: str | None = "20260827_0030"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

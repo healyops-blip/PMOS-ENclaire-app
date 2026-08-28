@@ -19,7 +19,9 @@ sudo apt-get install nginx python3-venv sqlite3 util-linux logrotate certbot pyt
 | `/opt/pomi/releases/<commit>` | immutable application release | `root:root`, not writable by service |
 | `/opt/pomi/current` | symlink to active release | `root:root` |
 | `/etc/pomi/pomi.env` | runtime configuration and secrets | `root:root`, `0600` |
+| `/etc/pomi/pomi-ocr.env` | Worker-only OCR API key | `root:root`, `0600` |
 | `/var/lib/pomi/pomi.db` | SQLite database | `pomi:pomi`, `0600` |
+| `/var/lib/pomi/storage` | private document storage root | `pomi:pomi`, `0700` |
 | `/var/lib/pomi/uploads` | private uploaded files | `pomi:pomi`, `0700` |
 | `/var/lib/pomi/reports` | generated reports | `pomi:pomi`, `0700` |
 | `/var/log/pomi` | FastAPI logs | `pomi:pomi`, `0750` |
@@ -30,17 +32,20 @@ Create the unprivileged service account and state directories:
 ```bash
 sudo useradd --system --home /nonexistent --shell /usr/sbin/nologin pomi
 sudo install -d -o root -g root -m 0755 /opt/pomi/releases /etc/pomi
-sudo install -d -o pomi -g pomi -m 0700 /var/lib/pomi /var/lib/pomi/uploads /var/lib/pomi/reports /var/backups/pomi
+sudo install -d -o pomi -g pomi -m 0700 /var/lib/pomi /var/lib/pomi/storage /var/lib/pomi/uploads /var/lib/pomi/reports /var/backups/pomi
 sudo install -d -o pomi -g pomi -m 0750 /var/log/pomi
 ```
 
-Copy `deploy/systemd/pomi.env.example` to `/etc/pomi/pomi.env`, review it,
-then enforce ownership and mode. Do not put initial or reset passwords in this
-persistent file.
+Copy `deploy/systemd/pomi.env.example` to `/etc/pomi/pomi.env` and
+`deploy/systemd/pomi-ocr.env.example` to `/etc/pomi/pomi-ocr.env`, then review
+them and enforce ownership and mode. Put the OCR API key only in the second file;
+do not put initial or reset passwords in either persistent file.
 
 ```bash
 sudo chown root:root /etc/pomi/pomi.env
 sudo chmod 0600 /etc/pomi/pomi.env
+sudo chown root:root /etc/pomi/pomi-ocr.env
+sudo chmod 0600 /etc/pomi/pomi-ocr.env
 ```
 
 ## First deployment
@@ -108,17 +113,18 @@ committed together.
 1. Put the reviewed commit in a new `/opt/pomi/releases/<commit>` directory.
 2. Create its virtual environment and install the backend.
 3. Run `sudo systemctl start pomi-backup.service` and verify success.
-4. Run Alembic from the new release against `/var/lib/pomi/pomi.db`.
-5. Atomically update `/opt/pomi/current` to the new release.
-6. Run `sudo systemctl restart pomi-api.service`.
-7. Verify `/health/ready`, then run the smoke test as the service user. It asks
+4. Stop `pomi-ocr-worker.service` before migrating if it is installed.
+5. Run Alembic from the new release against `/var/lib/pomi/pomi.db`.
+6. Atomically update `/opt/pomi/current` to the new release.
+7. Run `sudo systemctl restart pomi-api.service pomi-ocr-worker.service`.
+8. Verify `/health/ready`, then run the smoke test as the service user. It asks
    for both initial-account passwords without terminal echo:
 
    ```bash
    sudo -u pomi /opt/pomi/current/backend/.venv/bin/python /opt/pomi/current/deploy/scripts/auth_smoke.py
    ```
 
-8. Keep the previous release until the observation window ends.
+9. Keep the previous release until the observation window ends.
 
 ## Rollback and database restore
 

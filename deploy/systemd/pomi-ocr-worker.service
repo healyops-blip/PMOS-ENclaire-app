@@ -9,6 +9,7 @@ User=pomi
 Group=pomi
 WorkingDirectory=/opt/pomi/current/backend
 EnvironmentFile=/etc/pomi/pomi.env
+EnvironmentFile=/etc/pomi/pomi-ocr.env
 ExecStart=/opt/pomi/current/backend/.venv/bin/pomi-ocr-worker --poll-seconds 1
 Restart=on-failure
 RestartSec=5s

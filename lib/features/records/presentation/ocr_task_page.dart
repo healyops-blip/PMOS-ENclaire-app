@@ -5,6 +5,8 @@ import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:pmos_enclaire/features/records/data/order_reconciliation_repository.dart';
 import 'package:pmos_enclaire/features/records/presentation/medical_order_review_page.dart';
+import 'package:pmos_enclaire/features/records/presentation/clinical_text_confirmation_page.dart';
+import 'package:pmos_enclaire/features/records/presentation/lab_confirmation_page.dart';
 
 class OcrTaskPage extends StatefulWidget {
   const OcrTaskPage({
@@ -114,23 +116,29 @@ class _OcrTaskPageState extends State<OcrTaskPage> with WidgetsBindingObserver {
       final task = await widget.repository.retry(_task!.id);
       if (!mounted) return;
       setState(() => _task = task);
-      _schedule();
     } on Object catch (error) {
       if (mounted) setState(() => _requestError = error);
     } finally {
       if (mounted) setState(() => _requesting = false);
     }
+    if (mounted) _schedule();
   }
 
   void _openConfirmation() {
     Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (_) => OcrPendingConfirmationPage(
-          repository: widget.repository,
-          task: _task!,
-          document: widget.document,
-          documentRepository: widget.documentRepository,
-        ),
+        builder: (_) => _task!.materialType == 'lab_report'
+            ? LabConfirmationPage(
+                repository: widget.repository,
+                task: _task!,
+                documentRepository: widget.documentRepository,
+              )
+            : OcrPendingConfirmationPage(
+                repository: widget.repository,
+                task: _task!,
+                document: widget.document,
+                documentRepository: widget.documentRepository,
+              ),
       ),
     );
   }
@@ -206,7 +214,12 @@ class OcrPendingConfirmationPage extends StatelessWidget {
   final DocumentRepository? documentRepository;
 
   @override
-  Widget build(BuildContext context) => FutureBuilder<OcrTaskResult>(
+  Widget build(BuildContext context) {
+    if (task.materialType == 'imaging_text_report' ||
+        task.materialType == 'outpatient_record') {
+      return ClinicalTextConfirmationPage(repository: repository, task: task);
+    }
+    return FutureBuilder<OcrTaskResult>(
     future: repository.result(task.id),
     builder: (context, snapshot) {
       if (!snapshot.hasData) {
@@ -227,7 +240,8 @@ class OcrPendingConfirmationPage extends StatelessWidget {
       }
       return _genericPage(snapshot.data!);
     },
-  );
+    );
+  }
 
   Widget _genericPage(OcrTaskResult result) => Scaffold(
     key: Key('ocr-confirmation-${task.materialType}'),
