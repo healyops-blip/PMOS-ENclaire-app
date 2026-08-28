@@ -15,6 +15,7 @@ def _draft_schema(material_type: str) -> dict[str, Any]:
     - lab_report
     - medical_order
     - imaging_text_report
+    - outpatient_record
     """
 
     nullable_text = {"type": ["string", "null"], "maxLength": 20_000}
@@ -119,22 +120,54 @@ def _draft_schema(material_type: str) -> dict[str, Any]:
             "additionalProperties": False,
         }
 
-    if material_type == "imaging_text_report":
+    if material_type == "outpatient_record":
         return {
             "type": "object",
             "properties": {
                 "hospital_name": nullable_text,
-                "report_date": nullable_date,
-                "findings": nullable_text,
-                "conclusion": nullable_text,
+                "department_name": nullable_text,
+                "doctor_name": nullable_text,
+                "visit_date": nullable_date,
+                "chief_complaint": nullable_text,
+                "diagnosis_summary": nullable_text,
+                "treatment_plan": nullable_text,
+                "medical_advice": nullable_text,
             },
             "required": [
                 "hospital_name",
-                "report_date",
-                "findings",
-                "conclusion",
+                "department_name",
+                "doctor_name",
+                "visit_date",
+                "chief_complaint",
+                "diagnosis_summary",
+                "treatment_plan",
+                "medical_advice",
             ],
             "additionalProperties": False,
+        }
+
+    if material_type == "imaging_text_report":
+        return {
+            "type": "object",
+            "required": [
+                "examination_name",
+                "body_part",
+                "examination_method",
+                "findings_text",
+                "conclusion_text",
+                "examined_at",
+                "reported_at",
+            ],
+            "additionalProperties": False,
+            "properties": {
+                "examination_name": nullable_text,
+                "body_part": nullable_text,
+                "examination_method": nullable_text,
+                "findings_text": {"type": ["string", "null"], "maxLength": 20_000},
+                "conclusion_text": {"type": ["string", "null"], "maxLength": 20_000},
+                "examined_at": nullable_date,
+                "reported_at": nullable_date,
+            },
         }
 
     raise ValueError(f"Unsupported material_type: {material_type}")
@@ -251,6 +284,7 @@ def prompt_for(material_type: str) -> str:
         "lab_report": "化验/检验报告",
         "medical_order": "医嘱/处方",
         "imaging_text_report": "影像文字报告",
+        "outpatient_record": "门诊病历/就诊记录",
     }
     base = (
         f"{DATA_CONSTRUCT_PROMPT}\n"

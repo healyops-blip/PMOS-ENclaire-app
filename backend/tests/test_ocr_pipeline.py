@@ -159,7 +159,16 @@ def _payload(kind: str) -> dict[str, Any]:
             "examined_at": None,
             "reported_at": None,
         },
-        # outpatient_record 已移除
+        "outpatient_record": {
+            "hospital_name": None,
+            "department_name": None,
+            "doctor_name": None,
+            "visit_date": None,
+            "chief_complaint": None,
+            "diagnosis_summary": " visible text ",
+            "treatment_plan": None,
+            "medical_advice": None,
+        },
     }
     draft = drafts[kind]
     return {
