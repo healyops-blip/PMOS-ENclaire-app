@@ -1431,25 +1431,6 @@ class _ReportSummaryLayer extends StatelessWidget {
           ],
         ),
       ),
-      const SizedBox(height: 18),
-      PomiGlassCard(
-        padding: const EdgeInsets.all(15),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '报告数据来源（自动汇总）',
-              style: TextStyle(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 8),
-            Text('化验单：${labs.length} 份'),
-            Text('经期记录：$cycleCount 次 · 体重记录：$weightCount 个点'),
-            Text('用药记录：当前 ${medicines.length} 项'),
-            Text('就诊记录：$sourceCount 次历史 + 1 次当前'),
-          ],
-        ),
-      ),
-      const SizedBox(height: 18),
       Row(
         children: [
           const Text(
@@ -1590,6 +1571,24 @@ class _ReportSummaryLayer extends StatelessWidget {
                   ),
                 )
                 .toList(),
+      ),
+      const SizedBox(height: 18),
+      PomiGlassCard(
+        padding: const EdgeInsets.all(15),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '报告数据来源（自动汇总）',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            Text('化验单：${labs.length} 份'),
+            Text('经期记录：$cycleCount 次 · 体重记录：$weightCount 个点'),
+            Text('用药记录：当前 ${medicines.length} 项'),
+            Text('就诊记录：$sourceCount 次历史 + 1 次当前'),
+          ],
+        ),
       ),
       const SizedBox(height: 18),
       Text(
