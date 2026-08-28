@@ -21,6 +21,9 @@ class UploadScreen extends ConsumerStatefulWidget {
 class _UploadScreenState extends ConsumerState<UploadScreen> {
   String _documentType = 'lab';
   File? _file;
+  String? _idempotencyKey;
+  String? _status;
+  bool _working = false;
 
   static const typeLabels = {
     'lab': '化验 / 检测',
@@ -38,6 +41,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     if (path != null) {
       setState(() {
         _file = File(path);
+        _idempotencyKey = null;
       });
     }
   }
@@ -52,9 +56,73 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     if (result != null) {
       setState(() {
         _file = File(result.path);
+        _idempotencyKey = null;
       });
     }
   }
+
+  Future<void> _start() async {
+    final file = _file;
+    if (file == null) return;
+    setState(() {
+      _working = true;
+      _status = '正在安全上传原件';
+    });
+    try {
+      final api = ref.read(apiClientProvider);
+      final result = await api.recognizeOcr(
+        file: file,
+        materialType: _wireMaterialType,
+        promptVersion: 'pomi-ocr-v1',
+        consentVersion: 'pomi-external-processing-v1',
+        idempotencyKey:
+            _idempotencyKey ??= 'ocr-${DateTime.now().microsecondsSinceEpoch}',
+      );
+      if (!mounted) return;
+      setState(() => _status = '识别完成');
+      final resultId = result['ocr_result_id']?.toString();
+      if (resultId == null) {
+        throw const FormatException('识别结果缺少确认所需的版本信息，请重新识别');
+      }
+      final draft = Map<String, dynamic>.from(result)
+        ..removeWhere((key, _) => _ocrMetadataKeys.contains(key));
+      final confirmed = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder:
+              (_) => OcrConfirmScreen(
+                resultId: resultId,
+                resultSource: result['result_source']?.toString() ?? 'qwen3-vl',
+                draft: draft,
+              ),
+        ),
+      );
+      if (mounted && confirmed == true) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('资料已确认，可在“记录”中查看和认证')));
+        setState(() {
+          _file = null;
+          _idempotencyKey = null;
+          _status = null;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
+  String get _wireMaterialType => switch (_documentType) {
+    'lab' => 'lab_report',
+    'medical_order' => 'medical_order',
+    'imaging' => 'imaging_text_report',
+    _ => 'outpatient_record',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -69,7 +137,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
         RadioGroup<String>(
           groupValue: _documentType,
           onChanged: (value) {
-            if (value != null) {
+            if (!_working && value != null) {
               setState(() => _documentType = value);
             }
           },
@@ -78,6 +146,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
               for (final entry in typeLabels.entries)
                 RadioListTile<String>(
                   value: entry.key,
+                  enabled: !_working,
                   title: Text(entry.value),
                   contentPadding: EdgeInsets.zero,
                 ),
@@ -94,7 +163,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: _takePhoto,
+                onPressed: _working ? null : _takePhoto,
                 icon: const Icon(Icons.photo_camera_outlined),
                 label: const Text('拍照'),
               ),
@@ -102,7 +171,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
             const SizedBox(width: 10),
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: _pickFile,
+                onPressed: _working ? null : _pickFile,
                 icon: const Icon(Icons.folder_open_outlined),
                 label: const Text('相册 / 文件'),
               ),
@@ -125,12 +194,30 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
               ),
               trailing: IconButton(
                 tooltip: '移除',
-                onPressed: () => setState(() => _file = null),
+                onPressed:
+                    _working
+                        ? null
+                        : () => setState(() {
+                          _file = null;
+                          _idempotencyKey = null;
+                        }),
                 icon: const Icon(Icons.close),
               ),
             ),
           ),
         ],
+        if (_working) ...[
+          const SizedBox(height: 22),
+          const LinearProgressIndicator(),
+          const SizedBox(height: 8),
+          Text(_status ?? '处理中', textAlign: TextAlign.center),
+        ],
+        const SizedBox(height: 24),
+        FilledButton.icon(
+          onPressed: _file == null || _working ? null : _start,
+          icon: const Icon(Icons.document_scanner_outlined),
+          label: const Text('开始识别'),
+        ),
       ],
     );
 
@@ -149,7 +236,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                 const Spacer(),
                 IconButton(
                   tooltip: '关闭上传弹窗',
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: _working ? null : () => Navigator.pop(context),
                   icon: const Icon(Icons.close_rounded),
                 ),
               ],
@@ -400,6 +487,15 @@ class _JsonFields extends StatelessWidget {
   bool _longField(String? name) =>
       const {'医嘱原文', '检查所见', '检查结论', '主诉', '诊断摘要', '处理意见', '医嘱'}.contains(name);
 }
+
+const _ocrMetadataKeys = {
+  'ocr_task_id',
+  'ocr_result_id',
+  'document_id',
+  'document_revision_id',
+  'material_type',
+  'result_source',
+};
 
 Map<String, dynamic> buildOcrConfirmationPayload(Map<String, dynamic> draft) {
   final examinations = (draft['examinations'] as List? ?? const [])
