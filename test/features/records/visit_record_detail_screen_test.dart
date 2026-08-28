@@ -59,7 +59,7 @@ void main() {
     final stamp = tester.widget<Image>(
       find.byKey(const ValueKey('pomi-verified-stamp')),
     );
-    expect(stamp.width, 112);
+    expect(stamp.width, 132);
     expect(
       find.byKey(const ValueKey('pomi-verified-stamp-rotation')),
       findsOneWidget,
@@ -82,6 +82,7 @@ void main() {
       (name) => tester.getTopLeft(find.byKey(ValueKey('lab-value-$name'))).dx,
     );
     expect(valueAxis.toSet(), hasLength(1));
+    expect(valueAxis.first, greaterThan(200));
 
     await tester.scrollUntilVisible(
       find.text('医嘱与处方'),
@@ -124,5 +125,25 @@ void main() {
     expect(lowReference.data, '参考 ≥ 20 ng/mL');
     expect(lowReference.style?.color, const Color(0xFFC77A16));
     expect(find.text('低于参考范围'), findsNothing);
+  });
+
+  testWidgets('every Smoke visit displays the green verification stamp', (
+    tester,
+  ) async {
+    usePhoneViewport(tester);
+    for (final visit in smokeVisitRecordDetails) {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildPomiTheme(),
+          home: VisitRecordDetailScreen(visit: visit),
+        ),
+      );
+      await tester.pump();
+      expect(
+        find.byKey(const ValueKey('pomi-verified-stamp')),
+        findsOneWidget,
+        reason: '${visit.id} should show the green verification stamp',
+      );
+    }
   });
 }

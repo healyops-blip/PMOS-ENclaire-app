@@ -420,8 +420,6 @@ class _VisitHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isVerified =
-        visit.verificationState == VisitVerificationState.verified;
     return PomiGlassCard(
       borderRadius: 26,
       backgroundOpacity: .30,
@@ -496,29 +494,28 @@ class _VisitHeroCard extends StatelessWidget {
               ),
             ],
           ),
-          if (isVerified)
-            Positioned(
-              right: 23,
-              top: 23,
-              child: Semantics(
-                image: true,
-                label: '该报告已核验',
-                child: Opacity(
-                  opacity: .88,
-                  child: Transform.rotate(
-                    key: const ValueKey('pomi-verified-stamp-rotation'),
-                    angle: -math.pi / 4,
-                    child: Image.asset(
-                      'assets/images/pomi_verified_stamp.png',
-                      key: const ValueKey('pomi-verified-stamp'),
-                      width: 112,
-                      height: 112,
-                      filterQuality: FilterQuality.high,
-                    ),
+          Positioned(
+            right: 4,
+            top: 12,
+            child: Semantics(
+              image: true,
+              label: '该报告已核验',
+              child: Opacity(
+                opacity: .88,
+                child: Transform.rotate(
+                  key: const ValueKey('pomi-verified-stamp-rotation'),
+                  angle: -math.pi / 4,
+                  child: Image.asset(
+                    'assets/images/pomi_verified_stamp.png',
+                    key: const ValueKey('pomi-verified-stamp'),
+                    width: 132,
+                    height: 132,
+                    filterQuality: FilterQuality.high,
                   ),
                 ),
               ),
             ),
+          ),
         ],
       ),
     );
@@ -828,7 +825,7 @@ class _LabResultRow extends StatelessWidget {
             children: [
               Expanded(child: name),
               const SizedBox(width: 12),
-              SizedBox(width: 176, child: value),
+              SizedBox(width: 148, child: value),
             ],
           );
         },
