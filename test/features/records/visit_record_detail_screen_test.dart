@@ -37,6 +37,15 @@ void main() {
 
     for (final visit in smokeVisitRecordDetails) {
       expect(find.byKey(ValueKey('visit-record-${visit.id}')), findsOneWidget);
+      expect(
+        find.byKey(ValueKey('visit-hospital-${visit.id}')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(ValueKey('visit-department-${visit.id}')),
+        findsOneWidget,
+      );
+      expect(find.byKey(ValueKey('visit-doctor-${visit.id}')), findsOneWidget);
     }
 
     await tester.tap(find.byKey(const ValueKey('visit-record-visit-20260826')));

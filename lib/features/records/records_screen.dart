@@ -294,7 +294,7 @@ class _VisitRecordCard extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 3),
-                      _VisitMetadataFields(value: visit.facilityLine),
+                      _VisitMetadataFields(visit: visit),
                       if (visit.historyNote != null) ...[
                         const SizedBox(height: 5),
                         Text(
@@ -352,23 +352,37 @@ class _VisitRecordCard extends StatelessWidget {
 }
 
 class _VisitMetadataFields extends StatelessWidget {
-  const _VisitMetadataFields({required this.value});
+  const _VisitMetadataFields({required this.visit});
 
-  final String value;
+  final VisitRecordDetailData visit;
 
   @override
   Widget build(BuildContext context) {
-    final fields = value
-        .split(' · ')
-        .map((field) => field.trim())
-        .where((field) => field.isNotEmpty)
-        .toList(growable: false);
     return Wrap(
       spacing: 12,
       runSpacing: 2,
       children: [
-        for (final field in fields)
-          Text(field, style: Theme.of(context).textTheme.bodySmall),
+        Text(
+          visit.hospital,
+          key: ValueKey('visit-hospital-${visit.id}'),
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        Text(
+          visit.department,
+          key: ValueKey('visit-department-${visit.id}'),
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        Text(
+          visit.doctor,
+          key: ValueKey('visit-doctor-${visit.id}'),
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        if (visit.contextLabel != null)
+          Text(
+            visit.contextLabel!,
+            key: ValueKey('visit-context-${visit.id}'),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
       ],
     );
   }

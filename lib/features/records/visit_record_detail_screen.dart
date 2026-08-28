@@ -99,13 +99,6 @@ class VisitRecordDetailData {
   final List<VisitLabResult> labs;
   final List<VisitOrderItem> orders;
   final String? sampleDate;
-
-  String get facilityLine => [
-    hospital,
-    department,
-    doctor,
-    if (contextLabel != null) contextLabel!,
-  ].join(' · ');
 }
 
 const smokeVisitRecordDetails = <VisitRecordDetailData>[
