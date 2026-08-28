@@ -174,6 +174,38 @@ void main() {
     expect(client.dio.options.headers['Authorization'], isNull);
     expect(clearCalls, 1);
   });
+
+  test(
+    'a secure-store clear failure still drops the bearer and remains retryable',
+    () async {
+      final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api'));
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) => handler.resolve(
+            Response<void>(requestOptions: options, statusCode: 204),
+          ),
+        ),
+      );
+      final store = _FailOnceSessionStore()..value = 'opaque-session';
+      final client = PomiApiClient(dio: dio)..useSession('opaque-session');
+      var privateClearCalls = 0;
+      final repository = FastApiAuthRepository(
+        client,
+        store,
+        onSessionCleared: () async => privateClearCalls += 1,
+      );
+
+      await expectLater(repository.logout(), throwsStateError);
+      expect(client.dio.options.headers['Authorization'], isNull);
+      expect(store.value, 'opaque-session');
+      expect(privateClearCalls, 1);
+
+      await repository.logout();
+      expect(store.value, isNull);
+      expect(store.clearCalls, 2);
+      expect(privateClearCalls, 2);
+    },
+  );
 }
 
 const _account = <String, dynamic>{
@@ -197,4 +229,15 @@ class _MemorySessionStore implements SessionStore {
 
   @override
   Future<void> write(String sessionId) async => value = sessionId;
+}
+
+class _FailOnceSessionStore extends _MemorySessionStore {
+  int clearCalls = 0;
+
+  @override
+  Future<void> clear() async {
+    clearCalls += 1;
+    if (clearCalls == 1) throw StateError('simulated secure-store failure');
+    await super.clear();
+  }
 }

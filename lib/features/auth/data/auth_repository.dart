@@ -132,9 +132,24 @@ class FastApiAuthRepository implements AuthRepository {
   Future<void> _doClearLocalSession() async {
     if (_localSessionCleared) return;
     _localSessionCleared = true;
-    await sessionStore.clear();
+    Object? storageFailure;
+    StackTrace? storageStackTrace;
+    try {
+      await sessionStore.clear();
+    } on Object catch (error, stackTrace) {
+      _localSessionCleared = false;
+      storageFailure = error;
+      storageStackTrace = stackTrace;
+    }
     client.useSession(null);
-    await onSessionCleared?.call();
+    try {
+      await onSessionCleared?.call();
+    } on Object {
+      // Private-cache cleanup is best effort and must not restore an invalid bearer.
+    }
+    if (storageFailure != null) {
+      Error.throwWithStackTrace(storageFailure, storageStackTrace!);
+    }
   }
 
   AuthFailure _failure(DioException error) {
