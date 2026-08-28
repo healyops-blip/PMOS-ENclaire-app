@@ -106,15 +106,9 @@ jobs:
           max_bytes=$((10 * 1024 * 1024))
           while IFS= read -r -d '' file; do
             [[ -f "$file" ]] || continue
-            file_max_bytes=$max_bytes
-            case "$file" in
-              assets/fonts/NotoSansSC-*.ttf)
-                file_max_bytes=$((11 * 1024 * 1024))
-                ;;
-            esac
             size=$(wc -c < "$file")
-            if (( size > file_max_bytes )); then
-              echo "File exceeds allowed size: $file ($size bytes)"
+            if (( size > max_bytes )); then
+              echo "File exceeds 10 MiB: $file ($size bytes)"
               failed=1
             fi
           done < <(git ls-files -z)
