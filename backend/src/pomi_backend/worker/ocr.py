@@ -29,6 +29,7 @@ from pomi_backend.services.ocr_provider import (
     Qwen3VLOCRProvider,
 )
 from pomi_backend.services.ocr_validation import validate_provider_payload
+from pomi_backend.services.watermarks import generate_watermark_after_ocr
 
 logger = logging.getLogger("pomi.ocr.worker")
 
@@ -212,6 +213,12 @@ class OCRWorker:
             task.attempt_history = _finish_history(task, "succeeded", now)
             task.updated_at = now
             session.commit()
+            generate_watermark_after_ocr(
+                session,
+                self.storage_root,
+                document,
+                revision,
+            )
             self._log(task, "pending_confirmation")
 
     def _guard_provider_completion(
@@ -307,6 +314,15 @@ class OCRWorker:
         task.provider_call_started_at = None
         task.updated_at = now
         session.commit()
+        document = session.get(Document, task.document_id)
+        revision = session.get(DocumentRevision, task.document_revision_id)
+        if document is not None and revision is not None:
+            generate_watermark_after_ocr(
+                session,
+                self.storage_root,
+                document,
+                revision,
+            )
 
     def _log(self, task: OCRTask, status: str) -> None:
         uid_digest = hashlib.sha256(task.requested_by_uid.encode()).hexdigest()[:12]

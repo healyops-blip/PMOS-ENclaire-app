@@ -378,7 +378,45 @@ Authorization: Bearer <session_id>
 `confidence`、`uncertainty_reason`、`source_region`、`user_value` 和
 `confirmation_status`。
 
-### 11.2 批量确认化验
+`source_document.display_asset` 是 OCR 完成后由后端生成的私有展示副本状态。
+当 `status = ready` 时，客户端可携带同一个 Bearer Session 请求
+`file_endpoint`；该图片已经叠加 POMI 品牌水印，适合病例和诊断报告页面展示。
+OCR 和人工核对始终使用无水印的 `source_document.file_endpoint` 原件。
+
+### 11.2 POMI 水印展示副本
+
+仅 JPEG、PNG 在 OCR 成功并通过结构校验后自动生成水印展示副本。PDF 返回
+`unsupported`，不会影响 OCR 结果。水印生成失败也不会把 OCR 任务改成失败。
+
+```http
+GET /api/documents/{document_id}/revisions/{revision_id}/display
+Authorization: Bearer <session_id>
+```
+
+返回当前派生资源状态；OCR 尚未完成时 `data = null`。`ready` 状态包含私有
+`file_endpoint`、SHA-256、图片尺寸、MIME 类型和水印版本。
+
+```http
+GET /api/documents/{document_id}/revisions/{revision_id}/display/file
+Authorization: Bearer <session_id>
+```
+
+该接口返回带水印的 JPEG/PNG，响应使用 `Cache-Control: private, no-store`。
+未登录或访问其他患者资料时，不暴露资源是否存在，统一返回 `404`。
+
+```http
+POST /api/documents/{document_id}/revisions/{revision_id}/display/retry
+Authorization: Bearer <session_id>
+```
+
+仅已成功完成 OCR 的修订允许重试。重复调用复用同一条派生资源记录并递增
+`attempt_count`，不会创建新的原件修订。
+
+病例报告的 `snapshot.sources[].display_asset` 只来源于已确认医疗记录。报告快照
+保存水印版本、哈希及私有端点，不保存公开 URL；水印状态或哈希变化会产生新的
+报告来源摘要，避免复用过期快照。
+
+### 11.3 批量确认化验
 
 ```http
 POST /api/ocr/tasks/{task_id}/confirm
@@ -431,7 +469,7 @@ P0 字段为 `name/value/unit`。后端会重新执行数值解析、单位白�
 `LAB_UNIT_UNSUPPORTED`、`LAB_UNIT_INCOMPATIBLE`、`LAB_REFERENCE_RANGE_INVALID`、
 `LAB_DATE_INVALID`。失败请求不会写入 `lab_observation`，Flutter 应保留编辑内容并允许重试。
 
-### 11.3 读取正式化验数据
+### 11.4 读取正式化验数据
 
 ```http
 GET /api/lab-observations

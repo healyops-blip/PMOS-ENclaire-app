@@ -36,6 +36,10 @@ from pomi_backend.services.ocr_provider import (
     Qwen3VLOCRProvider,
 )
 from pomi_backend.services.orders import medical_order_data, medical_order_p0
+from pomi_backend.services.watermarks import (
+    display_asset_data,
+    generate_watermark_after_ocr,
+)
 
 router = APIRouter(prefix="/api/ocr/tasks", tags=["ocr"])
 
@@ -99,7 +103,19 @@ def recognize(
         existing_result = repository.result(existing.id)
         if existing_result is None:
             raise BusinessError("OCR_RESULT_NOT_READY", "OCR result is not ready.", 409)
-        return success(request, sync_result_data(existing, existing_result))
+        display_asset = generate_watermark_after_ocr(
+            session,
+            settings.storage_root,
+            document,
+            revision,
+        )
+        return success(
+            request,
+            {
+                **sync_result_data(existing, existing_result),
+                "display_asset": display_asset_data(display_asset),
+            },
+        )
     provider = Qwen3VLOCRProvider(
         api_base_url=settings.ocr_api_base_url,
         api_key=settings.ocr_api_key,
@@ -168,7 +184,19 @@ def recognize(
                 )
             )
     session.commit()
-    return success(request, sync_result_data(task, result))
+    display_asset = generate_watermark_after_ocr(
+        session,
+        settings.storage_root,
+        document,
+        revision,
+    )
+    return success(
+        request,
+        {
+            **sync_result_data(task, result),
+            "display_asset": display_asset_data(display_asset),
+        },
+    )
 
 
 class CreateOCRTaskRequest(BaseModel):

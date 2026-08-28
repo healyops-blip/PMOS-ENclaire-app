@@ -11,6 +11,7 @@ from sqlalchemy import Engine, func, select
 from pomi_backend.db import build_session_factory
 from pomi_backend.db.models import (
     Document,
+    DocumentDisplayAsset,
     DocumentRevision,
     ImagingReport,
     LabObservation,
@@ -198,6 +199,22 @@ def _seed_confirmed_ocr_data(engine: Engine, account_name: str) -> None:
         order_doc, order_rev, order_task, order_result = source("medical_order")
         image_doc, image_rev, _, image_result = source("imaging_text_report")
         visit_doc, visit_rev, _, visit_result = source("outpatient_record")
+        session.add(
+            DocumentDisplayAsset(
+                document_id=image_doc.id,
+                document_revision_id=image_rev.id,
+                asset_type="pomi_watermarked_display",
+                watermark_version="pomi-watermark-v1",
+                status="ready",
+                storage_path=f"derivatives/{image_doc.id}/{image_rev.id}/pomi.png",
+                file_hash="d" * 64,
+                file_size_bytes=1234,
+                mime_type="image/png",
+                pixel_width=1200,
+                pixel_height=1600,
+                attempt_count=1,
+            )
+        )
         session.add_all(
             [
                 LabObservation(
@@ -514,6 +531,14 @@ def test_report_uses_only_confirmed_ocr_records_with_revision_level_sources(
         ]
         assert len(medical_sources) == 7
         assert all(source["document_revision_id"] for source in medical_sources)
+        imaging_source = next(
+            source for source in medical_sources if source["source_type"] == "imaging_report"
+        )
+        assert imaging_source["display_asset"]["status"] == "ready"
+        assert imaging_source["display_asset"]["file_endpoint"] == (
+            f"/api/documents/{imaging_source['document_id']}/revisions/"
+            f"{imaging_source['document_revision_id']}/display/file"
+        )
 
         first_lab = session.scalar(
             select(LabObservation)

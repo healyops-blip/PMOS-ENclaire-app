@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from importlib.resources import files
 from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -89,3 +90,9 @@ def test_backup_logrotate_and_runbook_are_present() -> None:
     assert "rotate 14" in logrotate
     for section in ("## Upgrade", "## Rollback", "## Troubleshooting"):
         assert section in runbook
+
+
+def test_watermark_font_is_packaged_and_kept_small() -> None:
+    font = files("pomi_backend.assets").joinpath("PomiWatermarkSubset.ttf")
+    assert font.is_file()
+    assert 1_000 < len(font.read_bytes()) < 100_000

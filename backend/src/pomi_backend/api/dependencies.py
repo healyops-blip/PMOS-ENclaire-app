@@ -115,6 +115,7 @@ def get_ocr_task_service(
         account,
         model_name=request.app.state.settings.ocr_model,
         business_date=request.app.state.business_date_provider(),
+        storage_root=request.app.state.settings.storage_root,
     )
 
 
