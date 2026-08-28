@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
-from pomi_backend.services.llm_chat_provider import ChatProviderError, ChatRequest, QwenChatProvider
+from pomi_backend.services.llm_chat_provider import ChatRequest, QwenChatProvider
 
 
 REWRITE_SYSTEM_PROMPT = """

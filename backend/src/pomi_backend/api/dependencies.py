@@ -14,11 +14,13 @@ from pomi_backend.services import AuthService
 from pomi_backend.services.auth import AuthError
 from pomi_backend.services.clinical_text import ClinicalTextConfirmationService
 from pomi_backend.services.documents import DocumentService
+from pomi_backend.services.llm_chat_provider import QwenChatProvider
 from pomi_backend.services.medications import MedicationService
 from pomi_backend.services.ocr import OCRTaskService
 from pomi_backend.services.onboarding import OnboardingService
 from pomi_backend.services.orders import MedicalOrderService, ReconciliationService
 from pomi_backend.services.patient import PatientProfileService
+from pomi_backend.services.patient_note_rewrite import PatientNoteRewriteService
 from pomi_backend.services.patient_notes import PatientNoteService
 from pomi_backend.services.reports import ReportSnapshotService
 from pomi_backend.services.llm_chat_provider import QwenChatProvider

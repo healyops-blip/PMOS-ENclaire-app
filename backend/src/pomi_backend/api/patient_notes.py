@@ -7,9 +7,13 @@ from pomi_backend.api.dependencies import (
     PatientNoteRewriteServiceDependency,
     PatientNoteServiceDependency,
 )
-from pomi_backend.schemas.patient_notes import PatientNoteCopy, PatientNoteCreate, PatientNoteUpdate
-from pomi_backend.services.patient_notes import patient_note_data
+from pomi_backend.schemas.patient_notes import (
+    PatientNoteCopy,
+    PatientNoteCreate,
+    PatientNoteUpdate,
+)
 from pomi_backend.services.patient_note_rewrite import PatientNoteRewriteRequest
+from pomi_backend.services.patient_notes import patient_note_data
 
 router = APIRouter(prefix="/api/patient-notes", tags=["patient-notes"])
 
