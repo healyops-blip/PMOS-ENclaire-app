@@ -1619,12 +1619,12 @@ class _ReportSourceLayer extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(18, 10, 18, 32),
       children: [
         const Text(
-          '原始资料追溯',
+          '总睾酮趋势 · 原始数据',
           style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 5),
         const Text(
-          '这里展示报告引用的材料与修订标识。来源存证为本机演示，不代表医院签发或真实上链。',
+          '原始数据来源存证 · 仅供参考 · 不构成诊断',
           style: TextStyle(color: pomiMuted, height: 1.5),
         ),
         const SizedBox(height: 16),
