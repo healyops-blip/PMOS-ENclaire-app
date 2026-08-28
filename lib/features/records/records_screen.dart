@@ -1312,11 +1312,22 @@ class _ReportSummaryLayer extends StatelessWidget {
       const SizedBox(height: 8),
       PomiGlassCard(
         padding: EdgeInsets.all(15),
-        child: Text(
-          '${(summary['profile'] as Map?)?['nickname'] ?? '未设置姓名'}\n'
-          '身高：${(summary['profile'] as Map?)?['height_cm'] ?? '—'} cm\n'
-          '体重：${(summary['profile'] as Map?)?['weight_kg'] ?? '—'} kg',
-          style: TextStyle(height: 1.6),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              '${(summary['profile'] as Map?)?['nickname'] ?? '未设置姓名'}',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            Text(
+              '身高 ${(summary['profile'] as Map?)?['height_cm'] ?? '—'} cm',
+              style: const TextStyle(color: pomiMuted),
+            ),
+            Text(
+              '体重 ${(summary['profile'] as Map?)?['weight_kg'] ?? '—'} kg',
+              style: const TextStyle(color: pomiMuted),
+            ),
+          ],
         ),
       ),
       const SizedBox(height: 18),
