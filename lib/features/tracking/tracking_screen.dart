@@ -464,7 +464,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                                       ),
                                     ),
                                     const TextSpan(
-                                      text: ' 千克',
+                                      text: ' kg',
                                       style: TextStyle(
                                         color: pomiSecondaryText,
                                       ),
@@ -1020,7 +1020,7 @@ class _WeightTrendCard extends StatelessWidget {
                         ),
                       ),
                       const TextSpan(
-                        text: ' 千克',
+                        text: ' kg',
                         style: TextStyle(
                           color: pomiSecondaryText,
                           fontSize: 24,
