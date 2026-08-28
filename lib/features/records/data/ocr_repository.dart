@@ -175,8 +175,34 @@ class OcrTaskResult {
   );
 }
 
+class ClinicalConfirmationResult {
+  const ClinicalConfirmationResult({
+    required this.recordId,
+    required this.materialType,
+    required this.documentRevisionId,
+    required this.summary,
+    required this.reused,
+  });
+
+  final String recordId;
+  final String materialType;
+  final String documentRevisionId;
+  final Map<String, dynamic> summary;
+  final bool reused;
+
+  factory ClinicalConfirmationResult.fromJson(Map<String, dynamic> json) =>
+      ClinicalConfirmationResult(
+        recordId: json['record_id'] as String,
+        materialType: json['material_type'] as String,
+        documentRevisionId: json['document_revision_id'] as String,
+        summary: Map<String, dynamic>.from(json['summary'] as Map),
+        reused: json['reused'] as bool? ?? false,
+      );
+}
+
 class LabConfirmationItem {
   const LabConfirmationItem({
+    this.sourceIndex,
     required this.name,
     required this.value,
     required this.unit,
@@ -188,6 +214,7 @@ class LabConfirmationItem {
     this.note,
   });
 
+  final int? sourceIndex;
   final String name;
   final String value;
   final String unit;
@@ -199,6 +226,7 @@ class LabConfirmationItem {
   final String? note;
 
   Map<String, dynamic> toJson() => {
+    'source_index': sourceIndex,
     'name': name,
     'value': value,
     'unit': unit,
@@ -286,31 +314,6 @@ class OcrFieldError {
   final String message;
 }
 
-class ClinicalConfirmationResult {
-  const ClinicalConfirmationResult({
-    required this.recordId,
-    required this.materialType,
-    required this.documentRevisionId,
-    required this.summary,
-    required this.reused,
-  });
-
-  final String recordId;
-  final String materialType;
-  final String documentRevisionId;
-  final Map<String, dynamic> summary;
-  final bool reused;
-
-  factory ClinicalConfirmationResult.fromJson(Map<String, dynamic> json) =>
-      ClinicalConfirmationResult(
-        recordId: json['record_id'] as String,
-        materialType: json['material_type'] as String,
-        documentRevisionId: json['document_revision_id'] as String,
-        summary: Map<String, dynamic>.from(json['summary'] as Map),
-        reused: json['reused'] as bool? ?? false,
-      );
-}
-
 abstract interface class OcrRepository {
   Future<OcrTask> create({
     required String documentId,
@@ -319,6 +322,13 @@ abstract interface class OcrRepository {
   Future<OcrTask> get(String taskId);
   Future<OcrTaskResult> result(String taskId);
   Future<OcrTask> retry(String taskId);
+  Future<List<int>> sourceFile(OcrTask task);
+  Future<ClinicalConfirmationResult> confirmClinical({
+    required OcrTask task,
+    required String resultId,
+    required Map<String, dynamic> confirmedData,
+    required List<Map<String, dynamic>> fieldConfirmations,
+  });
   Future<LabConfirmationResult> confirmLab({
     required String taskId,
     required String resultId,
@@ -328,13 +338,6 @@ abstract interface class OcrRepository {
     String? examDate,
     String? reportDate,
     String? visitDate,
-  });
-  Future<List<int>> sourceFile(OcrTask task);
-  Future<ClinicalConfirmationResult> confirmClinical({
-    required OcrTask task,
-    required String resultId,
-    required Map<String, dynamic> confirmedData,
-    required List<Map<String, dynamic>> fieldConfirmations,
   });
 }
 
@@ -347,8 +350,10 @@ class FastApiOcrRepository implements OcrRepository, MedicalOrderGateway {
   @override
   Future<void> confirmMedicalOrder(
     String taskId,
+    String resultId,
+    String expectedRevisionId,
     List<MedicalOrderDraft> items,
-  ) => _orders.confirmMedicalOrder(taskId, items);
+  ) => _orders.confirmMedicalOrder(taskId, resultId, expectedRevisionId, items);
 
   @override
   Future<MedicationReconciliationDraft> createReconciliation(String taskId) =>
@@ -393,37 +398,6 @@ class FastApiOcrRepository implements OcrRepository, MedicalOrderGateway {
   );
 
   @override
-  Future<LabConfirmationResult> confirmLab({
-    required String taskId,
-    required String resultId,
-    required String expectedRevisionId,
-    required List<LabConfirmationItem> items,
-    String? sampleDate,
-    String? examDate,
-    String? reportDate,
-    String? visitDate,
-  }) async {
-    try {
-      final response = await client.dio.post<Map<String, dynamic>>(
-        '/ocr/tasks/$taskId/confirm',
-        data: {
-          'result_id': resultId,
-          'expected_revision_id': expectedRevisionId,
-          'visit_id': null,
-          'sample_date': _emptyAsNull(sampleDate),
-          'exam_date': _emptyAsNull(examDate),
-          'report_date': _emptyAsNull(reportDate),
-          'visit_date': _emptyAsNull(visitDate),
-          'items': items.map((item) => item.toJson()).toList(),
-        },
-      );
-      return LabConfirmationResult.fromJson(_data(response.data!));
-    } on DioException catch (error) {
-      throw _failure(error);
-    }
-  }
-
-  @override
   Future<List<int>> sourceFile(OcrTask task) async {
     try {
       final response = await client.dio.get<List<int>>(
@@ -453,14 +427,39 @@ class FastApiOcrRepository implements OcrRepository, MedicalOrderGateway {
           'confirmed_data': confirmedData,
           'field_confirmations': fieldConfirmations,
         },
-        options: Options(
-          headers: {
-            'Idempotency-Key':
-                'flutter-confirm-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}',
-          },
-        ),
       );
       return ClinicalConfirmationResult.fromJson(_data(response.data!));
+    } on DioException catch (error) {
+      throw _failure(error);
+    }
+  }
+
+  @override
+  Future<LabConfirmationResult> confirmLab({
+    required String taskId,
+    required String resultId,
+    required String expectedRevisionId,
+    required List<LabConfirmationItem> items,
+    String? sampleDate,
+    String? examDate,
+    String? reportDate,
+    String? visitDate,
+  }) async {
+    try {
+      final response = await client.dio.post<Map<String, dynamic>>(
+        '/ocr/tasks/$taskId/confirm',
+        data: {
+          'result_id': resultId,
+          'expected_revision_id': expectedRevisionId,
+          'visit_id': null,
+          'sample_date': _emptyAsNull(sampleDate),
+          'exam_date': _emptyAsNull(examDate),
+          'report_date': _emptyAsNull(reportDate),
+          'visit_date': _emptyAsNull(visitDate),
+          'items': items.map((item) => item.toJson()).toList(),
+        },
+      );
+      return LabConfirmationResult.fromJson(_data(response.data!));
     } on DioException catch (error) {
       throw _failure(error);
     }
@@ -570,19 +569,26 @@ class DemoOcrRepository implements OcrRepository, MedicalOrderGateway {
     resultId: 'demo-result-1',
     taskId: taskId,
     draft: const {
+      'hospital_name': 'Pomi Hospital',
+      'sample_date': '2026-08-19',
       'report_date': '2026-08-20',
       'items': [
         {
-          'name': '空腹血糖',
-          'value': '5.2',
-          'unit': 'mmol/L',
-          'reference_range': '3.9-6.1',
+          'item_name': '空腹血糖',
+          'item_code': 'GLU',
+          'raw_value': '5.2',
+          'numeric_value': 5.2,
+          'raw_unit': 'mmol/L',
+          'normalized_unit': 'mmol/L',
+          'reference_range_text': '3.9-6.1',
+          'reference_low': 3.9,
+          'reference_high': 6.1,
         },
       ],
     },
     fields: const [
       OcrFieldDraft(
-        path: 'items.0.value',
+        path: 'items.0.raw_value',
         value: '5.2',
         confidence: 0.72,
         sourceText: '5.2',
@@ -596,6 +602,8 @@ class DemoOcrRepository implements OcrRepository, MedicalOrderGateway {
   @override
   Future<void> confirmMedicalOrder(
     String taskId,
+    String resultId,
+    String expectedRevisionId,
     List<MedicalOrderDraft> items,
   ) async {}
 
@@ -618,6 +626,25 @@ class DemoOcrRepository implements OcrRepository, MedicalOrderGateway {
     ruleVersion: reconciliation.ruleVersion,
     items: reconciliation.items,
   );
+
+  @override
+  Future<List<int>> sourceFile(OcrTask task) async => const [];
+
+  @override
+  Future<ClinicalConfirmationResult> confirmClinical({
+    required OcrTask task,
+    required String resultId,
+    required Map<String, dynamic> confirmedData,
+    required List<Map<String, dynamic>> fieldConfirmations,
+  }) async {
+    return ClinicalConfirmationResult(
+      recordId: 'demo-clinical-${task.id}',
+      materialType: task.materialType,
+      documentRevisionId: task.documentRevisionId,
+      summary: confirmedData,
+      reused: false,
+    );
+  }
 
   @override
   Future<LabConfirmationResult> confirmLab({
@@ -645,25 +672,6 @@ class DemoOcrRepository implements OcrRepository, MedicalOrderGateway {
         ),
     ],
   );
-
-  @override
-  Future<List<int>> sourceFile(OcrTask task) async => const [];
-
-  @override
-  Future<ClinicalConfirmationResult> confirmClinical({
-    required OcrTask task,
-    required String resultId,
-    required Map<String, dynamic> confirmedData,
-    required List<Map<String, dynamic>> fieldConfirmations,
-  }) async {
-    return ClinicalConfirmationResult(
-      recordId: 'demo-clinical-${task.id}',
-      materialType: task.materialType,
-      documentRevisionId: task.documentRevisionId,
-      summary: confirmedData,
-      reused: false,
-    );
-  }
 }
 
 String? _emptyAsNull(String? value) {

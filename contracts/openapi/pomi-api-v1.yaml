@@ -187,14 +187,7 @@ paths:
     get:
       tags: [Dashboard]
       operationId: getDashboard
-      summary: Get the patient dashboard aggregate
-      parameters:
-        - name: date
-          in: query
-          schema:
-            type: string
-            format: date
-          description: Defaults to the server's current date.
+      summary: Get the fault-isolated patient dashboard aggregate
       responses:
         '200':
           description: Dashboard aggregate
@@ -236,6 +229,8 @@ paths:
       tags: [Medications]
       operationId: createMedication
       summary: Add a medication and its first event
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -261,7 +256,7 @@ paths:
     put:
       tags: [Medications]
       operationId: updateMedication
-      summary: Adjust, continue, or stop a medication
+      summary: Adjust, pause, resume, or stop a medication
       parameters:
         - $ref: '#/components/parameters/MedicationId'
       requestBody:
@@ -335,7 +330,7 @@ paths:
                   - type: object
                     properties:
                       data:
-                        $ref: '#/components/schemas/MedicationDaily'
+                        $ref: '#/components/schemas/MedicationDailyMutation'
 
   /api/medication-daily:
     get:
@@ -453,6 +448,22 @@ paths:
         '404':
           $ref: '#/components/responses/ErrorResponse'
         '409':
+          $ref: '#/components/responses/ErrorResponse'
+    delete:
+      tags: [Cycles]
+      operationId: deleteCycle
+      summary: Soft-delete a menstrual cycle
+      parameters:
+        - name: cycle_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Cycle deleted
+        '404':
           $ref: '#/components/responses/ErrorResponse'
 
   /api/weights:
@@ -742,14 +753,6 @@ paths:
               schema:
                 type: string
                 format: binary
-            image/png:
-              schema:
-                type: string
-                format: binary
-            application/pdf:
-              schema:
-                type: string
-                format: binary
         '403':
           $ref: '#/components/responses/ErrorResponse'
         '404':
@@ -778,7 +781,13 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/OcrTask'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
         '409':
+          $ref: '#/components/responses/ErrorResponse'
+        '422':
           $ref: '#/components/responses/ErrorResponse'
 
   /api/ocr/tasks/{task_id}:
@@ -800,6 +809,10 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/OcrTask'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
 
   /api/ocr/tasks/{task_id}/result:
     get:
@@ -822,12 +835,16 @@ paths:
                         $ref: '#/components/schemas/OcrDraftResult'
         '409':
           $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
 
   /api/ocr/tasks/{task_id}/confirm:
     post:
       tags: [OCR]
       operationId: confirmOcrResult
-      summary: Confirm edited OCR fields and create formal data atomically
+      summary: Atomically confirm a laboratory, clinical-text, or medical-order OCR draft
       parameters:
         - $ref: '#/components/parameters/TaskId'
       requestBody:
@@ -835,10 +852,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/OcrConfirmRequest'
+              oneOf:
+                - $ref: '#/components/schemas/LabConfirmRequest'
+                - $ref: '#/components/schemas/ClinicalTextConfirmRequest'
+                - $ref: '#/components/schemas/MedicalOrderConfirmRequest'
       responses:
-        '201':
-          description: Every medication confirmed and formal medical orders created
+        '200':
+          description: OCR result confirmed and formal records created atomically
           content:
             application/json:
               schema:
@@ -847,7 +867,14 @@ paths:
                   - type: object
                     properties:
                       data:
-                        $ref: '#/components/schemas/MedicalOrderConfirmationResult'
+                        oneOf:
+                          - $ref: '#/components/schemas/LabConfirmResult'
+                          - $ref: '#/components/schemas/ClinicalTextConfirmResult'
+                          - $ref: '#/components/schemas/MedicalOrderConfirmationResult'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
         '409':
           $ref: '#/components/responses/ErrorResponse'
         '422':
@@ -878,6 +905,67 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/OcrTask'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/lab-observations:
+    get:
+      tags: [Laboratory]
+      operationId: listLabObservations
+      summary: List confirmed laboratory observations for the current patient
+      responses:
+        '200':
+          description: Patient-scoped confirmed observations
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [items]
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/LabObservation'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/lab-observations/{observation_id}:
+    get:
+      tags: [Laboratory]
+      operationId: getLabObservation
+      summary: Get one patient-scoped confirmed laboratory observation
+      parameters:
+        - name: observation_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Confirmed observation
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LabObservation'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
 
   /api/medication-reconciliations:
     post:
@@ -952,28 +1040,10 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
 
   /api/patient-notes:
-    get:
-      tags: [Reports]
-      operationId: getLatestPatientNote
-      summary: Get the latest patient note draft or confirmation
-      responses:
-        '200':
-          description: Latest note or null
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiSuccess'
-                  - type: object
-                    properties:
-                      data:
-                        oneOf:
-                          - $ref: '#/components/schemas/PatientNote'
-                          - type: 'null'
     post:
       tags: [Reports]
       operationId: createPatientNote
-      summary: Create and optionally confirm a patient note
+      summary: Create a patient-note draft for the current visit
       requestBody:
         required: true
         content:
@@ -993,11 +1063,31 @@ paths:
                       data:
                         $ref: '#/components/schemas/PatientNote'
 
+  /api/patient-notes/latest:
+    get:
+      tags: [Reports]
+      operationId: getLatestPatientNote
+      summary: Get the latest patient note draft, confirmation, skip or consumed record
+      responses:
+        '200':
+          description: Latest note or null
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        oneOf:
+                          - $ref: '#/components/schemas/PatientNote'
+                          - type: 'null'
+
   /api/patient-notes/{note_id}:
     put:
       tags: [Reports]
       operationId: updatePatientNote
-      summary: Update or confirm a patient note without changing old reports
+      summary: Update an unconsumed patient-note draft
       parameters:
         - name: note_id
           in: path
@@ -1023,6 +1113,86 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/PatientNote'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/patient-notes/{note_id}/confirm:
+    post:
+      tags: [Reports]
+      operationId: confirmPatientNote
+      summary: Idempotently confirm a patient note
+      parameters:
+        - $ref: '#/components/parameters/PatientNoteId'
+      responses:
+        '200':
+          description: Patient note confirmed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PatientNote'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/patient-notes/{note_id}/skip:
+    post:
+      tags: [Reports]
+      operationId: skipPatientNote
+      summary: Idempotently skip a patient note
+      parameters:
+        - $ref: '#/components/parameters/PatientNoteId'
+      responses:
+        '200':
+          description: Patient note skipped
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PatientNote'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/patient-notes/{note_id}/copy:
+    post:
+      tags: [Reports]
+      operationId: copyPatientNote
+      summary: Copy a prior patient note into a new editable draft
+      parameters:
+        - $ref: '#/components/parameters/PatientNoteId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientNoteCopy'
+      responses:
+        '201':
+          description: New patient-note draft created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PatientNote'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
 
   /api/reports:
     get:
@@ -1269,6 +1439,13 @@ components:
         format: date
     MedicationId:
       name: medication_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PatientNoteId:
+      name: note_id
       in: path
       required: true
       schema:
@@ -1614,6 +1791,10 @@ components:
       type: string
       enum: [created, adjusted, paused, resumed, stopped]
 
+    MedicationUpdateEventType:
+      type: string
+      enum: [adjusted, paused, resumed, stopped]
+
     MedicationSourceCategory:
       type: string
       enum: [prescribed, supplement, other_long_term]
@@ -1679,7 +1860,7 @@ components:
           required: [event_type, event_date, updated_at]
           properties:
             event_type:
-              $ref: '#/components/schemas/MedicationEventType'
+              $ref: '#/components/schemas/MedicationUpdateEventType'
             event_date:
               type: string
               format: date
@@ -1696,6 +1877,11 @@ components:
             updated_at:
               type: string
               format: date-time
+      description: |
+        `adjusted` creates a new medication version rather than overwriting the
+        existing instruction. The old version is ended and the returned new
+        version links back through `replaces_medication_id`. `paused`, `resumed`,
+        and `stopped` append immutable events to the medication timeline.
 
     Medication:
       allOf:
@@ -1724,6 +1910,7 @@ components:
             replaces_medication_id:
               type: [string, 'null']
               format: uuid
+              description: Previous medication version replaced by this record.
             created_at:
               type: string
               format: date-time
@@ -1771,6 +1958,11 @@ components:
       properties:
         medication:
           $ref: '#/components/schemas/Medication'
+        replaced_medication:
+          oneOf:
+            - $ref: '#/components/schemas/Medication'
+            - type: 'null'
+          description: Ended prior version when an adjustment creates a replacement.
         event:
           $ref: '#/components/schemas/MedicationEvent'
 
@@ -1787,8 +1979,12 @@ components:
       allOf:
         - $ref: '#/components/schemas/PageMeta'
         - type: object
-          required: [items, groups]
+          required: [server_date, items, groups]
           properties:
+            server_date:
+              type: string
+              format: date
+              description: Server business date used for all medication writes.
             items:
               type: array
               items:
@@ -1813,37 +2009,38 @@ components:
     MedicationDailyUpsert:
       type: object
       required: [record_date, intake_status]
+      additionalProperties: false
       properties:
         record_date:
           type: string
           format: date
         intake_status:
           $ref: '#/components/schemas/IntakeStatus'
-        actual_dosage:
-          type: [number, 'null']
-          minimum: 0
-        actual_dosage_unit:
-          type: [string, 'null']
-          maxLength: 50
-        note:
-          type: [string, 'null']
-          maxLength: 500
 
     MedicationDaily:
-      allOf:
-        - $ref: '#/components/schemas/MedicationDailyUpsert'
-        - type: object
-          required: [medication_id]
-          properties:
-            id:
-              type: [string, 'null']
-              format: uuid
-            medication_id:
-              type: string
-              format: uuid
-            recorded_at:
-              type: [string, 'null']
-              format: date-time
+      type: object
+      required:
+        [id, medication_id, record_date, intake_status, recorded_at, recorded_by_uid, editable]
+      properties:
+        id:
+          type: [string, 'null']
+          format: uuid
+        medication_id:
+          type: string
+          format: uuid
+        record_date:
+          type: string
+          format: date
+        intake_status:
+          $ref: '#/components/schemas/IntakeStatus'
+        recorded_at:
+          type: [string, 'null']
+          format: date-time
+        recorded_by_uid:
+          type: [string, 'null']
+          format: uuid
+        editable:
+          type: boolean
 
     ThreeStateStats:
       type: object
@@ -1863,7 +2060,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/ThreeStateStats'
         - type: object
-          required: [from, to, items]
+          required: [from, to, items, business_date, editable_from]
           properties:
             from:
               type: string
@@ -1875,6 +2072,27 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/MedicationDaily'
+            business_date:
+              type: string
+              format: date
+            editable_from:
+              type: string
+              format: date
+
+    MedicationDailyMutation:
+      allOf:
+        - $ref: '#/components/schemas/MedicationDaily'
+        - type: object
+          required: [business_date, editable_from, month_summary]
+          properties:
+            business_date:
+              type: string
+              format: date
+            editable_from:
+              type: string
+              format: date
+            month_summary:
+              $ref: '#/components/schemas/MedicationDailyRange'
 
     FlowLevel:
       type: string
@@ -1927,28 +2145,23 @@ components:
 
     WeightInput:
       type: object
-      required: [measured_at, weight_kg]
+      additionalProperties: false
+      required: [record_date, weight_kg]
       properties:
-        measured_at:
+        record_date:
           type: string
-          format: date-time
+          format: date
         weight_kg:
           type: number
           minimum: 20
-          maximum: 350
-        source_type:
-          type: string
-          enum: [manual, imported]
-          default: manual
-        note:
-          type: [string, 'null']
-          maxLength: 500
+          maximum: 300
+          multipleOf: 0.1
 
     WeightRecord:
       allOf:
         - $ref: '#/components/schemas/WeightInput'
         - type: object
-          required: [id, created_at]
+          required: [id, created_at, updated_at]
           properties:
             id:
               type: string
@@ -1956,84 +2169,144 @@ components:
             created_at:
               type: string
               format: date-time
+            updated_at:
+              type: string
+              format: date-time
 
-    Dashboard:
+    DashboardSectionStatus:
+      type: string
+      enum: [ok, empty, error]
+
+    DashboardMedication:
+      allOf:
+        - $ref: '#/components/schemas/Medication'
+        - type: object
+          required: [daily]
+          properties:
+            daily:
+              $ref: '#/components/schemas/MedicationDaily'
+
+    DashboardFollowUpData:
       type: object
-      required: [server_date, data_as_of, profile_summary, today_medications, month_medication_stats]
+      required: [next_visit_date, state, days_remaining]
       properties:
-        server_date:
+        next_visit_date:
           type: string
           format: date
-        data_as_of:
+        state:
           type: string
-          format: date-time
-        profile_summary:
-          type: object
-          required: [patient_id]
-          properties:
-            patient_id:
-              type: string
-              format: uuid
-            nickname:
-              type: [string, 'null']
-            primary_condition:
-              type: [string, 'null']
-        next_visit:
-          type: [object, 'null']
-          properties:
-            date:
-              type: string
-              format: date
-            days_remaining:
-              type: integer
-        today_medications:
-          type: array
+          enum: [upcoming, due, overdue]
+        days_remaining:
+          type: integer
+          minimum: 0
+          description: Non-negative countdown; due and overdue visits return zero.
+
+    DashboardMonthlyMedicationData:
+      type: object
+      required: [from, to, taken, missed, unrecorded]
+      properties:
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+        taken:
+          type: integer
+          minimum: 0
+        missed:
+          type: integer
+          minimum: 0
+        unrecorded:
+          type: integer
+          minimum: 0
+
+    DashboardSectionError:
+      type: object
+      required: [code, message, retryable]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        retryable:
+          type: boolean
+
+    DashboardFollowUpSection:
+      type: object
+      required: [status, data, error]
+      properties:
+        status:
+          $ref: '#/components/schemas/DashboardSectionStatus'
+        data:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardFollowUpData'
+            - type: 'null'
+        error:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardSectionError'
+            - type: 'null'
+
+    DashboardTodayMedicationsSection:
+      type: object
+      required: [status, data, error]
+      properties:
+        status:
+          $ref: '#/components/schemas/DashboardSectionStatus'
+        data:
+          type: [array, 'null']
           items:
-            type: object
-            required: [medication_id, drug_name, intake_status]
-            properties:
-              medication_id:
-                type: string
-                format: uuid
-              drug_name:
-                type: string
-              specification:
-                type: [string, 'null']
-              dosage_text:
-                type: [string, 'null']
-              frequency:
-                type: [string, 'null']
-              intake_status:
-                $ref: '#/components/schemas/IntakeStatus'
-              recorded_at:
-                type: [string, 'null']
-                format: date-time
-        month_medication_stats:
-          allOf:
-            - $ref: '#/components/schemas/ThreeStateStats'
-            - type: object
-              required: [month, by_medication]
-              properties:
-                month:
-                  type: string
-                  pattern: '^\d{4}-\d{2}$'
-                by_medication:
-                  type: array
-                  items:
-                    allOf:
-                      - $ref: '#/components/schemas/ThreeStateStats'
-                      - type: object
-                        required: [medication_id, drug_name]
-                        properties:
-                          medication_id:
-                            type: string
-                            format: uuid
-                          drug_name:
-                            type: string
-        latest_report:
+            $ref: '#/components/schemas/DashboardMedication'
+        error:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardSectionError'
+            - type: 'null'
+
+    DashboardMonthlyMedicationSection:
+      type: object
+      required: [status, data, error]
+      properties:
+        status:
+          $ref: '#/components/schemas/DashboardSectionStatus'
+        data:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardMonthlyMedicationData'
+            - type: 'null'
+        error:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardSectionError'
+            - type: 'null'
+
+    DashboardLatestReportSection:
+      type: object
+      required: [status, data, error]
+      properties:
+        status:
+          $ref: '#/components/schemas/DashboardSectionStatus'
+        data:
           oneOf:
             - $ref: '#/components/schemas/ReportListItem'
             - type: 'null'
+        error:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardSectionError'
+            - type: 'null'
+
+    Dashboard:
+      type: object
+      required: [business_date, follow_up, today_medications, monthly_medication_summary, latest_report]
+      properties:
+        business_date:
+          type: string
+          format: date
+        follow_up:
+          $ref: '#/components/schemas/DashboardFollowUpSection'
+        today_medications:
+          $ref: '#/components/schemas/DashboardTodayMedicationsSection'
+        monthly_medication_summary:
+          $ref: '#/components/schemas/DashboardMonthlyMedicationSection'
+        latest_report:
+          $ref: '#/components/schemas/DashboardLatestReportSection'
 
     DocumentType:
       type: string
@@ -2249,7 +2522,7 @@ components:
 
     FieldConfirmationStatus:
       type: string
-      enum: [pending, accepted, corrected, rejected]
+      enum: [pending, confirmed, edited, rejected]
 
     OcrFieldResult:
       type: object
@@ -2278,14 +2551,15 @@ components:
 
     LabItemDraft:
       type: object
-      required: [item_name, raw_value]
+      required: [item_name, item_code, raw_value, numeric_value, raw_unit, normalized_unit, reference_range_text, reference_low, reference_high]
+      additionalProperties: false
       properties:
         item_name:
-          type: string
+          type: [string, 'null']
         item_code:
           type: [string, 'null']
         raw_value:
-          type: string
+          type: [string, 'null']
         numeric_value:
           type: [number, 'null']
         raw_unit:
@@ -2301,7 +2575,8 @@ components:
 
     LabDraft:
       type: object
-      required: [items]
+      required: [hospital_name, sample_date, report_date, items]
+      additionalProperties: false
       properties:
         hospital_name:
           type: [string, 'null']
@@ -2313,17 +2588,23 @@ components:
           format: date
         items:
           type: array
-          minItems: 1
           items:
             $ref: '#/components/schemas/LabItemDraft'
 
     MedicalOrderItemDraft:
       type: object
-      required: [drug_name, specification, dosage_value, dosage_unit, frequency, course, route, instructions, raw_order_text, explicitly_stopped]
+      required: [source_text, drug_name, normalized_drug_name, specification, dosage_text, dosage_value, dosage_unit, frequency, duration, route, instruction]
+      additionalProperties: false
       properties:
+        source_text:
+          type: [string, 'null']
         drug_name:
           type: [string, 'null']
+        normalized_drug_name:
+          type: [string, 'null']
         specification:
+          type: [string, 'null']
+        dosage_text:
           type: [string, 'null']
         dosage_value:
           type: [number, 'null']
@@ -2331,78 +2612,74 @@ components:
           type: [string, 'null']
         frequency:
           type: [string, 'null']
-        course:
+        duration:
           type: [string, 'null']
         route:
           type: [string, 'null']
-        instructions:
+        instruction:
           type: [string, 'null']
-        raw_order_text:
-          type: [string, 'null']
-        explicitly_stopped:
-          type: boolean
 
     MedicalOrderDraft:
       type: object
-      required: [order_text, medications]
+      required: [hospital_name, department_name, prescribed_at, orders]
+      additionalProperties: false
       properties:
-        facility:
+        hospital_name:
           type: [string, 'null']
-        order_text:
+        department_name:
           type: [string, 'null']
-        order_date:
+        prescribed_at:
           type: [string, 'null']
           format: date
-        medications:
+        orders:
           type: array
-          minItems: 1
           items:
             $ref: '#/components/schemas/MedicalOrderItemDraft'
 
     ImagingTextDraft:
       type: object
-      required: [findings, impression]
+      required: [examination_name, body_part, examination_method, findings_text, conclusion_text, examined_at, reported_at]
+      additionalProperties: false
       properties:
-        facility:
-          type: [string, 'null']
         examination_name:
           type: [string, 'null']
         body_part:
           type: [string, 'null']
-        modality:
+        examination_method:
           type: [string, 'null']
-        findings:
-          type: string
-        impression:
-          type: string
-        examination_date:
+        findings_text:
+          type: [string, 'null']
+        conclusion_text:
+          type: [string, 'null']
+        examined_at:
           type: [string, 'null']
           format: date
-        report_date:
+        reported_at:
           type: [string, 'null']
           format: date
 
     OutpatientRecordDraft:
       type: object
-      required: [visit_date, diagnosis_summary, medical_advice]
+      required: [hospital_name, department_name, doctor_name, visit_date, chief_complaint, diagnosis_summary, treatment_plan, medical_advice]
+      additionalProperties: false
       properties:
-        facility:
+        hospital_name:
           type: [string, 'null']
-        department:
+        department_name:
           type: [string, 'null']
         doctor_name:
           type: [string, 'null']
         visit_date:
-          type: string
+          type: [string, 'null']
           format: date
         chief_complaint:
           type: [string, 'null']
         diagnosis_summary:
-          type: string
+          type: [string, 'null']
         treatment_plan:
           type: [string, 'null']
         medical_advice:
-          type: string
+          type: [string, 'null']
 
     OcrDraftResult:
       type: object
@@ -2418,8 +2695,11 @@ components:
           type: object
           additionalProperties: true
         validated_draft:
-          type: object
-          additionalProperties: true
+          oneOf:
+            - $ref: '#/components/schemas/LabDraft'
+            - $ref: '#/components/schemas/MedicalOrderDraft'
+            - $ref: '#/components/schemas/ImagingTextDraft'
+            - $ref: '#/components/schemas/OutpatientRecordDraft'
         user_modified_data:
           type: [object, 'null']
           additionalProperties: true
@@ -2430,35 +2710,26 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OcrFieldResult'
-        source:
-          type: object
-          required: [document_id, document_revision_id, file_url]
-          properties:
-            document_id:
-              type: string
-              format: uuid
-            document_revision_id:
-              type: string
-              format: uuid
-            file_url:
-              type: string
-              format: uri-reference
+        source_document:
+          $ref: '#/components/schemas/OcrSourceDocument'
         created_at:
           type: string
           format: date-time
 
     MedicalOrderConfirmationItem:
       type: object
-      required: [index, confirmed, drug_name, dosage_value, dosage_unit, frequency, order_date, raw_order_text]
+      additionalProperties: false
+      required: [source_index, confirmed, source_text, drug_name, dosage_value, dosage_unit, frequency, prescribed_at]
       properties:
-        index:
+        source_index:
           type: integer
           minimum: 0
         confirmed:
           type: boolean
-          enum: [true]
+          const: true
         drug_name:
           type: string
+          minLength: 1
         specification:
           type: [string, 'null']
         dosage_value:
@@ -2466,44 +2737,485 @@ components:
           exclusiveMinimum: 0
         dosage_unit:
           type: string
+          minLength: 1
         frequency:
           type: string
-        course:
+          minLength: 1
+        duration:
           type: [string, 'null']
         route:
           type: [string, 'null']
-        instructions:
+        instruction:
           type: [string, 'null']
-        order_date:
+        prescribed_at:
           type: string
           format: date
-        raw_order_text:
+        source_text:
           type: string
+          minLength: 1
         explicitly_stopped:
           type: boolean
           default: false
 
-    OcrConfirmRequest:
+    MedicalOrderConfirmRequest:
       type: object
-      required: [items]
+      additionalProperties: false
+      required: [result_id, expected_revision_id, items]
       properties:
+        result_id:
+          type: string
+          format: uuid
+        expected_revision_id:
+          type: string
+          format: uuid
         items:
           type: array
           minItems: 1
+          maxItems: 100
           items:
             $ref: '#/components/schemas/MedicalOrderConfirmationItem'
 
     MedicalOrderConfirmationResult:
       type: object
-      required: [items, reused]
+      required: [items, reused, p0_evaluation]
       properties:
         items:
           type: array
           items:
-            type: object
-            additionalProperties: true
+            $ref: '#/components/schemas/MedicalOrder'
         reused:
           type: boolean
+        p0_evaluation:
+          $ref: '#/components/schemas/MedicalOrderP0Evaluation'
+
+    MedicalOrderP0Evaluation:
+      type: object
+      additionalProperties: false
+      required: [total_fields, valid_fields, invalid_fields, valid_rate, ocr_exact_match_fields, user_corrected_fields, ocr_exact_match_rate]
+      properties:
+        total_fields: {type: integer, minimum: 0}
+        valid_fields: {type: integer, minimum: 0}
+        invalid_fields: {type: integer, minimum: 0}
+        valid_rate: {type: number, minimum: 0, maximum: 1}
+        ocr_exact_match_fields: {type: integer, minimum: 0}
+        user_corrected_fields: {type: integer, minimum: 0}
+        ocr_exact_match_rate: {type: number, minimum: 0, maximum: 1}
+
+    MedicalOrder:
+      type: object
+      additionalProperties: false
+      required: [id, medication_index, document_id, document_revision_id, ocr_result_id, ocr_task_id, source_text, drug_name, standard_drug_id, specification, dosage_value, dosage_unit, frequency, duration, route, instruction, prescribed_at, explicitly_stopped, review_required, original_item_data, confirmed_item_data, confirmed_by_uid, confirmed_at]
+      properties:
+        id: {type: string, format: uuid}
+        medication_index: {type: integer, minimum: 0}
+        document_id: {type: string, format: uuid}
+        document_revision_id: {type: string, format: uuid}
+        ocr_result_id: {type: string, format: uuid}
+        ocr_task_id: {type: string, format: uuid}
+        source_text: {type: string}
+        drug_name: {type: string}
+        standard_drug_id: {type: [string, 'null']}
+        specification: {type: [string, 'null']}
+        dosage_value: {type: number, exclusiveMinimum: 0}
+        dosage_unit: {type: string}
+        frequency: {type: string}
+        duration: {type: [string, 'null']}
+        route: {type: [string, 'null']}
+        instruction: {type: [string, 'null']}
+        prescribed_at: {type: string, format: date}
+        explicitly_stopped: {type: boolean}
+        review_required: {type: boolean}
+        original_item_data: {type: object, additionalProperties: true}
+        confirmed_item_data: {type: object, additionalProperties: true}
+        confirmed_by_uid: {type: string, format: uuid}
+        confirmed_at: {type: string, format: date-time}
+
+    OcrSourceDocument:
+      type: object
+      additionalProperties: false
+      required: [document_id, document_revision_id, original_file_name, mime_type, revision_number, file_endpoint]
+      properties:
+        document_id:
+          type: string
+          format: uuid
+        document_revision_id:
+          type: string
+          format: uuid
+        original_file_name:
+          type: string
+        mime_type:
+          type: string
+          enum: [image/jpeg, image/png, application/pdf]
+        revision_number:
+          type: integer
+          minimum: 1
+        file_endpoint:
+          type: string
+          pattern: '^/api/documents/.+/revisions/.+/file$'
+
+    ClinicalFieldConfirmation:
+      type: object
+      additionalProperties: false
+      required: [field_path, user_value, confirmation_status]
+      properties:
+        field_path:
+          type: string
+          minLength: 1
+          maxLength: 300
+        user_value: {}
+        confirmation_status:
+          type: string
+          enum: [confirmed, edited, rejected]
+
+    ImagingTextConfirmation:
+      type: object
+      additionalProperties: false
+      required: [findings_text, conclusion_text]
+      properties:
+        examination_name:
+          type: [string, 'null']
+          maxLength: 200
+        body_part:
+          type: [string, 'null']
+          maxLength: 200
+        examination_method:
+          type: [string, 'null']
+          maxLength: 200
+        findings_text:
+          type: string
+          minLength: 1
+          maxLength: 20000
+        conclusion_text:
+          type: string
+          minLength: 1
+          maxLength: 20000
+        examined_at:
+          type: [string, 'null']
+          format: date
+        reported_at:
+          type: [string, 'null']
+          format: date
+
+    OutpatientRecordConfirmation:
+      type: object
+      additionalProperties: false
+      required: [visit_date, diagnosis_summary, medical_advice]
+      properties:
+        hospital_name:
+          type: [string, 'null']
+          maxLength: 200
+        department_name:
+          type: [string, 'null']
+          maxLength: 200
+        doctor_name:
+          type: [string, 'null']
+          maxLength: 100
+        visit_date:
+          type: string
+          format: date
+        chief_complaint:
+          type: [string, 'null']
+          maxLength: 20000
+        diagnosis_summary:
+          type: string
+          minLength: 1
+          maxLength: 20000
+        treatment_plan:
+          type: [string, 'null']
+          maxLength: 20000
+        medical_advice:
+          type: string
+          minLength: 1
+          maxLength: 20000
+
+    ClinicalTextConfirmRequest:
+      type: object
+      additionalProperties: false
+      required: [result_id, expected_revision_id, document_type, confirmed_data]
+      properties:
+        result_id:
+          type: string
+          format: uuid
+        expected_revision_id:
+          type: string
+          format: uuid
+        document_type:
+          type: string
+          enum: [imaging_text_report, outpatient_record]
+        confirmed_data:
+          oneOf:
+            - $ref: '#/components/schemas/ImagingTextConfirmation'
+            - $ref: '#/components/schemas/OutpatientRecordConfirmation'
+        field_confirmations:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClinicalFieldConfirmation'
+          default: []
+        confirm_all:
+          type: boolean
+          default: false
+
+    ClinicalTextP0Evaluation:
+      type: object
+      required: [required_fields, valid_required_fields, total_fields, corrected_fields, exact_match_fields]
+      properties:
+        required_fields:
+          type: integer
+          minimum: 0
+        valid_required_fields:
+          type: integer
+          minimum: 0
+        total_fields:
+          type: integer
+          minimum: 0
+        corrected_fields:
+          type: integer
+          minimum: 0
+        exact_match_fields:
+          type: integer
+          minimum: 0
+
+    ClinicalTextConfirmResult:
+      type: object
+      required: [record_id, task_id, result_id, created_resource_ids, reconciliation_required, material_type, document_id, document_revision_id, ocr_result_id, confirmed_at, summary, p0_evaluation, reused]
+      properties:
+        record_id:
+          type: string
+          format: uuid
+        task_id:
+          type: string
+          format: uuid
+        result_id:
+          type: string
+          format: uuid
+        created_resource_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        reconciliation_required:
+          type: boolean
+          const: false
+        material_type:
+          type: string
+          enum: [imaging_text_report, outpatient_record]
+        document_id:
+          type: string
+          format: uuid
+        document_revision_id:
+          type: string
+          format: uuid
+        ocr_result_id:
+          type: string
+          format: uuid
+        confirmed_at:
+          type: string
+          format: date-time
+        summary:
+          type: object
+          additionalProperties: true
+        p0_evaluation:
+          $ref: '#/components/schemas/ClinicalTextP0Evaluation'
+        reused:
+          type: boolean
+
+    LabConfirmationItem:
+      type: object
+      additionalProperties: false
+      required: [name, value, unit]
+      properties:
+        source_index:
+          type: [integer, 'null']
+          minimum: 0
+        name:
+          type: [string, 'null']
+          maxLength: 200
+        value:
+          type: [string, number, 'null']
+        unit:
+          type: [string, 'null']
+          maxLength: 40
+        reference_range:
+          type: [string, 'null']
+          maxLength: 120
+        sample_date:
+          type: [string, 'null']
+        exam_date:
+          type: [string, 'null']
+        report_date:
+          type: [string, 'null']
+        visit_date:
+          type: [string, 'null']
+        note:
+          type: [string, 'null']
+          maxLength: 1000
+
+    LabConfirmRequest:
+      type: object
+      additionalProperties: false
+      required: [result_id, expected_revision_id, items]
+      properties:
+        result_id:
+          type: string
+          format: uuid
+        expected_revision_id:
+          type: string
+          format: uuid
+        visit_id:
+          type: [string, 'null']
+          maxLength: 100
+        sample_date:
+          type: [string, 'null']
+        exam_date:
+          type: [string, 'null']
+        report_date:
+          type: [string, 'null']
+        visit_date:
+          type: [string, 'null']
+        items:
+          type: array
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/LabConfirmationItem'
+
+    LabP0Evaluation:
+      type: object
+      required: [total_fields, valid_fields, invalid_fields, valid_rate]
+      properties:
+        total_fields:
+          type: integer
+          minimum: 0
+        valid_fields:
+          type: integer
+          minimum: 0
+        invalid_fields:
+          type: integer
+          minimum: 0
+        valid_rate:
+          type: number
+          minimum: 0
+          maximum: 1
+        ocr_exact_match_fields:
+          type: integer
+          minimum: 0
+        user_corrected_fields:
+          type: integer
+          minimum: 0
+        ocr_exact_match_rate:
+          type: number
+          minimum: 0
+          maximum: 1
+
+    LabObservation:
+      type: object
+      required: [id, patient_id, document_id, document_revision_id, ocr_result_id, item_index, original_item_name, mapping_status, raw_value, numeric_value, original_unit, standard_unit, abnormal_status, original_item_data, confirmed_item_data, confirmed_by_uid, confirmed_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        patient_id:
+          type: string
+          format: uuid
+        visit_id:
+          type: [string, 'null']
+        document_id:
+          type: string
+          format: uuid
+        document_revision_id:
+          type: string
+          format: uuid
+        ocr_result_id:
+          type: string
+          format: uuid
+        item_index:
+          type: integer
+          minimum: 0
+        original_item_name:
+          type: string
+        standard_metric_id:
+          type: [string, 'null']
+        mapping_status:
+          type: string
+          enum: [mapped, needs_manual_review]
+        raw_value:
+          type: string
+        numeric_value:
+          type: string
+        original_unit:
+          type: string
+        standard_unit:
+          type: string
+        reference_range_raw:
+          type: [string, 'null']
+        reference_lower:
+          type: [string, 'null']
+        reference_upper:
+          type: [string, 'null']
+        abnormal_status:
+          type: string
+          enum: [low, normal, high, unknown]
+        sample_date:
+          type: [string, 'null']
+          format: date
+        exam_date:
+          type: [string, 'null']
+          format: date
+        report_date:
+          type: [string, 'null']
+          format: date
+        visit_date:
+          type: [string, 'null']
+          format: date
+        trend_date:
+          type: [string, 'null']
+          format: date
+        trend_date_source:
+          type: [string, 'null']
+          enum: [sample_date, exam_date, report_date, visit_date, null]
+        original_item_data:
+          type: object
+          additionalProperties: true
+        confirmed_item_data:
+          type: object
+          additionalProperties: true
+        confirmed_by_uid:
+          type: string
+          format: uuid
+        confirmed_at:
+          type: string
+          format: date-time
+        note:
+          type: [string, 'null']
+
+    LabConfirmResult:
+      type: object
+      required: [task_id, result_id, status, reused, created_resource_ids, confirmed_at, observations, p0_evaluation]
+      properties:
+        task_id:
+          type: string
+          format: uuid
+        result_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          const: confirmed
+        reused:
+          type: boolean
+        created_resource_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        confirmed_at:
+          type: string
+          format: date-time
+        observations:
+          type: array
+          items:
+            $ref: '#/components/schemas/LabObservation'
+        p0_evaluation:
+          $ref: '#/components/schemas/LabP0Evaluation'
 
     OcrRetryRequest:
       type: object
@@ -2517,7 +3229,7 @@ components:
 
     ReconciliationStatus:
       type: string
-      enum: [draft, executed]
+      enum: [draft, executing, executed]
 
     ComparisonType:
       type: string
@@ -2622,45 +3334,69 @@ components:
           items:
             $ref: '#/components/schemas/ReconciliationItemDecision'
 
-    ConfirmationStatus:
+    PatientNoteStatus:
       type: string
-      enum: [draft, confirmed, cancelled]
+      enum: [draft, confirmed, skipped, consumed]
 
     PatientNoteInput:
       type: object
-      required: [original_text, confirmation_status]
+      required: [original_text]
+      additionalProperties: false
       properties:
         original_text:
           type: string
           maxLength: 5000
-        confirmed_text:
+        visit_context:
           type: [string, 'null']
-          maxLength: 5000
-        confirmation_status:
-          $ref: '#/components/schemas/ConfirmationStatus'
+          maxLength: 200
+
+    PatientNoteCopy:
+      type: object
+      properties:
+        visit_context:
+          type: [string, 'null']
+          maxLength: 200
 
     PatientNote:
-      allOf:
-        - $ref: '#/components/schemas/PatientNoteInput'
-        - type: object
-          required: [id, created_at, updated_at]
-          properties:
-            id:
-              type: string
-              format: uuid
-            confirmed_at:
-              type: [string, 'null']
-              format: date-time
-            created_at:
-              type: string
-              format: date-time
-            updated_at:
-              type: string
-              format: date-time
+      type: object
+      required: [id, patient_id, original_text, status, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        patient_id:
+          type: string
+          format: uuid
+        visit_context:
+          type: [string, 'null']
+        original_text:
+          type: string
+        confirmed_text:
+          type: [string, 'null']
+        status:
+          $ref: '#/components/schemas/PatientNoteStatus'
+        source_note_id:
+          type: [string, 'null']
+          format: uuid
+        confirmed_by_uid:
+          type: [string, 'null']
+          format: uuid
+        confirmed_at:
+          type: [string, 'null']
+          format: date-time
+        consumed_at:
+          type: [string, 'null']
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
 
     ReportStatus:
       type: string
-      enum: [generating, succeeded, failed]
+      enum: [pending, succeeded, failed]
 
     ReportCreate:
       type: object

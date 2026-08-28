@@ -18,8 +18,11 @@ from pomi_backend.db.models.orders import (
     MedicationReconciliation,
     MedicationReconciliationItem,
 )
+from pomi_backend.db.models.reports import PatientNote, ReportSnapshot, ReportSource
 
 __all__ = [
+    "Document",
+    "DocumentRevision",
     "Medication",
     "ImagingReport",
     "LabObservation",
@@ -33,9 +36,10 @@ __all__ = [
     "OCRResult",
     "OCRTask",
     "OutpatientRecord",
+    "PatientNote",
     "PatientProfile",
-    "Document",
-    "DocumentRevision",
+    "ReportSnapshot",
+    "ReportSource",
     "UserAccount",
     "UserSession",
     "WeightRecord",

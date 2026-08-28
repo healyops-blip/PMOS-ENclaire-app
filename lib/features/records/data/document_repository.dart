@@ -91,6 +91,7 @@ abstract interface class DocumentRepository {
     required SelectedDocumentFile file,
     required String documentType,
     required String consentVersion,
+    required String idempotencyKey,
     required void Function(int sent, int total) onProgress,
   });
   Future<List<DocumentRevision>> revisions(String documentId);
@@ -99,6 +100,7 @@ abstract interface class DocumentRepository {
     required String expectedRevisionId,
     required String reason,
     required SelectedDocumentFile file,
+    required String idempotencyKey,
     required void Function(int sent, int total) onProgress,
   });
   Future<Uint8List> download(String documentId, String revisionId);
@@ -149,6 +151,7 @@ class FastApiDocumentRepository implements DocumentRepository {
     required SelectedDocumentFile file,
     required String documentType,
     required String consentVersion,
+    required String idempotencyKey,
     required void Function(int sent, int total) onProgress,
   }) async {
     try {
@@ -159,7 +162,7 @@ class FastApiDocumentRepository implements DocumentRepository {
           'external_processing_consent_version': consentVersion,
           'file': MultipartFile.fromBytes(file.bytes, filename: file.name),
         }),
-        options: Options(headers: {'Idempotency-Key': _idempotencyKey()}),
+        options: Options(headers: {'Idempotency-Key': idempotencyKey}),
         onSendProgress: onProgress,
       );
       return MedicalDocument.fromJson(_data(response.data!));
@@ -192,6 +195,7 @@ class FastApiDocumentRepository implements DocumentRepository {
     required String expectedRevisionId,
     required String reason,
     required SelectedDocumentFile file,
+    required String idempotencyKey,
     required void Function(int sent, int total) onProgress,
   }) async {
     try {
@@ -202,7 +206,7 @@ class FastApiDocumentRepository implements DocumentRepository {
           'expected_current_revision_id': expectedRevisionId,
           'file': MultipartFile.fromBytes(file.bytes, filename: file.name),
         }),
-        options: Options(headers: {'Idempotency-Key': _idempotencyKey()}),
+        options: Options(headers: {'Idempotency-Key': idempotencyKey}),
         onSendProgress: onProgress,
       );
       return DocumentRevision.fromJson(_data(response.data!));
@@ -235,9 +239,6 @@ class FastApiDocumentRepository implements DocumentRepository {
 
   dynamic _data(Map<String, dynamic> envelope) => envelope['data'];
 
-  String _idempotencyKey() =>
-      'flutter-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}';
-
   DocumentFailure _failure(DioException error) {
     final body = error.response?.data;
     if (body is Map && body['error'] is Map) {
@@ -265,6 +266,9 @@ class DemoDocumentRepository implements DocumentRepository {
   DemoDocumentRepository();
 
   final List<MedicalDocument> _documents = [];
+  final Map<String, List<DocumentRevision>> _revisions = {};
+  final Map<(String, String), Uint8List> _files = {};
+  final Map<String, DocumentRevision> _replacementRequests = {};
 
   @override
   Future<List<MedicalDocument>> list({String? documentType}) async => _documents
@@ -282,6 +286,7 @@ class DemoDocumentRepository implements DocumentRepository {
     required SelectedDocumentFile file,
     required String documentType,
     required String consentVersion,
+    required String idempotencyKey,
     required void Function(int sent, int total) onProgress,
   }) async {
     onProgress(file.bytes.length, file.bytes.length);
@@ -299,13 +304,7 @@ class DemoDocumentRepository implements DocumentRepository {
       uploadedAt: DateTime.now(),
     );
     _documents.insert(0, item);
-    return item;
-  }
-
-  @override
-  Future<List<DocumentRevision>> revisions(String documentId) async {
-    final item = await get(documentId);
-    return [
+    _revisions[id] = [
       DocumentRevision(
         id: item.currentRevisionId,
         revisionNumber: 1,
@@ -314,7 +313,13 @@ class DemoDocumentRepository implements DocumentRepository {
         createdAt: item.uploadedAt,
       ),
     ];
+    _files[(id, item.currentRevisionId)] = file.bytes;
+    return item;
   }
+
+  @override
+  Future<List<DocumentRevision>> revisions(String documentId) async =>
+      List.unmodifiable(_revisions[documentId] ?? const []);
 
   @override
   Future<DocumentRevision> replace({
@@ -322,25 +327,71 @@ class DemoDocumentRepository implements DocumentRepository {
     required String expectedRevisionId,
     required String reason,
     required SelectedDocumentFile file,
+    required String idempotencyKey,
     required void Function(int sent, int total) onProgress,
   }) async {
+    final requestKey = '$documentId:$idempotencyKey';
+    if (_replacementRequests.containsKey(requestKey)) {
+      return _replacementRequests[requestKey]!;
+    }
+    final index = _documents.indexWhere((item) => item.id == documentId);
+    if (index < 0) {
+      throw const DocumentFailure('RESOURCE_NOT_FOUND', '材料不存在。');
+    }
+    final current = _documents[index];
+    if (current.currentRevisionId != expectedRevisionId) {
+      throw const DocumentFailure('RESOURCE_VERSION_CONFLICT', '材料已更新，请刷新后重试。');
+    }
     onProgress(file.bytes.length, file.bytes.length);
-    return DocumentRevision(
-      id: '$documentId-r2',
-      revisionNumber: 2,
-      mimeType: 'image/png',
+    final history = _revisions[documentId]!;
+    final revisionNumber = history.length + 1;
+    final revisionId = '$documentId-r$revisionNumber';
+    final mimeType = file.name.toLowerCase().endsWith('.pdf')
+        ? 'application/pdf'
+        : 'image/png';
+    final revision = DocumentRevision(
+      id: revisionId,
+      revisionNumber: revisionNumber,
+      mimeType: mimeType,
       fileHash: 'demo-replacement-sha256',
       replacementReason: reason,
       createdAt: DateTime.now(),
     );
+    history.insert(0, revision);
+    _files[(documentId, revisionId)] = file.bytes;
+    _documents[index] = MedicalDocument(
+      id: current.id,
+      documentType: current.documentType,
+      originalFileName: file.name,
+      mimeType: mimeType,
+      fileSizeBytes: file.bytes.length,
+      fileHash: revision.fileHash,
+      currentRevisionId: revision.id,
+      uploadedAt: current.uploadedAt,
+    );
+    _replacementRequests[requestKey] = revision;
+    return revision;
   }
 
   @override
   Future<Uint8List> download(String documentId, String revisionId) async =>
-      Uint8List(0);
+      _files[(documentId, revisionId)] ?? Uint8List(0);
 
   @override
   Future<void> delete(String documentId) async {
     _documents.removeWhere((item) => item.id == documentId);
+    _revisions.remove(documentId);
+    _files.removeWhere((key, _) => key.$1 == documentId);
+    _replacementRequests.removeWhere(
+      (key, _) => key.startsWith('$documentId:'),
+    );
   }
+}
+
+int _documentIdempotencySequence = 0;
+
+String newDocumentIdempotencyKey() {
+  final timestamp = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
+  final sequence = (_documentIdempotencySequence++).toRadixString(36);
+  return 'flutter-$timestamp-$sequence';
 }

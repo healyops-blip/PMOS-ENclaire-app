@@ -38,27 +38,28 @@ class MedicalOrderDraft {
       dosageUnit.trim().isNotEmpty &&
       frequency.trim().isNotEmpty &&
       rawOrderText.trim().isNotEmpty &&
+      RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(orderDate) &&
       DateTime.tryParse(orderDate) != null;
 
   Map<String, dynamic> toJson() => {
-    'index': index,
+    'source_index': index,
     'confirmed': confirmed,
+    'source_text': rawOrderText,
     'drug_name': drugName.trim(),
     'specification': specification.trim().isEmpty ? null : specification.trim(),
     'dosage_value': num.tryParse(dosageValue),
     'dosage_unit': dosageUnit.trim(),
     'frequency': frequency.trim(),
-    'course': course.trim().isEmpty ? null : course.trim(),
+    'duration': course.trim().isEmpty ? null : course.trim(),
     'route': route.trim().isEmpty ? null : route.trim(),
-    'instructions': instructions.trim().isEmpty ? null : instructions.trim(),
-    'order_date': orderDate,
-    'raw_order_text': rawOrderText.trim(),
+    'instruction': instructions.trim().isEmpty ? null : instructions.trim(),
+    'prescribed_at': orderDate,
     'explicitly_stopped': explicitlyStopped,
   };
 
   static List<MedicalOrderDraft> fromDraft(Map<String, dynamic> draft) {
-    final date = draft['order_date']?.toString() ?? '';
-    final items = (draft['medications'] as List? ?? const []);
+    final date = draft['prescribed_at']?.toString() ?? '';
+    final items = (draft['orders'] as List? ?? const []);
     return List.generate(items.length, (index) {
       final item = Map<String, dynamic>.from(items[index] as Map);
       return MedicalOrderDraft(
@@ -68,10 +69,10 @@ class MedicalOrderDraft {
         dosageValue: item['dosage_value']?.toString() ?? '',
         dosageUnit: item['dosage_unit']?.toString() ?? '',
         frequency: item['frequency']?.toString() ?? '',
-        course: item['course']?.toString() ?? '',
+        course: item['duration']?.toString() ?? '',
         route: item['route']?.toString() ?? '',
-        instructions: item['instructions']?.toString() ?? '',
-        rawOrderText: item['raw_order_text']?.toString() ?? '',
+        instructions: item['instruction']?.toString() ?? '',
+        rawOrderText: item['source_text']?.toString() ?? '',
         orderDate: date,
         explicitlyStopped: item['explicitly_stopped'] as bool? ?? false,
       );
@@ -139,6 +140,8 @@ class MedicationReconciliationDraft {
 abstract interface class MedicalOrderGateway {
   Future<void> confirmMedicalOrder(
     String taskId,
+    String resultId,
+    String expectedRevisionId,
     List<MedicalOrderDraft> items,
   );
   Future<MedicationReconciliationDraft> createReconciliation(String taskId);
@@ -154,15 +157,21 @@ class FastApiMedicalOrderGateway implements MedicalOrderGateway {
   @override
   Future<void> confirmMedicalOrder(
     String taskId,
+    String resultId,
+    String expectedRevisionId,
     List<MedicalOrderDraft> items,
   ) async {
     try {
       await client.dio.post<Map<String, dynamic>>(
         '/ocr/tasks/$taskId/confirm',
-        data: {'items': items.map((item) => item.toJson()).toList()},
+        data: {
+          'result_id': resultId,
+          'expected_revision_id': expectedRevisionId,
+          'items': items.map((item) => item.toJson()).toList(),
+        },
       );
     } on DioException catch (error) {
-      throw OrderReviewException(_message(error));
+      throw _exception(error);
     }
   }
 
@@ -177,7 +186,7 @@ class FastApiMedicalOrderGateway implements MedicalOrderGateway {
       );
       return MedicationReconciliationDraft.fromJson(_data(response.data));
     } on DioException catch (error) {
-      throw OrderReviewException(_message(error));
+      throw _exception(error);
     }
   }
 
@@ -195,7 +204,7 @@ class FastApiMedicalOrderGateway implements MedicalOrderGateway {
               'item_id': item.id,
               'decision': item.decision,
               if (stopped && item.decision == 'accept') ...{
-                'stop_date': DateTime.now().toIso8601String().split('T').first,
+                'stop_date': item.newOrder?['prescribed_at'],
                 'stop_source': 'written_order',
               },
             };
@@ -204,25 +213,39 @@ class FastApiMedicalOrderGateway implements MedicalOrderGateway {
       );
       return MedicationReconciliationDraft.fromJson(_data(response.data));
     } on DioException catch (error) {
-      throw OrderReviewException(_message(error));
+      throw _exception(error);
     }
   }
 
   static Map<String, dynamic> _data(Map<String, dynamic>? envelope) =>
       Map<String, dynamic>.from(envelope?['data'] as Map);
 
-  static String _message(DioException error) {
+  static OrderReviewException _exception(DioException error) {
     final body = error.response?.data;
     if (body is Map && body['error'] is Map) {
-      return (body['error'] as Map)['message']?.toString() ?? '提交失败';
+      final apiError = body['error'] as Map;
+      final fieldErrors = <String, String>{};
+      final details = apiError['details'];
+      if (details is Map && details['fields'] is List) {
+        for (final raw in details['fields'] as List) {
+          if (raw is Map && raw['path'] != null && raw['message'] != null) {
+            fieldErrors[raw['path'].toString()] = raw['message'].toString();
+          }
+        }
+      }
+      return OrderReviewException(
+        apiError['message']?.toString() ?? '提交失败',
+        fieldErrors: fieldErrors,
+      );
     }
-    return '网络连接中断，请稍后重试。';
+    return const OrderReviewException('网络连接中断，请稍后重试。');
   }
 }
 
 class OrderReviewException implements Exception {
-  const OrderReviewException(this.message);
+  const OrderReviewException(this.message, {this.fieldErrors = const {}});
   final String message;
+  final Map<String, String> fieldErrors;
 
   @override
   String toString() => message;

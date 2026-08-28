@@ -6,15 +6,20 @@ class MedicationStatusController extends ChangeNotifier {
   MedicationStatusController({
     required this.gateway,
     required List<Medication> medications,
-    DateTime Function()? now,
+    Future<DateTime> Function()? businessDate,
   }) : _medications = [...medications],
-       _now = now ?? DateTime.now;
+       _businessDate = businessDate ?? gateway.businessDate;
 
   final MedicationDailyGateway gateway;
-  final DateTime Function() _now;
+  final Future<DateTime> Function() _businessDate;
   List<Medication> _medications;
 
   List<Medication> get medications => List.unmodifiable(_medications);
+
+  void replaceMedications(List<Medication> medications) {
+    _medications = [...medications];
+    notifyListeners();
+  }
 
   Future<void> setStatus(int index, MedicationStatus status) async {
     final previous = _medications[index];
@@ -22,7 +27,8 @@ class MedicationStatusController extends ChangeNotifier {
       ..[index] = previous.copyWith(status: status);
     notifyListeners();
     try {
-      await gateway.setDailyStatus(previous.id, _now(), status);
+      final date = await _businessDate();
+      await gateway.setDailyStatus(previous.id, date, status);
     } catch (_) {
       _medications = [..._medications]..[index] = previous;
       notifyListeners();

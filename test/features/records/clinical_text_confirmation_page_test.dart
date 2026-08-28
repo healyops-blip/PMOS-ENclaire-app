@@ -26,7 +26,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.scrollUntilVisible(
-        find.byKey(const Key('clinical-field-findings')),
+        find.byKey(const Key('clinical-field-findings_text')),
         300,
         scrollable: find
             .descendant(
@@ -37,11 +37,11 @@ void main() {
       );
       expect(find.textContaining('关键原文不能为空'), findsWidgets);
       await tester.enterText(
-        find.byKey(const Key('clinical-field-findings')),
+        find.byKey(const Key('clinical-field-findings_text')),
         '用户核对后的所见原文',
       );
       await tester.enterText(
-        find.byKey(const Key('clinical-field-impression')),
+        find.byKey(const Key('clinical-field-conclusion_text')),
         '用户核对后的结论原文',
       );
       final confirm = find.byKey(const Key('confirm-clinical-text'));
@@ -122,6 +122,52 @@ void main() {
       expect(repository.confirmCalls, 0);
     },
   );
+
+  testWidgets('maps server field errors and preserves the entered value', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final repository = _ClinicalRepository(fieldErrorFirst: true);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ClinicalTextConfirmationPage(
+          repository: repository,
+          task: _task('outpatient_record'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final diagnosis = find.byKey(const Key('clinical-field-diagnosis_summary'));
+    await tester.scrollUntilVisible(
+      diagnosis,
+      250,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const Key('clinical-confirmation-scroll')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.enterText(diagnosis, '用户保留的诊断原文');
+    final confirm = find.byKey(const Key('confirm-clinical-text'));
+    await tester.scrollUntilVisible(
+      confirm,
+      300,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const Key('clinical-confirmation-scroll')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.tap(confirm);
+    await tester.pumpAndSettle();
+    expect(find.text('请重新核对诊断原文'), findsOneWidget);
+    expect(find.text('用户保留的诊断原文'), findsOneWidget);
+  });
 }
 
 OcrTask _task(String materialType) => OcrTask(
@@ -135,30 +181,30 @@ OcrTask _task(String materialType) => OcrTask(
 );
 
 class _ClinicalRepository implements OcrRepository {
-  _ClinicalRepository({this.failFirst = false});
+  _ClinicalRepository({this.failFirst = false, this.fieldErrorFirst = false});
   final bool failFirst;
+  final bool fieldErrorFirst;
   int confirmCalls = 0;
 
   @override
   Future<OcrTaskResult> result(String taskId) async {
     final imaging = taskId.contains('imaging');
     return OcrTaskResult(
-      resultId: 'result-1',
+      resultId: 'result-$taskId',
       taskId: taskId,
       draft: imaging
           ? const {
-              'facility': '模拟医院',
               'examination_name': '盆腔超声',
               'body_part': '盆腔',
-              'modality': '超声',
-              'examination_date': '2026-08-20',
-              'report_date': '2026-08-21',
-              'findings': '',
-              'impression': '',
+              'examination_method': '超声',
+              'examined_at': '2026-08-20',
+              'reported_at': '2026-08-21',
+              'findings_text': '',
+              'conclusion_text': '',
             }
           : const {
-              'facility': '模拟医院',
-              'department': '内分泌科',
+              'hospital_name': '模拟医院',
+              'department_name': '内分泌科',
               'doctor_name': null,
               'visit_date': '2026-08-20',
               'chief_complaint': '月经不规律',
@@ -168,7 +214,7 @@ class _ClinicalRepository implements OcrRepository {
             },
       fields: const [
         OcrFieldDraft(
-          path: 'findings',
+          path: 'findings_text',
           value: null,
           confidence: 0.4,
           uncertaintyReason: '文字模糊',
@@ -188,6 +234,19 @@ class _ClinicalRepository implements OcrRepository {
     if (failFirst && confirmCalls == 1) {
       throw const OcrException('NETWORK_ERROR', '模拟网络失败');
     }
+    if (fieldErrorFirst && confirmCalls == 1) {
+      throw const OcrException(
+        'OCR_CONFIRMATION_INVALID',
+        '字段无效',
+        fieldErrors: [
+          OcrFieldError(
+            path: 'diagnosis_summary',
+            code: 'CLINICAL_FIELD_INVALID',
+            message: '请重新核对诊断原文',
+          ),
+        ],
+      );
+    }
     return ClinicalConfirmationResult(
       recordId: 'record-1',
       materialType: task.id.contains('imaging')
@@ -201,6 +260,18 @@ class _ClinicalRepository implements OcrRepository {
 
   @override
   Future<List<int>> sourceFile(OcrTask task) async => const [];
+
+  @override
+  Future<LabConfirmationResult> confirmLab({
+    required String taskId,
+    required String resultId,
+    required String expectedRevisionId,
+    required List<LabConfirmationItem> items,
+    String? sampleDate,
+    String? examDate,
+    String? reportDate,
+    String? visitDate,
+  }) => throw UnimplementedError();
 
   @override
   Future<OcrTask> create({

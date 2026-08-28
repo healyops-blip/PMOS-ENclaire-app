@@ -18,6 +18,7 @@ from pomi_backend.services.medications import MedicationService
 from pomi_backend.services.ocr import OCRTaskService
 from pomi_backend.services.orders import MedicalOrderService, ReconciliationService
 from pomi_backend.services.patient import PatientProfileService
+from pomi_backend.services.patient_notes import PatientNoteService
 
 bearer_scheme = HTTPBearer(auto_error=False, scheme_name="SessionBearer")
 
@@ -60,6 +61,21 @@ def get_current_account(service: AuthServiceDependency, session_id: SessionId) -
 CurrentAccount = Annotated[UserAccount, Depends(get_current_account)]
 
 
+def get_medication_service(
+    request: Request,
+    session: DatabaseSession,
+    account: CurrentAccount,
+) -> MedicationService:
+    return MedicationService(
+        session,
+        account,
+        request.app.state.business_date_provider(),
+    )
+
+
+MedicationServiceDependency = Annotated[MedicationService, Depends(get_medication_service)]
+
+
 def get_patient_profile_service(
     session: DatabaseSession, account: CurrentAccount
 ) -> PatientProfileService:
@@ -69,6 +85,15 @@ def get_patient_profile_service(
 PatientProfileServiceDependency = Annotated[
     PatientProfileService, Depends(get_patient_profile_service)
 ]
+
+
+def get_patient_note_service(
+    session: DatabaseSession, account: CurrentAccount
+) -> PatientNoteService:
+    return PatientNoteService(session, account)
+
+
+PatientNoteServiceDependency = Annotated[PatientNoteService, Depends(get_patient_note_service)]
 
 
 def get_document_service(
@@ -89,34 +114,23 @@ def get_ocr_task_service(
 OCRTaskServiceDependency = Annotated[OCRTaskService, Depends(get_ocr_task_service)]
 
 
-def get_medication_service(
-    request: Request,
-    session: DatabaseSession,
-    account: CurrentAccount,
-) -> MedicationService:
-    return MedicationService(
-        session,
-        account,
-        request.app.state.business_date_provider(),
-    )
-
-
-MedicationServiceDependency = Annotated[MedicationService, Depends(get_medication_service)]
-
-
 def get_medical_order_service(
-    session: DatabaseSession, account: CurrentAccount
+    request: Request, session: DatabaseSession, account: CurrentAccount
 ) -> MedicalOrderService:
-    return MedicalOrderService(session, account)
+    return MedicalOrderService(
+        session, account, business_date=request.app.state.business_date_provider()
+    )
 
 
 MedicalOrderServiceDependency = Annotated[MedicalOrderService, Depends(get_medical_order_service)]
 
 
 def get_reconciliation_service(
-    session: DatabaseSession, account: CurrentAccount
+    request: Request, session: DatabaseSession, account: CurrentAccount
 ) -> ReconciliationService:
-    return ReconciliationService(session, account)
+    return ReconciliationService(
+        session, account, business_date=request.app.state.business_date_provider()
+    )
 
 
 ReconciliationServiceDependency = Annotated[
@@ -125,9 +139,11 @@ ReconciliationServiceDependency = Annotated[
 
 
 def get_clinical_text_confirmation_service(
-    session: DatabaseSession, account: CurrentAccount
+    request: Request, session: DatabaseSession, account: CurrentAccount
 ) -> ClinicalTextConfirmationService:
-    return ClinicalTextConfirmationService(session, account)
+    return ClinicalTextConfirmationService(
+        session, account, business_date=request.app.state.business_date_provider()
+    )
 
 
 ClinicalTextConfirmationServiceDependency = Annotated[

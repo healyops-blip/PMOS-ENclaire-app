@@ -30,6 +30,7 @@ class _MedicalOrderReviewPageState extends State<MedicalOrderReviewPage> {
   );
   bool _submitting = false;
   Object? _error;
+  Map<String, String> _fieldErrors = const {};
 
   bool get _ready =>
       _items.isNotEmpty &&
@@ -39,9 +40,15 @@ class _MedicalOrderReviewPageState extends State<MedicalOrderReviewPage> {
     setState(() {
       _submitting = true;
       _error = null;
+      _fieldErrors = const {};
     });
     try {
-      await widget.gateway.confirmMedicalOrder(widget.task.id, _items);
+      await widget.gateway.confirmMedicalOrder(
+        widget.task.id,
+        widget.result.resultId,
+        widget.task.documentRevisionId,
+        _items,
+      );
       final reconciliation = await widget.gateway.createReconciliation(
         widget.task.id,
       );
@@ -60,6 +67,9 @@ class _MedicalOrderReviewPageState extends State<MedicalOrderReviewPage> {
       if (!mounted) return;
       setState(() {
         _error = error;
+        _fieldErrors = error is OrderReviewException
+            ? error.fieldErrors
+            : const {};
         _submitting = false;
       });
     }
@@ -86,6 +96,7 @@ class _MedicalOrderReviewPageState extends State<MedicalOrderReviewPage> {
           _OrderItemCard(
             key: Key('medical-order-item-${item.index}'),
             item: item,
+            errors: _fieldErrors,
             onChanged: () => setState(() {}),
           ),
         if (_error != null) ...[
@@ -165,10 +176,12 @@ class _OriginalDocumentPreview extends StatelessWidget {
 class _OrderItemCard extends StatelessWidget {
   const _OrderItemCard({
     required this.item,
+    required this.errors,
     required this.onChanged,
     super.key,
   });
   final MedicalOrderDraft item;
+  final Map<String, String> errors;
   final VoidCallback onChanged;
 
   @override
@@ -196,9 +209,15 @@ class _OrderItemCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          _field('药名 *', item.drugName, (value) => item.drugName = value),
+          _field(
+            '药名 *',
+            'drug_name',
+            item.drugName,
+            (value) => item.drugName = value,
+          ),
           _field(
             '规格',
+            'specification',
             item.specification,
             (value) => item.specification = value,
           ),
@@ -207,6 +226,7 @@ class _OrderItemCard extends StatelessWidget {
               Expanded(
                 child: _field(
                   '单次剂量 *',
+                  'dosage_value',
                   item.dosageValue,
                   (value) => item.dosageValue = value,
                   number: true,
@@ -216,17 +236,33 @@ class _OrderItemCard extends StatelessWidget {
               Expanded(
                 child: _field(
                   '剂量单位 *',
+                  'dosage_unit',
                   item.dosageUnit,
                   (value) => item.dosageUnit = value,
                 ),
               ),
             ],
           ),
-          _field('频率 *', item.frequency, (value) => item.frequency = value),
-          _field('疗程', item.course, (value) => item.course = value),
-          _field('途径', item.route, (value) => item.route = value),
-          _field('用法', item.instructions, (value) => item.instructions = value),
-          _field('开具日期 *', item.orderDate, (value) => item.orderDate = value),
+          _field(
+            '频率 *',
+            'frequency',
+            item.frequency,
+            (value) => item.frequency = value,
+          ),
+          _field('疗程', 'duration', item.course, (value) => item.course = value),
+          _field('途径', 'route', item.route, (value) => item.route = value),
+          _field(
+            '用法',
+            'instruction',
+            item.instructions,
+            (value) => item.instructions = value,
+          ),
+          _field(
+            '开具日期 *',
+            'prescribed_at',
+            item.orderDate,
+            (value) => item.orderDate = value,
+          ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('原文明确写明停药'),
@@ -257,6 +293,7 @@ class _OrderItemCard extends StatelessWidget {
 
   Widget _field(
     String label,
+    String field,
     String value,
     ValueChanged<String> changed, {
     bool number = false,
@@ -269,6 +306,7 @@ class _OrderItemCard extends StatelessWidget {
           : null,
       decoration: InputDecoration(
         labelText: label,
+        errorText: errors['items.${item.index}.$field'],
         border: const OutlineInputBorder(),
       ),
       onChanged: (value) {

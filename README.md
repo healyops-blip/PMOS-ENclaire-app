@@ -39,19 +39,20 @@ The current Flutter UI uses local demo data and includes:
 - three-step patient onboarding;
 - dashboard and medication three-state interactions;
 - medication management and reminder screens;
-- menstrual-cycle calendar and weight trends;
+- menstrual-cycle calendar with add, edit, completion, deletion, and trend states;
 - visit records and source traceability;
 - upload, OCR review, draft confirmation, and medication reconciliation;
 - report generation and three-layer report navigation;
 - revision-scoped, local-only hospital-certification interaction demo;
 - patient profile and authorization entry points.
 
-The Flutter screens still use local demo data. The FastAPI account-name/password
-authentication API and SQLite persistence are implemented, but the Flutter auth
-screens are not connected to them yet. Patient data APIs, real OCR, identity
-providers, blockchain nodes, and PDF export remain unimplemented. The
-certification interaction is explicitly a local UI demo: it does not represent
-a hospital, doctor, signature, credential, or blockchain transaction.
+The cycle screen now has a repository boundary and the authenticated FastAPI cycle
+history API is implemented; the demo shell injects local cycle data until Flutter
+authentication owns a live Session. Other Flutter screens still use local demo
+data. Real OCR, identity providers, blockchain nodes, and PDF export remain
+unimplemented. The certification interaction is explicitly a local UI demo: it
+does not represent a hospital, doctor, signature, credential, or blockchain
+transaction.
 
 ## Quality checks
 

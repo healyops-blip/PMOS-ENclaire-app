@@ -10,6 +10,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 
 NUMBER_PATTERN = re.compile(r"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$")
+MAX_NUMERIC_ABS = Decimal("999999999999")
 RANGE_PATTERN = re.compile(
     r"^\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*[-~～—]\s*"
     r"([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*$"
@@ -169,31 +170,37 @@ def parse_date(value: Any) -> date | None:
 
 def _reference_bounds(
     raw: Any, factor: Decimal
-) -> tuple[str | None, Decimal | None, Decimal | None, bool]:
+) -> tuple[str | None, Decimal | None, Decimal | None, bool, bool, bool]:
     if raw is None or str(raw).strip() == "":
-        return None, None, None, True
+        return None, None, None, True, True, True
     text = unicodedata.normalize("NFKC", str(raw)).strip()
     range_match = RANGE_PATTERN.fullmatch(text)
     if range_match:
         lower = Decimal(range_match.group(1)) * factor
         upper = Decimal(range_match.group(2)) * factor
-        return text, lower, upper, lower <= upper
+        return text, lower, upper, True, True, lower <= upper
     bound_match = BOUND_PATTERN.fullmatch(text)
     if bound_match:
         operator, number = bound_match.groups()
         boundary = Decimal(number) * factor
         if operator in {"<", "<=", "≤"}:
-            return text, None, boundary, True
-        return text, boundary, None, True
-    return text, None, None, False
+            return text, None, boundary, True, operator != "<", True
+        return text, boundary, None, operator != ">", True, True
+    return text, None, None, True, True, False
 
 
-def _abnormal(value: Decimal, lower: Decimal | None, upper: Decimal | None) -> str:
+def _abnormal(
+    value: Decimal,
+    lower: Decimal | None,
+    upper: Decimal | None,
+    lower_inclusive: bool,
+    upper_inclusive: bool,
+) -> str:
     if lower is None and upper is None:
         return "unknown"
-    if lower is not None and value < lower:
+    if lower is not None and (value < lower or (value == lower and not lower_inclusive)):
         return "low"
-    if upper is not None and value > upper:
+    if upper is not None and (value > upper or (value == upper and not upper_inclusive)):
         return "high"
     return "normal"
 
@@ -206,18 +213,32 @@ def normalize_lab_item(
     name = str(item.get("name") or "").strip()
     if not name:
         issues.append(FieldIssue(f"{prefix}.name", "LAB_NAME_REQUIRED", "项目名称不能为空。"))
+    elif len(name) > 200:
+        issues.append(
+            FieldIssue(f"{prefix}.name", "LAB_NAME_TOO_LONG", "项目名称不能超过 200 个字符。")
+        )
     raw_value = str(item.get("value") or "").strip()
     numeric = parse_number(item.get("value"))
     if not raw_value:
         issues.append(FieldIssue(f"{prefix}.value", "LAB_VALUE_REQUIRED", "数值不能为空。"))
     elif numeric is None:
         issues.append(FieldIssue(f"{prefix}.value", "LAB_VALUE_INVALID", "数值格式无法解析。"))
+    elif abs(numeric) > MAX_NUMERIC_ABS:
+        issues.append(
+            FieldIssue(f"{prefix}.value", "LAB_VALUE_OUT_OF_RANGE", "数值超出可保存范围。")
+        )
+    elif len(raw_value) > 100:
+        issues.append(
+            FieldIssue(f"{prefix}.value", "LAB_VALUE_TOO_LONG", "原始数值不能超过 100 个字符。")
+        )
     raw_unit = str(item.get("unit") or "").strip()
     unit = normalize_unit(item.get("unit"))
     if not raw_unit:
         issues.append(FieldIssue(f"{prefix}.unit", "LAB_UNIT_REQUIRED", "单位不能为空。"))
     elif unit is None:
         issues.append(FieldIssue(f"{prefix}.unit", "LAB_UNIT_UNSUPPORTED", "单位不在允许范围内。"))
+    elif len(raw_unit) > 40:
+        issues.append(FieldIssue(f"{prefix}.unit", "LAB_UNIT_TOO_LONG", "单位不能超过 40 个字符。"))
 
     spec = METRIC_BY_ALIAS.get(_key(name)) if name else None
     factor = Decimal("1")
@@ -234,8 +255,8 @@ def normalize_lab_item(
             )
         standard_unit = spec.standard_unit
 
-    reference_raw, lower, upper, reference_valid = _reference_bounds(
-        item.get("reference_range"), factor or Decimal("1")
+    reference_raw, lower, upper, lower_inclusive, upper_inclusive, reference_valid = (
+        _reference_bounds(item.get("reference_range"), factor or Decimal("1"))
     )
     if not reference_valid:
         issues.append(
@@ -243,6 +264,22 @@ def normalize_lab_item(
                 f"{prefix}.reference_range",
                 "LAB_REFERENCE_RANGE_INVALID",
                 "参考范围格式无法解析，请留空或输入如 3.9-6.1。",
+            )
+        )
+    elif reference_raw is not None and len(reference_raw) > 120:
+        issues.append(
+            FieldIssue(
+                f"{prefix}.reference_range",
+                "LAB_REFERENCE_RANGE_TOO_LONG",
+                "参考范围不能超过 120 个字符。",
+            )
+        )
+    elif any(bound is not None and abs(bound) > MAX_NUMERIC_ABS for bound in (lower, upper)):
+        issues.append(
+            FieldIssue(
+                f"{prefix}.reference_range",
+                "LAB_REFERENCE_RANGE_OUT_OF_RANGE",
+                "参考范围数值超出可保存范围。",
             )
         )
 
@@ -279,7 +316,13 @@ def normalize_lab_item(
             reference_range_raw=reference_raw,
             reference_lower=lower,
             reference_upper=upper,
-            abnormal_status=_abnormal(converted, lower, upper),
+            abnormal_status=_abnormal(
+                converted,
+                lower,
+                upper,
+                lower_inclusive,
+                upper_inclusive,
+            ),
             sample_date=parsed_dates["sample_date"],
             exam_date=parsed_dates["exam_date"],
             report_date=parsed_dates["report_date"],
@@ -308,8 +351,13 @@ def p0_evaluation(
     }
     if original_items is not None:
         matched = 0
-        for index, item in enumerate(items):
-            original = original_items[index] if index < len(original_items) else {}
+        for item in items:
+            source_index = item.get("source_index")
+            original = (
+                original_items[source_index]
+                if isinstance(source_index, int) and source_index < len(original_items)
+                else {}
+            )
             for field in ("name", "value", "unit"):
                 matched += int(
                     str(item.get(field) or "").strip() == str(original.get(field) or "").strip()

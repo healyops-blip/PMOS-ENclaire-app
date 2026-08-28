@@ -34,6 +34,7 @@ def list_medications(
     return success(
         request,
         {
+            "server_date": service.business_date.isoformat(),
             "items": [medication_data(record) for record in records],
             "groups": grouped_medications(records),
             "next_cursor": None,

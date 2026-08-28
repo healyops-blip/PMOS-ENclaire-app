@@ -21,11 +21,12 @@ void main() {
     final controller = MedicationStatusController(
       gateway: gateway,
       medications: const [medication],
-      now: () => DateTime(2026, 8, 27),
+      businessDate: () async => DateTime(2026, 8, 27),
     );
 
     final future = controller.setStatus(0, MedicationStatus.taken);
     expect(controller.medications.single.status, MedicationStatus.taken);
+    await Future<void>.delayed(Duration.zero);
     expect(gateway.medicationId, 'medication-1');
     expect(gateway.date, DateTime(2026, 8, 27));
 
@@ -54,6 +55,9 @@ class _ControlledGateway implements MedicationDailyGateway {
   final _result = Completer<void>();
   String? medicationId;
   DateTime? date;
+
+  @override
+  Future<DateTime> businessDate() async => DateTime(2026, 8, 27);
 
   @override
   Future<void> setDailyStatus(

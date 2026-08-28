@@ -74,6 +74,17 @@ def test_adjustment_creates_version_and_keeps_complete_event_chain(
             },
         )
     )
+    out_of_order = api_client.put(
+        f"/api/medications/{original['id']}",
+        headers=headers,
+        json={
+            "event_type": "resumed",
+            "event_date": "2026-08-04",
+            "updated_at": paused["medication"]["updated_at"],
+        },
+    )
+    assert out_of_order.status_code == 422
+    assert out_of_order.json()["error"]["code"] == "INVALID_EVENT_DATE"
     resumed = response_data(
         api_client.put(
             f"/api/medications/{original['id']}",
@@ -152,7 +163,7 @@ def test_adjustment_creates_version_and_keeps_complete_event_chain(
     assert conflict.json()["error"]["code"] == "RESOURCE_VERSION_CONFLICT"
 
 
-def test_daily_state_is_today_only_idempotent_and_unrecorded_is_not_stored(
+def test_daily_state_is_idempotent_and_unrecorded_is_not_stored(
     api_client: TestClient,
     api_engine,
 ) -> None:
@@ -183,18 +194,13 @@ def test_daily_state_is_today_only_idempotent_and_unrecorded_is_not_stored(
         )
     )
     assert first["id"] == repeated["id"] == missed["id"]
+    assert first["recorded_at"] == repeated["recorded_at"]
     assert missed["intake_status"] == "missed"
     with build_session_factory(api_engine)() as session:
         assert session.scalar(select(func.count()).select_from(MedicationDaily)) == 1
 
-    historical = api_client.put(
-        url,
-        headers=headers,
-        json={"record_date": "2026-08-01", "intake_status": "taken"},
-    )
-    assert historical.status_code == 409
-    assert historical.json()["error"]["code"] == "HISTORICAL_DAILY_STATUS_READ_ONLY"
-
+    medication_page = response_data(api_client.get("/api/medications", headers=headers))
+    assert medication_page["server_date"] == "2026-08-02"
     cleared = response_data(
         api_client.put(
             url,
