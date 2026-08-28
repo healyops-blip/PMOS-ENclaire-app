@@ -1312,6 +1312,7 @@ class _ReportSummaryLayer extends StatelessWidget {
       const SizedBox(height: 8),
       PomiGlassCard(
         padding: EdgeInsets.all(15),
+        backgroundColor: const Color(0xFFF3F3F5),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -1354,6 +1355,7 @@ class _ReportSummaryLayer extends StatelessWidget {
                   ),
             ),
         padding: const EdgeInsets.all(15),
+        backgroundColor: const Color(0xFFF3F3F5),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
