@@ -188,6 +188,23 @@ class _SequenceRepository implements OcrRepository {
   }
 
   @override
+  Future<List<int>> sourceFile(OcrTask task) async => const [];
+
+  @override
+  Future<ClinicalConfirmationResult> confirmClinical({
+    required OcrTask task,
+    required String resultId,
+    required Map<String, dynamic> confirmedData,
+    required List<Map<String, dynamic>> fieldConfirmations,
+  }) async => ClinicalConfirmationResult(
+    recordId: 'record-1',
+    materialType: 'imaging_text_report',
+    documentRevisionId: 'rev-1',
+    summary: confirmedData,
+    reused: false,
+  );
+
+  @override
   Future<LabConfirmationResult> confirmLab({
     required String taskId,
     required String resultId,

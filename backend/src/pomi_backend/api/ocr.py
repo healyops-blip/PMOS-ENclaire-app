@@ -6,7 +6,11 @@ from fastapi import APIRouter, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from pomi_backend.api.business import success
-from pomi_backend.api.dependencies import OCRTaskServiceDependency
+from pomi_backend.api.dependencies import (
+    ClinicalTextConfirmationServiceDependency,
+    OCRTaskServiceDependency,
+)
+from pomi_backend.schemas.clinical_text import ClinicalTextConfirmRequest
 from pomi_backend.services.ocr import task_data
 
 router = APIRouter(prefix="/api/ocr/tasks", tags=["ocr"])
@@ -70,13 +74,16 @@ def get_ocr_result(task_id: str, request: Request, service: OCRTaskServiceDepend
 @router.post("/{task_id}/confirm")
 def confirm_ocr_lab(
     task_id: str,
-    payload: ConfirmLabRequest,
+    payload: ConfirmLabRequest | ClinicalTextConfirmRequest,
     request: Request,
-    service: OCRTaskServiceDependency,
+    lab_service: OCRTaskServiceDependency,
+    clinical_service: ClinicalTextConfirmationServiceDependency,
 ) -> dict:
+    if isinstance(payload, ClinicalTextConfirmRequest):
+        return success(request, clinical_service.confirm(task_id, payload))
     return success(
         request,
-        service.confirm_lab(task_id, payload.model_dump(mode="json")),
+        lab_service.confirm_lab(task_id, payload.model_dump(mode="json")),
     )
 
 

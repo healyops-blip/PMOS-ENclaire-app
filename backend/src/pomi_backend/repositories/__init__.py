@@ -1,6 +1,7 @@
 """Persistence repositories."""
 
 from pomi_backend.repositories.auth import AuthRepository
+from pomi_backend.repositories.clinical_text import ClinicalTextRepository
 from pomi_backend.repositories.documents import DocumentRepository
 from pomi_backend.repositories.health import (
     MedicationDailyRepository,
@@ -20,6 +21,7 @@ from pomi_backend.repositories.reports import (
 
 __all__ = [
     "AuthRepository",
+    "ClinicalTextRepository",
     "DocumentRepository",
     "LabObservationRepository",
     "MedicationDailyRepository",

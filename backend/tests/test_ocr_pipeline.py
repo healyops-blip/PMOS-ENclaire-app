@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from io import BytesIO
 from typing import Any
@@ -10,7 +11,15 @@ from PIL import Image
 from sqlalchemy.orm import Session, sessionmaker
 
 from pomi_backend.config import Settings
-from pomi_backend.db.models import Document, OCRResult, OCRTask
+from pomi_backend.db.models import (
+    Document,
+    ImagingReport,
+    Medication,
+    OCRFieldResult,
+    OCRResult,
+    OCRTask,
+    OutpatientRecord,
+)
 from pomi_backend.db.models.auth import utc_now
 from pomi_backend.repositories import OCRRepository
 from pomi_backend.services.ocr_provider import (
@@ -67,6 +76,38 @@ def _create(client: TestClient, headers: dict[str, str], document: dict) -> dict
         ),
         201,
     )
+
+
+def _clinical_confirmation(kind: str, result: dict, document: dict) -> dict[str, Any]:
+    confirmed_data = (
+        {
+            "examination_name": "Pelvic ultrasound",
+            "body_part": "Pelvis",
+            "examination_method": "US",
+            "examined_at": "2026-08-20",
+            "reported_at": "2026-08-21",
+            "findings_text": "Verbatim imaging findings.",
+            "conclusion_text": "Verbatim imaging conclusion.",
+        }
+        if kind == "imaging_text_report"
+        else {
+            "hospital_name": "Synthetic Hospital",
+            "department_name": "Endocrinology",
+            "doctor_name": None,
+            "visit_date": "2026-08-20",
+            "chief_complaint": "Irregular cycles.",
+            "diagnosis_summary": "Verbatim diagnosis summary.",
+            "treatment_plan": "Medication words remain text only.",
+            "medical_advice": "Verbatim follow-up advice.",
+        }
+    )
+    return {
+        "result_id": result["id"],
+        "expected_revision_id": document["current_revision_id"],
+        "document_type": kind,
+        "confirmed_data": confirmed_data,
+        "field_confirmations": [],
+    }
 
 
 def _payload(kind: str) -> dict[str, Any]:
@@ -230,6 +271,7 @@ def test_four_materials_are_idempotent_traceable_and_uid_scoped(api_client: Test
         assert result["raw_response"]["provider_request"] == 1
         assert result["fields"][0]["confidence"] == 0.91
         assert result["fields"][0]["source_region"]["page"] == 1
+        assert result["source_document"]["document_revision_id"] == document["current_revision_id"]
         assert api_client.get(f"/api/ocr/tasks/{task['id']}", headers=outsider).status_code == 404
         assert (
             api_client.get(f"/api/ocr/tasks/{task['id']}/result", headers=outsider).status_code
@@ -416,6 +458,201 @@ def test_ocr_requires_consent_and_explicit_owned_revision(api_client: TestClient
         "/api/ocr/tasks/{task_id}/result",
         "/api/ocr/tasks/{task_id}/retry",
     }
+
+
+def test_imaging_and_outpatient_confirmation_is_idempotent_and_traceable(
+    api_client: TestClient,
+) -> None:
+    owner = _headers(api_client, "clinical-owner")
+    outsider = _headers(api_client, "clinical-outsider")
+    cases = {
+        "imaging_text_report": {
+            "examination_name": "Pelvic ultrasound",
+            "body_part": "Pelvis",
+            "examination_method": "US",
+            "examined_at": "2026-08-20",
+            "reported_at": "2026-08-21",
+            "findings_text": "Verbatim imaging findings.",
+            "conclusion_text": "Verbatim imaging conclusion.",
+        },
+        "outpatient_record": {
+            "hospital_name": "Synthetic Hospital",
+            "department_name": "Endocrinology",
+            "doctor_name": None,
+            "visit_date": "2026-08-20",
+            "chief_complaint": "Irregular cycles.",
+            "diagnosis_summary": "Verbatim diagnosis summary.",
+            "treatment_plan": "Medication words remain text only.",
+            "medical_advice": "Verbatim follow-up advice.",
+        },
+    }
+    record_ids = []
+    for index, (kind, confirmed_data) in enumerate(cases.items()):
+        document = _upload(api_client, owner, kind, index + 20)
+        task = _create(api_client, owner, document)
+        assert _worker(api_client, FakeProvider()).run_once() is True
+        result = _data(api_client.get(f"/api/ocr/tasks/{task['id']}/result", headers=owner))
+        payload = {
+            "result_id": result["id"],
+            "expected_revision_id": document["current_revision_id"],
+            "document_type": kind,
+            "confirmed_data": confirmed_data,
+            "field_confirmations": [
+                {
+                    "field_path": next(iter(confirmed_data)),
+                    "user_value": confirmed_data[next(iter(confirmed_data))],
+                    "confirmation_status": "edited",
+                }
+            ],
+        }
+        confirmed = _data(
+            api_client.post(
+                f"/api/ocr/tasks/{task['id']}/confirm",
+                headers={**owner, "Idempotency-Key": f"clinical-confirm-{index}"},
+                json=payload,
+            )
+        )
+        repeated = _data(
+            api_client.post(
+                f"/api/ocr/tasks/{task['id']}/confirm",
+                headers={**owner, "Idempotency-Key": f"clinical-confirm-{index}"},
+                json=payload,
+            )
+        )
+        assert repeated["record_id"] == confirmed["record_id"]
+        assert repeated["reused"] is True
+        assert confirmed["document_id"] == document["id"]
+        assert confirmed["document_revision_id"] == document["current_revision_id"]
+        assert (
+            confirmed["p0_evaluation"]["valid_required_fields"]
+            == confirmed["p0_evaluation"]["required_fields"]
+        )
+        changed_key = "medical_advice" if kind == "outpatient_record" else "conclusion_text"
+        changed_payload = {
+            **payload,
+            "confirmed_data": {**confirmed_data, changed_key: "Different replay content."},
+        }
+        conflict = api_client.post(
+            f"/api/ocr/tasks/{task['id']}/confirm", headers=owner, json=changed_payload
+        )
+        assert conflict.status_code == 409
+        assert conflict.json()["error"]["code"] == "OCR_ALREADY_CONFIRMED"
+        record_ids.append(confirmed["record_id"])
+        assert (
+            api_client.post(
+                f"/api/ocr/tasks/{task['id']}/confirm",
+                headers={**outsider, "Idempotency-Key": f"clinical-outsider-{index}"},
+                json=payload,
+            ).status_code
+            == 404
+        )
+
+    with api_client.app.state.session_factory() as session:
+        assert session.query(ImagingReport).count() == 1
+        assert session.query(OutpatientRecord).count() == 1
+        assert session.query(Medication).count() == 0
+        assert {field.confirmation_status for field in session.query(OCRFieldResult).all()} <= {
+            "confirmed",
+            "edited",
+            "rejected",
+            None,
+        }
+
+
+def test_clinical_confirmation_rejects_blank_text_and_future_date(
+    api_client: TestClient,
+) -> None:
+    headers = _headers(api_client, "clinical-invalid")
+    document = _upload(api_client, headers, "outpatient_record", 41)
+    task = _create(api_client, headers, document)
+    assert _worker(api_client, FakeProvider()).run_once() is True
+    result = _data(api_client.get(f"/api/ocr/tasks/{task['id']}/result", headers=headers))
+    response = api_client.post(
+        f"/api/ocr/tasks/{task['id']}/confirm",
+        headers={**headers, "Idempotency-Key": "clinical-invalid-confirm"},
+        json={
+            "result_id": result["id"],
+            "expected_revision_id": document["current_revision_id"],
+            "document_type": "outpatient_record",
+            "confirmed_data": {
+                "hospital_name": None,
+                "department_name": None,
+                "doctor_name": None,
+                "visit_date": "2099-01-01",
+                "chief_complaint": None,
+                "diagnosis_summary": " ",
+                "treatment_plan": None,
+                "medical_advice": " ",
+            },
+            "field_confirmations": [],
+        },
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] in {
+        "OCR_CONFIRMATION_INVALID",
+        "OCR_CONFIRMATION_INVALID_DATE",
+    }
+    assert {item["path"] for item in response.json()["error"]["details"]["fields"]} & {
+        "visit_date",
+        "diagnosis_summary",
+        "medical_advice",
+    }
+    with api_client.app.state.session_factory() as session:
+        assert session.query(OutpatientRecord).count() == 0
+
+
+def test_concurrent_identical_clinical_confirmation_creates_one_record(
+    api_client: TestClient,
+) -> None:
+    headers = _headers(api_client, "clinical-concurrent")
+    document = _upload(api_client, headers, "imaging_text_report", 42)
+    task = _create(api_client, headers, document)
+    assert _worker(api_client, FakeProvider()).run_once() is True
+    result = _data(api_client.get(f"/api/ocr/tasks/{task['id']}/result", headers=headers))
+    payload = _clinical_confirmation("imaging_text_report", result, document)
+
+    def confirm() -> tuple[int, dict]:
+        response = api_client.post(
+            f"/api/ocr/tasks/{task['id']}/confirm", headers=headers, json=payload
+        )
+        return response.status_code, response.json()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        responses = list(executor.map(lambda _: confirm(), range(2)))
+
+    assert {status for status, _ in responses} == {200}
+    data = [body["data"] for _, body in responses]
+    assert {item["reused"] for item in data} == {False, True}
+    assert data[0]["record_id"] == data[1]["record_id"]
+    with api_client.app.state.session_factory() as session:
+        assert session.query(ImagingReport).count() == 1
+
+
+def test_deleted_clinical_source_and_revoked_session_cannot_confirm(
+    api_client: TestClient,
+) -> None:
+    headers = _headers(api_client, "clinical-deleted")
+    document = _upload(api_client, headers, "outpatient_record", 43)
+    task = _create(api_client, headers, document)
+    assert _worker(api_client, FakeProvider()).run_once() is True
+    result = _data(api_client.get(f"/api/ocr/tasks/{task['id']}/result", headers=headers))
+    payload = _clinical_confirmation("outpatient_record", result, document)
+
+    assert api_client.delete(f"/api/documents/{document['id']}", headers=headers).status_code == 200
+    response = api_client.post(
+        f"/api/ocr/tasks/{task['id']}/confirm", headers=headers, json=payload
+    )
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "RESOURCE_NOT_FOUND"
+    assert api_client.post("/api/auth/logout", headers=headers).status_code == 204
+    assert (
+        api_client.post(
+            f"/api/ocr/tasks/{task['id']}/confirm", headers=headers, json=payload
+        ).status_code
+        == 401
+    )
+    with api_client.app.state.session_factory() as session:
+        assert session.query(OutpatientRecord).count() == 0
 
 
 def test_ocr_requires_a_live_authenticated_session(api_client: TestClient) -> None:

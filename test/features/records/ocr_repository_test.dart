@@ -109,6 +109,62 @@ void main() {
         .toSet();
     expect(messages, hasLength(categories.length));
   });
+
+  test(
+    'clinical confirmation pins result and revision with idempotency',
+    () async {
+      final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api'));
+      RequestOptions? request;
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            request = options;
+            handler.resolve(
+              Response<Map<String, dynamic>>(
+                requestOptions: options,
+                statusCode: 200,
+                data: {
+                  'success': true,
+                  'data': {
+                    'record_id': 'imaging-1',
+                    'material_type': 'imaging_text_report',
+                    'document_revision_id': 'rev-1',
+                    'summary': {'findings': 'verbatim'},
+                    'reused': false,
+                  },
+                },
+              ),
+            );
+          },
+        ),
+      );
+      final repository = FastApiOcrRepository(PomiApiClient(dio: dio));
+      final task = OcrTask.fromJson({
+        ..._task,
+        'material_type': 'imaging_text_report',
+      });
+
+      final result = await repository.confirmClinical(
+        task: task,
+        resultId: 'result-1',
+        confirmedData: {'findings_text': 'verbatim'},
+        fieldConfirmations: const [
+          {
+            'field_path': 'findings_text',
+            'user_value': 'verbatim',
+            'confirmation_status': 'confirmed',
+          },
+        ],
+      );
+
+      expect(result.recordId, 'imaging-1');
+      expect(request!.path, '/ocr/tasks/task-1/confirm');
+      expect(request!.headers['Idempotency-Key'], isNull);
+      expect(request!.data['result_id'], 'result-1');
+      expect(request!.data['expected_revision_id'], 'rev-1');
+      expect(request!.data['document_type'], 'imaging_text_report');
+    },
+  );
 }
 
 final _task = <String, dynamic>{

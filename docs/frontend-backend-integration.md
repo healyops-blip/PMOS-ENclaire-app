@@ -334,9 +334,19 @@ PUT 允许分步部分更新。请求中的 `complete_onboarding=true` 只有在
 - 影像文字：`examination_name`、`body_part`、`examination_method`、`findings_text`、`conclusion_text`、`examined_at`、`reported_at`。
 - 门诊：`hospital_name`、`department_name`、`doctor_name`、`visit_date`、`chief_complaint`、`diagnosis_summary`、`treatment_plan`、`medical_advice`。
 
-已实现的化验确认使用 `POST /api/ocr/tasks/{task_id}/confirm`，请求必须携带 `result_id`、`expected_revision_id` 和修改后的 `items[]`，报告级四类日期可为空。原草稿项目携带稳定的 `source_index`，删除项目会把其字段标记为 `rejected`，新增项目使用 `source_index=null`，避免列表删项后错误关联原字段。响应返回 `created_resource_ids[]`、`confirmed_at`、`observations[]`、`p0_evaluation` 和 `reused`。P0 `name/value/unit` 错误时返回 `error.details.fields[]`，Flutter 必须按 `path` 高亮并保留表单。其他三类材料的确认 payload 由对应 Issue 落地，不能复用化验结构猜测。
+已实现的化验确认使用 `POST /api/ocr/tasks/{task_id}/confirm`，请求必须携带 `result_id`、`expected_revision_id` 和修改后的 `items[]`，报告级四类日期可为空。原草稿项目携带稳定的 `source_index`，删除项目会把其字段标记为 `rejected`，新增项目使用 `source_index=null`，避免列表删项后错误关联原字段。响应返回 `created_resource_ids[]`、`confirmed_at`、`observations[]`、`p0_evaluation` 和 `reused`。P0 `name/value/unit` 错误时返回 `error.details.fields[]`，Flutter 必须按 `path` 高亮并保留表单。
 
 `lab_observation` 只保存用户确认成功的数据，并强制关联明确材料、修订和 OCR 结果。指标别名未命中时 `mapping_status=needs_manual_review`；异常状态由材料参考范围确定性计算；趋势日期优先级为采样、检查、报告、就诊。正式数据读取接口为 `GET /api/lab-observations` 和 `GET /api/lab-observations/{id}`，均按当前 UID 隔离。
+
+影像与门诊确认由 #24 落到独立正式表：
+
+- `imaging_report` 保存 `document_id + document_revision_id + ocr_result_id`、检查名称/部位/方式/日期、报告日期、所见原文、结论原文、确认人和时间。只处理报告文字，不分析影像本体。
+- `outpatient_record` 保存同样的三段来源标识，以及医院、科室、医生、就诊日期、主诉、诊断摘要、治疗计划、处理意见、确认人和时间。病历中的药物只保留为原文，不写当前用药或复诊日期。
+- Flutter 共用原件图片/单页 PDF 对照和长文本编辑组件；低置信度、缺失及日期异常会高亮。失败保留编辑值与滚动位置。
+- 确认请求必须携带 `result_id`、`expected_revision_id`、材料类型和字段决定；后端重新校验并在单一事务中写 OCR 最终值、字段状态和正式记录。重复确认返回同一正式记录。
+- `confirmed_data` 的字段名与上述 `validated_draft` 完全一致；影像的 `findings_text/conclusion_text`，以及门诊的 `visit_date/diagnosis_summary/medical_advice` 均为正式保存前的必填字段。
+- 字段错误统一返回 `error.details.fields[]`（`path/code/message`），客户端按 `path` 高亮且不得清空用户输入。相同请求重放返回 `reused=true`；已确认任务使用不同内容重放返回 `OCR_ALREADY_CONFIRMED`（409）。
+- 成功响应包含正式记录 ID、完整来源链路和 `p0_evaluation`；确认只保存临床文字，不会创建或修改用药、复诊或其他医疗行为数据。
 
 失败或超时任务通过 `POST /api/ocr/tasks/{task_id}/retry` 创建唯一关联的新尝试；重复点击返回同一个子任务。
 
