@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'smoke_report_fixture.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 const apiBaseUrl = String.fromEnvironment(
@@ -381,10 +383,13 @@ class SmokeApiClient extends ApiClient {
     }
     if (path == '/api/reports') {
       return {
-        'items': <Map<String, dynamic>>[],
+        'items': [Map<String, dynamic>.from(smokeReportListItem)],
         'next_cursor': null,
         'has_more': false,
       };
+    }
+    if (path == '/api/reports/smoke-report') {
+      return Map<String, dynamic>.from(smokeReportDetail);
     }
     if (path.startsWith('/api/ocr/tasks/')) {
       if (path.endsWith('/result')) {
@@ -417,7 +422,7 @@ class SmokeApiClient extends ApiClient {
         'account': {
           'uid': 'smoke-user',
           'account_name': values['account_name']?.toString() ?? 'smoke',
-          'onboarding_completed': false,
+          'onboarding_completed': true,
         },
       };
     }

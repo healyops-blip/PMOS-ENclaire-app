@@ -3510,16 +3510,39 @@ components:
 
     TrendPoint:
       type: object
-      required: [source_id, raw_value, date, date_source, abnormal_status]
+      required: [source_number, raw_value, date, date_source, abnormal_status, comparability]
       properties:
         source_id:
           type: string
           format: uuid
+        node_id:
+          type: string
+        source_number:
+          type: integer
+          minimum: 1
         value:
           type: [number, 'null']
         raw_value:
           type: string
+        numeric_value:
+          type: [number, 'null']
         unit:
+          type: [string, 'null']
+        original_unit:
+          type: [string, 'null']
+        normalized_value:
+          type: [number, 'null']
+        normalized_unit:
+          type: [string, 'null']
+        reference_lower:
+          type: [number, 'null']
+        reference_upper:
+          type: [number, 'null']
+        normalized_reference_lower:
+          type: [number, 'null']
+        normalized_reference_upper:
+          type: [number, 'null']
+        facility:
           type: [string, 'null']
         date:
           type: string
@@ -3529,6 +3552,8 @@ components:
           enum: [sample_date, report_date, encounter_date, measured_at, record_date]
         abnormal_status:
           $ref: '#/components/schemas/AbnormalStatus'
+        comparability:
+          $ref: '#/components/schemas/Comparability'
         exclusion_reason:
           type: [string, 'null']
 
@@ -3546,6 +3571,9 @@ components:
           $ref: '#/components/schemas/Comparability'
         comparability_reason:
           type: [string, 'null']
+        display_mode:
+          type: string
+          enum: [single_result, comparison, trend]
         points:
           type: array
           items:
