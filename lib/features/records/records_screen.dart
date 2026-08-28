@@ -1007,7 +1007,7 @@ class _ReportsList extends ConsumerWidget {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _createReport(context, ref),
         icon: const Icon(Icons.add),
-        label: const Text('生成报告'),
+        label: const Text('患者自述'),
       ),
     );
   }
