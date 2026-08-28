@@ -254,6 +254,14 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                       const SizedBox(height: 16),
                       FilledButton(
                         onPressed: () async {
+                          final today = DateUtils.dateOnly(DateTime.now());
+                          if (start.isAfter(today) ||
+                              (end != null && end!.isAfter(today))) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('只能记录今天及之前的经期')),
+                            );
+                            return;
+                          }
                           await ref
                               .read(apiClientProvider)
                               .post(
@@ -344,6 +352,14 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                         onPressed: () async {
                           final value = double.tryParse(controller.text);
                           if (value == null) return;
+                          if (date.isAfter(
+                            DateUtils.dateOnly(DateTime.now()),
+                          )) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('只能记录今天及之前的体重')),
+                            );
+                            return;
+                          }
                           await ref
                               .read(apiClientProvider)
                               .post(
