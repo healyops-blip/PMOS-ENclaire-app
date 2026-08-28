@@ -16,7 +16,8 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _index = 0;
-  int _recordsTab = 0;
+  // The navigation entry opens the complete reports list by default.
+  int _recordsTab = 1;
   void _openTab(int index) {
     if (index == 2) {
       _showUploadDialog();
