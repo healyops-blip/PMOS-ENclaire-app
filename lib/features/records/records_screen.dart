@@ -1257,11 +1257,6 @@ class _ReportSummaryLayer extends StatelessWidget {
     padding: const EdgeInsets.fromLTRB(18, 10, 18, 32),
     children: [
       Text(
-        'PCOS 指标看板',
-        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
-      ),
-      const SizedBox(height: 4),
-      Text(
         '生成于 ${report['generated_at']}',
         style: const TextStyle(color: pomiMuted),
       ),
