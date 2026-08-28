@@ -1588,6 +1588,13 @@ class _BmiPainter extends CustomPainter {
     for (var i = 0; i < 3; i++) {
       final y = chart.top + chart.height * i / 2;
       canvas.drawLine(Offset(chart.left, y), Offset(chart.right, y), grid);
+      final label = (max - (max - min) * i / 2).toStringAsFixed(2);
+      _drawText(
+        canvas,
+        label,
+        Offset(2, y - 7),
+        const TextStyle(color: pomiMuted, fontSize: 11),
+      );
     }
     final line =
         Paint()
@@ -1602,6 +1609,23 @@ class _BmiPainter extends CustomPainter {
       canvas.drawCircle(Offset(x, y), 5, Paint()..color = pomiPurple);
     }
     canvas.drawPath(path, line);
+    for (var i = 0; i < values.length; i++) {
+      final x = chart.left + chart.width * i / (values.length - 1);
+      _drawText(
+        canvas,
+        '26–${(8 + i * 4).toString().padLeft(2, '0')}',
+        Offset(x - 14, chart.bottom + 8),
+        const TextStyle(color: pomiMuted, fontSize: 10),
+      );
+    }
+  }
+
+  void _drawText(Canvas canvas, String text, Offset offset, TextStyle style) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    painter.paint(canvas, offset);
   }
 
   @override
