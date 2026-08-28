@@ -139,51 +139,62 @@ class _VisitRecordsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 96),
+    return Column(
       children: [
-        Row(
-          children: [
-            Text('就诊记录', style: Theme.of(context).textTheme.headlineMedium),
-            const Spacer(),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: pomiPurple.withValues(alpha: .08),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                '模拟数据',
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: pomiPurple,
-                  fontWeight: FontWeight.w700,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+          child: Row(
+            children: [
+              Text('就诊记录', style: Theme.of(context).textTheme.headlineMedium),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: pomiPurple.withValues(alpha: .08),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '模拟数据',
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: pomiPurple,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-        const SizedBox(height: 22),
-        Row(
-          children: [
-            Text('全部记录', style: Theme.of(context).textTheme.titleLarge),
-            const Spacer(),
-            TextButton.icon(
-              onPressed: () => _showFilters(context),
-              icon: const Icon(Icons.filter_alt_outlined, size: 19),
-              label: const Text('筛选'),
-            ),
-            TextButton.icon(
-              onPressed: () => _showUpload(context),
-              icon: const Icon(Icons.add, size: 19),
-              label: const Text('上传'),
-            ),
-          ],
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 22, 20, 96),
+            children: [
+              Row(
+                children: [
+                  Text('全部记录', style: Theme.of(context).textTheme.titleLarge),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: () => _showFilters(context),
+                    icon: const Icon(Icons.filter_alt_outlined, size: 19),
+                    label: const Text('筛选'),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => _showUpload(context),
+                    icon: const Icon(Icons.add, size: 19),
+                    label: const Text('上传'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              for (var index = 0; index < visits.length; index++) ...[
+                _VisitRecordCard(visit: visits[index]),
+                if (index != visits.length - 1) const SizedBox(height: 16),
+              ],
+            ],
+          ),
         ),
-        const SizedBox(height: 12),
-        for (var index = 0; index < visits.length; index++) ...[
-          _VisitRecordCard(visit: visits[index]),
-          if (index != visits.length - 1) const SizedBox(height: 16),
-        ],
       ],
     );
   }
