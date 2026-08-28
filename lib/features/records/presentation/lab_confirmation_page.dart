@@ -11,12 +11,14 @@ class LabConfirmationPage extends StatefulWidget {
     required this.repository,
     required this.task,
     this.documentRepository,
+    this.currentRevisionAvailable = false,
     super.key,
   });
 
   final OcrRepository repository;
   final OcrTask task;
   final DocumentRepository? documentRepository;
+  final bool currentRevisionAvailable;
 
   @override
   State<LabConfirmationPage> createState() => _LabConfirmationPageState();
@@ -424,6 +426,7 @@ class _LabConfirmationPageState extends State<LabConfirmationPage> {
             revisionId: widget.task.documentRevisionId,
             materialLabel: '化验／检测报告',
             ocrConfirmed: true,
+            currentRevisionAvailable: widget.currentRevisionAvailable,
           ),
         ],
       );

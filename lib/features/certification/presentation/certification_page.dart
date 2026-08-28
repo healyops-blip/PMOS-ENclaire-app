@@ -184,6 +184,7 @@ class CertificationEntryCard extends ConsumerStatefulWidget {
 class _CertificationEntryCardState
     extends ConsumerState<CertificationEntryCard> {
   CertificationRecord? _record;
+  int _loadToken = 0;
 
   @override
   void initState() {
@@ -194,19 +195,31 @@ class _CertificationEntryCardState
   @override
   void didUpdateWidget(CertificationEntryCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.eligible &&
-        (!oldWidget.eligible ||
-            oldWidget.documentId != widget.documentId ||
-            oldWidget.revisionId != widget.revisionId)) {
+    final identityChanged =
+        oldWidget.documentId != widget.documentId ||
+        oldWidget.revisionId != widget.revisionId;
+    if (!widget.eligible) {
+      _loadToken++;
+      _record = null;
+    } else if (!oldWidget.eligible || identityChanged) {
+      _record = null;
       _load();
     }
   }
 
   Future<void> _load() async {
+    final token = ++_loadToken;
+    final documentId = widget.documentId;
+    final revisionId = widget.revisionId;
     final record = await ref
         .read(certificationRepositoryProvider)
-        .read(widget.documentId, widget.revisionId);
-    if (mounted) setState(() => _record = record);
+        .read(documentId, revisionId);
+    if (mounted &&
+        token == _loadToken &&
+        widget.documentId == documentId &&
+        widget.revisionId == revisionId) {
+      setState(() => _record = record);
+    }
   }
 
   Future<void> _open() async {

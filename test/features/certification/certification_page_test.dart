@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -226,6 +228,70 @@ void main() {
     expect(find.text('医院认证 · 本地演示'), findsOneWidget);
     expect(find.byKey(const Key('certification-watermark')), findsNothing);
   });
+
+  testWidgets(
+    'revision change clears old watermark before async read completes',
+    (tester) async {
+      final repository = _DelayedRevisionRepository();
+      await tester.pumpWidget(
+        _app(
+          repository,
+          const CertificationEntryCard(
+            key: ValueKey('stable-entry'),
+            documentId: 'document-1',
+            revisionId: 'revision-old',
+            materialLabel: '化验报告',
+            ocrConfirmed: true,
+          ),
+        ),
+      );
+      repository.complete(
+        'revision-old',
+        const CertificationRecord(
+          documentId: 'document-1',
+          revisionId: 'revision-old',
+          status: CertificationStatus.succeeded,
+        ),
+      );
+      await tester.pump();
+      expect(find.byKey(const Key('certification-watermark')), findsOneWidget);
+
+      await tester.pumpWidget(
+        _app(
+          repository,
+          const CertificationEntryCard(
+            key: ValueKey('stable-entry'),
+            documentId: 'document-1',
+            revisionId: 'revision-new',
+            materialLabel: '化验报告',
+            ocrConfirmed: true,
+          ),
+        ),
+      );
+      expect(find.byKey(const Key('certification-watermark')), findsNothing);
+      repository.complete(
+        'revision-new',
+        CertificationRecord.notStarted('document-1', 'revision-new'),
+      );
+      await tester.pump();
+      expect(find.byKey(const Key('certification-watermark')), findsNothing);
+    },
+  );
+}
+
+class _DelayedRevisionRepository implements CertificationRepository {
+  final Map<String, Completer<CertificationRecord>> _reads = {};
+
+  @override
+  Future<CertificationRecord> read(String documentId, String revisionId) =>
+      (_reads[revisionId] ??= Completer<CertificationRecord>()).future;
+
+  void complete(String revisionId, CertificationRecord record) {
+    (_reads[revisionId] ??= Completer<CertificationRecord>()).complete(record);
+  }
+
+  @override
+  Future<void> write(CertificationRecord record) async {}
 }
 
 Widget _app(CertificationRepository repository, Widget child) => ProviderScope(

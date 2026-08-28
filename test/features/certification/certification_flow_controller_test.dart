@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pmos_enclaire/features/certification/application/certification_flow_controller.dart';
 import 'package:pmos_enclaire/features/certification/data/certification_repository.dart';
 import 'package:pmos_enclaire/features/certification/domain/certification_record.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -9,6 +12,7 @@ void main() {
   test(
     'local repository survives reconstruction for the same revision',
     () async {
+      SharedPreferences.setMockInitialValues({});
       final first = LocalCertificationRepository();
       await first.write(
         CertificationRecord(
@@ -54,6 +58,59 @@ void main() {
       (await repository.read('document', 'part.revision')).status,
       CertificationStatus.failed,
     );
+  });
+
+  test(
+    'load and write failures become recoverable local failure states',
+    () async {
+      final repository = _FlakyRepository(failReads: 1, failWrites: 1);
+      final controller = CertificationFlowController(
+        repository: repository,
+        documentId: 'document-1',
+        revisionId: 'revision-1',
+        transitionDuration: Duration.zero,
+        delay: (_) async {},
+        now: () => DateTime.utc(2026, 8, 27),
+      );
+
+      await controller.load();
+      expect(controller.loading, isFalse);
+      expect(controller.record.status, CertificationStatus.failed);
+      expect(controller.record.failureReason, contains('读取'));
+
+      await controller.start();
+      expect(controller.record.status, CertificationStatus.failed);
+      expect(controller.record.failureReason, contains('保存'));
+      expect(controller.record.hasWatermark, isFalse);
+
+      await controller.start();
+      expect(controller.record.status, CertificationStatus.succeeded);
+      expect(controller.record.attemptNumber, 2);
+      controller.dispose();
+    },
+  );
+
+  test('duplicate start while processing creates only one attempt', () async {
+    final repository = MemoryCertificationRepository();
+    final gate = Completer<void>();
+    final controller = CertificationFlowController(
+      repository: repository,
+      documentId: 'document-1',
+      revisionId: 'revision-1',
+      delay: (_) => gate.future,
+    );
+    await controller.load();
+
+    final first = controller.start();
+    final duplicate = controller.start();
+    await duplicate;
+    expect(controller.record.status, CertificationStatus.processing);
+    expect(controller.record.attemptNumber, 1);
+    gate.complete();
+    await first;
+    expect(controller.record.status, CertificationStatus.succeeded);
+    expect(controller.record.attemptNumber, 1);
+    controller.dispose();
   });
 
   test('states are isolated by document and revision', () async {
@@ -145,4 +202,29 @@ void main() {
       controller.dispose();
     },
   );
+}
+
+class _FlakyRepository implements CertificationRepository {
+  _FlakyRepository({this.failReads = 0, this.failWrites = 0});
+  int failReads;
+  int failWrites;
+  CertificationRecord? record;
+
+  @override
+  Future<CertificationRecord> read(String documentId, String revisionId) async {
+    if (failReads > 0) {
+      failReads--;
+      throw StateError('read failed');
+    }
+    return record ?? CertificationRecord.notStarted(documentId, revisionId);
+  }
+
+  @override
+  Future<void> write(CertificationRecord value) async {
+    if (failWrites > 0) {
+      failWrites--;
+      throw StateError('write failed');
+    }
+    record = value;
+  }
 }

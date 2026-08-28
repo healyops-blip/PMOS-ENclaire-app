@@ -60,6 +60,9 @@ class _MedicalOrderReviewPageState extends State<MedicalOrderReviewPage> {
             reconciliation: reconciliation,
             documentId: widget.task.documentId,
             revisionId: widget.task.documentRevisionId,
+            currentRevisionAvailable:
+                widget.document?.currentRevisionId ==
+                widget.task.documentRevisionId,
           ),
         ),
       );
@@ -324,12 +327,14 @@ class MedicationReconciliationPage extends StatefulWidget {
     required this.reconciliation,
     this.documentId,
     this.revisionId,
+    this.currentRevisionAvailable = false,
     super.key,
   });
   final MedicalOrderGateway gateway;
   final MedicationReconciliationDraft reconciliation;
   final String? documentId;
   final String? revisionId;
+  final bool currentRevisionAvailable;
 
   @override
   State<MedicationReconciliationPage> createState() =>
@@ -383,6 +388,7 @@ class _MedicationReconciliationPageState
             revisionId: widget.revisionId!,
             materialLabel: '医嘱／处方',
             ocrConfirmed: true,
+            currentRevisionAvailable: widget.currentRevisionAvailable,
           ),
           const SizedBox(height: 12),
         ],
