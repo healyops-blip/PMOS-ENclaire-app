@@ -159,7 +159,8 @@ def build_clean_base_image(input_path, report_type, logo_bbox, fill_mode="sample
     hb = header_band_by_type.get(report_type, 300)
     header_box = (0, 0, W, min(H, hb))
     if report_type == "门诊病历_就诊记录":
-        _fill_rect_with_sampled_color(image, header_box)
+        # 完全跳过 EMR 顶部页眉带统一清理，保持模板原貌；由逐字段清理覆盖必要区域
+        pass
     else:
         ImageDraw.Draw(image).rectangle(header_box, fill=(255, 255, 255))
 
