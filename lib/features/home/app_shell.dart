@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
+import '../../core/api_client.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../profile/profile_screen.dart';
 import '../records/records_screen.dart';
@@ -68,7 +69,10 @@ class _AppShellState extends State<AppShell> {
     ];
     return Scaffold(
       body: IndexedStack(index: _index, children: pages),
-      bottomNavigationBar: _PomiBottomNav(index: _index, onSelected: _openTab),
+      bottomNavigationBar:
+          smokeMode && _index == 3 && _recordsTab == 1
+              ? null
+              : _PomiBottomNav(index: _index, onSelected: _openTab),
     );
   }
 }
