@@ -1373,7 +1373,7 @@ class _ReportSummaryLayer extends StatelessWidget {
       ),
       const SizedBox(height: 14),
       const Text(
-        '月经记录 & 体重趋势',
+        '月经记录 & BMI趋势',
         style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
       ),
       const SizedBox(height: 8),
