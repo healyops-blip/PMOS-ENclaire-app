@@ -310,69 +310,59 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [pomiLavender, Color(0xFFFAF8FC), Colors.white],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 520),
-              child: Column(
-                children: [
-                  _OnboardingHeader(
-                    step: _step,
-                    onBack:
-                        _step == 0 || _saving
-                            ? null
-                            : () => setState(() => _step -= 1),
-                  ),
-                  Expanded(
-                    child: Form(
-                      key: _formKey,
-                      child: Align(
-                        alignment: Alignment.topCenter,
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 220),
-                          child: SingleChildScrollView(
-                            key: ValueKey(_step),
-                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-                            child:
-                                [
-                                  _basicStep(),
-                                  _cycleStep(),
-                                  _medicationStep(),
-                                ][_step],
-                          ),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Column(
+              children: [
+                _OnboardingHeader(
+                  step: _step,
+                  onBack:
+                      _step == 0 || _saving
+                          ? null
+                          : () => setState(() => _step -= 1),
+                ),
+                Expanded(
+                  child: Form(
+                    key: _formKey,
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 220),
+                        child: SingleChildScrollView(
+                          key: ValueKey(_step),
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+                          child:
+                              [
+                                _basicStep(),
+                                _cycleStep(),
+                                _medicationStep(),
+                              ][_step],
                         ),
                       ),
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed:
-                            _saving ? null : (_step == 2 ? _save : _next),
-                        child:
-                            _saving
-                                ? const SizedBox.square(
-                                  dimension: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                                : Text(_step == 2 ? '进入首页' : '下一步'),
-                      ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _saving ? null : (_step == 2 ? _save : _next),
+                      child:
+                          _saving
+                              ? const SizedBox.square(
+                                dimension: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                              : Text(_step == 2 ? '进入首页' : '下一步'),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -1023,6 +1013,6 @@ class _StepCard extends StatelessWidget {
         children: children,
       ),
     );
-    return showFrame ? Card(child: content) : content;
+    return showFrame ? PomiGlassCard(child: content) : content;
   }
 }

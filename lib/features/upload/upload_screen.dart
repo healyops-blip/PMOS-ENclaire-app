@@ -10,7 +10,9 @@ import '../../core/api_client.dart';
 import '../../core/theme.dart';
 
 class UploadScreen extends ConsumerStatefulWidget {
-  const UploadScreen({super.key});
+  const UploadScreen({this.modal = false, super.key});
+
+  final bool modal;
 
   @override
   ConsumerState<UploadScreen> createState() => _UploadScreenState();
@@ -124,109 +126,129 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('上传资料')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(18, 8, 18, 96),
-        children: [
-          const Text(
-            '选择材料类型',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+    final form = ListView(
+      padding: EdgeInsets.fromLTRB(18, 8, 18, widget.modal ? 24 : 96),
+      children: [
+        const Text(
+          '选择材料类型',
+          style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 12),
+        RadioGroup<String>(
+          groupValue: _documentType,
+          onChanged: (value) {
+            if (!_working && value != null) {
+              setState(() => _documentType = value);
+            }
+          },
+          child: Column(
+            children: [
+              for (final entry in typeLabels.entries)
+                RadioListTile<String>(
+                  value: entry.key,
+                  enabled: !_working,
+                  title: Text(entry.value),
+                  contentPadding: EdgeInsets.zero,
+                ),
+            ],
           ),
-          const SizedBox(height: 12),
-          RadioGroup<String>(
-            groupValue: _documentType,
-            onChanged: (value) {
-              if (!_working && value != null) {
-                setState(() => _documentType = value);
-              }
-            },
-            child: Column(
+        ),
+        const Divider(height: 30),
+        const Text(
+          '添加原件',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _working ? null : _takePhoto,
+                icon: const Icon(Icons.photo_camera_outlined),
+                label: const Text('拍照'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _working ? null : _pickFile,
+                icon: const Icon(Icons.folder_open_outlined),
+                label: const Text('相册 / 文件'),
+              ),
+            ),
+          ],
+        ),
+        if (_file != null) ...[
+          const SizedBox(height: 14),
+          PomiGlassCard(
+            child: ListTile(
+              leading: Icon(
+                _file!.path.toLowerCase().endsWith('.pdf')
+                    ? Icons.picture_as_pdf
+                    : Icons.image_outlined,
+              ),
+              title: Text(
+                _file!.uri.pathSegments.last,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              trailing: IconButton(
+                tooltip: '移除',
+                onPressed:
+                    _working
+                        ? null
+                        : () => setState(() {
+                          _file = null;
+                          _idempotencyKey = null;
+                        }),
+                icon: const Icon(Icons.close),
+              ),
+            ),
+          ),
+        ],
+        if (_working) ...[
+          const SizedBox(height: 22),
+          const LinearProgressIndicator(),
+          const SizedBox(height: 8),
+          Text(_status ?? '处理中', textAlign: TextAlign.center),
+        ],
+        const SizedBox(height: 24),
+        FilledButton.icon(
+          onPressed: _file == null || _working ? null : _start,
+          icon: const Icon(Icons.document_scanner_outlined),
+          label: const Text('开始识别'),
+        ),
+      ],
+    );
+
+    if (!widget.modal) {
+      return Scaffold(appBar: AppBar(title: const Text('上传资料')), body: form);
+    }
+
+    return PomiGlassCard(
+      borderRadius: 28,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 10, 8),
+            child: Row(
               children: [
-                for (final entry in typeLabels.entries)
-                  RadioListTile<String>(
-                    value: entry.key,
-                    enabled: !_working,
-                    title: Text(entry.value),
-                    contentPadding: EdgeInsets.zero,
+                const Expanded(
+                  child: Text(
+                    '上传资料',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
                   ),
+                ),
+                IconButton(
+                  tooltip: '关闭上传弹窗',
+                  onPressed: _working ? null : () => Navigator.pop(context),
+                  icon: const Icon(Icons.close_rounded),
+                ),
               ],
             ),
           ),
-          const Divider(height: 30),
-          const Text(
-            '添加原件',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _working ? null : _takePhoto,
-                  icon: const Icon(Icons.photo_camera_outlined),
-                  label: const Text('拍照'),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _working ? null : _pickFile,
-                  icon: const Icon(Icons.folder_open_outlined),
-                  label: const Text('相册 / 文件'),
-                ),
-              ),
-            ],
-          ),
-          if (_file != null) ...[
-            const SizedBox(height: 14),
-            Card(
-              child: ListTile(
-                leading: Icon(
-                  _file!.path.toLowerCase().endsWith('.pdf')
-                      ? Icons.picture_as_pdf
-                      : Icons.image_outlined,
-                ),
-                title: Text(
-                  _file!.uri.pathSegments.last,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                trailing: IconButton(
-                  tooltip: '移除',
-                  onPressed:
-                      _working
-                          ? null
-                          : () => setState(() {
-                            _file = null;
-                            _idempotencyKey = null;
-                          }),
-                  icon: const Icon(Icons.close),
-                ),
-              ),
-            ),
-          ],
-          if (_working) ...[
-            const SizedBox(height: 22),
-            const LinearProgressIndicator(),
-            const SizedBox(height: 8),
-            Text(_status ?? '处理中', textAlign: TextAlign.center),
-          ],
-          const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: _file == null || _working ? null : _start,
-            icon: const Icon(Icons.document_scanner_outlined),
-            label: const Text('开始识别'),
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            '支持 JPG、PNG 和单页 PDF，最大 20 MB。识别结果必须经你确认后才会进入报告。',
-            style: TextStyle(
-              color: Color(0xFF686E6A),
-              fontSize: 13,
-              height: 20 / 13,
-            ),
-          ),
+          const Divider(),
+          Expanded(child: form),
         ],
       ),
     );
@@ -290,21 +312,18 @@ class _OcrConfirmScreenState extends ConsumerState<OcrConfirmScreen> {
         padding: const EdgeInsets.fromLTRB(18, 8, 18, 100),
         children: [
           if (widget.resultSource == 'fallback')
-            Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF2D6),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFE7C878)),
-              ),
-              child: const Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.info_outline, color: Color(0xFF8A6410)),
-                  SizedBox(width: 10),
-                  Expanded(child: Text('当前为演示兜底结果，不是外部模型的实时识别。请逐项对照原件。')),
-                ],
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: PomiGlassCard(
+                padding: const EdgeInsets.all(14),
+                child: const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.info_outline, color: Color(0xFF8A6410)),
+                    SizedBox(width: 10),
+                    Expanded(child: Text('当前为演示兜底结果，不是外部模型的实时识别。请逐项对照原件。')),
+                  ],
+                ),
               ),
             ),
           const Text(
@@ -436,21 +455,18 @@ class _JsonFields extends StatelessWidget {
             ),
           ...List.generate(
             list.length,
-            (index) => Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border.all(color: pomiLine),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: _JsonFields(
-                label: '${label ?? '项目'} ${index + 1}',
-                value: list[index],
-                onChanged: (next) {
-                  list[index] = next;
-                  onChanged(list);
-                },
+            (index) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: PomiGlassCard(
+                padding: const EdgeInsets.all(14),
+                child: _JsonFields(
+                  label: '${label ?? '项目'} ${index + 1}',
+                  value: list[index],
+                  onChanged: (next) {
+                    list[index] = next;
+                    onChanged(list);
+                  },
+                ),
               ),
             ),
           ),

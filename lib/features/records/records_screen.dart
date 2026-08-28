@@ -7,6 +7,7 @@ import 'package:printing/printing.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../upload/certification_repository.dart';
+import '../upload/upload_screen.dart';
 
 final recordsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((
   ref,
@@ -26,137 +27,414 @@ class RecordsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(recordsProvider);
-    return DefaultTabController(
-      length: 2,
-      initialIndex: initialTab,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('就诊记录'),
-          bottom: const TabBar(tabs: [Tab(text: '医疗材料'), Tab(text: '就诊报告')]),
-          actions: [
-            IconButton(
-              tooltip: '刷新',
-              onPressed: () => ref.invalidate(recordsProvider),
-              icon: const Icon(Icons.refresh),
+    return Scaffold(
+      appBar: initialTab == 1 ? AppBar(title: const Text('就诊报告')) : null,
+      body: state.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stack) => Center(child: Text(error.toString())),
+        data: (data) {
+          final reportPage = Map<String, dynamic>.from(data['reports'] as Map);
+          final reports = List<Map<String, dynamic>>.from(
+            (reportPage['items'] as List).map(
+              (item) => Map<String, dynamic>.from(item as Map),
+            ),
+          );
+          if (initialTab == 1) return _ReportsList(reports: reports);
+          return const _VisitRecordsPage();
+        },
+      ),
+    );
+  }
+}
+
+class _VisitRecordsPage extends StatelessWidget {
+  const _VisitRecordsPage();
+
+  static const visits = [
+    _VisitRecordData(
+      date: '2026-08-26',
+      status: '来源签署已记录｜模拟',
+      statusTone: _VisitStatusTone.purple,
+      hospital: '模拟医院 B · 生殖内分泌科 · 陈医生',
+      rows: [
+        _VisitRecordRowData(
+          title: '化验单',
+          tag: '化验/检测',
+          tone: _VisitTagTone.purple,
+          trailing: '采样 2026-08-25',
+        ),
+        _VisitRecordRowData(
+          title: '医嘱',
+          tag: '医嘱/处方',
+          tone: _VisitTagTone.mint,
+          trailing: '2026-08-26',
+        ),
+      ],
+    ),
+    _VisitRecordData(
+      date: '2026-07-12',
+      status: '来源核验申请中',
+      statusTone: _VisitStatusTone.blue,
+      hospital: '模拟医院 A · 妇科 · 李医生',
+      rows: [
+        _VisitRecordRowData(
+          title: '门诊病历',
+          tag: '门诊病历',
+          tone: _VisitTagTone.amber,
+        ),
+        _VisitRecordRowData(
+          title: '医嘱',
+          tag: '医嘱/处方',
+          tone: _VisitTagTone.mint,
+        ),
+      ],
+    ),
+    _VisitRecordData(
+      date: '2026-06-20',
+      status: '患者上传｜来源未核验',
+      statusTone: _VisitStatusTone.gray,
+      hospital: '模拟医院 A · 妇科 · 李医生 · 就诊前检测',
+      rows: [
+        _VisitRecordRowData(
+          title: '化验单',
+          tag: '化验/检测',
+          tone: _VisitTagTone.purple,
+        ),
+      ],
+    ),
+    _VisitRecordData(
+      date: '2026-02-08',
+      note: '* 此数据超过 6 个月，仅供参考',
+      hospital: '模拟医院 A · 妇科 · 李医生',
+      rows: [
+        _VisitRecordRowData(
+          title: '门诊病历',
+          tag: '门诊病历',
+          tone: _VisitTagTone.amber,
+        ),
+      ],
+    ),
+    _VisitRecordData(
+      date: '2025-12-14',
+      note: '* 此数据超过 6 个月，仅供参考',
+      hospital: '模拟医院 C · 内分泌科 · 周医生',
+      rows: [
+        _VisitRecordRowData(
+          title: '化验单',
+          tag: '化验/检测',
+          tone: _VisitTagTone.purple,
+        ),
+      ],
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 96),
+      children: [
+        Row(
+          children: [
+            Text('就诊记录', style: Theme.of(context).textTheme.headlineMedium),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: pomiPurple.withValues(alpha: .08),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '模拟数据',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: pomiPurple,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
           ],
         ),
-        body: state.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, stack) => Center(child: Text(error.toString())),
-          data: (data) {
-            final documentPage = Map<String, dynamic>.from(
-              data['documents'] as Map,
-            );
-            final documents = List<Map<String, dynamic>>.from(
-              (documentPage['items'] as List).map(
-                (item) => Map<String, dynamic>.from(item as Map),
-              ),
-            );
-            final reportPage = Map<String, dynamic>.from(
-              data['reports'] as Map,
-            );
-            final reports = List<Map<String, dynamic>>.from(
-              (reportPage['items'] as List).map(
-                (item) => Map<String, dynamic>.from(item as Map),
-              ),
-            );
-            return TabBarView(
+        const SizedBox(height: 22),
+        Row(
+          children: [
+            Text('全部记录', style: Theme.of(context).textTheme.titleLarge),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: () => _showFilters(context),
+              icon: const Icon(Icons.filter_alt_outlined, size: 19),
+              label: const Text('筛选'),
+            ),
+            TextButton.icon(
+              onPressed: () => _showUpload(context),
+              icon: const Icon(Icons.add, size: 19),
+              label: const Text('上传'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        for (var index = 0; index < visits.length; index++) ...[
+          _VisitRecordCard(visit: visits[index]),
+          if (index != visits.length - 1) const SizedBox(height: 16),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _showFilters(BuildContext context) => showModalBottomSheet<void>(
+    context: context,
+    builder:
+        (context) => const SafeArea(
+          child: Padding(
+            padding: EdgeInsets.all(20),
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 10,
               children: [
-                _DocumentsList(documents: documents),
-                _ReportsList(reports: reports),
+                Text(
+                  '筛选记录',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                ),
+                SizedBox(width: double.infinity),
+                FilterChip(label: Text('全部'), selected: true, onSelected: null),
+                FilterChip(
+                  label: Text('化验/检测'),
+                  selected: false,
+                  onSelected: null,
+                ),
+                FilterChip(
+                  label: Text('门诊病历'),
+                  selected: false,
+                  onSelected: null,
+                ),
+                FilterChip(
+                  label: Text('医嘱/处方'),
+                  selected: false,
+                  onSelected: null,
+                ),
               ],
-            );
-          },
+            ),
+          ),
+        ),
+  );
+
+  Future<void> _showUpload(BuildContext context) => showDialog<void>(
+    context: context,
+    barrierColor: pomiInk.withValues(alpha: .22),
+    builder:
+        (context) => Dialog(
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 18,
+            vertical: 34,
+          ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * .84,
+            ),
+            child: const UploadScreen(modal: true),
+          ),
+        ),
+  );
+}
+
+enum _VisitStatusTone { purple, blue, gray }
+
+enum _VisitTagTone { purple, mint, amber }
+
+class _VisitRecordData {
+  const _VisitRecordData({
+    required this.date,
+    required this.hospital,
+    required this.rows,
+    this.status,
+    this.statusTone = _VisitStatusTone.gray,
+    this.note,
+  });
+
+  final String date;
+  final String hospital;
+  final List<_VisitRecordRowData> rows;
+  final String? status;
+  final _VisitStatusTone statusTone;
+  final String? note;
+}
+
+class _VisitRecordRowData {
+  const _VisitRecordRowData({
+    required this.title,
+    required this.tag,
+    required this.tone,
+    this.trailing,
+  });
+
+  final String title;
+  final String tag;
+  final _VisitTagTone tone;
+  final String? trailing;
+}
+
+class _VisitRecordCard extends StatelessWidget {
+  const _VisitRecordCard({required this.visit});
+
+  final _VisitRecordData visit;
+
+  @override
+  Widget build(BuildContext context) {
+    return PomiGlassCard(
+      borderRadius: 20,
+      backgroundOpacity: .36,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            visit.date,
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          if (visit.status != null) ...[
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: _VisitStatusBadge(
+                                text: visit.status!,
+                                tone: visit.statusTone,
+                              ),
+                            ),
+                          ],
+                          if (visit.note != null) ...[
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                visit.note!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.labelSmall,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        visit.hospital,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: pomiSecondaryText),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: pomiLine),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+            child: Column(
+              children: [
+                for (var index = 0; index < visit.rows.length; index++) ...[
+                  _VisitRecordRow(row: visit.rows[index]),
+                  if (index != visit.rows.length - 1)
+                    const SizedBox(height: 10),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VisitStatusBadge extends StatelessWidget {
+  const _VisitStatusBadge({required this.text, required this.tone});
+
+  final String text;
+  final _VisitStatusTone tone;
+
+  @override
+  Widget build(BuildContext context) {
+    final (background, foreground) = switch (tone) {
+      _VisitStatusTone.purple => (
+        pomiPurple.withValues(alpha: .10),
+        pomiPurple,
+      ),
+      _VisitStatusTone.blue => (
+        const Color(0xFFE4F1FF),
+        const Color(0xFF2F81C5),
+      ),
+      _VisitStatusTone.gray => (const Color(0xFFF1F0F3), pomiSecondaryText),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: foreground,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
   }
 }
 
-class _DocumentsList extends StatelessWidget {
-  const _DocumentsList({required this.documents});
+class _VisitRecordRow extends StatelessWidget {
+  const _VisitRecordRow({required this.row});
 
-  final List<Map<String, dynamic>> documents;
-
-  static const labels = {
-    'lab_report': '化验 / 检测',
-    'medical_order': '医嘱 / 处方',
-    'imaging_text_report': '影像文字报告',
-    'outpatient_record': '门诊病历',
-  };
+  final _VisitRecordRowData row;
 
   @override
   Widget build(BuildContext context) {
-    if (documents.isEmpty) {
-      return const _EmptyState(
-        icon: Icons.folder_open_outlined,
-        text: '还没有上传医疗资料',
-      );
-    }
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 96),
-      itemCount: documents.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        final document = documents[index];
-        return Card(
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 6,
-            ),
-            leading: _DocumentIcon(type: document['document_type'].toString()),
-            title: Text(
-              document['original_file_name'].toString(),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            subtitle: Text(
-              '${labels[document['document_type']] ?? document['document_type']} · '
-              '${_statusLabel(document['latest_ocr_status']?.toString())}',
-            ),
-            trailing: const Icon(Icons.chevron_right),
-            onTap:
-                () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder:
-                        (context) => DocumentDetailScreen(document: document),
-                  ),
-                ),
-          ),
-        );
-      },
-    );
-  }
-
-  static String _statusLabel(String? status) => switch (status) {
-    'confirmed' => '已确认',
-    'succeeded' || 'fallback' => '待确认',
-    'processing' => '识别中',
-    'pending' => '排队中',
-    'failed' => '识别失败',
-    _ => '未识别',
-  };
-}
-
-class _DocumentIcon extends StatelessWidget {
-  const _DocumentIcon({required this.type});
-
-  final String type;
-
-  @override
-  Widget build(BuildContext context) {
-    final icon = switch (type) {
-      'lab' => Icons.science_outlined,
-      'medical_order' => Icons.medication_outlined,
-      'imaging' => Icons.image_search_outlined,
-      _ => Icons.description_outlined,
+    final (background, foreground) = switch (row.tone) {
+      _VisitTagTone.purple => (pomiPurple.withValues(alpha: .09), pomiPurple),
+      _VisitTagTone.mint => (
+        pomiMint.withValues(alpha: .12),
+        const Color(0xFF169F91),
+      ),
+      _VisitTagTone.amber => (const Color(0xFFFFF2D9), const Color(0xFFC78519)),
     };
-    return CircleAvatar(
-      backgroundColor: const Color(0xFFE5F0ED),
-      foregroundColor: pomiTeal,
-      child: Icon(icon),
+    return Row(
+      children: [
+        SizedBox(
+          width: 88,
+          child: Text(
+            row.title,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            row.tag,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: foreground,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        if (row.trailing != null) ...[
+          const Spacer(),
+          Text(row.trailing!, style: Theme.of(context).textTheme.bodySmall),
+        ],
+      ],
     );
   }
 }
@@ -340,7 +618,7 @@ class _DocumentDetailScreenState extends ConsumerState<DocumentDetailScreen> {
               child: Text(
                 '提供区块链技术支持（当前仅为本地界面演示）',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 11, color: Color(0xFF6E7470)),
+                style: TextStyle(fontSize: 11, color: pomiSecondaryText),
               ),
             ),
         ],
@@ -426,7 +704,7 @@ class _ReconciliationScreenState extends ConsumerState<ReconciliationScreen> {
             final newInstruction = item['new_instruction'] as Map?;
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: Card(
+              child: PomiGlassCard(
                 child: Padding(
                   padding: const EdgeInsets.all(14),
                   child: Column(
@@ -522,7 +800,7 @@ class _DetailRow extends StatelessWidget {
             width: 88,
             child: Text(
               label,
-              style: const TextStyle(color: Color(0xFF6E7470)),
+              style: const TextStyle(color: pomiSecondaryText),
             ),
           ),
           Expanded(child: Text(value)),
@@ -595,7 +873,7 @@ class _ReportsList extends ConsumerWidget {
                     (context, index) => const SizedBox(height: 10),
                 itemBuilder: (context, index) {
                   final report = reports[index];
-                  return Card(
+                  return PomiGlassCard(
                     child: ListTile(
                       leading: const CircleAvatar(
                         backgroundColor: Color(0xFFFFE9E3),
@@ -872,36 +1150,27 @@ class _ReportSummaryLayer extends StatelessWidget {
         style: const TextStyle(color: pomiMuted),
       ),
       const SizedBox(height: 16),
-      Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFF8F5),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0x33E8917C)),
-        ),
-        child: const Text(
+      const PomiGlassCard(
+        padding: EdgeInsets.all(14),
+        child: Text(
           '仅整理已确认记录 · 不构成诊断或治疗建议',
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: pomiCoral,
+            color: pomiSecondaryText,
             fontSize: 11,
             fontWeight: FontWeight.w700,
           ),
         ),
       ),
       const SizedBox(height: 14),
-      Container(
+      PomiGlassCard(
         padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(
-          color: pomiLavender,
-          borderRadius: BorderRadius.circular(14),
-        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
               '患者自述',
-              style: TextStyle(color: pomiPurple, fontWeight: FontWeight.w800),
+              style: TextStyle(color: pomiInk, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 7),
             Text(
@@ -1050,54 +1319,49 @@ class _TrendCard extends StatelessWidget {
   final List<String> values;
   final VoidCallback? onTap;
   @override
-  Widget build(BuildContext context) => Card(
-    child: InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget build(BuildContext context) => PomiGlassCard(
+    onTap: onTap,
+    padding: const EdgeInsets.all(14),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: pomiLavender,
-                  foregroundColor: pomiPurple,
-                  child: Icon(icon),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                      Text(
-                        subtitle,
-                        style: const TextStyle(color: pomiMuted, fontSize: 11),
-                      ),
-                    ],
-                  ),
-                ),
-                if (onTap != null)
-                  const Icon(Icons.chevron_right, color: pomiPurple),
-              ],
+            CircleAvatar(
+              backgroundColor: pomiLavender,
+              foregroundColor: pomiPurple,
+              child: Icon(icon),
             ),
-            if (values.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              ...values.map(
-                (value) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Text(value, style: const TextStyle(fontSize: 12)),
-                ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(color: pomiMuted, fontSize: 11),
+                  ),
+                ],
               ),
-            ],
+            ),
+            if (onTap != null)
+              const Icon(Icons.chevron_right, color: pomiPurple),
           ],
         ),
-      ),
+        if (values.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          ...values.map(
+            (value) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Text(value, style: const TextStyle(fontSize: 12)),
+            ),
+          ),
+        ],
+      ],
     ),
   );
 }
@@ -1129,7 +1393,7 @@ class _ReportSourceLayer extends StatelessWidget {
           ...nonEmpty.map(
             (entry) => Padding(
               padding: const EdgeInsets.only(bottom: 10),
-              child: Card(
+              child: PomiGlassCard(
                 child: ExpansionTile(
                   title: Text(
                     '${entry.key}（${entry.value.length}）',
@@ -1206,7 +1470,7 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 44, color: const Color(0xFF7A807C)),
+          Icon(icon, size: 44, color: pomiSecondaryText),
           const SizedBox(height: 12),
           Text(text),
         ],
