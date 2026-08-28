@@ -157,6 +157,35 @@ class ReportSnapshotRepository:
             )
         )
 
+    def list_succeeded(self) -> list[ReportSnapshot]:
+        return list(
+            self.session.scalars(
+                select(ReportSnapshot)
+                .where(
+                    ReportSnapshot.patient_id == self.patient_id,
+                    ReportSnapshot.report_status == "succeeded",
+                )
+                .order_by(
+                    ReportSnapshot.report_generated_at.desc(),
+                    ReportSnapshot.created_at.desc(),
+                )
+            )
+        )
+
+    def latest_succeeded(self) -> ReportSnapshot | None:
+        return self.session.scalar(
+            select(ReportSnapshot)
+            .where(
+                ReportSnapshot.patient_id == self.patient_id,
+                ReportSnapshot.report_status == "succeeded",
+            )
+            .order_by(
+                ReportSnapshot.report_generated_at.desc(),
+                ReportSnapshot.created_at.desc(),
+            )
+            .limit(1)
+        )
+
     def add(self, report: ReportSnapshot) -> ReportSnapshot:
         if report.patient_id != self.patient_id:
             raise ValueError("report snapshot is outside repository scope")
@@ -251,3 +280,14 @@ class ReportSourceRepository:
         self.session.add(source)
         self.session.flush()
         return source
+
+    def list_for_report(self, report_id: str) -> list[ReportSource]:
+        if self.reports.get(report_id) is None:
+            return []
+        return list(
+            self.session.scalars(
+                select(ReportSource)
+                .where(ReportSource.report_id == report_id)
+                .order_by(ReportSource.included_at, ReportSource.id)
+            )
+        )

@@ -8,6 +8,7 @@ import 'package:pmos_enclaire/features/dashboard/data/dashboard_repository.dart'
 import 'package:pmos_enclaire/features/medications/data/medication_repository.dart';
 import 'package:pmos_enclaire/features/profile/data/patient_profile_repository.dart';
 import 'package:pmos_enclaire/features/reports/data/patient_note_repository.dart';
+import 'package:pmos_enclaire/features/reports/data/report_repository.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
 import 'package:pmos_enclaire/features/weight/data/weight_repository.dart';
 
@@ -21,6 +22,7 @@ class MainApp extends StatelessWidget {
     this.profileRepository,
     this.dashboardRepository,
     this.patientNoteRepository,
+    this.reportRepository,
     this.documentRepository,
     this.weightRepository,
     this.apiClient,
@@ -34,6 +36,7 @@ class MainApp extends StatelessWidget {
   final PatientProfileRepository? profileRepository;
   final DashboardRepository? dashboardRepository;
   final PatientNoteRepository? patientNoteRepository;
+  final ReportRepository? reportRepository;
   final DocumentRepository? documentRepository;
   final WeightRepository? weightRepository;
   final PomiApiClient? apiClient;
@@ -49,6 +52,7 @@ class MainApp extends StatelessWidget {
         profileRepository: profileRepository,
         dashboardRepository: dashboardRepository,
         patientNoteRepository: patientNoteRepository,
+        reportRepository: reportRepository,
         documentRepository: documentRepository,
         weightRepository: weightRepository,
         apiClient: apiClient,
