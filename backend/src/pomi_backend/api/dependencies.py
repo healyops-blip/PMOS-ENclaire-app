@@ -21,6 +21,8 @@ from pomi_backend.services.orders import MedicalOrderService, ReconciliationServ
 from pomi_backend.services.patient import PatientProfileService
 from pomi_backend.services.patient_notes import PatientNoteService
 from pomi_backend.services.reports import ReportSnapshotService
+from pomi_backend.services.llm_chat_provider import QwenChatProvider
+from pomi_backend.services.patient_note_rewrite import PatientNoteRewriteService
 
 bearer_scheme = HTTPBearer(auto_error=False, scheme_name="SessionBearer")
 
@@ -181,4 +183,20 @@ def get_report_snapshot_service(
 
 ReportSnapshotServiceDependency = Annotated[
     ReportSnapshotService, Depends(get_report_snapshot_service)
+]
+
+
+def get_patient_note_rewrite_service(request: Request) -> PatientNoteRewriteService:
+    settings = request.app.state.settings
+    provider = QwenChatProvider(
+        api_base_url=(settings.llm_api_base_url or settings.ocr_api_base_url),
+        api_key=(settings.llm_api_key or settings.ocr_api_key),
+        model=settings.llm_model,
+        timeout_seconds=settings.ocr_request_timeout_seconds,
+    )
+    return PatientNoteRewriteService(provider)
+
+
+PatientNoteRewriteServiceDependency = Annotated[
+    PatientNoteRewriteService, Depends(get_patient_note_rewrite_service)
 ]

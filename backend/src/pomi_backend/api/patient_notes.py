@@ -2,10 +2,14 @@
 
 from fastapi import APIRouter, Request, status
 
-from pomi_backend.api.business import success
-from pomi_backend.api.dependencies import PatientNoteServiceDependency
+from pomi_backend.api.business import BusinessError, success
+from pomi_backend.api.dependencies import (
+    PatientNoteRewriteServiceDependency,
+    PatientNoteServiceDependency,
+)
 from pomi_backend.schemas.patient_notes import PatientNoteCopy, PatientNoteCreate, PatientNoteUpdate
 from pomi_backend.services.patient_notes import patient_note_data
+from pomi_backend.services.patient_note_rewrite import PatientNoteRewriteRequest
 
 router = APIRouter(prefix="/api/patient-notes", tags=["patient-notes"])
 
@@ -51,3 +55,24 @@ def copy_note(
     service: PatientNoteServiceDependency,
 ) -> dict:
     return success(request, patient_note_data(service.copy(note_id, payload)))
+
+
+@router.post("/{note_id}/rewrite")
+def rewrite_note(
+    note_id: str,
+    request: Request,
+    service: PatientNoteServiceDependency,
+    rewrite: PatientNoteRewriteServiceDependency,
+) -> dict:
+    note = service.owned(note_id)
+    if note.status not in {"draft", "confirmed"}:
+        raise BusinessError("NOTE_NOT_EDITABLE", "Patient note is not editable.", 409)
+    if not (note.original_text and note.original_text.strip()):
+        raise BusinessError("NOTE_EMPTY", "Patient note original_text is empty.", 422)
+    rewritten = rewrite.rewrite(
+        PatientNoteRewriteRequest(
+            original_text=note.original_text,
+            visit_context=note.visit_context,
+        )
+    )
+    return success(request, {"rewritten_text": rewritten})
