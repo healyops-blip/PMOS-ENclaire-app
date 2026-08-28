@@ -1280,6 +1280,27 @@ class _ReportSummaryLayer extends StatelessWidget {
       ),
       const SizedBox(height: 14),
       PomiGlassCard(
+        onTap:
+            () => showDialog<void>(
+              context: context,
+              builder:
+                  (dialogContext) => AlertDialog(
+                    backgroundColor: Colors.white,
+                    title: const Text('患者自述'),
+                    content: SingleChildScrollView(
+                      child: Text(
+                        summary['patient_statement']?.toString() ?? '未填写',
+                        style: const TextStyle(height: 1.55),
+                      ),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(dialogContext),
+                        child: const Text('关闭'),
+                      ),
+                    ],
+                  ),
+            ),
         padding: const EdgeInsets.all(15),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
