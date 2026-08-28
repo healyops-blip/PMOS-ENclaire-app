@@ -46,6 +46,41 @@ void main() {
   );
 
   test(
+    'saves and parses the usual period duration in the cycle step',
+    () async {
+      late ApiCall savedCall;
+      final api = FakeApiClient(
+        handler: (call) {
+          savedCall = call;
+          return _draft(
+            currentStep: 'medications',
+            cycle: {
+              'last_menstrual_start_date': null,
+              'usual_cycle_min_days': 35,
+              'usual_cycle_max_days': 45,
+              'period_duration_days': 5,
+              'next_visit_date': null,
+              'updated_at': null,
+            },
+          );
+        },
+      );
+
+      final saved = await OnboardingRepository(api).saveCycle(
+        const OnboardingCycleDraft(
+          usualCycleMinDays: 35,
+          usualCycleMaxDays: 45,
+          periodDurationDays: 5,
+        ),
+      );
+
+      expect(saved.cycle?.periodDurationDays, 5);
+      expect(savedCall.path, '/api/onboarding/steps/cycle');
+      expect((savedCall.data as Map)['period_duration_days'], 5);
+    },
+  );
+
+  test(
     'complete sends the idempotency header and parses account plus profile',
     () async {
       late ApiCall call;
@@ -75,7 +110,10 @@ void main() {
   );
 }
 
-Map<String, dynamic> _draft({String currentStep = 'basic'}) => {
+Map<String, dynamic> _draft({
+  String currentStep = 'basic',
+  Map<String, dynamic>? cycle,
+}) => {
   'id': 'draft-1',
   'current_step': currentStep,
   'basic': {
@@ -86,7 +124,7 @@ Map<String, dynamic> _draft({String currentStep = 'basic'}) => {
     'weight_kg': null,
     'updated_at': null,
   },
-  'cycle': null,
+  'cycle': cycle,
   'medications': null,
   'updated_at': '2026-08-28T01:02:03Z',
 };
@@ -99,6 +137,7 @@ Map<String, dynamic> _profile() => {
   'height_cm': null,
   'usual_cycle_min_days': null,
   'usual_cycle_max_days': null,
+  'period_duration_days': null,
   'next_visit_date': null,
   'health_goal': null,
   'onboarding_completed': true,

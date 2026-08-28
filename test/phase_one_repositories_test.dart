@@ -25,11 +25,13 @@ void main() {
       expect(profile.nickname, isNull);
       expect(profile.birthYear, isNull);
       expect(profile.diagnosisYear, isNull);
+      expect(profile.periodDurationDays, isNull);
 
       final updated = await repository.updateProfile(
         PatientProfileUpdate(
           updatedAt: profile.updatedAt,
           nickname: 'Alice',
+          periodDurationDays: const JsonPatchField<int>.value(5),
           nextVisitDate: const JsonPatchField<String>.value(null),
         ),
       );
@@ -38,6 +40,7 @@ void main() {
       expect(updateCall.path, '/api/patient/profile');
       expect(updateCall.data, {
         'nickname': 'Alice',
+        'period_duration_days': 5,
         'next_visit_date': null,
         'updated_at': '2026-08-28T01:02:03.000Z',
       });
@@ -130,6 +133,7 @@ Map<String, dynamic> _profile() => {
   'height_cm': null,
   'usual_cycle_min_days': null,
   'usual_cycle_max_days': null,
+  'period_duration_days': null,
   'next_visit_date': null,
   'health_goal': null,
   'onboarding_completed': false,

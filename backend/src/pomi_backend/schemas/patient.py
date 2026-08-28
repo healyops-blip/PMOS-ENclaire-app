@@ -20,6 +20,7 @@ class PatientProfileUpdate(BaseModel):
     diagnosis_year: int | None = Field(default=None, ge=1900, le=2100)
     usual_cycle_min_days: int | None = Field(default=None, ge=15, le=120)
     usual_cycle_max_days: int | None = Field(default=None, ge=15, le=120)
+    period_duration_days: int | None = Field(default=None, ge=1, le=14)
     primary_condition: str | None = Field(default=None, min_length=1, max_length=80)
     next_visit_date: date | None = None
     health_goal: str | None = Field(default=None, max_length=500)

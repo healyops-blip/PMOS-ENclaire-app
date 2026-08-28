@@ -71,6 +71,7 @@ class OnboardingCycleDraft {
     this.lastMenstrualStartDate,
     this.usualCycleMinDays,
     this.usualCycleMaxDays,
+    this.periodDurationDays,
     this.nextVisitDate,
     this.updatedAt,
   });
@@ -84,6 +85,7 @@ class OnboardingCycleDraft {
       ),
       usualCycleMinDays: jsonIntOrNull(json, 'usual_cycle_min_days'),
       usualCycleMaxDays: jsonIntOrNull(json, 'usual_cycle_max_days'),
+      periodDurationDays: jsonIntOrNull(json, 'period_duration_days'),
       nextVisitDate: jsonStringOrNull(json, 'next_visit_date'),
       updatedAt: jsonDateTimeOrNull(json, 'updated_at'),
     );
@@ -92,6 +94,7 @@ class OnboardingCycleDraft {
   final String? lastMenstrualStartDate;
   final int? usualCycleMinDays;
   final int? usualCycleMaxDays;
+  final int? periodDurationDays;
   final String? nextVisitDate;
   final DateTime? updatedAt;
 
@@ -99,6 +102,7 @@ class OnboardingCycleDraft {
     'last_menstrual_start_date': lastMenstrualStartDate,
     'usual_cycle_min_days': usualCycleMinDays,
     'usual_cycle_max_days': usualCycleMaxDays,
+    'period_duration_days': periodDurationDays,
     'next_visit_date': nextVisitDate,
     'updated_at': updatedAt?.toUtc().toIso8601String(),
   };

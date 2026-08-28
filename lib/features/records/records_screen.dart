@@ -20,16 +20,25 @@ final recordsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((
   return {'documents': values[0], 'reports': values[1]};
 });
 
+final reportDetailProvider = FutureProvider.autoDispose
+    .family<Map<String, dynamic>, String>((ref, reportId) async {
+      final detail = await ref
+          .read(apiClientProvider)
+          .get('/api/reports/$reportId');
+      return Map<String, dynamic>.from(detail as Map);
+    });
+
 class RecordsScreen extends ConsumerWidget {
-  const RecordsScreen({this.initialTab = 0, super.key});
+  const RecordsScreen({this.initialTab = 0, this.onBack, super.key});
 
   final int initialTab;
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(recordsProvider);
     return Scaffold(
-      appBar: initialTab == 1 ? AppBar(title: const Text('就诊报告')) : null,
+      appBar: null,
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stack) => Center(child: Text(error.toString())),
@@ -48,13 +57,37 @@ class RecordsScreen extends ConsumerWidget {
               (item) => Map<String, dynamic>.from(item as Map),
             ),
           );
-          if (initialTab == 1) return _ReportsList(reports: reports);
+          if (initialTab == 1) {
+            if (smokeMode && reports.isNotEmpty) {
+              return _ApiReportViewer(
+                reportId: reports.first['report_id'].toString(),
+                onBack: onBack,
+              );
+            }
+            return _ReportsList(reports: reports);
+          }
           if (smokeMode) return const VisitRecordsPage();
           return _DocumentsList(documents: documents);
         },
       ),
     );
   }
+}
+
+class _ApiReportViewer extends ConsumerWidget {
+  const _ApiReportViewer({required this.reportId, this.onBack});
+
+  final String reportId;
+  final VoidCallback? onBack;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => ref
+      .watch(reportDetailProvider(reportId))
+      .when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stack) => Center(child: Text(error.toString())),
+        data: (report) => ReportViewer(report: report, onBack: onBack),
+      );
 }
 
 class VisitRecordsPage extends StatelessWidget {
@@ -66,14 +99,7 @@ class VisitRecordsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-          child: Row(
-            children: [
-              Text('就诊记录', style: Theme.of(context).textTheme.headlineMedium),
-            ],
-          ),
-        ),
+        const SizedBox(height: 18),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 22, 20, 96),
@@ -307,6 +333,19 @@ class _VisitRecordCard extends StatelessWidget {
                           ),
                         ),
                       ],
+                      const SizedBox(height: 3),
+                      const Align(
+                        alignment: Alignment.center,
+                        child: Text(
+                          '区块链技术支持',
+                          style: TextStyle(
+                            color: pomiPurple,
+                            fontSize: 10,
+                            height: 14 / 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -934,7 +973,7 @@ class _ReportsList extends ConsumerWidget {
                         foregroundColor: pomiCoral,
                         child: Icon(Icons.summarize_outlined),
                       ),
-                      title: const Text('复诊准备报告'),
+                      title: const Text('数据汇总'),
                       subtitle: Text(report['generated_at'].toString()),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () async {
@@ -961,7 +1000,7 @@ class _ReportsList extends ConsumerWidget {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _createReport(context, ref),
         icon: const Icon(Icons.add),
-        label: const Text('生成报告'),
+        label: const Text('患者自述'),
       ),
     );
   }
@@ -988,7 +1027,7 @@ class _ReportsList extends ConsumerWidget {
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 6),
-                const Text('报告会原样保留你确认的文字。'),
+                const Text('可补充患者自述；指标看板会自动汇总已上传的检验单和其他资料。'),
                 const SizedBox(height: 16),
                 TextField(
                   controller: statement,
@@ -1001,11 +1040,7 @@ class _ReportsList extends ConsumerWidget {
                 ),
                 const SizedBox(height: 16),
                 FilledButton(
-                  onPressed:
-                      () => Navigator.pop(
-                        sheetContext,
-                        statement.text.trim().isNotEmpty,
-                      ),
+                  onPressed: () => Navigator.pop(sheetContext, true),
                   child: const Text('确认自述并生成'),
                 ),
               ],
@@ -1018,14 +1053,22 @@ class _ReportsList extends ConsumerWidget {
     }
     try {
       final api = ref.read(apiClientProvider);
-      final note = await api.post(
-        '/api/patient-notes',
-        data: {'original_text': statement.text.trim()},
-      );
-      await api.post('/api/patient-notes/${note['id']}/confirm');
+      final text = statement.text.trim();
+      String? noteId;
+      if (text.isNotEmpty) {
+        final note = await api.post(
+          '/api/patient-notes',
+          data: {'original_text': text},
+        );
+        await api.post('/api/patient-notes/${note['id']}/confirm');
+        noteId = note['id']?.toString();
+      }
       final report = await api.post(
         '/api/reports',
-        data: {'patient_note_id': note['id'], 'confirm_incomplete': true},
+        data: {
+          if (noteId != null) 'patient_note_id': noteId,
+          'confirm_incomplete': true,
+        },
       );
       ref.invalidate(recordsProvider);
       if (context.mounted) {
@@ -1051,9 +1094,10 @@ class _ReportsList extends ConsumerWidget {
 }
 
 class ReportViewer extends ConsumerStatefulWidget {
-  const ReportViewer({required this.report, super.key});
+  const ReportViewer({required this.report, this.onBack, super.key});
 
   final Map<String, dynamic> report;
+  final VoidCallback? onBack;
 
   @override
   ConsumerState<ReportViewer> createState() => _ReportViewerState();
@@ -1061,12 +1105,11 @@ class ReportViewer extends ConsumerStatefulWidget {
 
 class _ReportViewerState extends ConsumerState<ReportViewer> {
   int _layer = 0;
-
-  void _share() {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('PDF 导出正在开发，当前可先在应用内查看报告')));
-  }
+  String? _selectedTrendMetricId;
+  final _cycleSectionKey = GlobalKey();
+  final _bmiSectionKey = GlobalKey();
+  final _medicationSectionKey = GlobalKey();
+  final _labSectionKey = GlobalKey();
 
   @override
   Widget build(BuildContext context) {
@@ -1092,18 +1135,48 @@ class _ReportViewerState extends ConsumerState<ReportViewer> {
         return value;
       }),
     );
-    final labs = List<Map<String, dynamic>>.from(
-      (trends['labs'] as List? ?? const []).expand((group) {
-        final value = Map<String, dynamic>.from(group as Map);
-        return (value['points'] as List? ?? const []).map((item) {
-          final point = Map<String, dynamic>.from(item as Map);
-          point['item_name'] = point['original_item_name'];
-          point['sample_date'] = point['date'];
-          point['raw_unit'] = point['original_unit'];
-          return point;
-        });
-      }),
+    final labTrends = List<Map<String, dynamic>>.from(
+      (trends['labs'] as List? ?? const []).map(
+        (item) => Map<String, dynamic>.from(item as Map),
+      ),
     );
+    final labs = <Map<String, dynamic>>[];
+    for (final group in labTrends) {
+      final points = List<Map<String, dynamic>>.from(
+        (group['points'] as List? ?? const []).map(
+          (item) => Map<String, dynamic>.from(item as Map),
+        ),
+      );
+      if (points.isEmpty) continue;
+      final point = points.last;
+      point['metric_id'] = group['metric_id'];
+      point['item_name'] =
+          group['metric_name'] ?? point['original_item_name'] ?? '指标';
+      point['sample_date'] = point['date'];
+      point['raw_unit'] =
+          point['original_unit'] ?? point['normalized_unit'] ?? group['unit'];
+      labs.add(point);
+    }
+    Map<String, dynamic>? glucoseTrend;
+    for (final group in labTrends) {
+      final metricId = group['metric_id']?.toString().toLowerCase() ?? '';
+      final name =
+          (group['metric_name'] ?? group['item_name'])?.toString() ?? '';
+      if (metricId == 'glucose' ||
+          name.contains('空腹血糖') ||
+          name.toLowerCase().contains('fasting glucose')) {
+        glucoseTrend = group;
+        break;
+      }
+    }
+    final selectedTrend =
+        _selectedTrendMetricId == null
+            ? null
+            : labTrends.cast<Map<String, dynamic>?>().firstWhere(
+              (group) =>
+                  group?['metric_id']?.toString() == _selectedTrendMetricId,
+              orElse: () => null,
+            );
     final weights = List<Map<String, dynamic>>.from(
       (trends['weights'] as List? ?? []).map(
         (item) => Map<String, dynamic>.from(item as Map),
@@ -1122,30 +1195,44 @@ class _ReportViewerState extends ConsumerState<ReportViewer> {
       ),
     };
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('就诊准备报告'),
-        actions: [
-          IconButton(
-            tooltip: '分享 PDF',
-            onPressed: _share,
-            icon: const Icon(Icons.ios_share_outlined),
-          ),
-        ],
-      ),
+      backgroundColor: Colors.white,
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
-            child: SegmentedButton<int>(
-              showSelectedIcon: false,
-              segments: const [
-                ButtonSegment(value: 0, label: Text('① 摘要')),
-                ButtonSegment(value: 1, label: Text('② 趋势')),
-                ButtonSegment(value: 2, label: Text('③ 来源')),
+          SafeArea(
+            bottom: false,
+            child: Row(
+              children: [
+                IconButton(
+                  tooltip: '返回',
+                  onPressed: () {
+                    if (_layer != 0) {
+                      setState(() => _layer = 0);
+                      return;
+                    }
+                    if (Navigator.of(context).canPop()) {
+                      Navigator.of(context).pop();
+                    } else {
+                      widget.onBack?.call();
+                    }
+                  },
+                  icon: const Icon(Icons.arrow_back_rounded),
+                ),
+                const Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Padding(
+                      padding: EdgeInsets.only(right: 16),
+                      child: Text(
+                        'POMI报告',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ],
-              selected: {_layer},
-              onSelectionChanged:
-                  (value) => setState(() => _layer = value.first),
             ),
           ),
           Expanded(
@@ -1157,6 +1244,22 @@ class _ReportViewerState extends ConsumerState<ReportViewer> {
                   summary: summary,
                   medicines: medicines,
                   labs: labs,
+                  glucoseTrend: glucoseTrend,
+                  weights: weights,
+                  cycles: cycles,
+                  cycleCount: cycles.length,
+                  weightCount: weights.length,
+                  sourceCount: sourceGroups['报告来源']!.length,
+                  cycleSectionKey: _cycleSectionKey,
+                  bmiSectionKey: _bmiSectionKey,
+                  medicationSectionKey: _medicationSectionKey,
+                  labSectionKey: _labSectionKey,
+                  onOpenTrends:
+                      (metricId) => setState(() {
+                        _selectedTrendMetricId = metricId;
+                        _layer = 1;
+                      }),
+                  onOpenSources: () => setState(() => _layer = 2),
                   medicalBoundary: (summary['disclaimers'] as List? ?? const [])
                       .join('\n'),
                 ),
@@ -1164,6 +1267,8 @@ class _ReportViewerState extends ConsumerState<ReportViewer> {
                   weights: weights,
                   cycles: cycles,
                   labs: labs,
+                  glucoseTrend: glucoseTrend,
+                  selectedTrend: selectedTrend,
                   onOpenSources: () => setState(() => _layer = 2),
                 ),
                 _ReportSourceLayer(sourceGroups: sourceGroups),
@@ -1182,51 +1287,121 @@ class _ReportSummaryLayer extends StatelessWidget {
     required this.summary,
     required this.medicines,
     required this.labs,
+    required this.glucoseTrend,
+    required this.weights,
+    required this.cycles,
+    required this.cycleCount,
+    required this.weightCount,
+    required this.sourceCount,
+    required this.cycleSectionKey,
+    required this.bmiSectionKey,
+    required this.medicationSectionKey,
+    required this.labSectionKey,
+    required this.onOpenTrends,
+    required this.onOpenSources,
     required this.medicalBoundary,
   });
   final Map<String, dynamic> report;
   final Map<String, dynamic> summary;
   final List<Map<String, dynamic>> medicines;
   final List<Map<String, dynamic>> labs;
+  final Map<String, dynamic>? glucoseTrend;
+  final List<Map<String, dynamic>> weights;
+  final List<Map<String, dynamic>> cycles;
   final String medicalBoundary;
+  final int cycleCount;
+  final int weightCount;
+  final int sourceCount;
+  final GlobalKey cycleSectionKey;
+  final GlobalKey bmiSectionKey;
+  final GlobalKey medicationSectionKey;
+  final GlobalKey labSectionKey;
+  final ValueChanged<String?> onOpenTrends;
+  final VoidCallback onOpenSources;
+
+  void _jumpToSection(GlobalKey key) {
+    final targetContext = key.currentContext;
+    if (targetContext == null) return;
+    Scrollable.ensureVisible(
+      targetContext,
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutCubic,
+      alignment: 0.06,
+    );
+  }
+
+  String get _reportAbstract {
+    final weightSummary = Map<String, dynamic>.from(
+      summary['weight_summary'] as Map? ?? const {},
+    );
+    final weight = weightSummary['latest_weight_kg'];
+    final bmi = weightSummary['latest_bmi'];
+    final glucosePoints = glucoseTrend?['points'] as List? ?? const [];
+    final glucose =
+        glucosePoints.isEmpty
+            ? null
+            : Map<String, dynamic>.from(glucosePoints.last as Map);
+    final glucoseText =
+        glucose == null
+            ? ''
+            : '最新空腹血糖 ${glucose['normalized_value'] ?? glucose['numeric_value'] ?? glucose['raw_value'] ?? '—'} ${glucose['normalized_unit'] ?? glucoseTrend?['unit'] ?? glucose['original_unit'] ?? ''}。';
+    return '本次报告汇总 $cycleCount 次经期记录、$weightCount 个体重数据点、${labs.length} 项检查指标和 ${medicines.length} 项当前用药。'
+        '${weight == null ? '' : '当前体重 $weight kg${bmi == null ? '' : '，BMI $bmi'}。'}'
+        '$glucoseText';
+  }
+
+  Map<String, dynamic> get _weightSummary =>
+      Map<String, dynamic>.from(summary['weight_summary'] as Map? ?? const {});
+
+  String get _bmiAssessment => switch (_weightSummary['bmi_status']) {
+    'low' => '偏低',
+    'in_range' => '范围内',
+    'high' => '略高',
+    _ => '暂无评估',
+  };
 
   @override
   Widget build(BuildContext context) => ListView(
     padding: const EdgeInsets.fromLTRB(18, 10, 18, 32),
     children: [
-      Text(
-        summary['patient_name']?.toString() ?? '就诊摘要',
-        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+      const Text(
+        '基本信息',
+        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
       ),
-      const SizedBox(height: 4),
-      Text(
-        '生成于 ${report['generated_at']}',
-        style: const TextStyle(color: pomiMuted),
-      ),
-      const SizedBox(height: 16),
-      const PomiGlassCard(
-        padding: EdgeInsets.all(14),
-        child: Text(
-          '仅整理已确认记录 · 不构成诊断或治疗建议',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: pomiSecondaryText,
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-          ),
+      const SizedBox(height: 8),
+      PomiGlassCard(
+        padding: EdgeInsets.all(15),
+        backgroundColor: const Color(0xFFF3F3F5),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              '${(summary['profile'] as Map?)?['nickname'] ?? '未设置姓名'}',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            Text(
+              '身高 ${(summary['profile'] as Map?)?['height_cm'] ?? '—'} cm',
+              style: const TextStyle(color: pomiMuted),
+            ),
+            Text(
+              '体重 ${_weightSummary['latest_weight_kg'] ?? '—'} kg',
+              style: const TextStyle(color: pomiMuted),
+            ),
+          ],
         ),
       ),
-      const SizedBox(height: 14),
+      const SizedBox(height: 18),
+      const Text(
+        '患者自述',
+        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+      ),
+      const SizedBox(height: 8),
       PomiGlassCard(
         padding: const EdgeInsets.all(15),
+        backgroundColor: const Color(0xFFF3F3F5),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              '患者自述',
-              style: TextStyle(color: pomiInk, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 7),
             Text(
               summary['patient_statement']?.toString() ?? '未填写',
               style: const TextStyle(height: 1.55),
@@ -1235,45 +1410,153 @@ class _ReportSummaryLayer extends StatelessWidget {
         ),
       ),
       const SizedBox(height: 18),
-      _ReportSection(
-        title: '当前用药',
-        count: medicines.length,
-        children:
-            medicines
-                .map(
-                  (item) => ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(item['drug_name'].toString()),
-                    subtitle: Text(
-                      [
-                        item['dosage_text'],
-                        item['frequency'],
-                      ].where((value) => value != null).join(' · '),
-                    ),
-                  ),
-                )
-                .toList(),
+      const Text(
+        '摘要',
+        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
       ),
-      _ReportSection(
-        title: '检查指标',
-        count: labs.length,
-        children:
-            labs
-                .map(
-                  (item) => ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(item['item_name'].toString()),
-                    subtitle: Text(
-                      item['sample_date']?.toString() ??
-                          item['report_date']?.toString() ??
-                          '',
+      const SizedBox(height: 8),
+      PomiGlassCard(
+        padding: const EdgeInsets.all(15),
+        backgroundColor: const Color(0xFFF3F3F5),
+        child: Text(_reportAbstract, style: const TextStyle(height: 1.6)),
+      ),
+      const SizedBox(height: 18),
+      _AbnormalMetricsSection(labs: labs, onOpenTrends: onOpenTrends),
+      const SizedBox(height: 18),
+      Column(
+        key: cycleSectionKey,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _CycleHistorySection(
+            cycles: cycles,
+            summary: Map<String, dynamic>.from(
+              summary['cycle_summary'] as Map? ?? const {},
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 18),
+      Column(
+        key: bmiSectionKey,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'BMI趋势',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '当前 ${_weightSummary['latest_weight_kg'] ?? '—'} kg，BMI ${_weightSummary['latest_bmi'] ?? '—'}（参考 ${_weightSummary['bmi_reference_lower'] ?? '—'} – ${_weightSummary['bmi_reference_upper'] ?? '—'}，$_bmiAssessment）',
+            style: const TextStyle(color: pomiMuted),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 350,
+            child: CustomPaint(
+              painter: _TrendChartFramePainter(),
+              child: Padding(
+                padding: const EdgeInsets.all(2),
+                child: _BmiTrendChart(weights: weights),
+              ),
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 18),
+      _GlucoseTrendSection(trend: glucoseTrend),
+      const SizedBox(height: 18),
+      KeyedSubtree(
+        key: medicationSectionKey,
+        child: _ReportSection(
+          title: '当前用药',
+          count: medicines.length,
+          children:
+              medicines
+                  .map((item) => _ReportMedicationTile(item: item))
+                  .toList(),
+        ),
+      ),
+      KeyedSubtree(
+        key: labSectionKey,
+        child: _ReportSection(
+          title: '检查指标',
+          count: labs.length,
+          children:
+              labs
+                  .map(
+                    (item) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(item['item_name'].toString()),
+                      subtitle: Text(
+                        item['sample_date']?.toString() ??
+                            item['report_date']?.toString() ??
+                            '',
+                      ),
+                      trailing: Text(
+                        '${item['raw_value'] ?? ''} ${item['raw_unit'] ?? ''}',
+                      ),
                     ),
-                    trailing: Text(
-                      '${item['raw_value'] ?? ''} ${item['raw_unit'] ?? ''}',
-                    ),
-                  ),
-                )
-                .toList(),
+                  )
+                  .toList(),
+        ),
+      ),
+      const SizedBox(height: 18),
+      const Text(
+        '报告数据来源（自动汇总）',
+        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+      ),
+      const SizedBox(height: 8),
+      PomiGlassCard(
+        padding: EdgeInsets.zero,
+        child: Column(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.science_outlined, color: pomiPurple),
+              title: const Text('化验单'),
+              subtitle: Text('${labs.length} 份'),
+              trailing: const Icon(Icons.chevron_right, color: pomiMuted),
+              onTap: () => _jumpToSection(labSectionKey),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.water_drop_outlined, color: pomiPurple),
+              title: const Text('经期记录'),
+              subtitle: Text('$cycleCount 次'),
+              trailing: const Icon(Icons.chevron_right, color: pomiMuted),
+              onTap: () => _jumpToSection(cycleSectionKey),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(
+                Icons.monitor_weight_outlined,
+                color: pomiPurple,
+              ),
+              title: const Text('体重记录'),
+              subtitle: Text('$weightCount 个点'),
+              trailing: const Icon(Icons.chevron_right, color: pomiMuted),
+              onTap: () => _jumpToSection(bmiSectionKey),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.medication_outlined, color: pomiPurple),
+              title: const Text('用药记录'),
+              subtitle: Text('${medicines.length} 项'),
+              trailing: const Icon(Icons.chevron_right, color: pomiMuted),
+              onTap: () => _jumpToSection(medicationSectionKey),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(
+                Icons.local_hospital_outlined,
+                color: pomiPurple,
+              ),
+              title: const Text('就诊记录'),
+              subtitle: Text('$sourceCount 次历史，1 次当前'),
+              trailing: const Icon(Icons.chevron_right, color: pomiMuted),
+              onTap: onOpenSources,
+            ),
+          ],
+        ),
       ),
       const SizedBox(height: 18),
       Text(
@@ -1284,79 +1567,1080 @@ class _ReportSummaryLayer extends StatelessWidget {
   );
 }
 
+class _AbnormalMetricsSection extends StatelessWidget {
+  const _AbnormalMetricsSection({
+    required this.labs,
+    required this.onOpenTrends,
+  });
+
+  final List<Map<String, dynamic>> labs;
+  final ValueChanged<String?> onOpenTrends;
+
+  @override
+  Widget build(BuildContext context) {
+    final abnormal =
+        labs
+            .where(
+              (item) =>
+                  item['abnormal_status'] == 'high' ||
+                  item['abnormal_status'] == 'low',
+            )
+            .take(4)
+            .toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '异常指标',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 8),
+        if (abnormal.isEmpty)
+          const PomiGlassCard(
+            padding: EdgeInsets.all(15),
+            child: Text('本次报告暂无异常指标'),
+          )
+        else
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            childAspectRatio: 1.55,
+            children:
+                abnormal.map((item) {
+                  final value = item['raw_value']?.toString() ?? '—';
+                  final unit = item['raw_unit']?.toString() ?? '';
+                  final status =
+                      item['abnormal_status'] == 'high' ? '偏高' : '偏低';
+                  final name = item['item_name']?.toString() ?? '指标';
+                  return Semantics(
+                    button: true,
+                    label: '查看$name趋势',
+                    onTap: () => onOpenTrends(item['metric_id']?.toString()),
+                    child: PomiGlassCard(
+                      onTap: () => onOpenTrends(item['metric_id']?.toString()),
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  name,
+                                  style: const TextStyle(color: pomiMuted),
+                                ),
+                              ),
+                              Text(
+                                status,
+                                style: const TextStyle(
+                                  color: pomiCoral,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Spacer(),
+                          Text(
+                            '$value $unit',
+                            style: const TextStyle(
+                              color: pomiCoral,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          Text(
+                            item['sample_date']?.toString() ??
+                                item['report_date']?.toString() ??
+                                '',
+                            style: const TextStyle(
+                              color: pomiMuted,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+          ),
+      ],
+    );
+  }
+}
+
+class _CycleHistorySection extends StatelessWidget {
+  const _CycleHistorySection({required this.cycles, required this.summary});
+
+  final List<Map<String, dynamic>> cycles;
+  final Map<String, dynamic> summary;
+
+  String _date(String? value, {bool includeYear = true}) {
+    final parsed = value == null ? null : DateTime.tryParse(value);
+    if (parsed == null) return '—';
+    return '${includeYear ? '${parsed.year} 年 ' : ''}${parsed.month} 月 ${parsed.day} 日';
+  }
+
+  List<(String, String, String, String)> get _rows {
+    final descending = cycles.reversed.toList();
+    int? previousYear;
+    return descending.map((item) {
+      final start = DateTime.tryParse(item['start_date']?.toString() ?? '');
+      final year = start?.year;
+      final yearLabel = year != null && year != previousYear ? '$year 年' : '';
+      previousYear = year;
+      final cycleEnd = item['cycle_end_date']?.toString();
+      final duration =
+          cycleEnd == null
+              ? '开始时间：${_date(item['start_date']?.toString(), includeYear: false)}'
+              : '${_date(item['start_date']?.toString(), includeYear: year != DateTime.tryParse(cycleEnd)?.year)}至${_date(cycleEnd, includeYear: false)}';
+      return (
+        yearLabel,
+        duration,
+        item['cycle_length_days'] == null
+            ? '—'
+            : '${item['cycle_length_days']} 天',
+        item['duration_days'] == null ? '—' : '${item['duration_days']} 天',
+      );
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text(
+        '经期历史',
+        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+      ),
+      const SizedBox(height: 5),
+      Text(
+        '${_date(summary['range_start']?.toString())}－${_date(summary['range_end']?.toString())}',
+        style: const TextStyle(color: pomiMuted, fontSize: 12),
+      ),
+      const SizedBox(height: 8),
+      PomiGlassCard(
+        padding: const EdgeInsets.all(12),
+        backgroundColor: const Color(0xFFF3F3F5),
+        child: Table(
+          columnWidths: const {
+            0: FixedColumnWidth(48),
+            1: FlexColumnWidth(),
+            2: FixedColumnWidth(52),
+            3: FixedColumnWidth(52),
+          },
+          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+          border: const TableBorder(
+            horizontalInside: BorderSide(color: pomiLine),
+          ),
+          children: [
+            TableRow(
+              decoration: BoxDecoration(
+                color: pomiPurple.withValues(alpha: .06),
+              ),
+              children: const [
+                _CycleHistoryCell('年份', isHeader: true),
+                _CycleHistoryCell('周期持续时间', isHeader: true),
+                _CycleHistoryCell('周期长度', isHeader: true),
+                _CycleHistoryCell('月经长度', isHeader: true),
+              ],
+            ),
+            ..._rows.map(
+              (row) => TableRow(
+                children: [
+                  _CycleHistoryCell(row.$1),
+                  _CycleHistoryCell(row.$2),
+                  _CycleHistoryCell(row.$3),
+                  _CycleHistoryCell(row.$4),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+}
+
+class _CycleHistoryCell extends StatelessWidget {
+  const _CycleHistoryCell(this.text, {this.isHeader = false});
+
+  final String text;
+  final bool isHeader;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 9),
+    child: Text(
+      text,
+      style: TextStyle(
+        color: isHeader ? pomiMuted : pomiInk,
+        fontSize: isHeader ? 10 : 10.5,
+        height: 1.35,
+        fontWeight: isHeader ? FontWeight.w700 : FontWeight.w400,
+      ),
+    ),
+  );
+}
+
+class _BmiTrendChart extends StatefulWidget {
+  const _BmiTrendChart({required this.weights});
+  final List<Map<String, dynamic>> weights;
+
+  @override
+  State<_BmiTrendChart> createState() => _BmiTrendChartState();
+}
+
+class _BmiTrendChartState extends State<_BmiTrendChart> {
+  final _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final allPoints =
+        widget.weights.where((item) => item['bmi'] is num).toList();
+    final points =
+        allPoints.length <= 8
+            ? allPoints
+            : allPoints.sublist(allPoints.length - 8);
+    final values = points.map((e) => (e['bmi'] as num).toDouble()).toList();
+    final labels =
+        points
+            .map((e) => e['record_date']?.toString().substring(0, 10) ?? '')
+            .toList();
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final desiredWidth = values.length * 96.0;
+        final chartWidth =
+            desiredWidth > constraints.maxWidth
+                ? desiredWidth
+                : constraints.maxWidth;
+        return Scrollbar(
+          controller: _scrollController,
+          thumbVisibility: chartWidth > constraints.maxWidth,
+          scrollbarOrientation: ScrollbarOrientation.bottom,
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.only(bottom: 12),
+            child: SizedBox(
+              width: chartWidth,
+              height: constraints.maxHeight - 12,
+              child: CustomPaint(
+                painter: _TrendLinePainter(
+                  values,
+                  labels,
+                  unitLabel: 'BMI',
+                  fractionDigits: 1,
+                ),
+                child: const SizedBox.expand(),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _TrendLinePainter extends CustomPainter {
+  _TrendLinePainter(
+    this.values,
+    this.labels, {
+    this.unitLabel,
+    this.fractionDigits = 2,
+  });
+  final List<double> values;
+  final List<String> labels;
+  final String? unitLabel;
+  final int fractionDigits;
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (values.isEmpty) return;
+    final min = values.reduce((a, b) => a < b ? a : b) - .5;
+    final max = values.reduce((a, b) => a > b ? a : b) + .5;
+    final chart = Rect.fromLTWH(
+      48,
+      unitLabel == null ? 12 : 38,
+      size.width - 64,
+      unitLabel == null ? size.height - 36 : size.height - 62,
+    );
+    if (unitLabel != null) {
+      _drawText(
+        canvas,
+        unitLabel!,
+        const Offset(28, 14),
+        const TextStyle(color: pomiMuted, fontSize: 10),
+      );
+    }
+    final grid =
+        Paint()
+          ..color = const Color(0xFFECEAF0)
+          ..strokeWidth = 1;
+    for (var i = 0; i < 3; i++) {
+      final y = chart.top + chart.height * i / 2;
+      canvas.drawLine(Offset(chart.left, y), Offset(chart.right, y), grid);
+      final label = (max - (max - min) * i / 2).toStringAsFixed(fractionDigits);
+      _drawText(
+        canvas,
+        label,
+        Offset(2, y - 7),
+        const TextStyle(color: pomiMuted, fontSize: 11),
+      );
+    }
+    final line =
+        Paint()
+          ..color = pomiPurple
+          ..strokeWidth = 3
+          ..style = PaintingStyle.stroke;
+    final path = Path();
+    for (var i = 0; i < values.length; i++) {
+      final x =
+          values.length == 1
+              ? chart.center.dx
+              : chart.left + chart.width * i / (values.length - 1);
+      final y = chart.bottom - (values[i] - min) / (max - min) * chart.height;
+      i == 0 ? path.moveTo(x, y) : path.lineTo(x, y);
+      canvas.drawCircle(Offset(x, y), 5, Paint()..color = pomiPurple);
+    }
+    if (values.length > 1) canvas.drawPath(path, line);
+    for (var i = 0; i < values.length; i++) {
+      final x =
+          values.length == 1
+              ? chart.center.dx
+              : chart.left + chart.width * i / (values.length - 1);
+      _drawCenteredText(
+        canvas,
+        labels[i],
+        Offset(x, chart.bottom + 8),
+        const TextStyle(color: pomiMuted, fontSize: 10),
+        size.width,
+      );
+    }
+  }
+
+  void _drawText(Canvas canvas, String text, Offset offset, TextStyle style) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    painter.paint(canvas, offset);
+  }
+
+  void _drawCenteredText(
+    Canvas canvas,
+    String text,
+    Offset center,
+    TextStyle style,
+    double availableWidth,
+  ) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final left = (center.dx - painter.width / 2).clamp(
+      2.0,
+      availableWidth - painter.width - 2,
+    );
+    painter.paint(canvas, Offset(left, center.dy));
+  }
+
+  @override
+  bool shouldRepaint(covariant _TrendLinePainter oldDelegate) =>
+      oldDelegate.values != values ||
+      oldDelegate.labels != labels ||
+      oldDelegate.unitLabel != unitLabel ||
+      oldDelegate.fractionDigits != fractionDigits;
+}
+
+class _GlucoseTrendChart extends StatefulWidget {
+  const _GlucoseTrendChart({required this.points, required this.unit});
+
+  final List<Map<String, dynamic>> points;
+  final String unit;
+
+  @override
+  State<_GlucoseTrendChart> createState() => _GlucoseTrendChartState();
+}
+
+class _GlucoseTrendChartState extends State<_GlucoseTrendChart> {
+  final _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final points = <_GlucosePoint>[];
+      for (var i = 0; i < widget.points.length; i++) {
+        final point = _GlucosePoint.fromBackend(widget.points[i], i);
+        if (point != null) points.add(point);
+      }
+      final desiredWidth = points.length * 96.0;
+      final chartWidth =
+          desiredWidth > constraints.maxWidth
+              ? desiredWidth
+              : constraints.maxWidth;
+      return CustomPaint(
+        painter: _TrendChartFramePainter(),
+        child: Padding(
+          padding: const EdgeInsets.all(2),
+          child: Scrollbar(
+            controller: _scrollController,
+            thumbVisibility: chartWidth > constraints.maxWidth,
+            scrollbarOrientation: ScrollbarOrientation.bottom,
+            child: SingleChildScrollView(
+              controller: _scrollController,
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.only(bottom: 12),
+              child: SizedBox(
+                width: chartWidth,
+                height: constraints.maxHeight - 16,
+                child: CustomPaint(
+                  painter: _GlucoseTrendPainter(points, widget.unit),
+                  child: const SizedBox.expand(),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _TrendChartFramePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final frame = RRect.fromRectAndRadius(
+      Rect.fromLTWH(1, 1, size.width - 2, size.height - 2),
+      const Radius.circular(18),
+    );
+    canvas.drawRRect(frame, Paint()..color = const Color(0xFFFCFBFD));
+    final border = Path()..addRRect(frame);
+    final paint =
+        Paint()
+          ..color = const Color(0xFFB8B0C0)
+          ..strokeWidth = 1.2
+          ..style = PaintingStyle.stroke;
+    for (final metric in border.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        canvas.drawPath(
+          metric.extractPath(distance, (distance + 5).clamp(0, metric.length)),
+          paint,
+        );
+        distance += 9;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _TrendChartFramePainter oldDelegate) => false;
+}
+
+enum _GlucosePointState { high, low, normal, converted, unverified }
+
+class _GlucosePoint {
+  const _GlucosePoint({
+    required this.value,
+    required this.date,
+    required this.hospital,
+    required this.state,
+    this.referenceMin,
+    this.referenceMax,
+  });
+
+  final double value;
+  final String date;
+  final String hospital;
+  final _GlucosePointState state;
+  final double? referenceMin;
+  final double? referenceMax;
+
+  static _GlucosePoint? fromBackend(Map<String, dynamic> item, int index) {
+    final value = _number(
+      item['normalized_value'] ?? item['numeric_value'] ?? item['raw_value'],
+    );
+    final rawDate = item['date']?.toString();
+    if (value == null || rawDate == null || rawDate.isEmpty) return null;
+    final originalUnit = item['original_unit']?.toString();
+    final normalizedUnit = item['normalized_unit']?.toString();
+    final converted =
+        originalUnit != null &&
+        normalizedUnit != null &&
+        originalUnit != normalizedUnit;
+    final abnormal = item['abnormal_status']?.toString();
+    final comparable = item['comparability']?.toString() != 'incomparable';
+    final state =
+        !comparable || abnormal == 'unknown'
+            ? _GlucosePointState.unverified
+            : abnormal == 'high'
+            ? _GlucosePointState.high
+            : abnormal == 'low'
+            ? _GlucosePointState.low
+            : converted
+            ? _GlucosePointState.converted
+            : _GlucosePointState.normal;
+    final sourceNumber = item['source_number'] ?? index + 1;
+    return _GlucosePoint(
+      value: value,
+      date: rawDate.length >= 7 ? rawDate.substring(0, 7) : rawDate,
+      hospital:
+          item['facility']?.toString() ??
+          item['hospital_name']?.toString() ??
+          '来源 $sourceNumber',
+      state: state,
+      referenceMin: _number(
+        item['normalized_reference_lower'] ?? item['reference_lower'],
+      ),
+      referenceMax: _number(
+        item['normalized_reference_upper'] ?? item['reference_upper'],
+      ),
+    );
+  }
+
+  static double? _number(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '');
+  }
+}
+
+class _GlucoseTrendPainter extends CustomPainter {
+  _GlucoseTrendPainter(this.points, this.unit);
+
+  final List<_GlucosePoint> points;
+  final String unit;
+
+  double get _minY {
+    final values = [
+      ...points.map((point) => point.value),
+      ...points.map((point) => point.referenceMin).whereType<double>(),
+    ];
+    if (values.isEmpty) return 3.8;
+    final minimum = values.reduce((a, b) => a < b ? a : b);
+    return minimum >= 3.8 ? 3.8 : (minimum / .4).floor() * .4;
+  }
+
+  double get _maxY {
+    final values = [
+      ...points.map((point) => point.value),
+      ...points.map((point) => point.referenceMax).whereType<double>(),
+    ];
+    if (values.isEmpty) return 6.2;
+    final maximum = values.reduce((a, b) => a > b ? a : b);
+    return maximum <= 6.2 ? 6.2 : (maximum / .4).ceil() * .4;
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (points.isEmpty) return;
+    final chart = Rect.fromLTRB(46, 58, size.width - 18, size.height - 72);
+    _drawText(
+      canvas,
+      unit,
+      const Offset(28, 25),
+      const TextStyle(color: pomiMuted, fontSize: 11),
+    );
+
+    final gridPaint =
+        Paint()
+          ..color = const Color(0xFFE3DFE6)
+          ..strokeWidth = 1;
+    for (var i = 0; i < 7; i++) {
+      final tick = _maxY - (_maxY - _minY) * i / 6;
+      final y = _mapY(tick, chart);
+      canvas.drawLine(Offset(chart.left, y), Offset(chart.right, y), gridPaint);
+      _drawRightAlignedText(
+        canvas,
+        tick.toStringAsFixed(1),
+        Offset(chart.left - 8, y - 7),
+        const TextStyle(color: pomiMuted, fontSize: 10),
+      );
+    }
+
+    final offsets = <Offset>[];
+    for (var i = 0; i < points.length; i++) {
+      final point = points[i];
+      final x =
+          points.length == 1
+              ? chart.center.dx
+              : chart.left + chart.width * i / (points.length - 1);
+      final y = _mapY(point.value, chart);
+      offsets.add(Offset(x, y));
+      final referenceMin = point.referenceMin;
+      final referenceMax = point.referenceMax;
+      if (referenceMin != null && referenceMax != null) {
+        canvas.drawLine(
+          Offset(x, _mapY(referenceMin, chart)),
+          Offset(x, _mapY(referenceMax, chart)),
+          Paint()
+            ..color = const Color(0xFFC8C3CC)
+            ..strokeWidth = 7
+            ..strokeCap = StrokeCap.round,
+        );
+      } else if (referenceMin ?? referenceMax case final bound?) {
+        final boundY = _mapY(bound, chart);
+        canvas.drawLine(
+          Offset(x - 5, boundY),
+          Offset(x + 5, boundY),
+          Paint()
+            ..color = const Color(0xFFC8C3CC)
+            ..strokeWidth = 3
+            ..strokeCap = StrokeCap.round,
+        );
+      }
+    }
+
+    final trendPaint =
+        Paint()
+          ..color = pomiPurple
+          ..strokeWidth = 1.8
+          ..style = PaintingStyle.stroke;
+    for (var i = 1; i < points.length; i++) {
+      if (points[i - 1].state == _GlucosePointState.unverified ||
+          points[i].state == _GlucosePointState.unverified) {
+        continue;
+      }
+      _drawDashedPath(
+        canvas,
+        Path()
+          ..moveTo(offsets[i - 1].dx, offsets[i - 1].dy)
+          ..lineTo(offsets[i].dx, offsets[i].dy),
+        trendPaint,
+        dash: 5,
+        gap: 5,
+      );
+    }
+
+    for (var i = 0; i < points.length; i++) {
+      final point = points[i];
+      final offset = offsets[i];
+      final color = switch (point.state) {
+        _GlucosePointState.high => const Color(0xFFB84A4A),
+        _GlucosePointState.low => const Color(0xFFB84A4A),
+        _GlucosePointState.normal => const Color(0xFF43785B),
+        _GlucosePointState.converted => pomiPurple,
+        _GlucosePointState.unverified => const Color(0xFF817A88),
+      };
+      canvas.drawCircle(offset, 7, Paint()..color = Colors.white);
+      if (point.state == _GlucosePointState.unverified) {
+        canvas.drawCircle(
+          offset,
+          6,
+          Paint()
+            ..color = color
+            ..strokeWidth = 2
+            ..style = PaintingStyle.stroke,
+        );
+      } else {
+        canvas.drawCircle(offset, 5.5, Paint()..color = color);
+      }
+
+      final suffix = switch (point.state) {
+        _GlucosePointState.high => ' ↑',
+        _GlucosePointState.low => ' ↓',
+        _GlucosePointState.converted => '*',
+        _GlucosePointState.unverified => '?',
+        _GlucosePointState.normal => '',
+      };
+      _drawCenteredText(
+        canvas,
+        '${point.value.toStringAsFixed(1)}$suffix',
+        Offset(offset.dx, offset.dy - 27),
+        TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight:
+              point.state == _GlucosePointState.high
+                  ? FontWeight.w800
+                  : FontWeight.w600,
+        ),
+        size.width,
+      );
+      _drawCenteredText(
+        canvas,
+        point.date,
+        Offset(offset.dx, chart.bottom + 25),
+        const TextStyle(color: pomiMuted, fontSize: 9),
+        size.width,
+      );
+      _drawCenteredText(
+        canvas,
+        point.hospital,
+        Offset(offset.dx, chart.bottom + 44),
+        const TextStyle(color: pomiMuted, fontSize: 9),
+        size.width,
+      );
+    }
+  }
+
+  double _mapY(double value, Rect chart) =>
+      chart.bottom - (value - _minY) / (_maxY - _minY) * chart.height;
+
+  void _drawDashedPath(
+    Canvas canvas,
+    Path path,
+    Paint paint, {
+    required double dash,
+    required double gap,
+  }) {
+    for (final metric in path.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        canvas.drawPath(
+          metric.extractPath(
+            distance,
+            (distance + dash).clamp(0, metric.length),
+          ),
+          paint,
+        );
+        distance += dash + gap;
+      }
+    }
+  }
+
+  void _drawText(Canvas canvas, String text, Offset offset, TextStyle style) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    painter.paint(canvas, offset);
+  }
+
+  void _drawRightAlignedText(
+    Canvas canvas,
+    String text,
+    Offset offset,
+    TextStyle style,
+  ) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    painter.paint(canvas, Offset(offset.dx - painter.width, offset.dy));
+  }
+
+  void _drawCenteredText(
+    Canvas canvas,
+    String text,
+    Offset center,
+    TextStyle style,
+    double availableWidth,
+  ) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: TextDirection.ltr,
+      textAlign: TextAlign.center,
+    )..layout();
+    final left = (center.dx - painter.width / 2).clamp(
+      3.0,
+      availableWidth - painter.width - 3,
+    );
+    painter.paint(canvas, Offset(left, center.dy));
+  }
+
+  @override
+  bool shouldRepaint(covariant _GlucoseTrendPainter oldDelegate) =>
+      oldDelegate.points != points || oldDelegate.unit != unit;
+}
+
+class _GlucoseTrendSection extends StatelessWidget {
+  const _GlucoseTrendSection({required this.trend});
+
+  final Map<String, dynamic>? trend;
+
+  @override
+  Widget build(BuildContext context) {
+    final points = List<Map<String, dynamic>>.from(
+      (trend?['points'] as List? ?? const []).map(
+        (item) => Map<String, dynamic>.from(item as Map),
+      ),
+    );
+    final unit = trend?['unit']?.toString() ?? 'mmol/L';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '空腹血糖（FPG）趋势',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 8),
+        Text('单位：$unit', style: const TextStyle(color: pomiMuted)),
+        const SizedBox(height: 8),
+        if (points.isEmpty)
+          const PomiGlassCard(
+            padding: EdgeInsets.all(15),
+            child: Text('暂无可比较的空腹血糖数据'),
+          )
+        else
+          SizedBox(
+            height: 350,
+            child: _GlucoseTrendChart(points: points, unit: unit),
+          ),
+      ],
+    );
+  }
+}
+
+class _ReportMedicationTile extends StatelessWidget {
+  const _ReportMedicationTile({required this.item});
+  final Map<String, dynamic> item;
+
+  @override
+  Widget build(BuildContext context) {
+    final adherence = Map<String, dynamic>.from(
+      item['adherence'] as Map? ?? const {},
+    );
+    final percent = (adherence['adherence_percent'] as num?)?.toDouble();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  item['drug_name']?.toString() ?? '用药',
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              if (percent != null)
+                Text(
+                  '${percent.round()}%',
+                  style: const TextStyle(
+                    fontSize: 17,
+                    color: pomiPurple,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${item['dosage_text'] ?? item['specification'] ?? ''} · ${item['frequency'] ?? ''}',
+            style: const TextStyle(color: pomiMuted),
+          ),
+          const SizedBox(height: 8),
+          if (percent != null) ...[
+            LinearProgressIndicator(
+              value: percent / 100,
+              minHeight: 8,
+              borderRadius: BorderRadius.circular(8),
+              color: pomiMint,
+              backgroundColor: pomiLine,
+            ),
+            const SizedBox(height: 5),
+            Text(
+              '已服用 ${adherence['taken'] ?? 0} 天 · 主动漏服 ${adherence['missed'] ?? 0} 天 · 未记录 ${adherence['unrecorded'] ?? 0} 天',
+              style: const TextStyle(color: pomiMuted, fontSize: 12),
+            ),
+          ] else
+            const Text(
+              '暂无服药记录',
+              style: TextStyle(color: pomiMuted, fontSize: 12),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SelectedLabTrendSection extends StatelessWidget {
+  const _SelectedLabTrendSection({required this.trend});
+
+  final Map<String, dynamic> trend;
+
+  @override
+  Widget build(BuildContext context) {
+    final name =
+        trend['metric_name']?.toString() ??
+        trend['item_name']?.toString() ??
+        '检查指标';
+    final unit = trend['unit']?.toString() ?? '';
+    final points = List<Map<String, dynamic>>.from(
+      (trend['points'] as List? ?? const []).map(
+        (item) => Map<String, dynamic>.from(item as Map),
+      ),
+    );
+    final values = <double>[];
+    final labels = <String>[];
+    for (final point in points) {
+      final value = _trendNumber(
+        point['normalized_value'] ??
+            point['numeric_value'] ??
+            point['raw_value'],
+      );
+      final date = point['date']?.toString() ?? '';
+      if (value == null || date.isEmpty) continue;
+      values.add(value);
+      labels.add(date.length > 10 ? date.substring(0, 10) : date);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$name趋势',
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+        ),
+        if (unit.isNotEmpty) ...[
+          const SizedBox(height: 5),
+          Text('单位：$unit', style: const TextStyle(color: pomiMuted)),
+        ],
+        const SizedBox(height: 8),
+        if (values.isEmpty)
+          const PomiGlassCard(
+            padding: EdgeInsets.all(15),
+            child: Text('暂无可绘制的趋势数据'),
+          )
+        else
+          SizedBox(
+            height: 300,
+            child: PomiGlassCard(
+              padding: const EdgeInsets.all(2),
+              child: CustomPaint(
+                painter: _TrendLinePainter(
+                  values,
+                  labels,
+                  unitLabel: unit.isEmpty ? null : unit,
+                  fractionDigits:
+                      values.any((value) => value.abs() >= 10) ? 1 : 2,
+                ),
+                child: const SizedBox.expand(),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  double? _trendNumber(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '');
+  }
+}
+
 class _ReportTrendLayer extends StatelessWidget {
   const _ReportTrendLayer({
     required this.weights,
     required this.cycles,
     required this.labs,
+    required this.glucoseTrend,
+    required this.selectedTrend,
     required this.onOpenSources,
   });
   final List<Map<String, dynamic>> weights;
   final List<Map<String, dynamic>> cycles;
   final List<Map<String, dynamic>> labs;
+  final Map<String, dynamic>? glucoseTrend;
+  final Map<String, dynamic>? selectedTrend;
   final VoidCallback onOpenSources;
 
   @override
-  Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.fromLTRB(18, 10, 18, 32),
-    children: [
-      const Text(
-        '完整趋势',
-        style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
-      ),
-      const SizedBox(height: 5),
-      const Text(
-        '按时间查看确认后的记录；点开来源可追溯原始材料。',
-        style: TextStyle(color: pomiMuted),
-      ),
-      const SizedBox(height: 16),
-      _TrendCard(
-        icon: Icons.monitor_weight_outlined,
-        title: '体重',
-        subtitle:
-            weights.isEmpty
-                ? '暂无数据'
-                : '${weights.length} 个记录点 · 最新 ${weights.last['weight_kg']} kg',
-        values:
-            weights.reversed
-                .take(6)
-                .map(
-                  (item) =>
-                      '${item['record_date'].toString().substring(0, 10)}  ${item['weight_kg']} kg',
-                )
-                .toList(),
-      ),
-      const SizedBox(height: 10),
-      _TrendCard(
-        icon: Icons.water_drop_outlined,
-        title: '经期',
-        subtitle: cycles.isEmpty ? '暂无数据' : '${cycles.length} 个周期记录',
-        values:
-            cycles
-                .take(6)
-                .map(
-                  (item) =>
-                      '${item['start_date']}  至  ${item['end_date'] ?? '进行中'}',
-                )
-                .toList(),
-      ),
-      const SizedBox(height: 10),
-      _TrendCard(
-        icon: Icons.science_outlined,
-        title: '检查指标',
-        subtitle: labs.isEmpty ? '暂无数据' : '${labs.length} 个已确认指标',
-        values:
-            labs
-                .take(8)
-                .map(
-                  (item) =>
-                      '${item['item_name']}  ${item['raw_value'] ?? ''} ${item['raw_unit'] ?? ''}',
-                )
-                .toList(),
-        onTap: onOpenSources,
-      ),
-    ],
-  );
+  Widget build(BuildContext context) {
+    final children =
+        selectedTrend != null
+            ? <Widget>[_SelectedLabTrendSection(trend: selectedTrend!)]
+            : <Widget>[
+              const Text(
+                '完整趋势',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 5),
+              const Text(
+                '按时间查看确认后的记录；点开来源可追溯原始材料。',
+                style: TextStyle(color: pomiMuted),
+              ),
+              const SizedBox(height: 16),
+              _TrendCard(
+                icon: Icons.monitor_weight_outlined,
+                title: '体重',
+                subtitle:
+                    weights.isEmpty
+                        ? '暂无数据'
+                        : '${weights.length} 个记录点 · 最新 ${weights.last['weight_kg']} kg',
+                values:
+                    weights.reversed
+                        .take(6)
+                        .map(
+                          (item) =>
+                              '${item['record_date'].toString().substring(0, 10)}  ${item['weight_kg']} kg',
+                        )
+                        .toList(),
+              ),
+              const SizedBox(height: 10),
+              _TrendCard(
+                icon: Icons.water_drop_outlined,
+                title: '经期',
+                subtitle: cycles.isEmpty ? '暂无数据' : '${cycles.length} 个周期记录',
+                values:
+                    cycles
+                        .take(6)
+                        .map(
+                          (item) =>
+                              '${item['start_date']}  至  ${item['end_date'] ?? '进行中'}',
+                        )
+                        .toList(),
+              ),
+              const SizedBox(height: 10),
+              _TrendCard(
+                icon: Icons.science_outlined,
+                title: '检查指标',
+                subtitle: labs.isEmpty ? '暂无数据' : '${labs.length} 个已确认指标',
+                values:
+                    labs
+                        .take(8)
+                        .map(
+                          (item) =>
+                              '${item['item_name']}  ${item['raw_value'] ?? ''} ${item['raw_unit'] ?? ''}',
+                        )
+                        .toList(),
+                onTap: onOpenSources,
+              ),
+              const SizedBox(height: 10),
+              _GlucoseTrendSection(trend: glucoseTrend),
+              const SizedBox(height: 10),
+              _TrendCard(
+                icon: Icons.show_chart_rounded,
+                title: '总睾酮趋势',
+                subtitle:
+                    '${labs.where((item) => (item['item_name']?.toString() ?? '').contains('睾酮')).length} 个已确认数据点',
+                values:
+                    labs
+                        .where(
+                          (item) => (item['item_name']?.toString() ?? '')
+                              .contains('睾酮'),
+                        )
+                        .take(6)
+                        .map(
+                          (item) =>
+                              '${item['sample_date'] ?? item['report_date'] ?? ''}  ${item['raw_value'] ?? ''} ${item['raw_unit'] ?? ''}',
+                        )
+                        .toList(),
+                onTap: onOpenSources,
+              ),
+            ];
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 32),
+      children: children,
+    );
+  }
 }
 
 class _TrendCard extends StatelessWidget {
@@ -1432,12 +2716,12 @@ class _ReportSourceLayer extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(18, 10, 18, 32),
       children: [
         const Text(
-          '原始资料追溯',
+          '报告数据来源',
           style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 5),
         const Text(
-          '这里展示报告引用的材料与修订标识。来源存证为本机演示，不代表医院签发或真实上链。',
+          '原始数据来源存证 · 仅供参考 · 不构成诊断',
           style: TextStyle(color: pomiMuted, height: 1.5),
         ),
         const SizedBox(height: 16),

@@ -110,6 +110,7 @@ class OnboardingService:
         cycle = draft.cycle_data or {}
         profile.usual_cycle_min_days = cycle.get("usual_cycle_min_days")
         profile.usual_cycle_max_days = cycle.get("usual_cycle_max_days")
+        profile.period_duration_days = cycle.get("period_duration_days")
         profile.next_visit_date = _date_value(cycle.get("next_visit_date"))
         profile.onboarding_completed = True
         profile.onboarding_completed_at = utc_now()
