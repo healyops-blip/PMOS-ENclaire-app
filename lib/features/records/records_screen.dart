@@ -411,12 +411,7 @@ class _VisitRecordCard extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 3),
-                      Text(
-                        visit.hospital,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
+                      _VisitMetadataFields(value: visit.hospital),
                     ],
                   ),
                 ),
@@ -439,6 +434,29 @@ class _VisitRecordCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _VisitMetadataFields extends StatelessWidget {
+  const _VisitMetadataFields({required this.value});
+
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final fields = value
+        .split(' · ')
+        .map((field) => field.trim())
+        .where((field) => field.isNotEmpty)
+        .toList(growable: false);
+    return Wrap(
+      spacing: 12,
+      runSpacing: 2,
+      children: [
+        for (final field in fields)
+          Text(field, style: Theme.of(context).textTheme.bodySmall),
+      ],
     );
   }
 }
