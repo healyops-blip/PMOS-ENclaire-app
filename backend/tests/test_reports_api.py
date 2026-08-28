@@ -41,6 +41,18 @@ def test_report_freshness_uses_calendar_month_boundaries() -> None:
     assert _freshness(date(2025, 8, 30), as_of) == "archived"
 
 
+def test_total_testosterone_requires_hormone_context() -> None:
+    complete = {
+        "cycle_phase": "follicular",
+        "hormone_medication_status": False,
+        "method": "immunoassay",
+    }
+    assert not ReportSnapshotService._hormone_context_incomplete("total_testosterone", [complete])
+    assert ReportSnapshotService._hormone_context_incomplete(
+        "total_testosterone", [{**complete, "method": None}]
+    )
+
+
 def _auth(client: TestClient, account_name: str) -> dict[str, str]:
     password = "report-pass-44"
     register = client.post(

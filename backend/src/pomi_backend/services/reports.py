@@ -45,6 +45,7 @@ TEMPLATE_VERSION = "report-snapshot-v2"
 CANONICAL_TREND_UNITS = {
     "glucose": "mmol/L",
     "total_cholesterol": "mmol/L",
+    "total_testosterone": "nmol/L",
     "testosterone": "nmol/L",
 }
 BMI_REFERENCE_LOWER = 18.5
@@ -343,6 +344,7 @@ class ReportSnapshotService:
             "gender": self.profile.gender,
             "height_cm": _json_value(self.profile.height_cm),
             "diagnosis_year": self.profile.diagnosis_year,
+            "period_duration_days": self.profile.period_duration_days,
             "primary_condition": self.profile.primary_condition,
             "next_visit_date": _json_value(self.profile.next_visit_date),
             "health_goal": self.profile.health_goal,
@@ -1031,7 +1033,14 @@ class ReportSnapshotService:
 
     @staticmethod
     def _hormone_context_incomplete(metric_id: str, items: list[dict[str, Any]]) -> bool:
-        hormone_metrics = {"lh", "fsh", "estradiol", "progesterone", "testosterone"}
+        hormone_metrics = {
+            "lh",
+            "fsh",
+            "estradiol",
+            "progesterone",
+            "total_testosterone",
+            "testosterone",
+        }
         if metric_id not in hormone_metrics:
             return False
         return any(

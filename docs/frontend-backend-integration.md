@@ -239,6 +239,7 @@ Authorization: Bearer <session_id>
 | `diagnosis_year` | integer | 是 | 用户，不能晚于当前年 |
 | `primary_condition` | string | 是 | 当前默认 `pcos` |
 | `usual_cycle_length_days` | integer | 是 | 引导周期步骤，15–120 |
+| `period_duration_days` | integer | 是 | 通常经期持续天数，1–14；完成引导后写入患者画像 |
 | `last_menstrual_start_date` | date | 是 | 引导周期步骤 |
 | `next_visit_date` | date | 是 | 首页倒计时 |
 | `health_goal` | string | 是 | 管理目标 |

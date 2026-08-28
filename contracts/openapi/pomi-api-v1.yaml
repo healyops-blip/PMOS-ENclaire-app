@@ -1738,6 +1738,10 @@ components:
           type: [integer, 'null']
           minimum: 15
           maximum: 120
+        period_duration_days:
+          type: [integer, 'null']
+          minimum: 1
+          maximum: 14
         last_menstrual_start_date:
           type: [string, 'null']
           format: date
@@ -1781,6 +1785,10 @@ components:
           type: [string, 'null']
         usual_cycle_length_days:
           type: [integer, 'null']
+        period_duration_days:
+          type: [integer, 'null']
+          minimum: 1
+          maximum: 14
         last_menstrual_start_date:
           type: [string, 'null']
           format: date

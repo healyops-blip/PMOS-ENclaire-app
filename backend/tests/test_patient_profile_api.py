@@ -44,6 +44,7 @@ def test_profile_onboarding_and_nullable_visit_date_are_persistent(
                 "gender": "female",
                 "height_cm": 165.5,
                 "diagnosis_year": 2024,
+                "period_duration_days": 5,
                 "primary_condition": "PCOS",
                 "next_visit_date": None,
                 "health_goal": "Prepare follow-up materials",
@@ -54,6 +55,7 @@ def test_profile_onboarding_and_nullable_visit_date_are_persistent(
     )
     assert updated["id"] == profile["id"]
     assert updated["birth_year"] == 1996
+    assert updated["period_duration_days"] == 5
     assert updated["onboarding_completed"] is True
     assert updated["next_visit_date"] is None
     assert updated["onboarding_completed_at"] is not None

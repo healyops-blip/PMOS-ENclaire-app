@@ -46,6 +46,10 @@ class PatientProfile(Base):
             "OR usual_cycle_min_days <= usual_cycle_max_days",
             name="patient_profile_cycle_range",
         ),
+        CheckConstraint(
+            "period_duration_days IS NULL OR period_duration_days BETWEEN 1 AND 14",
+            name="patient_profile_period_duration",
+        ),
     )
 
     patient_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
@@ -63,6 +67,7 @@ class PatientProfile(Base):
     diagnosis_year: Mapped[int | None] = mapped_column(Integer)
     usual_cycle_min_days: Mapped[int | None] = mapped_column(Integer)
     usual_cycle_max_days: Mapped[int | None] = mapped_column(Integer)
+    period_duration_days: Mapped[int | None] = mapped_column(Integer)
     primary_condition: Mapped[str | None] = mapped_column(String(80))
     next_visit_date: Mapped[date | None] = mapped_column(Date)
     health_goal: Mapped[str | None] = mapped_column(String(500))

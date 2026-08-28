@@ -250,6 +250,7 @@ class SmokeApiClient extends ApiClient {
     'birth_date': '1997-01-01',
     'height_cm': null,
     'diagnosis_year': 2023,
+    'period_duration_days': 5,
     'next_visit_date': null,
     'health_goal': '整理复诊资料，并与医生高效沟通',
     'external_ocr_notice_accepted_at': '2026-08-27T00:00:00Z',

@@ -1437,7 +1437,7 @@ class _ReportSummaryLayer extends StatelessWidget {
               style: const TextStyle(color: pomiMuted),
             ),
             Text(
-              '体重 ${(summary['profile'] as Map?)?['weight_kg'] ?? '—'} kg',
+              '体重 ${_weightSummary['latest_weight_kg'] ?? '—'} kg',
               style: const TextStyle(color: pomiMuted),
             ),
           ],
@@ -1858,8 +1858,12 @@ class _BmiTrendChartState extends State<_BmiTrendChart> {
 
   @override
   Widget build(BuildContext context) {
+    final allPoints =
+        widget.weights.where((item) => item['bmi'] is num).toList();
     final points =
-        widget.weights.where((item) => item['bmi'] is num).take(8).toList();
+        allPoints.length <= 8
+            ? allPoints
+            : allPoints.sublist(allPoints.length - 8);
     final values = points.map((e) => (e['bmi'] as num).toDouble()).toList();
     final labels =
         points
@@ -2229,14 +2233,25 @@ class _GlucoseTrendPainter extends CustomPainter {
               : chart.left + chart.width * i / (points.length - 1);
       final y = _mapY(point.value, chart);
       offsets.add(Offset(x, y));
-      if (point.referenceMin case final min?) {
-        final max = point.referenceMax!;
+      final referenceMin = point.referenceMin;
+      final referenceMax = point.referenceMax;
+      if (referenceMin != null && referenceMax != null) {
         canvas.drawLine(
-          Offset(x, _mapY(min, chart)),
-          Offset(x, _mapY(max, chart)),
+          Offset(x, _mapY(referenceMin, chart)),
+          Offset(x, _mapY(referenceMax, chart)),
           Paint()
             ..color = const Color(0xFFC8C3CC)
             ..strokeWidth = 7
+            ..strokeCap = StrokeCap.round,
+        );
+      } else if (referenceMin ?? referenceMax case final bound?) {
+        final boundY = _mapY(bound, chart);
+        canvas.drawLine(
+          Offset(x - 5, boundY),
+          Offset(x + 5, boundY),
+          Paint()
+            ..color = const Color(0xFFC8C3CC)
+            ..strokeWidth = 3
             ..strokeCap = StrokeCap.round,
         );
       }
