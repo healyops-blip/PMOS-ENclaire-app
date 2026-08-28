@@ -557,15 +557,6 @@ class _HorizontalCycleCalendarState extends State<_HorizontalCycleCalendar> {
                       ),
                     ),
                   ),
-                  IconButton(
-                    tooltip: '记录经期',
-                    onPressed: widget.onAdd,
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.white.withValues(alpha: .48),
-                      foregroundColor: pomiPurple,
-                    ),
-                    icon: const Icon(Icons.calendar_month_outlined, size: 21),
-                  ),
                 ],
               ),
             ),
