@@ -19,6 +19,7 @@ from pomi_backend.services.ocr import OCRTaskService
 from pomi_backend.services.orders import MedicalOrderService, ReconciliationService
 from pomi_backend.services.patient import PatientProfileService
 from pomi_backend.services.patient_notes import PatientNoteService
+from pomi_backend.services.report_files import ReportFileService
 from pomi_backend.services.reports import ReportSnapshotService
 
 bearer_scheme = HTTPBearer(auto_error=False, scheme_name="SessionBearer")
@@ -167,3 +168,14 @@ def get_report_snapshot_service(
 ReportSnapshotServiceDependency = Annotated[
     ReportSnapshotService, Depends(get_report_snapshot_service)
 ]
+
+
+def get_report_file_service(
+    request: Request,
+    session: DatabaseSession,
+    account: CurrentAccount,
+) -> ReportFileService:
+    return ReportFileService(session, account, request.app.state.settings.storage_root)
+
+
+ReportFileServiceDependency = Annotated[ReportFileService, Depends(get_report_file_service)]

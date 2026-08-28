@@ -8,22 +8,37 @@ import 'package:pmos_enclaire/core/widgets/pomi_surfaces.dart';
 import 'package:pmos_enclaire/features/certification/data/certification_repository.dart';
 import 'package:pmos_enclaire/features/certification/domain/certification_record.dart';
 import 'package:pmos_enclaire/features/records/data/document_repository.dart';
+import 'package:pmos_enclaire/features/reports/data/report_pdf_repository.dart';
 import 'package:pmos_enclaire/features/reports/data/report_repository.dart';
+import 'package:pmos_enclaire/features/reports/presentation/report_pdf_panel.dart';
 import 'package:printing/printing.dart';
 
 class ReportViewerPage extends StatefulWidget {
-  const ReportViewerPage({
+  ReportViewerPage({
     required this.report,
     required this.repository,
     required this.documentRepository,
     required this.certificationRepository,
+    ReportPdfRepository? pdfRepository,
+    ReportPdfCache? pdfCache,
+    ReportPdfSystemActions? pdfSystemActions,
+    this.pdfPollingInterval = const Duration(milliseconds: 800),
+    this.pdfMaxPolls = 45,
     super.key,
-  });
+  }) : pdfRepository = pdfRepository ?? DemoReportPdfRepository(),
+       pdfCache = pdfCache ?? ReportPdfCache(accountScope: 'demo'),
+       pdfSystemActions =
+           pdfSystemActions ?? const AndroidReportPdfSystemActions();
 
   final ReportSnapshotItem report;
   final ReportRepository repository;
   final DocumentRepository documentRepository;
   final CertificationRepository certificationRepository;
+  final ReportPdfRepository pdfRepository;
+  final ReportPdfCache pdfCache;
+  final ReportPdfSystemActions pdfSystemActions;
+  final Duration pdfPollingInterval;
+  final int pdfMaxPolls;
 
   @override
   State<ReportViewerPage> createState() => _ReportViewerPageState();
@@ -187,6 +202,14 @@ class _ReportViewerPageState extends State<ReportViewerPage>
                   icon: const Icon(Icons.arrow_back_rounded),
                 ),
           actions: [
+            ReportPdfPanel(
+              reportId: widget.report.reportId,
+              repository: widget.pdfRepository,
+              cache: widget.pdfCache,
+              systemActions: widget.pdfSystemActions,
+              pollingInterval: widget.pdfPollingInterval,
+              maxPolls: widget.pdfMaxPolls,
+            ),
             Padding(
               padding: const EdgeInsets.only(right: 12),
               child: Center(

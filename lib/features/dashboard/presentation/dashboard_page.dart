@@ -22,6 +22,7 @@ import 'package:pmos_enclaire/features/records/data/ocr_repository.dart';
 import 'package:pmos_enclaire/features/reports/presentation/report_page.dart';
 import 'package:pmos_enclaire/features/reports/data/patient_note_repository.dart';
 import 'package:pmos_enclaire/features/reports/data/report_repository.dart';
+import 'package:pmos_enclaire/features/reports/data/report_pdf_repository.dart';
 import 'package:pmos_enclaire/features/weight/application/weight_controller.dart';
 import 'package:pmos_enclaire/features/weight/data/weight_repository.dart';
 
@@ -33,6 +34,8 @@ class DashboardPage extends StatefulWidget {
     required this.documentRepository,
     required this.weightRepository,
     this.reportRepository,
+    this.reportPdfRepository,
+    this.reportPdfCache,
     this.ocrRepository,
     this.dashboardRepository,
     this.onLogout,
@@ -47,6 +50,8 @@ class DashboardPage extends StatefulWidget {
   final PatientNoteRepository patientNoteRepository;
   final DocumentRepository documentRepository;
   final ReportRepository? reportRepository;
+  final ReportPdfRepository? reportPdfRepository;
+  final ReportPdfCache? reportPdfCache;
   final OcrRepository? ocrRepository;
   final WeightRepository weightRepository;
   final DashboardRepository? dashboardRepository;
@@ -221,6 +226,11 @@ class _DashboardPageState extends State<DashboardPage> {
                     reportRepository:
                         widget.reportRepository ?? DemoReportRepository(),
                     documentRepository: widget.documentRepository,
+                    reportPdfRepository:
+                        widget.reportPdfRepository ?? DemoReportPdfRepository(),
+                    reportPdfCache:
+                        widget.reportPdfCache ??
+                        ReportPdfCache(accountScope: widget.account.uid),
                   ),
                 ),
               ),

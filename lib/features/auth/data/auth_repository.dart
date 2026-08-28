@@ -21,11 +21,19 @@ abstract interface class AuthRepository {
 }
 
 class FastApiAuthRepository implements AuthRepository {
-  FastApiAuthRepository(this.client, this.sessionStore, {this.onLogout});
+  FastApiAuthRepository(
+    this.client,
+    this.sessionStore, {
+    this.onSessionCleared,
+  }) {
+    client.onUnauthorized = _clearLocalSession;
+  }
 
   final PomiApiClient client;
   final SessionStore sessionStore;
-  final Future<void> Function()? onLogout;
+  final Future<void> Function()? onSessionCleared;
+  Future<void>? _sessionClear;
+  bool _localSessionCleared = false;
 
   @override
   Future<AuthSession> login({
@@ -51,6 +59,7 @@ class FastApiAuthRepository implements AuthRepository {
       );
       await sessionStore.write(session.sessionId);
       client.useSession(session.sessionId);
+      _localSessionCleared = false;
       return session;
     } on DioException catch (error) {
       throw _failure(error);
@@ -82,15 +91,17 @@ class FastApiAuthRepository implements AuthRepository {
   @override
   Future<Account?> restore() async {
     final sessionId = await sessionStore.read();
-    if (sessionId == null || sessionId.isEmpty) return null;
+    if (sessionId == null || sessionId.isEmpty) {
+      await _clearLocalSession();
+      return null;
+    }
     client.useSession(sessionId);
     try {
       final response = await client.dio.get<Map<String, dynamic>>('/auth/me');
       return Account.fromJson(response.data!);
     } on DioException catch (error) {
       if (error.response?.statusCode == 401) {
-        await sessionStore.clear();
-        client.useSession(null);
+        await _clearLocalSession();
         return null;
       }
       throw _failure(error);
@@ -104,9 +115,40 @@ class FastApiAuthRepository implements AuthRepository {
     } on DioException catch (error) {
       if (error.response?.statusCode != 401) throw _failure(error);
     } finally {
-      await onLogout?.call();
+      await _clearLocalSession();
+    }
+  }
+
+  Future<void> _clearLocalSession() {
+    final current = _sessionClear;
+    if (current != null) return current;
+    final operation = _doClearLocalSession();
+    _sessionClear = operation;
+    return operation.whenComplete(() {
+      if (identical(_sessionClear, operation)) _sessionClear = null;
+    });
+  }
+
+  Future<void> _doClearLocalSession() async {
+    if (_localSessionCleared) return;
+    _localSessionCleared = true;
+    Object? storageFailure;
+    StackTrace? storageStackTrace;
+    try {
       await sessionStore.clear();
-      client.useSession(null);
+    } on Object catch (error, stackTrace) {
+      _localSessionCleared = false;
+      storageFailure = error;
+      storageStackTrace = stackTrace;
+    }
+    client.useSession(null);
+    try {
+      await onSessionCleared?.call();
+    } on Object {
+      // Private-cache cleanup is best effort and must not restore an invalid bearer.
+    }
+    if (storageFailure != null) {
+      Error.throwWithStackTrace(storageFailure, storageStackTrace!);
     }
   }
 

@@ -1,8 +1,12 @@
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pmos_enclaire/core/network/pomi_api_client.dart';
 import 'package:pmos_enclaire/features/auth/data/auth_repository.dart';
 import 'package:pmos_enclaire/features/auth/data/session_store.dart';
+import 'package:pmos_enclaire/features/reports/data/report_pdf_repository.dart';
 
 void main() {
   test(
@@ -84,13 +88,122 @@ void main() {
       final repository = FastApiAuthRepository(
         PomiApiClient(dio: dio),
         store,
-        onLogout: () async => cacheCleared = true,
+        onSessionCleared: () async => cacheCleared = true,
       );
 
       await repository.logout();
 
       expect(cacheCleared, isTrue);
       expect(store.value, isNull);
+    },
+  );
+
+  test('logout clears every account-scoped private PDF cache', () async {
+    final root = await Directory.systemTemp.createTemp('pomi-auth-cache-test-');
+    addTearDown(() async {
+      if (await root.exists()) await root.delete(recursive: true);
+    });
+    Future<Directory> directoryProvider() async => root;
+    final bytes = Uint8List.fromList('%PDF-1.7\nprivate'.codeUnits);
+    final accountA = ReportPdfCache(
+      accountScope: 'account-a',
+      directoryProvider: directoryProvider,
+    );
+    final accountB = ReportPdfCache(
+      accountScope: 'account-b',
+      directoryProvider: directoryProvider,
+    );
+    final fileA = await accountA.store(reportId: 'report-a', bytes: bytes);
+    final fileB = await accountB.store(reportId: 'report-b', bytes: bytes);
+
+    final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api'));
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) => handler.resolve(
+          Response<void>(requestOptions: options, statusCode: 204),
+        ),
+      ),
+    );
+    final store = _MemorySessionStore()..value = 'opaque-session';
+    final client = PomiApiClient(dio: dio)..useSession('opaque-session');
+    var clearCalls = 0;
+    final repository = FastApiAuthRepository(
+      client,
+      store,
+      onSessionCleared: () async {
+        clearCalls += 1;
+        await ReportPdfCache.clearAllAccounts(
+          directoryProvider: directoryProvider,
+        );
+      },
+    );
+
+    await repository.logout();
+
+    expect(store.value, isNull);
+    expect(client.dio.options.headers['Authorization'], isNull);
+    expect(clearCalls, 1);
+    expect(await fileA.exists(), isFalse);
+    expect(await fileB.exists(), isFalse);
+  });
+
+  test('a restored 401 session clears local private data once', () async {
+    final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api'));
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) => handler.reject(
+          DioException(
+            requestOptions: options,
+            response: Response<void>(requestOptions: options, statusCode: 401),
+            type: DioExceptionType.badResponse,
+          ),
+        ),
+      ),
+    );
+    final store = _MemorySessionStore()..value = 'expired-session';
+    final client = PomiApiClient(dio: dio);
+    var clearCalls = 0;
+    final repository = FastApiAuthRepository(
+      client,
+      store,
+      onSessionCleared: () async => clearCalls += 1,
+    );
+
+    expect(await repository.restore(), isNull);
+    expect(store.value, isNull);
+    expect(client.dio.options.headers['Authorization'], isNull);
+    expect(clearCalls, 1);
+  });
+
+  test(
+    'a secure-store clear failure still drops the bearer and remains retryable',
+    () async {
+      final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api'));
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) => handler.resolve(
+            Response<void>(requestOptions: options, statusCode: 204),
+          ),
+        ),
+      );
+      final store = _FailOnceSessionStore()..value = 'opaque-session';
+      final client = PomiApiClient(dio: dio)..useSession('opaque-session');
+      var privateClearCalls = 0;
+      final repository = FastApiAuthRepository(
+        client,
+        store,
+        onSessionCleared: () async => privateClearCalls += 1,
+      );
+
+      await expectLater(repository.logout(), throwsStateError);
+      expect(client.dio.options.headers['Authorization'], isNull);
+      expect(store.value, 'opaque-session');
+      expect(privateClearCalls, 1);
+
+      await repository.logout();
+      expect(store.value, isNull);
+      expect(store.clearCalls, 2);
+      expect(privateClearCalls, 2);
     },
   );
 }
@@ -116,4 +229,15 @@ class _MemorySessionStore implements SessionStore {
 
   @override
   Future<void> write(String sessionId) async => value = sessionId;
+}
+
+class _FailOnceSessionStore extends _MemorySessionStore {
+  int clearCalls = 0;
+
+  @override
+  Future<void> clear() async {
+    clearCalls += 1;
+    if (clearCalls == 1) throw StateError('simulated secure-store failure');
+    await super.clear();
+  }
 }

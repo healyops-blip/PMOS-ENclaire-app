@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 
 const pomiApiBaseUrl = String.fromEnvironment(
@@ -17,9 +19,25 @@ class PomiApiClient {
               sendTimeout: const Duration(seconds: 30),
               headers: const {'Accept': 'application/json'},
             ),
-          );
+          ) {
+    this.dio.interceptors.add(
+      InterceptorsWrapper(
+        onError: (error, handler) async {
+          if (error.response?.statusCode == 401) {
+            try {
+              await onUnauthorized?.call();
+            } on Object {
+              // Session invalidation must never swallow the original 401.
+            }
+          }
+          handler.next(error);
+        },
+      ),
+    );
+  }
 
   final Dio dio;
+  FutureOr<void> Function()? onUnauthorized;
 
   void useSession(String? sessionId) {
     if (sessionId == null || sessionId.isEmpty) {

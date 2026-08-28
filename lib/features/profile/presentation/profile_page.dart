@@ -241,7 +241,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         key: const Key('logout-button'),
                         icon: Icons.logout_rounded,
                         title: '退出登录',
-                        subtitle: '清除本账号的离线首页缓存',
+                        subtitle: '清除本账号的离线首页与报告缓存',
                         last: true,
                         onTap: widget.onLogout == null
                             ? () => _showNotReady(context)
