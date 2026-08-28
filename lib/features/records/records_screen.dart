@@ -1305,6 +1305,19 @@ class _ReportSummaryLayer extends StatelessWidget {
   Widget build(BuildContext context) => ListView(
     padding: const EdgeInsets.fromLTRB(18, 10, 18, 32),
     children: [
+      const Text(
+        '基本信息',
+        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+      ),
+      const SizedBox(height: 8),
+      const PomiGlassCard(
+        padding: EdgeInsets.all(15),
+        child: Text(
+          '已确诊 PCOS · 当前健康信息已汇总\n最近记录与就诊资料可在下方查看',
+          style: TextStyle(height: 1.6),
+        ),
+      ),
+      const SizedBox(height: 18),
       PomiGlassCard(
         onTap:
             () => showDialog<void>(
@@ -1379,19 +1392,6 @@ class _ReportSummaryLayer extends StatelessWidget {
             Text('用药记录：当前 ${medicines.length} 项'),
             Text('就诊记录：$sourceCount 次历史 + 1 次当前'),
           ],
-        ),
-      ),
-      const SizedBox(height: 18),
-      const Text(
-        '基本信息',
-        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-      ),
-      const SizedBox(height: 8),
-      PomiGlassCard(
-        padding: const EdgeInsets.all(15),
-        child: Text(
-          '已确诊 PCOS · 当前健康信息已汇总\n最近记录与就诊资料可在下方查看',
-          style: const TextStyle(height: 1.6),
         ),
       ),
       const SizedBox(height: 18),
