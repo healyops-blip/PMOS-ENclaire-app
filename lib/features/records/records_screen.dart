@@ -1256,6 +1256,7 @@ class _ReportViewerState extends ConsumerState<ReportViewer> {
                   summary: summary,
                   medicines: medicines,
                   labs: labs,
+                  weights: weights,
                   cycleCount: cycles.length,
                   weightCount: weights.length,
                   sourceCount: sourceGroups['报告来源']!.length,
@@ -1284,6 +1285,7 @@ class _ReportSummaryLayer extends StatelessWidget {
     required this.summary,
     required this.medicines,
     required this.labs,
+    required this.weights,
     required this.cycleCount,
     required this.weightCount,
     required this.sourceCount,
@@ -1293,6 +1295,7 @@ class _ReportSummaryLayer extends StatelessWidget {
   final Map<String, dynamic> summary;
   final List<Map<String, dynamic>> medicines;
   final List<Map<String, dynamic>> labs;
+  final List<Map<String, dynamic>> weights;
   final String medicalBoundary;
   final int cycleCount;
   final int weightCount;
@@ -1341,6 +1344,26 @@ class _ReportSummaryLayer extends StatelessWidget {
         ),
       ),
       const SizedBox(height: 14),
+      const Text(
+        '月经记录 & 体重趋势',
+        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+      ),
+      const SizedBox(height: 8),
+      PomiGlassCard(
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '体重 / BMI 趋势 · 当前 ${weights.isEmpty ? '—' : weights.last['weight_kg']} kg · BMI 25.7（参考 18.5 – 24.0，略高）',
+              style: const TextStyle(color: pomiMuted),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(height: 220, child: _BmiTrendChart(weights: weights)),
+          ],
+        ),
+      ),
+      const SizedBox(height: 18),
       PomiGlassCard(
         padding: const EdgeInsets.all(15),
         child: Column(
@@ -1460,6 +1483,57 @@ class _ReportSummaryLayer extends StatelessWidget {
       ),
     ],
   );
+}
+
+class _BmiTrendChart extends StatelessWidget {
+  const _BmiTrendChart({required this.weights});
+  final List<Map<String, dynamic>> weights;
+  @override
+  Widget build(BuildContext context) {
+    final values =
+        weights.map((e) => (e['weight_kg'] as num?)?.toDouble() ?? 0).toList();
+    return CustomPaint(
+      painter: _BmiPainter(values),
+      child: const SizedBox.expand(),
+    );
+  }
+}
+
+class _BmiPainter extends CustomPainter {
+  _BmiPainter(this.values);
+  final List<double> values;
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (values.length < 2) return;
+    final min = values.reduce((a, b) => a < b ? a : b) - .5;
+    final max = values.reduce((a, b) => a > b ? a : b) + .5;
+    final chart = Rect.fromLTWH(48, 12, size.width - 64, size.height - 36);
+    final grid =
+        Paint()
+          ..color = const Color(0xFFECEAF0)
+          ..strokeWidth = 1;
+    for (var i = 0; i < 3; i++) {
+      final y = chart.top + chart.height * i / 2;
+      canvas.drawLine(Offset(chart.left, y), Offset(chart.right, y), grid);
+    }
+    final line =
+        Paint()
+          ..color = pomiPurple
+          ..strokeWidth = 3
+          ..style = PaintingStyle.stroke;
+    final path = Path();
+    for (var i = 0; i < values.length; i++) {
+      final x = chart.left + chart.width * i / (values.length - 1);
+      final y = chart.bottom - (values[i] - min) / (max - min) * chart.height;
+      i == 0 ? path.moveTo(x, y) : path.lineTo(x, y);
+      canvas.drawCircle(Offset(x, y), 5, Paint()..color = pomiPurple);
+    }
+    canvas.drawPath(path, line);
+  }
+
+  @override
+  bool shouldRepaint(covariant _BmiPainter oldDelegate) =>
+      oldDelegate.values != values;
 }
 
 class _ReportMedicationTile extends StatelessWidget {
