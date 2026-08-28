@@ -233,12 +233,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
             padding: const EdgeInsets.fromLTRB(20, 12, 10, 8),
             child: Row(
               children: [
-                const Expanded(
-                  child: Text(
-                    '上传资料',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-                  ),
-                ),
+                const Spacer(),
                 IconButton(
                   tooltip: '关闭上传弹窗',
                   onPressed: _working ? null : () => Navigator.pop(context),
