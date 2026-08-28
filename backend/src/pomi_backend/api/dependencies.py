@@ -23,8 +23,6 @@ from pomi_backend.services.patient import PatientProfileService
 from pomi_backend.services.patient_note_rewrite import PatientNoteRewriteService
 from pomi_backend.services.patient_notes import PatientNoteService
 from pomi_backend.services.reports import ReportSnapshotService
-from pomi_backend.services.llm_chat_provider import QwenChatProvider
-from pomi_backend.services.patient_note_rewrite import PatientNoteRewriteService
 
 bearer_scheme = HTTPBearer(auto_error=False, scheme_name="SessionBearer")
 

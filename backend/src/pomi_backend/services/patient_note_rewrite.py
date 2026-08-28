@@ -6,7 +6,6 @@ from dataclasses import dataclass
 
 from pomi_backend.services.llm_chat_provider import ChatRequest, QwenChatProvider
 
-
 REWRITE_SYSTEM_PROMPT = """
 你是一名妇科电子病历语言规范化助手。
 
