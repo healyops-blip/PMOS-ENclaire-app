@@ -9,11 +9,13 @@ class ClinicalTextConfirmationPage extends StatefulWidget {
   const ClinicalTextConfirmationPage({
     required this.repository,
     required this.task,
+    this.currentRevisionAvailable = false,
     super.key,
   });
 
   final OcrRepository repository;
   final OcrTask task;
+  final bool currentRevisionAvailable;
 
   @override
   State<ClinicalTextConfirmationPage> createState() =>
@@ -266,6 +268,7 @@ class _ClinicalTextConfirmationPageState
                       revisionId: widget.task.documentRevisionId,
                       materialLabel: _imaging ? '影像文字报告' : '门诊病历／就诊记录',
                       ocrConfirmed: true,
+                      currentRevisionAvailable: widget.currentRevisionAvailable,
                     ),
                   ],
                 ),

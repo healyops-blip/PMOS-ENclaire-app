@@ -133,6 +133,9 @@ class _OcrTaskPageState extends State<OcrTaskPage> with WidgetsBindingObserver {
                 repository: widget.repository,
                 task: _task!,
                 documentRepository: widget.documentRepository,
+                currentRevisionAvailable:
+                    widget.document.currentRevisionId ==
+                    _task!.documentRevisionId,
               )
             : OcrPendingConfirmationPage(
                 repository: widget.repository,
@@ -231,7 +234,12 @@ class OcrPendingConfirmationPage extends StatelessWidget {
   Widget build(BuildContext context) {
     if (task.materialType == 'imaging_text_report' ||
         task.materialType == 'outpatient_record') {
-      return ClinicalTextConfirmationPage(repository: repository, task: task);
+      return ClinicalTextConfirmationPage(
+        repository: repository,
+        task: task,
+        currentRevisionAvailable:
+            document?.currentRevisionId == task.documentRevisionId,
+      );
     }
     return FutureBuilder<OcrTaskResult>(
       future: repository.result(task.id),

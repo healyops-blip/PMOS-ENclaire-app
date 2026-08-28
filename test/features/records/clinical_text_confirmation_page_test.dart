@@ -282,16 +282,4 @@ class _ClinicalRepository implements OcrRepository {
   Future<OcrTask> get(String taskId) => throw UnimplementedError();
   @override
   Future<OcrTask> retry(String taskId) => throw UnimplementedError();
-
-  @override
-  Future<LabConfirmationResult> confirmLab({
-    required String taskId,
-    required String resultId,
-    required String expectedRevisionId,
-    required List<LabConfirmationItem> items,
-    String? sampleDate,
-    String? examDate,
-    String? reportDate,
-    String? visitDate,
-  }) => throw UnimplementedError();
 }

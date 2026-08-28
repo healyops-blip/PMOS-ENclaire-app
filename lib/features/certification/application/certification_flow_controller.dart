@@ -44,11 +44,16 @@ class CertificationFlowController extends ChangeNotifier {
   bool get loading => _loading;
 
   Future<void> load() async {
-    _record = await repository.read(documentId, revisionId);
-    _loading = false;
-    _notify();
-    if (_record.status == CertificationStatus.processing) {
-      unawaited(_finishProcessing(_runToken));
+    try {
+      _record = await repository.read(documentId, revisionId);
+      _loading = false;
+      _notify();
+      if (_record.status == CertificationStatus.processing) {
+        unawaited(_finishProcessing(_runToken));
+      }
+    } on Object {
+      _loading = false;
+      _fail('无法读取本地演示状态，请重试。');
     }
   }
 
@@ -67,8 +72,13 @@ class CertificationFlowController extends ChangeNotifier {
       pendingOutcome: outcome,
       attemptNumber: attempt,
     );
-    await repository.write(_record);
     _notify();
+    try {
+      await repository.write(_record);
+    } on Object {
+      _fail('无法保存本地演示状态，请重试。');
+      return;
+    }
     await _finishProcessing(++_runToken);
   }
 
@@ -85,7 +95,13 @@ class CertificationFlowController extends ChangeNotifier {
 
     // Re-read so a controller restored after navigation never overwrites a
     // newer local transition for the same revision.
-    final current = await repository.read(documentId, revisionId);
+    late final CertificationRecord current;
+    try {
+      current = await repository.read(documentId, revisionId);
+    } on Object {
+      _fail('无法恢复本地演示进度，请重试。');
+      return;
+    }
     if (current.status != CertificationStatus.processing) {
       _record = current;
       _notify();
@@ -104,7 +120,21 @@ class CertificationFlowController extends ChangeNotifier {
       clearFailureReason: outcome == CertificationDemoOutcome.succeeded,
       clearPendingOutcome: true,
     );
-    await repository.write(_record);
+    try {
+      await repository.write(_record);
+      _notify();
+    } on Object {
+      _fail('无法保存本地演示结果，请重试。');
+    }
+  }
+
+  void _fail(String message) {
+    _record = _record.copyWith(
+      status: CertificationStatus.failed,
+      updatedAt: _now().toUtc(),
+      failureReason: message,
+      clearPendingOutcome: true,
+    );
     _notify();
   }
 

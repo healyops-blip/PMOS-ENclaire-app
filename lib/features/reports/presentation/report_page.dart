@@ -7,6 +7,7 @@ import 'package:pmos_enclaire/core/theme/pomi_theme.dart';
 import 'package:pmos_enclaire/core/widgets/demo_badge.dart';
 import 'package:pmos_enclaire/core/widgets/pomi_line_chart.dart';
 import 'package:pmos_enclaire/core/widgets/pomi_surfaces.dart';
+import 'package:pmos_enclaire/features/reports/data/patient_note_repository.dart';
 import 'package:printing/printing.dart';
 
 enum _PdfAction { save, share, print }

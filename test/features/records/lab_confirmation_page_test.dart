@@ -14,7 +14,11 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp(
-            home: LabConfirmationPage(repository: repository, task: _task),
+            home: LabConfirmationPage(
+              repository: repository,
+              task: _task,
+              currentRevisionAvailable: true,
+            ),
           ),
         ),
       );

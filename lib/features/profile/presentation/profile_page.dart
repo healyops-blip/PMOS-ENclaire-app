@@ -444,6 +444,7 @@ class _ProfileAction extends StatelessWidget {
     required this.subtitle,
     required this.onTap,
     this.last = false,
+    super.key,
   });
 
   final IconData icon;
