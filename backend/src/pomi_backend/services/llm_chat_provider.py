@@ -53,7 +53,11 @@ class QwenChatProvider:
 
     def chat(self, request: ChatRequest) -> ChatResponse:
         if not self.api_key:
-            raise ChatProviderError("LLM_NOT_CONFIGURED", "LLM service is not configured.", retryable=False)
+            raise ChatProviderError(
+                "LLM_NOT_CONFIGURED",
+                "LLM service is not configured.",
+                retryable=False,
+            )
         body = {
             "model": request.model or self.model,
             "messages": request.messages,
@@ -85,7 +89,11 @@ class QwenChatProvider:
                 retryable=500 <= (status or 500) < 600,
             ) from exc
         except (httpx.HTTPError, ValueError) as exc:
-            raise ChatProviderError("NETWORK_OR_JSON", "LLM network or JSON error.", retryable=True) from exc
+            raise ChatProviderError(
+                "NETWORK_OR_JSON",
+                "LLM network or JSON error.",
+                retryable=True,
+            ) from exc
         finally:
             if self.client is None and "active_client" in locals():
                 active_client.close()
@@ -98,5 +106,9 @@ class QwenChatProvider:
             if not isinstance(content, str):
                 raise TypeError("message content is not a string")
         except (KeyError, TypeError, IndexError) as exc:
-            raise ChatProviderError("RESPONSE_FORMAT", "LLM response format is invalid.", retryable=True) from exc
+            raise ChatProviderError(
+                "RESPONSE_FORMAT",
+                "LLM response format is invalid.",
+                retryable=True,
+            ) from exc
         return ChatResponse(raw_response=raw, content=content)
