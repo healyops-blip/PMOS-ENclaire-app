@@ -27,12 +27,14 @@ class ApiFailure implements Exception {
     this.message, {
     this.statusCode,
     this.retryAfterSeconds,
+    this.requestId,
   });
 
   final String code;
   final String message;
   final int? statusCode;
   final int? retryAfterSeconds;
+  final String? requestId;
 
   @override
   String toString() => message;
@@ -73,13 +75,29 @@ class ApiClient {
   final Dio dio;
   final FlutterSecureStorage storage;
 
-  Future<dynamic> get(String path) async => _request(() => dio.get(path));
+  Future<dynamic> get(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+  }) async => _request(() => dio.get(path, queryParameters: queryParameters));
 
-  Future<dynamic> post(String path, {Object? data}) async =>
-      _request(() => dio.post(path, data: data));
+  Future<dynamic> post(
+    String path, {
+    Object? data,
+    Map<String, String>? headers,
+  }) async => _request(
+    () => dio.post(path, data: data, options: Options(headers: headers)),
+  );
 
-  Future<dynamic> put(String path, {Object? data}) async =>
-      _request(() => dio.put(path, data: data));
+  Future<dynamic> put(
+    String path, {
+    Object? data,
+    Map<String, String>? headers,
+  }) async => _request(
+    () => dio.put(path, data: data, options: Options(headers: headers)),
+  );
+
+  Future<dynamic> delete(String path, {Object? data}) async =>
+      _request(() => dio.delete(path, data: data));
 
   Future<dynamic> upload(
     String path, {
@@ -112,6 +130,23 @@ class ApiClient {
     try {
       final response = await call();
       final body = response.data;
+      if (body is Map && body['success'] is bool) {
+        final requestId =
+            body['request_id']?.toString() ??
+            response.headers.value('x-request-id');
+        if (body['success'] == true) return body['data'];
+        final apiError = body['error'];
+        final code =
+            apiError is Map
+                ? apiError['code']?.toString() ?? 'REQUEST_FAILED'
+                : 'REQUEST_FAILED';
+        throw ApiFailure(
+          code,
+          _userMessage(code, null),
+          statusCode: response.statusCode,
+          requestId: requestId,
+        );
+      }
       if (body is Map && body.length == 1 && body.containsKey('data')) {
         return body['data'];
       }
@@ -129,17 +164,22 @@ class ApiClient {
       final retryAfter = int.tryParse(
         error.response?.headers.value('retry-after') ?? '',
       );
+      final requestId =
+          body['request_id']?.toString() ??
+          error.response?.headers.value('x-request-id');
       return ApiFailure(
         code,
         _userMessage(code, retryAfter),
         statusCode: error.response?.statusCode,
         retryAfterSeconds: retryAfter,
+        requestId: requestId,
       );
     }
     return ApiFailure(
       'NETWORK_ERROR',
       '无法连接服务器，请检查网络后重试',
       statusCode: error.response?.statusCode,
+      requestId: error.response?.headers.value('x-request-id'),
     );
   }
 
@@ -183,7 +223,10 @@ class SmokeApiClient extends ApiClient {
   String _id(String prefix) => '$prefix-${_nextId++}';
 
   @override
-  Future<dynamic> get(String path) async {
+  Future<dynamic> get(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+  }) async {
     if (path == '/api/auth/me') {
       return {
         'uid': 'smoke-user',
@@ -219,7 +262,11 @@ class SmokeApiClient extends ApiClient {
   }
 
   @override
-  Future<dynamic> post(String path, {Object? data}) async {
+  Future<dynamic> post(
+    String path, {
+    Object? data,
+    Map<String, String>? headers,
+  }) async {
     final values = _map(data);
     if (path == '/api/auth/register' || path == '/api/auth/logout') {
       return <String, dynamic>{};
@@ -277,13 +324,26 @@ class SmokeApiClient extends ApiClient {
   }
 
   @override
-  Future<dynamic> put(String path, {Object? data}) async {
+  Future<dynamic> put(
+    String path, {
+    Object? data,
+    Map<String, String>? headers,
+  }) async {
     final values = _map(data);
     if (path == '/api/patient/profile') {
       _profile.addAll(values);
       return Map.of(_profile);
     }
     return {'id': _id('smoke'), ...values};
+  }
+
+  @override
+  Future<dynamic> delete(String path, {Object? data}) async {
+    final cycleMatch = RegExp(r'^/api/cycles/([^/]+)$').firstMatch(path);
+    if (cycleMatch != null) {
+      _cycles.removeWhere((item) => item['id'] == cycleMatch.group(1));
+    }
+    return null;
   }
 
   @override

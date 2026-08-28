@@ -70,13 +70,20 @@ class _FakeApiClient extends ApiClient {
   bool meOnboardingCompleted = false;
 
   @override
-  Future<dynamic> get(String path) async {
+  Future<dynamic> get(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+  }) async {
     getPaths.add(path);
     return _account(onboardingCompleted: meOnboardingCompleted);
   }
 
   @override
-  Future<dynamic> post(String path, {Object? data}) async {
+  Future<dynamic> post(
+    String path, {
+    Object? data,
+    Map<String, String>? headers,
+  }) async {
     postPaths.add(path);
     postBodies.add(Map<String, dynamic>.from(data! as Map));
     if (path == '/api/auth/register') {
