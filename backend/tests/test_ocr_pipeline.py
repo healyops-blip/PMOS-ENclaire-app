@@ -18,6 +18,7 @@ from pomi_backend.db.models import (
     OCRFieldResult,
     OCRResult,
     OCRTask,
+    OutpatientRecord,
 )
 from pomi_backend.db.models.auth import utc_now
 from pomi_backend.repositories import OCRRepository
