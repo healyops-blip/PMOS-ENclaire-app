@@ -353,6 +353,16 @@ class _LatestVisitStatusCard extends StatelessWidget {
                   fontWeight: FontWeight.w400,
                 ),
               ),
+              SizedBox(height: 3),
+              Text(
+                '区块链技术支持',
+                style: TextStyle(
+                  color: pomiPurple,
+                  fontSize: 10,
+                  height: 14 / 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
         ),
