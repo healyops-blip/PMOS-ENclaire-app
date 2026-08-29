@@ -399,14 +399,6 @@ class _DatasetDocumentCard extends StatelessWidget {
                                 date,
                                 style: Theme.of(context).textTheme.titleLarge,
                               ),
-                              const SizedBox(width: 8),
-                              _VisitStatusBadge(
-                                text: verified ? '已核验' : '未核验',
-                                tone:
-                                    verified
-                                        ? VisitVerificationState.verified
-                                        : VisitVerificationState.unverified,
-                              ),
                             ],
                           ),
                           const SizedBox(height: 3),
@@ -761,20 +753,21 @@ class _VisitRecordRow extends StatelessWidget {
             style: Theme.of(context).textTheme.titleMedium,
           ),
         ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-          decoration: BoxDecoration(
-            color: background,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(
-            tag,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: foreground,
-              fontWeight: FontWeight.w700,
+        if (tag != row.title)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+            decoration: BoxDecoration(
+              color: background,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              tag,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: foreground,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
-        ),
         if (row.trailing != null) ...[
           const SizedBox(width: 8),
           Expanded(
