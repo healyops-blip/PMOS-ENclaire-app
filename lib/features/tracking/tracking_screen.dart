@@ -35,6 +35,17 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
   /// 正在编辑的已有经期记录；为空表示新建。
   Map<String, dynamic>? _editingCycle;
 
+  /// 最近一次 build 拿到的经期列表，供保存时做本地校验。
+  List<Map<String, dynamic>> _cycles = const [];
+
+  /// 把后端的 flow_level（可能是 unknown / null / 其它）收敛到分段按钮支持的值。
+  static String _normalizeFlow(Object? value) {
+    final flow = value?.toString();
+    return (flow == 'light' || flow == 'medium' || flow == 'heavy')
+        ? flow!
+        : 'medium';
+  }
+
   /// 找出包含 [day] 的已有经期记录（用于点日历时编辑而不是重复新建）。
   Map<String, dynamic>? _cycleContaining(
     DateTime day,
@@ -68,6 +79,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
               (item) => Map<String, dynamic>.from(item as Map),
             ),
           );
+          _cycles = cycles;
           final weights = List<Map<String, dynamic>>.from(
             (data['weights'] as List).map(
               (item) => Map<String, dynamic>.from(item as Map),
@@ -109,8 +121,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                         _cycleEnd = DateTime.tryParse(
                           existing['end_date']?.toString() ?? '',
                         );
-                        _cycleFlow =
-                            existing['flow_level']?.toString() ?? 'medium';
+                        _cycleFlow = _normalizeFlow(existing['flow_level']);
                       } else {
                         _editingCycle = null;
                         _cycleStart = selected;
@@ -217,6 +228,21 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
 
   Future<void> _saveInlineCycle() async {
     if (_savingCycle) return;
+    // 新建一条早于「进行中」经期的历史记录时，必须有结束日期，否则两条都会
+    // 被后端当成开放区间而判定重叠。
+    if (_editingCycle == null && _cycleEnd == null) {
+      final hasLater = _cycles.any((c) {
+        final s = DateTime.tryParse(c['start_date']?.toString() ?? '');
+        return s != null &&
+            DateUtils.dateOnly(s).isAfter(DateUtils.dateOnly(_cycleStart));
+      });
+      if (hasLater) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('这段经期在更近的记录之前，请先选择结束日期')));
+        return;
+      }
+    }
     setState(() => _savingCycle = true);
     try {
       final api = ref.read(apiClientProvider);

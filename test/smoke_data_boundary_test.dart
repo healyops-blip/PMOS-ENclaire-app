@@ -302,7 +302,8 @@ void main() {
                   'id': 'cycle-1',
                   'start_date': iso(start),
                   'end_date': iso(end),
-                  'flow_level': 'heavy',
+                  // 后端可能返回 'unknown'，分段按钮不能接受，不应崩溃。
+                  'flow_level': 'unknown',
                   'updated_at': '2026-08-20T00:00:00Z',
                 },
               ],
