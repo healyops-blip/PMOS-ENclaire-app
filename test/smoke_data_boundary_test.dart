@@ -212,17 +212,22 @@ void main() {
               },
             ],
           ),
+          // 正式版和 Smoke 现在同一套 UI；本月状态由真实 medication-daily 聚合。
+          monthlyMedicationStatusProvider.overrideWith(
+            (ref) async => {
+              'medication-active': (taken: 3, missed: 1, unrecorded: 0),
+            },
+          ),
         ],
         child: app(const MedicationManagementScreen()),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('真实当前用药'), findsOneWidget);
+    expect(find.text('真实当前用药'), findsWidgets);
     expect(find.text('真实历史用药'), findsOneWidget);
-    expect(find.text('当前用药'), findsOneWidget);
-    expect(find.text('每日提醒'), findsNothing);
-    expect(find.text('本月状态'), findsNothing);
+    expect(find.text('用药提醒'), findsOneWidget);
+    expect(find.text('本月状态'), findsOneWidget);
     expect(find.textContaining('优思明'), findsNothing);
   });
 

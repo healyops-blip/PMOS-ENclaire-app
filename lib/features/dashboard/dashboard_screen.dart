@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../medications/medication_catalog.dart';
+import '../records/records_screen.dart' show recordsProvider;
 
 final dashboardProvider = FutureProvider.autoDispose<Map<String, dynamic>>((
   ref,
@@ -54,6 +55,48 @@ final medicationsProvider =
         }),
       );
     });
+
+/// 本月每种用药的 taken / missed / unrecorded 计数，键为 medication_id。
+/// 由 /api/medication-daily 当月区间聚合，正式版和 Smoke 用同一套 UI。
+final monthlyMedicationStatusProvider = FutureProvider.autoDispose<
+  Map<String, ({int taken, int missed, int unrecorded})>
+>((ref) async {
+  final now = DateTime.now();
+  String two(int v) => v.toString().padLeft(2, '0');
+  final value = await ref
+      .read(apiClientProvider)
+      .get(
+        '/api/medication-daily',
+        queryParameters: {
+          'from': '${now.year}-${two(now.month)}-01',
+          'to': '${now.year}-${two(now.month)}-${two(now.day)}',
+        },
+      );
+  final items = (value as List?) ?? const [];
+  final agg = <String, List<int>>{};
+  for (final raw in items) {
+    if (raw is! Map) continue;
+    final id = raw['medication_id']?.toString();
+    if (id == null || id.isEmpty) continue;
+    final bucket = agg.putIfAbsent(id, () => <int>[0, 0, 0]);
+    switch (raw['intake_status']?.toString()) {
+      case 'taken':
+        bucket[0]++;
+      case 'missed':
+        bucket[1]++;
+      default:
+        bucket[2]++;
+    }
+  }
+  return {
+    for (final entry in agg.entries)
+      entry.key: (
+        taken: entry.value[0],
+        missed: entry.value[1],
+        unrecorded: entry.value[2],
+      ),
+  };
+});
 
 final medicationCatalogProvider =
     FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
@@ -106,6 +149,52 @@ class DashboardScreen extends ConsumerWidget {
   }
 }
 
+typedef _LatestVisit =
+    ({String date, String hospital, String label, String tag});
+
+const _materialTags = <String, String>{
+  'lab_report': '化验/检测',
+  'medical_order': '医嘱/处方',
+  'imaging_text_report': '影像报告',
+  'outpatient_record': '门诊病历',
+};
+
+/// recordsProvider 的 documents 里按 uploaded_at 取最新一份，映射成卡片文案。
+_LatestVisit? _latestVisitOf(Map<String, dynamic> records) {
+  final docs =
+      ((records['documents'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList()
+        ..sort(
+          (a, b) => (b['uploaded_at']?.toString() ?? '').compareTo(
+            a['uploaded_at']?.toString() ?? '',
+          ),
+        );
+  if (docs.isEmpty) return null;
+  final doc = docs.first;
+  String? pick(List<String> keys) {
+    for (final k in keys) {
+      final v = doc[k]?.toString().trim();
+      if (v != null && v.isNotEmpty) return v.split('T').first;
+    }
+    return null;
+  }
+
+  final type = doc['document_type']?.toString() ?? '';
+  return (
+    date:
+        pick(['visit_date', 'report_date', 'sample_date', 'uploaded_at']) ??
+        '最新上传',
+    hospital:
+        (doc['hospital_name'] ?? doc['hospital'])?.toString() ??
+        doc['original_file_name']?.toString() ??
+        '医疗记录',
+    label: doc['original_file_name']?.toString() ?? '医疗资料',
+    tag: _materialTags[type] ?? '医疗资料',
+  );
+}
+
 class _DashboardBody extends ConsumerWidget {
   const _DashboardBody({
     required this.data,
@@ -127,6 +216,9 @@ class _DashboardBody extends ConsumerWidget {
     );
     final nextVisit = profile['next_visit_date']?.toString();
     final days = _daysUntil(nextVisit);
+    final latestVisit = ref
+        .watch(recordsProvider)
+        .maybeWhen(data: _latestVisitOf, orElse: () => null);
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -237,9 +329,15 @@ class _DashboardBody extends ConsumerWidget {
                   ),
                 ],
               ),
-              if (smokeMode) ...[
+              if (latestVisit != null) ...[
                 const SizedBox(height: 14),
-                _LatestVisitStatusCard(onTap: () => onOpenRecords()),
+                _LatestVisitStatusCard(
+                  date: latestVisit.date,
+                  hospital: latestVisit.hospital,
+                  materialLabel: latestVisit.label,
+                  materialTag: latestVisit.tag,
+                  onTap: () => onOpenRecords(),
+                ),
               ],
             ],
           ),
@@ -255,7 +353,10 @@ class _DashboardBody extends ConsumerWidget {
                     builder: (context) => const MedicationManagementScreen(),
                   ),
                 ),
-            onUpdated: () => ref.invalidate(dashboardProvider),
+            onUpdated: () {
+              ref.invalidate(dashboardProvider);
+              ref.invalidate(monthlyMedicationStatusProvider);
+            },
           ),
         ),
         const SizedBox(height: 12),
@@ -313,11 +414,20 @@ class _HomeActionButton extends StatelessWidget {
   );
 }
 
-/// TODO(product): Bind this preview copy to the latest visit document and
-/// signature workflow after the API fields are confirmed.
+/// 首页「最近就诊」卡：取自 recordsProvider 里最新上传的一份材料。
 class _LatestVisitStatusCard extends StatelessWidget {
-  const _LatestVisitStatusCard({required this.onTap});
+  const _LatestVisitStatusCard({
+    required this.date,
+    required this.hospital,
+    required this.materialLabel,
+    required this.materialTag,
+    required this.onTap,
+  });
 
+  final String date;
+  final String hospital;
+  final String materialLabel;
+  final String materialTag;
   final VoidCallback onTap;
 
   @override
@@ -339,12 +449,12 @@ class _LatestVisitStatusCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '2026-08-25',
+                          date,
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          '仁和医院',
+                          hospital,
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                         const SizedBox(height: 3),
@@ -392,8 +502,10 @@ class _LatestVisitStatusCard extends StatelessWidget {
                   SizedBox(
                     width: 88,
                     child: Text(
-                      '化验单',
+                      materialLabel,
                       style: Theme.of(context).textTheme.titleMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   Container(
@@ -406,7 +518,7 @@ class _LatestVisitStatusCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
-                      '化验/检测',
+                      materialTag,
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         color: pomiPurple,
                         fontWeight: FontWeight.w700,
@@ -492,79 +604,53 @@ class MedicationManagementScreen extends ConsumerWidget {
                     ),
                   )
                   .toList();
+          final monthlyStatus = ref
+              .watch(monthlyMedicationStatusProvider)
+              .maybeWhen(
+                data: (value) => value,
+                orElse:
+                    () =>
+                        const <
+                          String,
+                          ({int taken, int missed, int unrecorded})
+                        >{},
+              );
+          final monthlyRows = [
+            for (final item in active)
+              () {
+                final id = item['id']?.toString();
+                final counts =
+                    (id == null ? null : monthlyStatus[id]) ??
+                    (taken: 0, missed: 0, unrecorded: 0);
+                return _MonthlyMedicationStatus(
+                  medicationId: id,
+                  name: _shortMedicationName(
+                    medicationDisplayName(
+                      item['drug_name'],
+                      standardDrugId: item['standard_drug_id'],
+                    ),
+                  ),
+                  taken: counts.taken,
+                  missed: counts.missed,
+                  unrecorded: counts.unrecorded,
+                );
+              }(),
+          ];
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 36),
             children: [
-              _MedicationPageHeading(smokeMode ? '用药提醒' : '当前用药'),
+              const _MedicationPageHeading('用药提醒'),
               const SizedBox(height: 16),
-              if (smokeMode)
-                if (reminders.isEmpty)
-                  const _MedicationEmptyCard(message: '还没有当前用药')
-                else
-                  _ReminderCard(reminders: reminders)
+              if (reminders.isEmpty)
+                const _MedicationEmptyCard(message: '还没有当前用药')
               else
-                _CurrentMedicationCard(items: active),
-              if (smokeMode) ...[
+                _ReminderCard(reminders: reminders),
+              if (monthlyRows.isNotEmpty) ...[
                 const SizedBox(height: 28),
                 const _MedicationPageHeading('本月状态'),
                 const SizedBox(height: 16),
                 _MonthlyMedicationCard(
-                  rows: [
-                    _MonthlyMedicationStatus(
-                      medicationId:
-                          active.isNotEmpty
-                              ? active[0]['id']?.toString()
-                              : null,
-                      name:
-                          active.isNotEmpty
-                              ? _shortMedicationName(
-                                medicationDisplayName(
-                                  active[0]['drug_name'],
-                                  standardDrugId: active[0]['standard_drug_id'],
-                                ),
-                              )
-                              : '盐酸二甲双胍...',
-                      taken: 22,
-                      missed: 2,
-                      unrecorded: 2,
-                    ),
-                    _MonthlyMedicationStatus(
-                      medicationId:
-                          active.length > 1
-                              ? active[1]['id']?.toString()
-                              : null,
-                      name:
-                          active.length > 1
-                              ? _shortMedicationName(
-                                medicationDisplayName(
-                                  active[1]['drug_name'],
-                                  standardDrugId: active[1]['standard_drug_id'],
-                                ),
-                              )
-                              : '叶酸',
-                      taken: 24,
-                      missed: 1,
-                      unrecorded: 1,
-                    ),
-                    _MonthlyMedicationStatus(
-                      medicationId:
-                          active.length > 2
-                              ? active[2]['id']?.toString()
-                              : null,
-                      name:
-                          active.length > 2
-                              ? _shortMedicationName(
-                                medicationDisplayName(
-                                  active[2]['drug_name'],
-                                  standardDrugId: active[2]['standard_drug_id'],
-                                ),
-                              )
-                              : '维生素 D3',
-                      taken: 25,
-                      missed: 1,
-                      unrecorded: 0,
-                    ),
-                  ],
+                  rows: monthlyRows,
                   onRowTap:
                       (status) =>
                           _showMonthlyMedicationDetails(context, ref, status),
@@ -574,7 +660,7 @@ class MedicationManagementScreen extends ConsumerWidget {
               const _MedicationPageHeading('停换药历史'),
               const SizedBox(height: 16),
               _MedicationHistoryCard(
-                items: smokeMode ? null : inactive,
+                items: inactive,
                 onRejoin: () => _addMedication(context, ref),
               ),
             ],
@@ -1251,74 +1337,6 @@ class _DateListSection extends StatelessWidget {
                     .toList(),
           ),
       ],
-    );
-  }
-}
-
-class _CurrentMedicationCard extends StatelessWidget {
-  const _CurrentMedicationCard({required this.items});
-
-  final List<Map<String, dynamic>> items;
-
-  @override
-  Widget build(BuildContext context) {
-    if (items.isEmpty) {
-      return const _MedicationEmptyCard(message: '还没有当前用药');
-    }
-    return PomiGlassCard(
-      padding: const EdgeInsets.symmetric(horizontal: 18),
-      borderRadius: 22,
-      backgroundOpacity: .34,
-      child: Column(
-        children: [
-          for (var index = 0; index < items.length; index++) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Row(
-                children: [
-                  const Icon(Icons.medication_outlined, color: pomiPurple),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          medicationDisplayName(
-                            items[index]['drug_name'],
-                            standardDrugId: items[index]['standard_drug_id'],
-                          ),
-                          style: Theme.of(
-                            context,
-                          ).textTheme.titleMedium?.copyWith(fontSize: 15),
-                        ),
-                        const SizedBox(height: 3),
-                        if ((items[index]['dosage_text']?.toString() ?? '')
-                            .isNotEmpty)
-                          Text(
-                            '每次用量：${items[index]['dosage_text']}',
-                            style: Theme.of(
-                              context,
-                            ).textTheme.bodySmall?.copyWith(fontSize: 12),
-                          ),
-                        if ((items[index]['frequency']?.toString() ?? '')
-                            .isNotEmpty)
-                          Text(
-                            '每日用量：${items[index]['frequency']}',
-                            style: Theme.of(
-                              context,
-                            ).textTheme.bodySmall?.copyWith(fontSize: 12),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (index != items.length - 1)
-              const Divider(height: 1, color: pomiLine),
-          ],
-        ],
-      ),
     );
   }
 }
