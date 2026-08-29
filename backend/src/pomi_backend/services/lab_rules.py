@@ -28,13 +28,13 @@ class MetricSpec:
 
 @dataclass(frozen=True)
 class NormalizedLabItem:
-    original_item_name: str
+    original_item_name: str | None
     standard_metric_id: str | None
     mapping_status: str
-    raw_value: str
-    numeric_value: Decimal
-    original_unit: str
-    standard_unit: str
+    raw_value: str | None
+    numeric_value: Decimal | None
+    original_unit: str | None
+    standard_unit: str | None
     reference_range_raw: str | None
     reference_lower: Decimal | None
     reference_upper: Decimal | None
@@ -131,6 +131,8 @@ UNIT_ALIASES = {
     "10^12/l": "10^12/L",
     "10*12/l": "10^12/L",
     "10¹²/l": "10^12/L",
+    "μmol/l": "μmol/L",
+    "µmol/l": "μmol/L",
 }
 
 
@@ -147,11 +149,29 @@ def parse_number(value: Any) -> Decimal | None:
     return parsed if parsed.is_finite() else None
 
 
+_LEADING_NUMBER_PATTERN = re.compile(r"^\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*(.*)$", re.DOTALL)
+
+
+def _split_number_and_unit(raw: Any) -> tuple[Decimal | None, str | None]:
+    """Split a glued "<number> <unit>" value, e.g. "6 ×10^9/L" -> (6, "×10^9/L")."""
+    match = _LEADING_NUMBER_PATTERN.match(str(raw).replace(",", ""))
+    if match is None:
+        return None, None
+    return parse_number(match.group(1)), (match.group(2).strip() or None)
+
+
 def normalize_unit(value: Any) -> str | None:
     if value is None:
         return None
-    text = unicodedata.normalize("NFKC", str(value)).strip().replace(" ", "")
+    text = str(value).strip().replace(" ", "")
+    # 把上标数量级 10⁹ / 10¹² 先规范成 10^9 / 10^12（必须在 NFKC 之前执行，
+    # 否则 NFKC 会把上标并进数字，10⁹/L 变成 109/L 而丢失幂号）。
+    sup = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹", "0123456789")
+    text = re.sub(r"[⁰¹²³⁴⁵⁶⁷⁸⁹]+", lambda m: "^" + m.group(0).translate(sup), text)
+    text = unicodedata.normalize("NFKC", text).strip()
     text = text.replace("μ", "μ").replace("µ", "µ")
+    # 容忍常见的 "×10^9/L" 前导乘号（模型常以 ×/x/✕ 开头书写数量级）。
+    text = re.sub(r"^[×xX✕✖*]", "", text)
     return UNIT_ALIASES.get(text.casefold())
 
 
@@ -190,12 +210,14 @@ def _reference_bounds(
 
 
 def _abnormal(
-    value: Decimal,
+    value: Decimal | None,
     lower: Decimal | None,
     upper: Decimal | None,
     lower_inclusive: bool,
     upper_inclusive: bool,
 ) -> str:
+    if value is None:
+        return "unknown"
     if lower is None and upper is None:
         return "unknown"
     if lower is not None and (value < lower or (value == lower and not lower_inclusive)):
@@ -211,36 +233,38 @@ def normalize_lab_item(
     prefix = f"items.{index}"
     issues: list[FieldIssue] = []
     name = str(item.get("name") or "").strip()
-    if not name:
-        issues.append(FieldIssue(f"{prefix}.name", "LAB_NAME_REQUIRED", "项目名称不能为空。"))
-    elif len(name) > 200:
-        issues.append(
-            FieldIssue(f"{prefix}.name", "LAB_NAME_TOO_LONG", "项目名称不能超过 200 个字符。")
-        )
+    name = name or None
     raw_value = str(item.get("value") or "").strip()
     numeric = parse_number(item.get("value"))
-    if not raw_value:
-        issues.append(FieldIssue(f"{prefix}.value", "LAB_VALUE_REQUIRED", "数值不能为空。"))
-    elif numeric is None:
-        issues.append(FieldIssue(f"{prefix}.value", "LAB_VALUE_INVALID", "数值格式无法解析。"))
-    elif abs(numeric) > MAX_NUMERIC_ABS:
+    inline_unit: str | None = None
+    if numeric is None and raw_value:
+        # 模型有时把「数值 单位」写在同一个字段里（如 "6 ×10^9/L"、"146 g/L"）。
+        # 取前导数字作为数值，尾部留作单位候选（仅在单位字段为空时采用），
+        # 并把 raw_value 归一为纯数字，避免展示时单位重复。
+        numeric, inline_unit = _split_number_and_unit(raw_value)
+        if numeric is not None:
+            raw_value = str(numeric)
+    if numeric is not None and abs(numeric) > MAX_NUMERIC_ABS:
         issues.append(
             FieldIssue(f"{prefix}.value", "LAB_VALUE_OUT_OF_RANGE", "数值超出可保存范围。")
         )
-    elif len(raw_value) > 100:
+    if raw_value and len(raw_value) > 100:
         issues.append(
             FieldIssue(f"{prefix}.value", "LAB_VALUE_TOO_LONG", "原始数值不能超过 100 个字符。")
         )
-    raw_unit = str(item.get("unit") or "").strip()
-    unit = normalize_unit(item.get("unit"))
+    spec = METRIC_BY_ALIAS.get(_key(name)) if name else None
+    raw_unit = str(item.get("unit") or "").strip() or (inline_unit or "")
+    unit = normalize_unit(raw_unit or None)
     if not raw_unit:
-        issues.append(FieldIssue(f"{prefix}.unit", "LAB_UNIT_REQUIRED", "单位不能为空。"))
+        # 单位缺失：未映射指标允许入库，保留空串由前端展示为「—」；
+        # 已映射为标准指标的项目必须有单位，否则数值无法安全换算到
+        # 标准趋势线，会与其他单位的点混在一起。
+        unit = None
     elif unit is None:
-        issues.append(FieldIssue(f"{prefix}.unit", "LAB_UNIT_UNSUPPORTED", "单位不在允许范围内。"))
-    elif len(raw_unit) > 40:
+        unit = raw_unit or None
+    if raw_unit and len(raw_unit) > 40:
         issues.append(FieldIssue(f"{prefix}.unit", "LAB_UNIT_TOO_LONG", "单位不能超过 40 个字符。"))
 
-    spec = METRIC_BY_ALIAS.get(_key(name)) if name else None
     factor = Decimal("1")
     standard_unit = unit or raw_unit
     if spec is not None and unit is not None:
@@ -258,15 +282,7 @@ def normalize_lab_item(
     reference_raw, lower, upper, lower_inclusive, upper_inclusive, reference_valid = (
         _reference_bounds(item.get("reference_range"), factor or Decimal("1"))
     )
-    if not reference_valid:
-        issues.append(
-            FieldIssue(
-                f"{prefix}.reference_range",
-                "LAB_REFERENCE_RANGE_INVALID",
-                "参考范围格式无法解析，请留空或输入如 3.9-6.1。",
-            )
-        )
-    elif reference_raw is not None and len(reference_raw) > 120:
+    if reference_raw is not None and len(reference_raw) > 120:
         issues.append(
             FieldIssue(
                 f"{prefix}.reference_range",
@@ -298,10 +314,13 @@ def normalize_lab_item(
                 )
             )
 
-    if issues:
-        return None, issues
-    assert numeric is not None and unit is not None
-    converted = numeric * factor
+    # 字段级解析问题仅保留在原始/确认 JSON 中，不阻止入库。缺失值以
+    # NULL 保存，后续趋势计算会自动忽略不可比较的点。
+    issues = []
+    raw_value = raw_value or None
+    raw_unit = raw_unit or None
+    standard_unit = standard_unit or None
+    converted = numeric * factor if numeric is not None else None
     priority = ("sample_date", "exam_date", "report_date", "visit_date")
     trend_source = next((field for field in priority if parsed_dates[field] is not None), None)
     return (
@@ -340,9 +359,14 @@ def p0_evaluation(
     total = len(items) * 3
     valid = 0
     for item in items:
+        value = item.get("value")
+        number = parse_number(value)
+        inline_unit: str | None = None
+        if number is None:
+            number, inline_unit = _split_number_and_unit(value)
         valid += int(bool(str(item.get("name") or "").strip()))
-        valid += int(parse_number(item.get("value")) is not None)
-        valid += int(normalize_unit(item.get("unit")) is not None)
+        valid += int(number is not None)
+        valid += int(normalize_unit(str(item.get("unit") or "").strip() or inline_unit) is not None)
     output: dict[str, int | float] = {
         "total_fields": total,
         "valid_fields": valid,

@@ -13,11 +13,24 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from pomi_backend.api.business import BusinessError
-from pomi_backend.db.models import Document, DocumentRevision, OCRTask, UserAccount
+from pomi_backend.db.models import (
+    Document,
+    DocumentDisplayAsset,
+    DocumentRevision,
+    OCRResult,
+    OCRTask,
+    UserAccount,
+)
 from pomi_backend.db.models.auth import utc_now
 from pomi_backend.db.models.health import new_uuid
 from pomi_backend.repositories import DocumentRepository, PatientRepository
 from pomi_backend.services.document_storage import private_path, safe_file_name, store_upload
+from pomi_backend.services.watermarks import (
+    ASSET_TYPE,
+    WATERMARK_VERSION,
+    DocumentWatermarkService,
+    display_asset_data,
+)
 
 
 def revision_data(revision: DocumentRevision) -> dict[str, Any]:
@@ -96,13 +109,47 @@ class DocumentService:
             .order_by(OCRTask.created_at.desc(), OCRTask.id.desc())
             .limit(1)
         )
+        revision = current_revision
+        if revision is None and document.current_revision_id:
+            revision = self.repository.revision(document.id, document.current_revision_id)
+        display_asset = (
+            self.repository.display_asset(
+                document.id,
+                revision.id,
+                asset_type=ASSET_TYPE,
+                watermark_version=WATERMARK_VERSION,
+            )
+            if revision is not None
+            else None
+        )
+        # 把最新 OCR 结果的 validated_draft（识别出的临床字段）合并进文档详情，
+        # 使记录页能展示影像检查所见/结论、门诊主诉/诊断、医嘱药品等丰富字段。
+        ocr_draft: dict[str, Any] = {}
+        if latest_task is not None:
+            latest_result = self.session.scalar(
+                select(OCRResult)
+                .where(OCRResult.task_id == latest_task.id)
+                .order_by(OCRResult.created_at.desc())
+                .limit(1)
+            )
+            if latest_result is not None and isinstance(latest_result.validated_draft, dict):
+                ocr_draft = {
+                    key: value
+                    for key, value in latest_result.validated_draft.items()
+                    if value is not None
+                }
         return {
+            # OCR 草稿只补充临床字段，绝不能覆盖数据库的权威字段（id、
+            # document_type、latest_ocr_status、display_asset 等）。供应商响应
+            # 未做 Schema 校验且模型可能多吐同名键，因此最先展开、优先级最低。
+            **ocr_draft,
             **document_data(document, current_revision),
             "latest_ocr_task_id": latest_task.id if latest_task is not None else None,
             "latest_ocr_status": latest_task.status if latest_task is not None else None,
             "latest_ocr_result_source": (
                 latest_task.result_source if latest_task is not None else None
             ),
+            "display_asset": display_asset_data(display_asset),
         }
 
     def upload(
@@ -281,6 +328,50 @@ class DocumentService:
             raise BusinessError("RESOURCE_NOT_FOUND", "Revision was not found.", 404)
         return private_path(self.storage_root, revision.storage_path), revision, document
 
+    def display_asset(
+        self,
+        document_id: str,
+        revision_id: str,
+    ) -> tuple[DocumentDisplayAsset | None, DocumentRevision, Document]:
+        document = self.owned(document_id)
+        revision = self.repository.revision(document.id, revision_id)
+        if revision is None:
+            raise BusinessError("RESOURCE_NOT_FOUND", "Revision was not found.", 404)
+        asset = self.repository.display_asset(
+            document.id,
+            revision.id,
+            asset_type=ASSET_TYPE,
+            watermark_version=WATERMARK_VERSION,
+        )
+        return asset, revision, document
+
+    def retry_display_asset(
+        self,
+        document_id: str,
+        revision_id: str,
+    ) -> DocumentDisplayAsset:
+        asset, revision, document = self.display_asset(document_id, revision_id)
+        return DocumentWatermarkService(self.session, self.storage_root).generate(
+            document,
+            revision,
+            force=asset is None or asset.status != "ready",
+        )
+
+    def display_file(
+        self,
+        document_id: str,
+        revision_id: str,
+    ) -> tuple[Path, DocumentDisplayAsset, Document]:
+        asset, _, document = self.display_asset(document_id, revision_id)
+        if asset is None:
+            raise BusinessError(
+                "RESOURCE_NOT_FOUND",
+                "The watermarked display image was not found.",
+                404,
+            )
+        path = DocumentWatermarkService(self.session, self.storage_root).file(asset)
+        return path, asset, document
+
 
 def purge_deleted_documents(
     session: Session,
@@ -328,6 +419,22 @@ def purge_deleted_documents(
             if storage_root.resolve() in path.parents and path.is_file():
                 path.unlink()
                 removed += 1
+            display_assets = list(
+                session.scalars(
+                    select(DocumentDisplayAsset).where(
+                        DocumentDisplayAsset.document_revision_id == revision.id
+                    )
+                )
+            )
+            for asset in display_assets:
+                if asset.storage_path:
+                    display_path = (storage_root / asset.storage_path).resolve()
+                    if storage_root.resolve() in display_path.parents and display_path.is_file():
+                        display_path.unlink()
+                        removed += 1
+                asset.status = "purged"
+                asset.storage_path = None
+                asset.updated_at = now
         document.purge_after = None
     session.commit()
     return removed

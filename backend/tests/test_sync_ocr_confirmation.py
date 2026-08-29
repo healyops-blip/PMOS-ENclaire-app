@@ -8,7 +8,14 @@ from PIL import Image
 from pytest import MonkeyPatch
 from sqlalchemy import func, select
 
-from pomi_backend.db.models import LabObservation, Medication, MedicationEvent, OCRResult, OCRTask
+from pomi_backend.db.models import (
+    DocumentDisplayAsset,
+    LabObservation,
+    Medication,
+    MedicationEvent,
+    OCRResult,
+    OCRTask,
+)
 from pomi_backend.services.ocr_provider import OCRProviderResponse
 
 
@@ -25,7 +32,7 @@ def _headers(client: TestClient, name: str) -> dict[str, str]:
 
 def _image() -> bytes:
     output = BytesIO()
-    Image.new("RGB", (32, 24), "white").save(output, format="PNG")
+    Image.new("RGB", (320, 240), (52, 64, 82)).save(output, format="PNG")
     return output.getvalue()
 
 
@@ -131,6 +138,17 @@ def test_sync_recognize_persists_result_and_reuses_idempotency_key(
 
     assert repeated == first
     assert FakeProvider.calls == 1
+    display = first["display_asset"]
+    assert display["status"] == "ready"
+    assert display["watermark_version"] == "pomi-watermark-v2"
+    assert display["pixel_width"] == 320
+    assert display["pixel_height"] == 240
+    watermarked = api_client.get(display["file_endpoint"], headers=owner)
+    assert watermarked.status_code == 200
+    assert watermarked.headers["cache-control"] == "private, no-store"
+    with Image.open(BytesIO(watermarked.content)) as image:
+        assert image.size == (320, 240)
+        assert image.convert("RGB").getpixel((160, 120)) != (52, 64, 82)
     with api_client.app.state.session_factory() as session:
         assert session.scalar(select(func.count()).select_from(OCRTask)) == 1
         assert session.scalar(select(func.count()).select_from(OCRResult)) == 1
@@ -138,11 +156,44 @@ def test_sync_recognize_persists_result_and_reuses_idempotency_key(
         assert task is not None
         assert task.status == "pending_confirmation"
         assert task.result_source == "fake-qwen"
+        assert session.scalar(select(func.count()).select_from(DocumentDisplayAsset)) == 1
 
     second_owner = _headers(api_client, "sync-ocr-other-owner")
     other = _recognize(api_client, second_owner)
     assert other["ocr_task_id"] != first["ocr_task_id"]
     assert FakeProvider.calls == 2
+    assert api_client.get(display["file_endpoint"], headers=second_owner).status_code == 404
+
+
+def test_watermark_retry_isolated_from_successful_ocr(
+    api_client: TestClient, monkeypatch: MonkeyPatch
+) -> None:
+    monkeypatch.setattr("pomi_backend.api.ocr.Qwen3VLOCRProvider", FakeProvider)
+    owner = _headers(api_client, "sync-watermark-retry")
+    from pomi_backend.services import watermarks
+
+    renderer = watermarks._render_watermarked_image
+
+    def fail_renderer(*_args, **_kwargs):
+        raise OSError("synthetic renderer failure")
+
+    monkeypatch.setattr(watermarks, "_render_watermarked_image", fail_renderer)
+    recognized = _recognize(api_client, owner, key="sync-watermark-retry-001")
+    failed = recognized["display_asset"]
+    assert failed["status"] == "failed"
+    assert failed["error"]["code"] == "WATERMARK_RENDER_FAILED"
+    task = _data(api_client.get(f"/api/ocr/tasks/{recognized['ocr_task_id']}", headers=owner))
+    assert task["status"] == "pending_confirmation"
+
+    retry_endpoint = (
+        f"/api/documents/{recognized['document_id']}/revisions/"
+        f"{recognized['document_revision_id']}/display/retry"
+    )
+    monkeypatch.setattr(watermarks, "_render_watermarked_image", renderer)
+    recovered = _data(api_client.post(retry_endpoint, headers=owner))
+    assert recovered["status"] == "ready"
+    assert recovered["id"] == failed["id"]
+    assert recovered["attempt_count"] == failed["attempt_count"] + 1
 
 
 def test_sync_confirmation_is_atomic_idempotent_and_owned(
@@ -192,12 +243,14 @@ def test_sync_confirmation_is_atomic_idempotent_and_owned(
         assert session.get(OCRTask, recognized["ocr_task_id"]).status == "confirmed"
 
 
-def test_sync_confirmation_rejects_invalid_items_without_partial_writes(
+def test_sync_confirmation_accepts_unmapped_drug_and_free_text_dosage(
     api_client: TestClient, monkeypatch: MonkeyPatch
 ) -> None:
+    """未映射药名与无法解析为数值的剂量文本不再阻塞入库（缺空就缺着，但不失败）。"""
     monkeypatch.setattr("pomi_backend.api.ocr.Qwen3VLOCRProvider", FakeProvider)
-    owner = _headers(api_client, "sync-confirm-invalid")
-    recognized = _recognize(api_client, owner, key="sync-confirm-invalid-001")
+    owner = _headers(api_client, "sync-confirm-lenient")
+    recognized = _recognize(api_client, owner, key="sync-confirm-lenient-001")
+    pending_task_id = recognized["ocr_task_id"]
     endpoint = f"/api/ocr/results/{recognized['ocr_result_id']}/confirm"
 
     unknown = api_client.post(
@@ -205,39 +258,48 @@ def test_sync_confirmation_rejects_invalid_items_without_partial_writes(
         headers=owner,
         json=_confirmation(drug_name="未知药品"),
     )
-    assert unknown.status_code == 422
-    assert unknown.json()["error"]["code"] == "OCR_CONFIRMATION_INVALID"
-    assert unknown.json()["error"]["details"]["fields"][0]["code"] == "DRUG_MAPPING_REQUIRED"
+    assert unknown.status_code == 200
+    created = unknown.json()["data"]
+    assert created["status"] == "confirmed"
+    assert len(created["medications"]) == 1
+    assert created["medications"][0]["standard_drug_id"] is None
 
+    # 剂量为自由文本时不再 422：单独识别一个新任务验证。
+    recognized_dosage = _recognize(api_client, owner, key="sync-confirm-lenient-002")
+    dosage_endpoint = f"/api/ocr/results/{recognized_dosage['ocr_result_id']}/confirm"
     invalid_dosage = api_client.post(
-        endpoint,
+        dosage_endpoint,
         headers=owner,
         json=_confirmation(dosage="一片"),
     )
-    assert invalid_dosage.status_code == 422
-    assert invalid_dosage.json()["error"]["details"]["fields"][0]["code"] == "DOSAGE_INVALID"
+    assert invalid_dosage.status_code == 200
 
+    # 化验值非法仍然 422：单独识别一个新任务验证。
+    recognized_lab = _recognize(api_client, owner, key="sync-confirm-lenient-003")
+    lab_endpoint = f"/api/ocr/results/{recognized_lab['ocr_result_id']}/confirm"
     invalid_lab = _confirmation()
     invalid_lab["examinations"][0]["value"] = "not-a-number"
-    rejected = api_client.post(endpoint, headers=owner, json=invalid_lab)
+    rejected = api_client.post(lab_endpoint, headers=owner, json=invalid_lab)
     assert rejected.status_code == 422
     assert rejected.json()["error"]["code"] == "OCR_CONFIRMATION_INVALID"
 
+    # 重复化验项 / 越界 source_index 仍然 422：复用第三个任务。
     duplicate = _confirmation()
     duplicate["examinations"].append(dict(duplicate["examinations"][0]))
-    duplicate_response = api_client.post(endpoint, headers=owner, json=duplicate)
+    duplicate_response = api_client.post(lab_endpoint, headers=owner, json=duplicate)
     assert duplicate_response.status_code == 422
 
     invalid_source = _confirmation()
     invalid_source["examinations"][0]["source_index"] = 99
-    source_response = api_client.post(endpoint, headers=owner, json=invalid_source)
+    source_response = api_client.post(lab_endpoint, headers=owner, json=invalid_source)
     assert source_response.status_code == 422
     assert source_response.json()["error"]["details"]["fields"][0]["code"] == (
         "OCR_SOURCE_INDEX_INVALID"
     )
 
     empty = api_client.post(
-        endpoint,
+        f"/api/ocr/results/"
+        f"{_recognize(api_client, owner, key='sync-confirm-lenient-004')['ocr_result_id']}/confirm",
         headers=owner,
         json={"examinations": [], "medication_suggestions": []},
     )
@@ -245,7 +307,9 @@ def test_sync_confirmation_rejects_invalid_items_without_partial_writes(
     assert empty.json()["error"]["code"] == "OCR_CONFIRMATION_EMPTY"
 
     with api_client.app.state.session_factory() as session:
-        assert session.scalar(select(func.count()).select_from(LabObservation)) == 0
-        assert session.scalar(select(func.count()).select_from(Medication)) == 0
-        assert session.scalar(select(func.count()).select_from(MedicationEvent)) == 0
-        assert session.get(OCRTask, recognized["ocr_task_id"]).status == "pending_confirmation"
+        # 任务 1（未知药品）与任务 2（自由文本剂量）各成功确认 1 条，共 2 条；
+        # 任务 3（非法化验值/重复项/越界索引）与任务 4（空 payload）被 422 拒绝，不计数。
+        assert session.scalar(select(func.count()).select_from(LabObservation)) == 2
+        assert session.scalar(select(func.count()).select_from(Medication)) == 2
+        assert session.scalar(select(func.count()).select_from(MedicationEvent)) == 2
+        assert session.get(OCRTask, pending_task_id).status == "confirmed"

@@ -1,6 +1,7 @@
 """Authenticated medical document and immutable revision API."""
 
 from datetime import datetime
+from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, File, Form, Header, Query, Request, UploadFile, status
@@ -9,6 +10,7 @@ from fastapi.responses import FileResponse
 from pomi_backend.api.business import success
 from pomi_backend.api.dependencies import DocumentServiceDependency
 from pomi_backend.services.documents import revision_data
+from pomi_backend.services.watermarks import display_asset_data
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 DocumentType = Literal["lab_report", "medical_order", "imaging_text_report", "outpatient_record"]
@@ -80,7 +82,15 @@ def list_revisions(document_id: str, request: Request, service: DocumentServiceD
     service.owned(document_id)
     return success(
         request,
-        [revision_data(revision) for revision in service.repository.revisions(document_id)],
+        [
+            {
+                **revision_data(revision),
+                "display_asset": display_asset_data(
+                    service.display_asset(document_id, revision.id)[0]
+                ),
+            }
+            for revision in service.repository.revisions(document_id)
+        ],
     )
 
 
@@ -117,6 +127,51 @@ def download_revision(
         filename=document.original_file_name,
         headers={
             "ETag": f'"{revision.file_hash}"',
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.get("/{document_id}/revisions/{revision_id}/display")
+def get_display_asset(
+    document_id: str,
+    revision_id: str,
+    request: Request,
+    service: DocumentServiceDependency,
+) -> dict:
+    asset, _, _ = service.display_asset(document_id, revision_id)
+    return success(request, display_asset_data(asset))
+
+
+@router.post("/{document_id}/revisions/{revision_id}/display/retry")
+def retry_display_asset(
+    document_id: str,
+    revision_id: str,
+    request: Request,
+    service: DocumentServiceDependency,
+) -> dict:
+    asset = service.retry_display_asset(document_id, revision_id)
+    return success(request, display_asset_data(asset))
+
+
+@router.get(
+    "/{document_id}/revisions/{revision_id}/display/file",
+    response_class=FileResponse,
+)
+def download_display_asset(
+    document_id: str,
+    revision_id: str,
+    service: DocumentServiceDependency,
+) -> FileResponse:
+    path, asset, document = service.display_file(document_id, revision_id)
+    extension = ".jpg" if asset.mime_type == "image/jpeg" else ".png"
+    return FileResponse(
+        path,
+        media_type=asset.mime_type,
+        filename=f"{Path(document.original_file_name).stem}-pomi{extension}",
+        headers={
+            "ETag": f'"{asset.file_hash}"',
             "Cache-Control": "private, no-store",
             "X-Content-Type-Options": "nosniff",
         },

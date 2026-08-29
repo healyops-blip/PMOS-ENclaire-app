@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class FieldConfirmation(BaseModel):
@@ -33,17 +33,10 @@ class ImagingTextConfirmation(BaseModel):
     examination_name: str | None = Field(default=None, max_length=200)
     body_part: str | None = Field(default=None, max_length=200)
     examination_method: str | None = Field(default=None, max_length=200)
-    findings_text: str = Field(min_length=1, max_length=20000)
-    conclusion_text: str = Field(min_length=1, max_length=20000)
+    findings_text: str | None = Field(default=None, max_length=20000)
+    conclusion_text: str | None = Field(default=None, max_length=20000)
     examined_at: date | None = None
     reported_at: date | None = None
-
-    @field_validator("findings_text", "conclusion_text")
-    @classmethod
-    def non_blank(cls, value: str) -> str:
-        if not value.strip():
-            raise ValueError("critical original text cannot be blank")
-        return value
 
 
 class OutpatientConfirmation(BaseModel):
@@ -52,15 +45,8 @@ class OutpatientConfirmation(BaseModel):
     hospital_name: str | None = Field(default=None, max_length=200)
     department_name: str | None = Field(default=None, max_length=200)
     doctor_name: str | None = Field(default=None, max_length=100)
-    visit_date: date
+    visit_date: date | None = None
     chief_complaint: str | None = Field(default=None, max_length=20000)
-    diagnosis_summary: str = Field(min_length=1, max_length=20000)
+    diagnosis_summary: str | None = Field(default=None, max_length=20000)
     treatment_plan: str | None = Field(default=None, max_length=20000)
-    medical_advice: str = Field(min_length=1, max_length=20000)
-
-    @field_validator("diagnosis_summary", "medical_advice")
-    @classmethod
-    def non_blank(cls, value: str) -> str:
-        if not value.strip():
-            raise ValueError("critical original text cannot be blank")
-        return value
+    medical_advice: str | None = Field(default=None, max_length=20000)

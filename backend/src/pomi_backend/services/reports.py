@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from pomi_backend.api.business import BusinessError
 from pomi_backend.db.models import (
+    DocumentDisplayAsset,
     ImagingReport,
     LabObservation,
     MedicalOrder,
@@ -39,6 +40,11 @@ from pomi_backend.repositories import (
     ReportSourceRepository,
 )
 from pomi_backend.schemas.reports import ReportCreate
+from pomi_backend.services.watermarks import (
+    ASSET_TYPE,
+    WATERMARK_VERSION,
+    display_asset_data,
+)
 
 RULE_VERSION = "report-rules-v2"
 TEMPLATE_VERSION = "report-snapshot-v2"
@@ -494,6 +500,10 @@ class ReportSnapshotService:
                     "origin_kind": item.origin_kind,
                     "document_id": item.document_id,
                     "document_revision_id": item.document_revision_id,
+                    "display_asset": self._display_asset_identity(
+                        item.document_id,
+                        item.document_revision_id,
+                    ),
                 }
                 for item in source_drafts
             ],
@@ -507,6 +517,10 @@ class ReportSnapshotService:
     ) -> list[dict[str, Any]]:
         nodes: list[dict[str, Any]] = []
         for number, draft in enumerate(drafts, start=1):
+            display_asset = self._display_asset(
+                draft.document_id,
+                draft.document_revision_id,
+            )
             source = ReportSource(
                 id=new_uuid(),
                 report_id=report.id,
@@ -527,10 +541,42 @@ class ReportSnapshotService:
                     "origin_kind": source.origin_kind,
                     "document_id": source.document_id,
                     "document_revision_id": source.document_revision_id,
+                    "display_asset": display_asset_data(display_asset),
                     "rule_execution_id": source.rule_execution_id,
                 }
             )
         return nodes
+
+    def _display_asset(
+        self,
+        document_id: str | None,
+        revision_id: str | None,
+    ) -> DocumentDisplayAsset | None:
+        if document_id is None or revision_id is None:
+            return None
+        return self.session.scalar(
+            select(DocumentDisplayAsset).where(
+                DocumentDisplayAsset.document_id == document_id,
+                DocumentDisplayAsset.document_revision_id == revision_id,
+                DocumentDisplayAsset.asset_type == ASSET_TYPE,
+                DocumentDisplayAsset.watermark_version == WATERMARK_VERSION,
+            )
+        )
+
+    def _display_asset_identity(
+        self,
+        document_id: str | None,
+        revision_id: str | None,
+    ) -> dict[str, Any] | None:
+        asset = self._display_asset(document_id, revision_id)
+        if asset is None:
+            return None
+        return {
+            "asset_type": asset.asset_type,
+            "watermark_version": asset.watermark_version,
+            "status": asset.status,
+            "file_hash": asset.file_hash,
+        }
 
     def _build_snapshot(
         self,
@@ -681,6 +727,8 @@ class ReportSnapshotService:
                     point_reason = "missing_valid_date"
                 elif date.fromisoformat(item["trend_date"]) > self.business_date:
                     point_reason = "future_date"
+                elif normalized_value is None:
+                    point_reason = "missing_numeric_value"
                 elif target_unit and normalized_unit != target_unit:
                     converted = self._convert_lab_value(
                         metric_id,
@@ -976,6 +1024,8 @@ class ReportSnapshotService:
 
     @staticmethod
     def _abnormal_status(item: LabObservation) -> str:
+        if item.numeric_value is None:
+            return "unknown"
         if item.reference_lower is None and item.reference_upper is None:
             return "unknown"
         if item.reference_lower is not None and item.numeric_value < item.reference_lower:
@@ -1016,7 +1066,7 @@ class ReportSnapshotService:
     @staticmethod
     def _convert_lab_value(
         metric_id: str,
-        value: float,
+        value: float | None,
         from_unit: str | None,
         to_unit: str,
     ) -> float | None:
@@ -1029,7 +1079,7 @@ class ReportSnapshotService:
             ("testosterone", "nmol/L", "ng/dL"): 1 / 0.0347,
         }
         factor = conversions.get((metric_id, from_unit, to_unit))
-        return round(value * factor, 6) if factor is not None else None
+        return round(value * factor, 6) if factor is not None and value is not None else None
 
     @staticmethod
     def _hormone_context_incomplete(metric_id: str, items: list[dict[str, Any]]) -> bool:
@@ -1084,7 +1134,7 @@ class ReportSnapshotService:
     ) -> dict[str, Any]:
         return {
             **cls._list_item(report, has_updates=has_updates, reused=reused),
-            "snapshot": report.snapshot_json,
+            "snapshot": report.snapshot_json or {},
             "date_sources": report.date_source_json or {},
             "data_freshness": report.freshness_result_json or {},
         }

@@ -45,9 +45,11 @@ class OCRRecognizeData(BaseModel):
 class OCRConfirmExamination(BaseModel):
     model_config = ConfigDict(extra="forbid")
     source_index: int = Field(ge=0)
-    item_name: str = Field(min_length=1, max_length=200)
-    value: str | int | float
-    unit: str = Field(min_length=1, max_length=40)
+    item_name: str | None = Field(default=None, max_length=200)
+    # 允许缺空：化验单上数值/单位偶有 OCR 漏识别，确认时保持原样入库，
+    # 由 lab_rules 按可解析程度标记，不再强制必填。
+    value: str | int | float | None = None
+    unit: str | None = Field(default=None, max_length=40)
     reference_range: str | None = Field(default=None, max_length=120)
     note: str | None = Field(default=None, max_length=1000)
 

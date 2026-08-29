@@ -9,32 +9,32 @@
   <title>Pomi</title>
   <style>
     @font-face {
-      font-family: 'Noto Sans SC';
-      src: url('assets/assets/fonts/NotoSansSC-Regular.ttf') format('truetype');
+      font-family: 'POMI Noto Sans SC Subset';
+      src: url('assets/assets/fonts/pomi_web_subset/NotoSansSC-Regular.ttf') format('truetype');
       font-style: normal;
       font-weight: 400;
-      font-display: block;
+      font-display: swap;
     }
     @font-face {
-      font-family: 'Noto Sans SC';
-      src: url('assets/assets/fonts/NotoSansSC-Medium.ttf') format('truetype');
+      font-family: 'POMI Noto Sans SC Subset';
+      src: url('assets/assets/fonts/pomi_web_subset/NotoSansSC-Medium.ttf') format('truetype');
       font-style: normal;
       font-weight: 500;
-      font-display: block;
+      font-display: swap;
     }
     @font-face {
-      font-family: 'Noto Sans SC';
-      src: url('assets/assets/fonts/NotoSansSC-Bold.ttf') format('truetype');
+      font-family: 'POMI Noto Sans SC Subset';
+      src: url('assets/assets/fonts/pomi_web_subset/NotoSansSC-Bold.ttf') format('truetype');
       font-style: normal;
       font-weight: 700;
-      font-display: block;
+      font-display: swap;
     }
     @font-face {
-      font-family: 'Noto Sans SC';
-      src: url('assets/assets/fonts/NotoSansSC-ExtraBold.ttf') format('truetype');
+      font-family: 'POMI Noto Sans SC Subset';
+      src: url('assets/assets/fonts/pomi_web_subset/NotoSansSC-ExtraBold.ttf') format('truetype');
       font-style: normal;
       font-weight: 800;
-      font-display: block;
+      font-display: swap;
     }
     html,
     body {
@@ -43,12 +43,66 @@
       margin: 0;
       overflow: hidden;
       background: #f8f5fa;
-      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Noto Sans SC', sans-serif;
+      font-family: 'POMI Noto Sans SC Subset', sans-serif;
+    }
+
+    #pomi-loading {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      color: #6a4c93;
+      background:
+        radial-gradient(circle at 100% 0%, rgba(221, 245, 255, .72), transparent 54%),
+        radial-gradient(circle at 100% 36%, rgba(110, 80, 230, .30), transparent 58%),
+        radial-gradient(circle at 0% 72%, rgba(242, 154, 211, .28), transparent 62%),
+        #fffefa;
+      font-size: 14px;
+      font-weight: 700;
+      transition: opacity 180ms ease;
+    }
+
+    #pomi-loading.is-hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .pomi-loading-spinner {
+      width: 30px;
+      height: 30px;
+      box-sizing: border-box;
+      border: 3px solid rgba(106, 76, 147, .18);
+      border-top-color: #6a4c93;
+      border-radius: 50%;
+      animation: pomi-spin 800ms linear infinite;
+    }
+
+    @keyframes pomi-spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .pomi-loading-spinner { animation-duration: 1600ms; }
     }
   </style>
 </head>
 <body>
+  <div id="pomi-loading" role="status" aria-live="polite">
+    <span class="pomi-loading-spinner" aria-hidden="true"></span>
+    <span>POMI 加载中…</span>
+  </div>
   <script>
+    window.addEventListener('flutter-first-frame', () => {
+      const loading = document.getElementById('pomi-loading');
+      if (!loading) return;
+      loading.classList.add('is-hidden');
+      window.setTimeout(() => loading.remove(), 220);
+    }, { once: true });
+
     // Prevent an older Flutter service worker from serving stale Dart output
     // in the local preview. The preview is intentionally a live build, not a
     // PWA cache.

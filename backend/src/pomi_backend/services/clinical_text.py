@@ -44,11 +44,7 @@ def _record_data(
     confirmed = record.confirmed_payload
     keys = sorted(set(original) | set(confirmed))
     corrected = sum(original.get(key) != confirmed.get(key) for key in keys)
-    required = (
-        ("findings_text", "conclusion_text")
-        if isinstance(record, ImagingReport)
-        else ("visit_date", "diagnosis_summary", "medical_advice")
-    )
+    required = ()
     return {
         "record_id": record.id,
         "task_id": task.id,
@@ -128,15 +124,6 @@ class ClinicalTextConfirmationService:
         revision = self.documents.revision(task.document_id, task.document_revision_id)
         if document is None or revision is None:
             raise BusinessError("RESOURCE_NOT_FOUND", "OCR source revision was not found.", 404)
-
-        decision_issues = self._decision_issues(payload, confirmed, result)
-        if decision_issues:
-            raise BusinessError(
-                "OCR_CONFIRMATION_INVALID",
-                "Resolve the highlighted fields before confirmation.",
-                422,
-                details={"fields": decision_issues},
-            )
 
         if not self.ocr.claim_confirmation(task.id, now=utc_now()):
             self.session.rollback()
@@ -285,7 +272,6 @@ class ClinicalTextConfirmationService:
     ) -> list[dict[str, str]]:
         final_values = confirmed.model_dump(mode="json")
         known_paths = {field.field_path for field in self.ocr.fields(result.id)}
-        required = self._required_fields(confirmed)
         seen: set[str] = set()
         issues: list[dict[str, str]] = []
         for decision in payload.field_confirmations:
@@ -299,15 +285,6 @@ class ClinicalTextConfirmationService:
             elif decision.user_value != final_values.get(decision.field_path):
                 code = "CLINICAL_FIELD_DECISION_VALUE_MISMATCH"
                 message = "字段决定与最终确认值不一致。"
-            elif decision.confirmation_status == "rejected" and decision.field_path in required:
-                code = "CLINICAL_REQUIRED_FIELD_REJECTED"
-                message = "关键字段不能在保存正式记录时标记为拒绝。"
-            elif (
-                decision.confirmation_status == "rejected"
-                and final_values.get(decision.field_path) is not None
-            ):
-                code = "CLINICAL_REJECTED_FIELD_HAS_VALUE"
-                message = "标记为拒绝的可选字段必须清空。"
             seen.add(decision.field_path)
             if code is not None and message is not None:
                 issues.append({"path": decision.field_path, "code": code, "message": message})

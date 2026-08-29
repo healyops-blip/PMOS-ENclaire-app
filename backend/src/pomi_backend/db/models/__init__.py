@@ -2,7 +2,7 @@
 
 from pomi_backend.db.models.auth import UserAccount, UserSession
 from pomi_backend.db.models.clinical_text import ImagingReport, OutpatientRecord
-from pomi_backend.db.models.documents import Document, DocumentRevision
+from pomi_backend.db.models.documents import Document, DocumentDisplayAsset, DocumentRevision
 from pomi_backend.db.models.health import (
     Medication,
     MedicationDaily,
@@ -23,6 +23,7 @@ from pomi_backend.db.models.reports import PatientNote, ReportSnapshot, ReportSo
 
 __all__ = [
     "Document",
+    "DocumentDisplayAsset",
     "DocumentRevision",
     "Medication",
     "ImagingReport",
