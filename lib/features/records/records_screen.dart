@@ -13,38 +13,40 @@ import 'visit_record_detail_screen.dart';
 final recordsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((
   ref,
 ) async {
+  final api = ref.read(apiClientProvider);
+  // 文档、报告、化验项一次性拉齐，作为同一个 AsyncValue 返回。
+  // 三者必须一致刷新：`labObservationsProvider` 曾是独立 provider，导致
+  // 确认新化验单后文档已更新、化验项仍是旧缓存（新卡片显示「0 项结果」，
+  // 看起来像没保存）。/api/documents 列表项已由后端 service.data() 完整
+  // 合并（OCR 草稿临床字段 / display_asset / latest_ocr_status），无需再
+  // 逐个拉详情。
   final values = await Future.wait([
-    ref.read(apiClientProvider).get('/api/documents'),
-    ref.read(apiClientProvider).get('/api/reports'),
+    api.get('/api/documents'),
+    api.get('/api/reports'),
+    api.get('/api/lab-observations'),
   ]);
-  final documentPage = Map<String, dynamic>.from(values[0] as Map);
-  final items = List<Map<String, dynamic>>.from(
-    (documentPage['items'] as List? ?? const []).map(
-      (item) => Map<String, dynamic>.from(item as Map),
-    ),
-  );
-  final documents = await Future.wait(
-    items.map((item) async {
-      final id = item['document_id']?.toString();
-      if (id == null) return item;
-      try {
-        final detail = await ref.read(apiClientProvider).get('/api/documents/$id');
-        return {...item, ...Map<String, dynamic>.from(detail as Map)};
-      } catch (_) {
-        return item;
-      }
-    }),
-  );
-  return {'documents': documents, 'reports': values[1]};
+  final documents = _itemsOf(values[0]);
+  final labs = _itemsOf(values[2]);
+  return {'documents': documents, 'reports': values[1], 'labs': labs};
 });
 
-final labObservationsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-  final value = await ref.read(apiClientProvider).get('/api/lab-observations');
-  final page = Map<String, dynamic>.from(value as Map);
+/// 接受后端分页对象（取 `items`）或已经是列表的值，统一成 `List<Map>`。
+List<Map<String, dynamic>> _itemsOf(Object? value) {
+  final list =
+      value is List
+          ? value
+          : (value is Map ? value['items'] as List? : null) ?? const [];
   return List<Map<String, dynamic>>.from(
-    (page['items'] as List? ?? const []).map((item) => Map<String, dynamic>.from(item as Map)),
+    list.map((item) => Map<String, dynamic>.from(item as Map)),
   );
-});
+}
+
+/// 后端 /api/documents 列表与详情以 `id` 为主键；部分历史/测试数据用 `document_id`。
+/// 统一从两者中解析出文档 ID，避免映射时取到 null 导致化验项过滤失败。
+String? _documentIdOf(Map<String, dynamic> document) {
+  final id = document['document_id']?.toString() ?? document['id']?.toString();
+  return id == null || id.isEmpty ? null : id;
+}
 
 final reportDetailProvider = FutureProvider.autoDispose
     .family<Map<String, dynamic>, String>((ref, reportId) async {
@@ -63,7 +65,6 @@ class RecordsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(recordsProvider);
-    final labsState = ref.watch(labObservationsProvider);
     return Scaffold(
       appBar: null,
       body: state.when(
@@ -89,13 +90,9 @@ class RecordsScreen extends ConsumerWidget {
           // visit timeline and detail presentation. The old document-list UI
           // is not part of this product surface.
           return VisitRecordsPage(
-            labs: labsState.maybeWhen(data: (value) => value, orElse: () => const []),
+            labs: _itemsOf(data['labs']),
             onRecordsChanged: () => ref.invalidate(recordsProvider),
-            documents: List<Map<String, dynamic>>.from(
-              (data['documents'] as List? ?? const []).map(
-                (item) => Map<String, dynamic>.from(item as Map),
-              ),
-            ),
+            documents: _itemsOf(data['documents']),
           );
         },
       ),
@@ -124,6 +121,7 @@ class VisitRecordsPage extends StatelessWidget {
     this.documents = const [],
     this.labs = const [],
     this.onRecordsChanged,
+    this.visitsOverride,
     super.key,
   });
 
@@ -131,9 +129,18 @@ class VisitRecordsPage extends StatelessWidget {
   final List<Map<String, dynamic>> labs;
   final VoidCallback? onRecordsChanged;
 
-  List<VisitRecordDetailData> get visits => documents.isEmpty
-      ? (smokeMode ? smokeVisitRecordDetails : const [])
-      : documents.map((document) => _documentToVisit(document, labs)).toList();
+  /// 仅供 widget 测试注入一组已知的就诊记录来验证列表/详情渲染；
+  /// 生产代码永远不传此参数，走 documents → [_documentToVisit] 管线。
+  @visibleForTesting
+  final List<VisitRecordDetailData>? visitsOverride;
+
+  List<VisitRecordDetailData> get visits =>
+      visitsOverride ??
+      (documents.isEmpty
+          ? (smokeMode ? smokeVisitRecordDetails : const [])
+          : documents
+              .map((document) => _documentToVisit(document, labs))
+              .toList());
 
   static VisitRecordDetailData _documentToVisit(
     Map<String, dynamic> document,
@@ -142,23 +149,33 @@ class VisitRecordsPage extends StatelessWidget {
     final type = document['document_type']?.toString() ?? '医疗资料';
     final name = document['original_file_name']?.toString() ?? type;
     final date = document['uploaded_at']?.toString().split('T').first ?? '最新上传';
-    final documentId = document['document_id']?.toString();
-    final labs = observations
-        .where((item) => item['document_id']?.toString() == documentId)
-        .map(
-          (item) => VisitLabResult(
-            name: item['original_item_name']?.toString() ?? '检查项目',
-            value: item['raw_value']?.toString() ?? item['numeric_value']?.toString() ?? '—',
-            unit: item['standard_unit']?.toString() ?? item['original_unit']?.toString() ?? '',
-            reference: item['reference_range_raw']?.toString() ?? '—',
-            status: switch (item['abnormal_status']?.toString()) {
-              'high' => VisitLabStatus.high,
-              'low' => VisitLabStatus.low,
-              _ => VisitLabStatus.normal,
-            },
-          ),
-        )
-        .toList();
+    final documentId = _documentIdOf(document);
+    final matchedObservations =
+        observations
+            .where((item) => item['document_id']?.toString() == documentId)
+            .toList();
+    final labs =
+        matchedObservations
+            .map(
+              (item) => VisitLabResult(
+                name: item['original_item_name']?.toString() ?? '检查项目',
+                value:
+                    item['raw_value']?.toString() ??
+                    item['numeric_value']?.toString() ??
+                    '—',
+                unit:
+                    item['standard_unit']?.toString() ??
+                    item['original_unit']?.toString() ??
+                    '',
+                reference: item['reference_range_raw']?.toString() ?? '—',
+                status: switch (item['abnormal_status']?.toString()) {
+                  'high' => VisitLabStatus.high,
+                  'low' => VisitLabStatus.low,
+                  _ => VisitLabStatus.normal,
+                },
+              ),
+            )
+            .toList();
 
     // 影像文字报告：检查所见/结论/部位/检查方式等专属字段。
     if (type == 'imaging_text_report') {
@@ -166,11 +183,17 @@ class VisitRecordsPage extends StatelessWidget {
       final conclusion = document['conclusion_text']?.toString();
       final fields = <VisitClinicalField>[
         if (_nonEmpty(document['examination_name']))
-          VisitClinicalField(label: '检查名称', value: document['examination_name']!),
+          VisitClinicalField(
+            label: '检查名称',
+            value: document['examination_name']!,
+          ),
         if (_nonEmpty(document['body_part']))
           VisitClinicalField(label: '检查部位', value: document['body_part']!),
         if (_nonEmpty(document['examination_method']))
-          VisitClinicalField(label: '检查方法', value: document['examination_method']!),
+          VisitClinicalField(
+            label: '检查方法',
+            value: document['examination_method']!,
+          ),
         if (findings != null)
           VisitClinicalField(label: '检查所见', value: findings),
         if (conclusion != null)
@@ -179,8 +202,14 @@ class VisitRecordsPage extends StatelessWidget {
       return VisitRecordDetailData(
         id: documentId ?? name,
         date: date,
-        hospital: document['hospital_name']?.toString() ?? document['hospital']?.toString() ?? '上传资料',
-        department: document['department_name']?.toString() ?? document['department']?.toString() ?? '影像检查',
+        hospital:
+            document['hospital_name']?.toString() ??
+            document['hospital']?.toString() ??
+            '上传资料',
+        department:
+            document['department_name']?.toString() ??
+            document['department']?.toString() ??
+            '影像检查',
         doctor: document['attending_doctor']?.toString() ?? '待核验',
         verificationState: VisitVerificationState.unverified,
         verificationLabel: '待核验',
@@ -190,9 +219,10 @@ class VisitRecordsPage extends StatelessWidget {
           VisitRecordSummaryItem(
             title: '影像报告',
             category: VisitRecordCategory.lab,
-            trailing: labs.isEmpty
-                ? (findings != null ? '已识别检查所见' : '已上传')
-                : '${labs.length} 项结果',
+            trailing:
+                labs.isEmpty
+                    ? (findings != null ? '已识别检查所见' : '已上传')
+                    : '${labs.length} 项结果',
           ),
         ],
         clinicalFields: fields,
@@ -206,7 +236,10 @@ class VisitRecordsPage extends StatelessWidget {
         if (_nonEmpty(document['chief_complaint']))
           VisitClinicalField(label: '主诉', value: document['chief_complaint']!),
         if (_nonEmpty(document['diagnosis_summary']))
-          VisitClinicalField(label: '诊断摘要', value: document['diagnosis_summary']!),
+          VisitClinicalField(
+            label: '诊断摘要',
+            value: document['diagnosis_summary']!,
+          ),
         if (_nonEmpty(document['treatment_plan']))
           VisitClinicalField(label: '处理意见', value: document['treatment_plan']!),
         if (_nonEmpty(document['medical_advice']))
@@ -217,8 +250,14 @@ class VisitRecordsPage extends StatelessWidget {
       return VisitRecordDetailData(
         id: documentId ?? name,
         date: document['visit_date']?.toString().split('T').first ?? date,
-        hospital: document['hospital_name']?.toString() ?? document['hospital']?.toString() ?? '上传资料',
-        department: document['department_name']?.toString() ?? document['department']?.toString() ?? '门诊',
+        hospital:
+            document['hospital_name']?.toString() ??
+            document['hospital']?.toString() ??
+            '上传资料',
+        department:
+            document['department_name']?.toString() ??
+            document['department']?.toString() ??
+            '门诊',
         doctor: document['doctor_name']?.toString() ?? '待核验',
         verificationState: VisitVerificationState.unverified,
         verificationLabel: '待核验',
@@ -228,9 +267,8 @@ class VisitRecordsPage extends StatelessWidget {
           VisitRecordSummaryItem(
             title: '门诊病历',
             category: VisitRecordCategory.outpatient,
-            trailing: _nonEmpty(document['diagnosis_summary'])
-                ? '已识别诊断'
-                : '已上传',
+            trailing:
+                _nonEmpty(document['diagnosis_summary']) ? '已识别诊断' : '已上传',
           ),
         ],
         clinicalFields: fields,
@@ -239,7 +277,8 @@ class VisitRecordsPage extends StatelessWidget {
     }
 
     // 医嘱 / 处方：药品清单。
-    final medications = (document['medication_suggestions'] as List? ?? const [])
+    final medications = (document['medication_suggestions'] as List? ??
+            const [])
         .whereType<Map>()
         .toList(growable: false);
     if (type == 'medical_order') {
@@ -247,7 +286,10 @@ class VisitRecordsPage extends StatelessWidget {
         for (final item in medications)
           VisitOrderItem(
             name: item['drug_name']?.toString() ?? '药品',
-            dosage: item['dosage']?.toString() ?? item['dosage_text']?.toString() ?? '未注明',
+            dosage:
+                item['dosage']?.toString() ??
+                item['dosage_text']?.toString() ??
+                '未注明',
             frequency: item['frequency']?.toString() ?? '未注明',
             change: VisitOrderChange.added,
             note: item['instruction']?.toString(),
@@ -256,8 +298,14 @@ class VisitRecordsPage extends StatelessWidget {
       return VisitRecordDetailData(
         id: documentId ?? name,
         date: date,
-        hospital: document['hospital_name']?.toString() ?? document['hospital']?.toString() ?? '上传资料',
-        department: document['department_name']?.toString() ?? document['department']?.toString() ?? '医嘱处方',
+        hospital:
+            document['hospital_name']?.toString() ??
+            document['hospital']?.toString() ??
+            '上传资料',
+        department:
+            document['department_name']?.toString() ??
+            document['department']?.toString() ??
+            '医嘱处方',
         doctor: document['doctor_name']?.toString() ?? '待核验',
         verificationState: VisitVerificationState.unverified,
         verificationLabel: '待核验',
@@ -272,7 +320,10 @@ class VisitRecordsPage extends StatelessWidget {
         ],
         clinicalFields: [
           if (_nonEmpty(document['diagnosis_summary']))
-            VisitClinicalField(label: '诊断摘要', value: document['diagnosis_summary']!),
+            VisitClinicalField(
+              label: '诊断摘要',
+              value: document['diagnosis_summary']!,
+            ),
           if (_nonEmpty(document['medical_advice']))
             VisitClinicalField(label: '医嘱', value: document['medical_advice']!),
         ],
@@ -281,19 +332,44 @@ class VisitRecordsPage extends StatelessWidget {
     }
 
     // 化验 / 检测报告：医院/日期 + 化验项列表。
+    // 同步识别草稿顶层用 hospital / 无报告级日期；报告级日期改从已确认
+    // 化验项里取（每条化验项都带 sample_date / report_date）。
+    String? firstObservationDate(String key) {
+      for (final item in matchedObservations) {
+        final value = item[key]?.toString();
+        if (value != null && value.isNotEmpty) return value.split('T').first;
+      }
+      return null;
+    }
+
+    final hospitalText =
+        document['hospital_name']?.toString() ??
+        document['hospital']?.toString();
+    final reportDateText =
+        document['report_date']?.toString() ??
+        firstObservationDate('report_date');
+    final sampleDateText =
+        document['sample_date']?.toString() ??
+        firstObservationDate('sample_date');
     final clinical = <VisitClinicalField>[
-      if (_nonEmpty(document['hospital_name']))
-        VisitClinicalField(label: '医院', value: document['hospital_name']!),
-      if (_nonEmpty(document['report_date']))
-        VisitClinicalField(label: '报告日期', value: document['report_date']!),
-      if (_nonEmpty(document['sample_date']))
-        VisitClinicalField(label: '采样日期', value: document['sample_date']!),
+      if (_nonEmpty(hospitalText))
+        VisitClinicalField(label: '医院', value: hospitalText!),
+      if (_nonEmpty(reportDateText))
+        VisitClinicalField(label: '报告日期', value: reportDateText!),
+      if (_nonEmpty(sampleDateText))
+        VisitClinicalField(label: '采样日期', value: sampleDateText!),
     ];
     return VisitRecordDetailData(
       id: documentId ?? name,
       date: date,
-      hospital: document['hospital_name']?.toString() ?? document['hospital']?.toString() ?? '上传资料',
-      department: document['department_name']?.toString() ?? document['department']?.toString() ?? type,
+      hospital:
+          document['hospital_name']?.toString() ??
+          document['hospital']?.toString() ??
+          '上传资料',
+      department:
+          document['department_name']?.toString() ??
+          document['department']?.toString() ??
+          type,
       doctor: '待核验',
       verificationState: VisitVerificationState.unverified,
       verificationLabel: '待核验',
@@ -392,24 +468,24 @@ class VisitRecordsPage extends StatelessWidget {
 
   Future<void> _showUpload(BuildContext context) async {
     await showDialog<void>(
-    context: context,
-    barrierColor: pomiInk.withValues(alpha: .22),
-    builder:
-        (context) => Dialog(
-          backgroundColor: Colors.transparent,
-          surfaceTintColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(
-            horizontal: 18,
-            vertical: 34,
-          ),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.sizeOf(context).height * .84,
+      context: context,
+      barrierColor: pomiInk.withValues(alpha: .22),
+      builder:
+          (context) => Dialog(
+            backgroundColor: Colors.transparent,
+            surfaceTintColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 18,
+              vertical: 34,
             ),
-            child: const UploadScreen(modal: true),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height * .84,
+              ),
+              child: const UploadScreen(modal: true),
+            ),
           ),
-        ),
-  );
+    );
     onRecordsChanged?.call();
   }
 }
@@ -1269,7 +1345,7 @@ class _ReportsList extends ConsumerWidget {
                         child: Icon(Icons.summarize_outlined),
                       ),
                       title: const Text('数据汇总'),
-                      subtitle: Text(report['generated_at'].toString()),
+                      subtitle: Text(report['generated_at']?.toString() ?? '—'),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () async {
                         final detail = await ref
@@ -1408,16 +1484,22 @@ class _ReportViewerState extends ConsumerState<ReportViewer> {
 
   @override
   Widget build(BuildContext context) {
+    // snapshot 由后端快照 JSON 反序列化而来；历史/异常数据可能为 null，
+    // 统一兜底为空结构，避免 `as Map` 强转在渲染时抛 TypeError 红屏。
     final snapshot = Map<String, dynamic>.from(
-      widget.report['snapshot'] as Map,
+      widget.report['snapshot'] as Map? ?? const <String, dynamic>{},
     );
-    final summary = Map<String, dynamic>.from(snapshot['summary'] as Map);
+    final summary = Map<String, dynamic>.from(
+      snapshot['summary'] as Map? ?? const <String, dynamic>{},
+    );
     final profile = Map<String, dynamic>.from(
       summary['profile'] as Map? ?? const {},
     );
     summary['patient_name'] = profile['nickname'];
     summary['patient_statement'] = summary['patient_note_text'];
-    final trends = Map<String, dynamic>.from(snapshot['trends'] as Map);
+    final trends = Map<String, dynamic>.from(
+      snapshot['trends'] as Map? ?? const <String, dynamic>{},
+    );
     final medicines = List<Map<String, dynamic>>.from(
       (summary['current_medications'] as List? ?? []).map((item) {
         final value = Map<String, dynamic>.from(item as Map);
@@ -1846,7 +1928,7 @@ class _ReportSummaryLayer extends StatelessWidget {
                 color: pomiPurple,
               ),
               title: const Text('就诊记录'),
-              subtitle: Text('$sourceCount 次历史，1 次当前'),
+              subtitle: Text('$sourceCount 份材料来源'),
               trailing: const Icon(Icons.chevron_right, color: pomiMuted),
               onTap: onOpenSources,
             ),

@@ -29,16 +29,28 @@ void main() {
         overrides: [
           recordsProvider.overrideWith(
             (ref) async => {
-              'documents': {
-                'items': [
-                  {
-                    'id': 'document-1',
-                    'document_type': 'lab_report',
-                    'original_file_name': '真实化验单.pdf',
-                    'latest_ocr_status': 'confirmed',
-                  },
-                ],
-              },
+              'documents': [
+                {
+                  'id': 'document-1',
+                  'document_type': 'lab_report',
+                  'original_file_name': '真实化验单.pdf',
+                  'latest_ocr_status': 'confirmed',
+                  'hospital': '真实三甲医院',
+                },
+              ],
+              // 化验项与文档同属一个 recordsProvider payload：确认入库后
+              // 二者必须一起刷新，卡片才不会显示「0 项结果」。
+              'labs': [
+                {
+                  'document_id': 'document-1',
+                  'original_item_name': '空腹血糖',
+                  'raw_value': '5.2',
+                  'standard_unit': 'mmol/L',
+                  'reference_range_raw': '3.9-6.1',
+                  'abnormal_status': 'normal',
+                  'report_date': '2026-08-20',
+                },
+              ],
               'reports': {'items': <Map<String, dynamic>>[]},
             },
           ),
@@ -49,6 +61,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('真实化验单.pdf'), findsOneWidget);
+    expect(find.text('1 项结果'), findsOneWidget);
     expect(find.text('模拟数据'), findsNothing);
     expect(find.textContaining('模拟医院'), findsNothing);
   });

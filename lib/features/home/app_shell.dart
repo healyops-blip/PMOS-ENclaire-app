@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
 import '../../core/api_client.dart';
@@ -8,14 +9,14 @@ import '../records/records_screen.dart';
 import '../tracking/tracking_screen.dart';
 import '../upload/upload_screen.dart';
 
-class AppShell extends StatefulWidget {
+class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
 
   @override
-  State<AppShell> createState() => _AppShellState();
+  ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends ConsumerState<AppShell> {
   int _index = 0;
   // Bottom-navigation entry opens the visit-record list by default;
   // the report viewer is reached explicitly via the dashboard's "指标看板".
@@ -50,6 +51,11 @@ class _AppShellState extends State<AppShell> {
             ),
           ),
     );
+    // 上传弹窗关闭后强制刷新记录列表，确保新确认入库的材料立即出现。
+    // recordsProvider 现在一次性返回文档 + 报告 + 化验项，刷新它即可。
+    if (mounted) {
+      ref.invalidate(recordsProvider);
+    }
   }
 
   void _openRecords({bool reports = false}) => setState(() {
