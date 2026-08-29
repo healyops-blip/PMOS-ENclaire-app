@@ -112,6 +112,35 @@ void main() {
     },
   );
 
+  test(
+    'tolerates numeric strings for height_cm in legacy draft responses',
+    () async {
+      final api = FakeApiClient(
+        handler: (call) => {
+          'id': 'draft-1',
+          'current_step': 'basic',
+          // Legacy server draft serialized Decimal as a string.
+          'basic': {
+            'nickname': 'Pomi',
+            'birth_year': 1997,
+            'diagnosis_year': null,
+            'height_cm': '165.5',
+            'weight_kg': '58.3',
+            'updated_at': null,
+          },
+          'cycle': null,
+          'medications': null,
+          'updated_at': '2026-08-28T01:02:03Z',
+        },
+      );
+
+      final loaded = await OnboardingRepository(api).getDraft();
+
+      expect(loaded.basic?.heightCm, 165.5);
+      expect(loaded.basic?.weightKg, 58.3);
+    },
+  );
+
   test('Smoke onboarding preserves the complete response contract', () async {
     FlutterSecureStorage.setMockInitialValues({});
     final repository = OnboardingRepository(
