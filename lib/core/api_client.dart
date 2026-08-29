@@ -36,6 +36,7 @@ class ApiFailure implements Exception {
     this.statusCode,
     this.retryAfterSeconds,
     this.requestId,
+    this.details,
   });
 
   final String code;
@@ -43,6 +44,19 @@ class ApiFailure implements Exception {
   final int? statusCode;
   final int? retryAfterSeconds;
   final String? requestId;
+
+  /// 后端 `error.details` 原样透传，供表单按 `fields[]` 高亮出错项。
+  final Map<String, dynamic>? details;
+
+  /// `error.details.fields` 规范化为 `[{path, code, message}]`。
+  List<Map<String, dynamic>> get fieldIssues {
+    final raw = details?['fields'];
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList(growable: false);
+  }
 
   @override
   String toString() => message;
@@ -181,6 +195,12 @@ class ApiClient {
           _userMessage(code, null),
           statusCode: response.statusCode,
           requestId: requestId,
+          details:
+              apiError is Map
+                  ? Map<String, dynamic>.from(
+                    apiError['details'] as Map? ?? const {},
+                  )
+                  : null,
         );
       }
       if (body is Map && body.length == 1 && body.containsKey('data')) {
@@ -209,6 +229,9 @@ class ApiClient {
         statusCode: error.response?.statusCode,
         retryAfterSeconds: retryAfter,
         requestId: requestId,
+        details: Map<String, dynamic>.from(
+          apiError['details'] as Map? ?? const {},
+        ),
       );
     }
     return ApiFailure(

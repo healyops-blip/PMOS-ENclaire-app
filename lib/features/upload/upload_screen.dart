@@ -136,6 +136,13 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('资料已确认，可在“记录”中查看和认证')));
+        // 弹窗模式：确认成功后自动关闭上传弹窗，让打开它的入口
+        // （AppShell / 记录页）在 showDialog 返回时立即刷新记录列表。
+        // 否则弹窗停在原地，记录页拿不到刷新信号，新材料要重启才出现。
+        if (widget.modal && Navigator.canPop(context)) {
+          Navigator.of(context).pop();
+          return;
+        }
         setState(() {
           _bytes = null;
           _fileName = null;
@@ -325,6 +332,13 @@ class OcrConfirmScreen extends ConsumerStatefulWidget {
 class _OcrConfirmScreenState extends ConsumerState<OcrConfirmScreen> {
   late Map<String, dynamic> _draft;
   bool _saving = false;
+  final _scrollController = ScrollController();
+
+  /// 归一化后的草稿字段路径（如 `examinations.0.value`）-> 出错原因。
+  final Map<String, String> _fieldErrors = {};
+
+  /// 顶部错误横幅逐条文案，覆盖所有出错项（包括无法定位到输入框的）。
+  List<String> _errorSummary = const [];
 
   @override
   void initState() {
@@ -334,16 +348,82 @@ class _OcrConfirmScreenState extends ConsumerState<OcrConfirmScreen> {
     );
   }
 
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  /// 后端错误路径 -> 草稿输入框路径。
+  /// 化验项后端前缀是 `items.`，草稿里在 `examinations.` 下，字段名 `name` 对应
+  /// 草稿的 `item_name`；影像/门诊后端包了一层 `confirmed_data.`。
+  static String _toDraftPath(String backendPath) {
+    var path = backendPath;
+    if (path.startsWith('confirmed_data.')) {
+      path = path.substring('confirmed_data.'.length);
+    }
+    if (path.startsWith('items.')) {
+      path = 'examinations.${path.substring('items.'.length)}';
+      if (path.endsWith('.name')) {
+        path = '${path.substring(0, path.length - '.name'.length)}.item_name';
+      }
+    }
+    const topRemap = {
+      'hospital_name': 'hospital',
+      'department_name': 'department',
+    };
+    return topRemap[path] ?? path;
+  }
+
+  String _friendlyLabel(String draftPath) {
+    final parts = <String>[];
+    for (final part in draftPath.split('.')) {
+      final index = int.tryParse(part);
+      parts.add(
+        index != null ? '第 ${index + 1} 项' : (_JsonFields.labels[part] ?? part),
+      );
+    }
+    return parts.join(' · ');
+  }
+
+  void _applyFieldIssues(List<Map<String, dynamic>> issues) {
+    _fieldErrors.clear();
+    final summary = <String>[];
+    for (final issue in issues) {
+      final backendPath = issue['path']?.toString() ?? '';
+      final message = issue['message']?.toString() ?? '该项未通过校验';
+      final draftPath = _toDraftPath(backendPath);
+      _fieldErrors[draftPath] = message;
+      summary.add(
+        backendPath.isEmpty
+            ? message
+            : '「${_friendlyLabel(draftPath)}」$message',
+      );
+    }
+    setState(() => _errorSummary = summary);
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
   Future<void> _confirm() async {
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _errorSummary = const [];
+      _fieldErrors.clear();
+    });
     try {
       final api = ref.read(apiClientProvider);
       final materialType = widget.materialType;
       final endpoint =
           materialType == 'imaging_text_report' ||
-              materialType == 'outpatient_record'
-          ? '/api/ocr/tasks/${widget.taskId}/confirm'
-          : '/api/ocr/results/${widget.resultId}/confirm';
+                  materialType == 'outpatient_record'
+              ? '/api/ocr/tasks/${widget.taskId}/confirm'
+              : '/api/ocr/results/${widget.resultId}/confirm';
       final payload = buildOcrConfirmationPayload(
         _draft,
         materialType: materialType,
@@ -353,6 +433,15 @@ class _OcrConfirmScreenState extends ConsumerState<OcrConfirmScreen> {
       );
       await api.post(endpoint, data: payload);
       if (mounted) Navigator.pop(context, true);
+    } on ApiFailure catch (error) {
+      if (!mounted) return;
+      if (error.fieldIssues.isNotEmpty) {
+        _applyFieldIssues(error.fieldIssues);
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -369,8 +458,40 @@ class _OcrConfirmScreenState extends ConsumerState<OcrConfirmScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('核对识别结果')),
       body: ListView(
+        controller: _scrollController,
         padding: const EdgeInsets.fromLTRB(18, 8, 18, 100),
         children: [
+          if (_errorSummary.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: PomiGlassCard(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '有 ${_errorSummary.length} 处需要修正',
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    for (final line in _errorSummary)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text('· $line'),
+                      ),
+                  ],
+                ),
+              ),
+            ),
           if (widget.resultSource == 'fallback')
             Padding(
               padding: const EdgeInsets.only(bottom: 16),
@@ -395,6 +516,10 @@ class _OcrConfirmScreenState extends ConsumerState<OcrConfirmScreen> {
           const SizedBox(height: 18),
           _JsonFields(
             value: _draft,
+            fieldErrors: _fieldErrors,
+            onErrorCleared: (path) {
+              if (_fieldErrors.remove(path) != null) setState(() {});
+            },
             onChanged:
                 (value) => _draft = Map<String, dynamic>.from(value as Map),
           ),
@@ -413,11 +538,25 @@ class _OcrConfirmScreenState extends ConsumerState<OcrConfirmScreen> {
 }
 
 class _JsonFields extends StatelessWidget {
-  const _JsonFields({required this.value, required this.onChanged, this.label});
+  const _JsonFields({
+    required this.value,
+    required this.onChanged,
+    this.label,
+    this.path = '',
+    this.fieldErrors = const {},
+    this.onErrorCleared,
+  });
 
   final dynamic value;
   final ValueChanged<dynamic> onChanged;
   final String? label;
+
+  /// 当前节点在草稿里的点分路径，用于匹配后端 `fields[]` 的出错项。
+  final String path;
+  final Map<String, String> fieldErrors;
+  final ValueChanged<String>? onErrorCleared;
+
+  String _childPath(Object key) => path.isEmpty ? '$key' : '$path.$key';
 
   static const labels = {
     'document_type': '材料类型',
@@ -436,9 +575,12 @@ class _JsonFields extends StatelessWidget {
     'body_part': '检查部位',
     'examination_method': '检查方法',
     'item_name': '项目名称',
+    'name': '项目名称',
     'item_code': '项目代码',
     'raw_value': '原始数值',
     'numeric_value': '数值',
+    'value': '数值',
+    'source_index': '来源序号',
     'unit': '单位',
     'raw_unit': '原始单位',
     'normalized_unit': '标准单位',
@@ -487,6 +629,9 @@ class _JsonFields extends StatelessWidget {
                     child: _JsonFields(
                       label: labels[entry.key] ?? entry.key.toString(),
                       value: entry.value,
+                      path: _childPath(entry.key),
+                      fieldErrors: fieldErrors,
+                      onErrorCleared: onErrorCleared,
                       onChanged: (next) {
                         map[entry.key] = next;
                         onChanged(map);
@@ -522,6 +667,9 @@ class _JsonFields extends StatelessWidget {
                 child: _JsonFields(
                   label: '${label ?? '项目'} ${index + 1}',
                   value: list[index],
+                  path: _childPath(index),
+                  fieldErrors: fieldErrors,
+                  onErrorCleared: onErrorCleared,
                   onChanged: (next) {
                     list[index] = next;
                     onChanged(list);
@@ -534,12 +682,14 @@ class _JsonFields extends StatelessWidget {
       );
     }
     final original = value;
+    final error = fieldErrors[path];
     return TextFormField(
       initialValue: value?.toString() ?? '',
       enabled: label != '材料类型',
       maxLines: _longField(label) ? 3 : 1,
-      decoration: InputDecoration(labelText: label),
+      decoration: InputDecoration(labelText: label, errorText: error),
       onChanged: (text) {
+        if (error != null) onErrorCleared?.call(path);
         if (original is num) {
           onChanged(num.tryParse(text) ?? text);
         } else {
