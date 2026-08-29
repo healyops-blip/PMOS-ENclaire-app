@@ -141,8 +141,9 @@ def normalize_algorithm_payload(payload: dict[str, Any], original_file_name: str
         # Imaging text reports and outpatient records carry material-specific
         # fields that must survive normalization; the generic envelope above
         # drops them, so forward the whole draft's extra keys verbatim.
+        _list_keys = {"examinations", "items", "orders", "medication_suggestions"}
         for key, value in draft.items():
-            if key not in payload and key not in {"examinations", "items", "orders", "medication_suggestions"}:
+            if key not in payload and key not in _list_keys:
                 payload[key] = value
     payload["original_file_name"] = original_file_name
     if evidence is not None:
