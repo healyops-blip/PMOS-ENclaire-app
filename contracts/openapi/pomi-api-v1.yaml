@@ -3002,13 +3002,6 @@ components:
         total_fields:
           type: integer
           minimum: 0
-        corrected_fields:
-          type: integer
-          minimum: 0
-        exact_match_fields:
-          type: integer
-          minimum: 0
-
     ClinicalTextConfirmResult:
       type: object
       required: [record_id, task_id, result_id, created_resource_ids, reconciliation_required, material_type, document_id, document_revision_id, ocr_result_id, confirmed_at, summary, p0_evaluation, reused]

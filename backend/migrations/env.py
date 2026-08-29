@@ -21,7 +21,7 @@ from pomi_backend.db.models import (  # noqa: F401
     OCRFieldResult,
     OCRResult,
     OCRTask,
-    OutpatientRecord,
+    # OutpatientRecord,  # 门诊病历已不再支持
     PatientNote,
     PatientProfile,
     ReportSnapshot,
