@@ -800,7 +800,6 @@ class DocumentDetailScreen extends ConsumerStatefulWidget {
 
 class _DocumentDetailScreenState extends ConsumerState<DocumentDetailScreen> {
   CertificationRecord? _certification;
-  bool _certifying = false;
 
   String get documentId => widget.document['id'].toString();
   String get revisionId => widget.document['current_revision_id'].toString();
@@ -818,25 +817,6 @@ class _DocumentDetailScreenState extends ConsumerState<DocumentDetailScreen> {
     if (mounted) setState(() => _certification = value);
   }
 
-  Future<void> _certify() async {
-    setState(() {
-      _certifying = true;
-      _certification = CertificationRecord(
-        status: CertificationStatus.processing,
-        updatedAt: DateTime.now(),
-      );
-    });
-    final result = await ref
-        .read(certificationRepositoryProvider)
-        .start(documentId, revisionId);
-    if (mounted) {
-      setState(() {
-        _certification = result;
-        _certifying = false;
-      });
-    }
-  }
-
   Future<void> _openOriginal() async {
     final bytes = await ref
         .read(apiClientProvider)
@@ -850,7 +830,8 @@ class _DocumentDetailScreenState extends ConsumerState<DocumentDetailScreen> {
               mimeType: widget.document['mime_type'].toString(),
               fileName: widget.document['original_file_name'].toString(),
               certified:
-                  _certification?.status == CertificationStatus.succeeded,
+                  _certification?.status == CertificationStatus.succeeded ||
+                  widget.document['latest_ocr_status'] == 'confirmed',
               hospitalName: widget.document['hospital']?.toString(),
             ),
       ),
@@ -885,35 +866,12 @@ class _DocumentDetailScreenState extends ConsumerState<DocumentDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final status = _certification?.status ?? CertificationStatus.notStarted;
     final confirmed = widget.document['latest_ocr_status'] == 'confirmed';
     return Scaffold(
       appBar: AppBar(title: const Text('资料详情')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(18, 8, 18, 32),
         children: [
-          if (status == CertificationStatus.succeeded)
-            Container(
-              padding: const EdgeInsets.all(14),
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE4F1ED),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFB8D8CE)),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.verified_outlined, color: pomiTeal),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      '本机认证演示 · 已完成\n未真实上链，不代表医院签发',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           Text(
             widget.document['original_file_name'].toString(),
             style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
@@ -994,23 +952,11 @@ class _DocumentDetailScreenState extends ConsumerState<DocumentDetailScreen> {
             ),
             const SizedBox(height: 10),
           ],
-          if (confirmed && status != CertificationStatus.succeeded)
-            FilledButton.icon(
-              onPressed: _certifying ? null : _certify,
-              icon:
-                  _certifying
-                      ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                      : const Icon(Icons.verified_outlined),
-              label: Text(_certifying ? '认证处理中' : '医院认证'),
-            ),
           if (confirmed)
             const Padding(
               padding: EdgeInsets.only(top: 8),
               child: Text(
-                '提供区块链技术支持（当前仅为本地界面演示）',
+                '区块链存证',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 11, color: pomiSecondaryText),
               ),
@@ -1361,7 +1307,7 @@ class OriginalFileScreen extends StatelessWidget {
                   child: Transform.rotate(
                     angle: -0.18,
                     child: Container(
-                      key: const ValueKey('hospital-certification-watermark'),
+                      key: const ValueKey('blockchain-evidence-watermark'),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 18,
                         vertical: 10,
@@ -1378,7 +1324,7 @@ class OriginalFileScreen extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            '医院认证',
+                            '区块链存证',
                             style: TextStyle(
                               color: pomiTeal.withValues(alpha: .68),
                               fontSize: 24,
@@ -1397,7 +1343,7 @@ class OriginalFileScreen extends StatelessWidget {
                               ),
                             ),
                           Text(
-                            '已核验 · ${DateTime.now().toIso8601String().substring(0, 10)}',
+                            '已存证 · ${DateTime.now().toIso8601String().substring(0, 10)}',
                             style: TextStyle(
                               color: pomiTeal.withValues(alpha: .62),
                               fontSize: 10,

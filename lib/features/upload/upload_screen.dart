@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
+import 'certification_repository.dart';
 
 class UploadScreen extends ConsumerStatefulWidget {
   const UploadScreen({this.modal = false, super.key});
@@ -24,6 +25,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   String? _idempotencyKey;
   String? _status;
   bool _working = false;
+  bool _autoEvidenceAfterCapture = false;
 
   static const typeLabels = {
     'lab': '化验 / 检测',
@@ -42,6 +44,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       setState(() {
         _file = File(path);
         _idempotencyKey = null;
+        _autoEvidenceAfterCapture = false;
       });
       await _start();
     }
@@ -58,6 +61,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       setState(() {
         _file = File(result.path);
         _idempotencyKey = null;
+        _autoEvidenceAfterCapture = true;
       });
       await _start();
     }
@@ -98,14 +102,31 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
               ),
         ),
       );
+      if (mounted && confirmed == true && _autoEvidenceAfterCapture) {
+        final documentId = result['document_id']?.toString();
+        final revisionId = result['document_revision_id']?.toString();
+        if (documentId != null && revisionId != null) {
+          setState(() => _status = '正在完成区块链存证');
+          await ref
+              .read(certificationRepositoryProvider)
+              .start(documentId, revisionId);
+        }
+      }
       if (mounted && confirmed == true) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('资料已确认，可在“记录”中查看和认证')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _autoEvidenceAfterCapture
+                  ? '资料已上传服务器并完成区块链存证，原件已加水印'
+                  : '资料已确认，可在“记录”中查看',
+            ),
+          ),
+        );
         setState(() {
           _file = null;
           _idempotencyKey = null;
           _status = null;
+          _autoEvidenceAfterCapture = false;
         });
       }
     } catch (error) {

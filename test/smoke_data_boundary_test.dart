@@ -99,7 +99,7 @@ void main() {
     expect(find.text('1 条'), findsOneWidget);
   });
 
-  testWidgets('certified original overlays hospital watermark', (tester) async {
+  testWidgets('stored original overlays blockchain evidence watermark', (tester) async {
     usePhoneViewport(tester);
     await tester.pumpWidget(
       app(
@@ -183,10 +183,10 @@ void main() {
       ),
     );
     expect(
-      find.byKey(const ValueKey('hospital-certification-watermark')),
+      find.byKey(const ValueKey('blockchain-evidence-watermark')),
       findsOneWidget,
     );
-    expect(find.text('医院认证'), findsOneWidget);
+    expect(find.text('区块链存证'), findsOneWidget);
     expect(find.text('示例医院'), findsOneWidget);
   });
 
