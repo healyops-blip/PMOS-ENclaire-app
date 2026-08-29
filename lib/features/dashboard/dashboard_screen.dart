@@ -1359,14 +1359,7 @@ class _MonthlyMedicationCalendar extends StatelessWidget {
     final missedDates = _datesWithStatus(statusByDate, 'missed');
     final unrecordedDates = _datesWithStatus(statusByDate, 'unrecorded');
     final takenCount = _datesWithStatus(statusByDate, 'taken').length;
-    DateTime? expectedFrom;
-    for (final date in statusByDate.keys) {
-      final parsed = DateTime.tryParse(date);
-      if (parsed != null &&
-          (expectedFrom == null || parsed.isBefore(expectedFrom))) {
-        expectedFrom = parsed;
-      }
-    }
+    final today = DateUtils.dateOnly(DateTime.now());
     final monthLabel = '${month.year}年${month.month}月';
 
     return SafeArea(
@@ -1405,16 +1398,22 @@ class _MonthlyMedicationCalendar extends StatelessWidget {
                 crossAxisCount: 7,
                 mainAxisSpacing: 8,
                 crossAxisSpacing: 8,
+                childAspectRatio: 1,
               ),
               itemBuilder: (context, index) {
                 final day = cells[index];
                 if (day == null) return const SizedBox.shrink();
                 final date = DateTime(month.year, month.month, day);
-                if (expectedFrom != null && date.isBefore(expectedFrom)) {
-                  return const SizedBox.shrink();
-                }
                 final key = date.toIso8601String().substring(0, 10);
-                final status = statusByDate[key] ?? 'unrecorded';
+                final recorded = statusByDate[key];
+                final String status;
+                if (recorded != null) {
+                  status = recorded;
+                } else if (date.isAfter(today)) {
+                  status = 'future';
+                } else {
+                  status = 'none';
+                }
                 return _MonthStatusCell(day: day, status: status);
               },
             ),
@@ -1475,20 +1474,32 @@ class _MonthStatusCell extends StatelessWidget {
     final (background, foreground) = switch (status) {
       'taken' => (pomiSuccess.withValues(alpha: .14), pomiSuccess),
       'missed' => (pomiCoral.withValues(alpha: .30), const Color(0xFFB85E4D)),
-      _ => (pomiLine.withValues(alpha: .72), pomiSecondaryText),
+      'unrecorded' => (pomiLine.withValues(alpha: .72), pomiSecondaryText),
+      'future' => (
+        Colors.transparent,
+        pomiSecondaryText.withValues(alpha: .35),
+      ),
+      // 'none'：本月内、非应服药日或无记录 —— 只显示浅底日期。
+      _ => (const Color(0xFFF3F1F6), pomiSecondaryText.withValues(alpha: .8)),
     };
     return Tooltip(
       message: switch (status) {
         'taken' => '已服用',
         'missed' => '主动漏服',
-        _ => '未记录',
+        'unrecorded' => '未记录',
+        _ => '$day 日',
       },
       child: Container(
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: background,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: foreground.withValues(alpha: .14)),
+          border: Border.all(
+            color:
+                status == 'future'
+                    ? Colors.transparent
+                    : foreground.withValues(alpha: .14),
+          ),
         ),
         child: Text(
           '$day',

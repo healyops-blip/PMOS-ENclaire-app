@@ -284,6 +284,45 @@ void main() {
     expect(find.text('${yesterday.month}月${yesterday.day}日'), findsOneWidget);
   });
 
+  testWidgets('tapping a day inside an existing cycle opens it for editing', (
+    tester,
+  ) async {
+    usePhoneViewport(tester);
+    final today = DateUtils.dateOnly(DateTime.now());
+    final start = today.subtract(const Duration(days: 3));
+    final end = today.subtract(const Duration(days: 1));
+    String iso(DateTime d) => d.toIso8601String().substring(0, 10);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          trackingProvider.overrideWith(
+            (ref) async => {
+              'cycles': [
+                {
+                  'id': 'cycle-1',
+                  'start_date': iso(start),
+                  'end_date': iso(end),
+                  'flow_level': 'heavy',
+                  'updated_at': '2026-08-20T00:00:00Z',
+                },
+              ],
+              'weights': <Map<String, dynamic>>[],
+            },
+          ),
+        ],
+        child: app(const TrackingScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('${end.day}').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('更新经期记录'), findsOneWidget);
+    expect(find.text('删除这条记录'), findsOneWidget);
+    expect(find.text('${start.month}月${start.day}日'), findsOneWidget);
+  });
+
   testWidgets('today weight can be saved without a future-date warning', (
     tester,
   ) async {

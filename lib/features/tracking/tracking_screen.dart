@@ -32,6 +32,28 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
   DateTime? _cycleEnd;
   String _cycleFlow = 'medium';
 
+  /// 正在编辑的已有经期记录；为空表示新建。
+  Map<String, dynamic>? _editingCycle;
+
+  /// 找出包含 [day] 的已有经期记录（用于点日历时编辑而不是重复新建）。
+  Map<String, dynamic>? _cycleContaining(
+    DateTime day,
+    List<Map<String, dynamic>> cycles,
+  ) {
+    final target = DateUtils.dateOnly(day);
+    for (final cycle in cycles) {
+      final start = DateTime.tryParse(cycle['start_date']?.toString() ?? '');
+      if (start == null) continue;
+      final end =
+          DateTime.tryParse(cycle['end_date']?.toString() ?? '') ?? start;
+      if (!target.isBefore(DateUtils.dateOnly(start)) &&
+          !target.isAfter(DateUtils.dateOnly(end))) {
+        return cycle;
+      }
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(trackingProvider);
@@ -66,19 +88,35 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                   onSelected: (day) {
                     final selected = DateUtils.dateOnly(day);
                     final today = DateUtils.dateOnly(DateTime.now());
-                    setState(() {
-                      _focusedDay = selected;
-                      if (!selected.isAfter(today)) {
-                        _cycleStart = selected;
-                        _cycleEnd = null;
-                        _cycleEditorExpanded = true;
-                      }
-                    });
                     if (selected.isAfter(today)) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('只能记录今天及之前的经期')),
                       );
+                      return;
                     }
+                    final existing = _cycleContaining(selected, cycles);
+                    setState(() {
+                      _focusedDay = selected;
+                      _cycleEditorExpanded = true;
+                      if (existing != null) {
+                        // 点到已有经期内的某天 → 打开这条记录编辑。
+                        _editingCycle = existing;
+                        _cycleStart =
+                            DateTime.tryParse(
+                              existing['start_date']?.toString() ?? '',
+                            ) ??
+                            selected;
+                        _cycleEnd = DateTime.tryParse(
+                          existing['end_date']?.toString() ?? '',
+                        );
+                        _cycleFlow =
+                            existing['flow_level']?.toString() ?? 'medium';
+                      } else {
+                        _editingCycle = null;
+                        _cycleStart = selected;
+                        _cycleEnd = null;
+                      }
+                    });
                   },
                   onAdd:
                       () => _addCycle(context, ref, initialStart: _focusedDay),
@@ -93,6 +131,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                         () => setState(() {
                           _cycleEditorExpanded = !_cycleEditorExpanded;
                           if (_cycleEditorExpanded) {
+                            _editingCycle = null;
                             _cycleStart = _focusedDay;
                             _cycleEnd = null;
                           }
@@ -121,12 +160,17 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                                   end: _cycleEnd,
                                   flow: _cycleFlow,
                                   saving: _savingCycle,
+                                  isEditing: _editingCycle != null,
                                   onStartTap: _selectInlineCycleStart,
                                   onEndTap: _selectInlineCycleEnd,
                                   onFlowChanged:
                                       (value) =>
                                           setState(() => _cycleFlow = value),
                                   onSave: _saveInlineCycle,
+                                  onDelete:
+                                      _editingCycle == null
+                                          ? null
+                                          : _deleteInlineCycle,
                                 )
                                 : const SizedBox.shrink(),
                       ),
@@ -175,18 +219,75 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     if (_savingCycle) return;
     setState(() => _savingCycle = true);
     try {
-      await ref
-          .read(apiClientProvider)
-          .post(
-            '/api/cycles',
-            data: {
-              'start_date': _cycleStart.toIso8601String().substring(0, 10),
-              'end_date': _cycleEnd?.toIso8601String().substring(0, 10),
-              'flow_level': _cycleFlow,
-            },
-          );
+      final api = ref.read(apiClientProvider);
+      final body = {
+        'start_date': _cycleStart.toIso8601String().substring(0, 10),
+        'end_date': _cycleEnd?.toIso8601String().substring(0, 10),
+        'flow_level': _cycleFlow,
+      };
+      final editing = _editingCycle;
+      if (editing != null) {
+        await api.put(
+          '/api/cycles/${editing['id']}',
+          data: {
+            ...body,
+            if (editing['updated_at'] != null)
+              'updated_at': editing['updated_at'],
+          },
+        );
+      } else {
+        await api.post('/api/cycles', data: body);
+      }
       ref.invalidate(trackingProvider);
-      if (mounted) setState(() => _cycleEditorExpanded = false);
+      if (mounted) {
+        setState(() {
+          _cycleEditorExpanded = false;
+          _editingCycle = null;
+        });
+      }
+    } on ApiFailure catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _savingCycle = false);
+    }
+  }
+
+  Future<void> _deleteInlineCycle() async {
+    final editing = _editingCycle;
+    if (editing == null || _savingCycle) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('删除这条经期记录？'),
+            content: const Text('删除后不可恢复。'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('删除'),
+              ),
+            ],
+          ),
+    );
+    if (confirmed != true) return;
+    setState(() => _savingCycle = true);
+    try {
+      await ref.read(apiClientProvider).delete('/api/cycles/${editing['id']}');
+      ref.invalidate(trackingProvider);
+      if (mounted) {
+        setState(() {
+          _cycleEditorExpanded = false;
+          _editingCycle = null;
+        });
+      }
     } on ApiFailure catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -908,16 +1009,20 @@ class _InlineCycleEditor extends StatelessWidget {
     required this.onEndTap,
     required this.onFlowChanged,
     required this.onSave,
+    this.isEditing = false,
+    this.onDelete,
   });
 
   final DateTime start;
   final DateTime? end;
   final String flow;
   final bool saving;
+  final bool isEditing;
   final VoidCallback onStartTap;
   final VoidCallback onEndTap;
   final ValueChanged<String> onFlowChanged;
   final VoidCallback onSave;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -971,8 +1076,16 @@ class _InlineCycleEditor extends StatelessWidget {
                       dimension: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                    : const Text('保存经期记录'),
+                    : Text(isEditing ? '更新经期记录' : '保存经期记录'),
           ),
+          if (isEditing && onDelete != null) ...[
+            const SizedBox(height: 4),
+            TextButton(
+              onPressed: saving ? null : onDelete,
+              style: TextButton.styleFrom(foregroundColor: pomiCoral),
+              child: const Text('删除这条记录'),
+            ),
+          ],
         ],
       ),
     );
