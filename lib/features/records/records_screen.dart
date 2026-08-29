@@ -8,6 +8,7 @@ import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../upload/certification_repository.dart';
 import '../upload/upload_screen.dart';
+import 'visit_record_detail_screen.dart';
 
 final recordsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((
   ref,
@@ -65,7 +66,7 @@ class RecordsScreen extends ConsumerWidget {
             }
             return _ReportsList(reports: reports);
           }
-          if (smokeMode) return const _VisitRecordsPage();
+          if (smokeMode) return const VisitRecordsPage();
           return _DocumentsList(documents: documents);
         },
       ),
@@ -89,86 +90,10 @@ class _ApiReportViewer extends ConsumerWidget {
       );
 }
 
-class _VisitRecordsPage extends StatelessWidget {
-  const _VisitRecordsPage();
+class VisitRecordsPage extends StatelessWidget {
+  const VisitRecordsPage({super.key});
 
-  static const visits = [
-    _VisitRecordData(
-      date: '2026-08-26',
-      status: '已核验',
-      statusTone: _VisitStatusTone.purple,
-      hospital: '模拟医院 B · 生殖内分泌科 · 陈医生',
-      rows: [
-        _VisitRecordRowData(
-          title: '化验单',
-          tag: '化验/检测',
-          tone: _VisitTagTone.purple,
-          trailing: '采样 2026-08-25',
-        ),
-        _VisitRecordRowData(
-          title: '医嘱',
-          tag: '医嘱/处方',
-          tone: _VisitTagTone.mint,
-          trailing: '2026-08-26',
-        ),
-      ],
-    ),
-    _VisitRecordData(
-      date: '2026-07-12',
-      status: '未核验',
-      statusTone: _VisitStatusTone.blue,
-      hospital: '模拟医院 A · 妇科 · 李医生',
-      rows: [
-        _VisitRecordRowData(
-          title: '门诊病历',
-          tag: '门诊病历',
-          tone: _VisitTagTone.amber,
-        ),
-        _VisitRecordRowData(
-          title: '医嘱',
-          tag: '医嘱/处方',
-          tone: _VisitTagTone.mint,
-        ),
-      ],
-    ),
-    _VisitRecordData(
-      date: '2026-06-20',
-      status: '未核验',
-      statusTone: _VisitStatusTone.gray,
-      hospital: '模拟医院 A · 妇科 · 李医生 · 就诊前检测',
-      rows: [
-        _VisitRecordRowData(
-          title: '化验单',
-          tag: '化验/检测',
-          tone: _VisitTagTone.purple,
-        ),
-      ],
-    ),
-    _VisitRecordData(
-      date: '2026-02-08',
-      note: '* 此数据超过 6 个月，仅供参考',
-      hospital: '模拟医院 A · 妇科 · 李医生',
-      rows: [
-        _VisitRecordRowData(
-          title: '门诊病历',
-          tag: '门诊病历',
-          tone: _VisitTagTone.amber,
-        ),
-      ],
-    ),
-    _VisitRecordData(
-      date: '2025-12-14',
-      note: '* 此数据超过 6 个月，仅供参考',
-      hospital: '模拟医院 C · 内分泌科 · 周医生',
-      rows: [
-        _VisitRecordRowData(
-          title: '化验单',
-          tag: '化验/检测',
-          tone: _VisitTagTone.purple,
-        ),
-      ],
-    ),
-  ];
+  static const visits = smokeVisitRecordDetails;
 
   @override
   Widget build(BuildContext context) {
@@ -352,50 +277,21 @@ class _DocumentIcon extends StatelessWidget {
   }
 }
 
-enum _VisitStatusTone { purple, blue, gray }
-
-enum _VisitTagTone { purple, mint, amber }
-
-class _VisitRecordData {
-  const _VisitRecordData({
-    required this.date,
-    required this.hospital,
-    required this.rows,
-    this.status,
-    this.statusTone = _VisitStatusTone.gray,
-    this.note,
-  });
-
-  final String date;
-  final String hospital;
-  final List<_VisitRecordRowData> rows;
-  final String? status;
-  final _VisitStatusTone statusTone;
-  final String? note;
-}
-
-class _VisitRecordRowData {
-  const _VisitRecordRowData({
-    required this.title,
-    required this.tag,
-    required this.tone,
-    this.trailing,
-  });
-
-  final String title;
-  final String tag;
-  final _VisitTagTone tone;
-  final String? trailing;
-}
-
 class _VisitRecordCard extends StatelessWidget {
   const _VisitRecordCard({required this.visit});
 
-  final _VisitRecordData visit;
+  final VisitRecordDetailData visit;
 
   @override
   Widget build(BuildContext context) {
     return PomiGlassCard(
+      key: ValueKey('visit-record-${visit.id}'),
+      onTap:
+          () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (context) => VisitRecordDetailScreen(visit: visit),
+            ),
+          ),
       borderRadius: 20,
       backgroundOpacity: .36,
       child: Column(
@@ -414,30 +310,29 @@ class _VisitRecordCard extends StatelessWidget {
                             visit.date,
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
-                          if (visit.status != null) ...[
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: _VisitStatusBadge(
-                                text: visit.status!,
-                                tone: visit.statusTone,
-                              ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: _VisitStatusBadge(
+                              text: visit.verificationLabel,
+                              tone: visit.verificationState,
                             ),
-                          ],
-                          if (visit.note != null) ...[
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                visit.note!,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.labelSmall,
-                              ),
-                            ),
-                          ],
+                          ),
                         ],
                       ),
                       const SizedBox(height: 3),
-                      _VisitMetadataFields(value: visit.hospital),
+                      _VisitMetadataFields(visit: visit),
+                      if (visit.historyNote != null) ...[
+                        const SizedBox(height: 5),
+                        Text(
+                          '超过 6 个月 · 仅供参考',
+                          style: Theme.of(
+                            context,
+                          ).textTheme.labelSmall?.copyWith(
+                            color: const Color(0xFF9B6818),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 3),
                       const Align(
                         alignment: Alignment.center,
@@ -454,7 +349,21 @@ class _VisitRecordCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right, color: pomiSecondaryText),
+                const SizedBox(width: 8),
+                const Column(
+                  children: [
+                    Icon(Icons.chevron_right_rounded, color: pomiSecondaryText),
+                    SizedBox(height: 2),
+                    Text(
+                      '详情',
+                      style: TextStyle(
+                        color: pomiSecondaryText,
+                        fontSize: 10,
+                        height: 14 / 10,
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -463,9 +372,13 @@ class _VisitRecordCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
             child: Column(
               children: [
-                for (var index = 0; index < visit.rows.length; index++) ...[
-                  _VisitRecordRow(row: visit.rows[index]),
-                  if (index != visit.rows.length - 1)
+                for (
+                  var index = 0;
+                  index < visit.summaryItems.length;
+                  index++
+                ) ...[
+                  _VisitRecordRow(row: visit.summaryItems[index]),
+                  if (index != visit.summaryItems.length - 1)
                     const SizedBox(height: 10),
                 ],
               ],
@@ -478,23 +391,37 @@ class _VisitRecordCard extends StatelessWidget {
 }
 
 class _VisitMetadataFields extends StatelessWidget {
-  const _VisitMetadataFields({required this.value});
+  const _VisitMetadataFields({required this.visit});
 
-  final String value;
+  final VisitRecordDetailData visit;
 
   @override
   Widget build(BuildContext context) {
-    final fields = value
-        .split(' · ')
-        .map((field) => field.trim())
-        .where((field) => field.isNotEmpty)
-        .toList(growable: false);
     return Wrap(
       spacing: 12,
       runSpacing: 2,
       children: [
-        for (final field in fields)
-          Text(field, style: Theme.of(context).textTheme.bodySmall),
+        Text(
+          visit.hospital,
+          key: ValueKey('visit-hospital-${visit.id}'),
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        Text(
+          visit.department,
+          key: ValueKey('visit-department-${visit.id}'),
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        Text(
+          visit.doctor,
+          key: ValueKey('visit-doctor-${visit.id}'),
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        if (visit.contextLabel != null)
+          Text(
+            visit.contextLabel!,
+            key: ValueKey('visit-context-${visit.id}'),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
       ],
     );
   }
@@ -504,20 +431,23 @@ class _VisitStatusBadge extends StatelessWidget {
   const _VisitStatusBadge({required this.text, required this.tone});
 
   final String text;
-  final _VisitStatusTone tone;
+  final VisitVerificationState tone;
 
   @override
   Widget build(BuildContext context) {
     final (background, foreground) = switch (tone) {
-      _VisitStatusTone.purple => (
+      VisitVerificationState.verified || VisitVerificationState.archived => (
         pomiPurple.withValues(alpha: .10),
         pomiPurple,
       ),
-      _VisitStatusTone.blue => (
+      VisitVerificationState.pending => (
         const Color(0xFFE4F1FF),
         const Color(0xFF2F81C5),
       ),
-      _VisitStatusTone.gray => (const Color(0xFFF1F0F3), pomiSecondaryText),
+      VisitVerificationState.unverified => (
+        const Color(0xFFF1F0F3),
+        pomiSecondaryText,
+      ),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
@@ -541,17 +471,26 @@ class _VisitStatusBadge extends StatelessWidget {
 class _VisitRecordRow extends StatelessWidget {
   const _VisitRecordRow({required this.row});
 
-  final _VisitRecordRowData row;
+  final VisitRecordSummaryItem row;
 
   @override
   Widget build(BuildContext context) {
-    final (background, foreground) = switch (row.tone) {
-      _VisitTagTone.purple => (pomiPurple.withValues(alpha: .09), pomiPurple),
-      _VisitTagTone.mint => (
+    final (tag, background, foreground) = switch (row.category) {
+      VisitRecordCategory.lab => (
+        '化验/检测',
+        pomiPurple.withValues(alpha: .09),
+        pomiPurple,
+      ),
+      VisitRecordCategory.order => (
+        '医嘱/处方',
         pomiMint.withValues(alpha: .12),
         const Color(0xFF169F91),
       ),
-      _VisitTagTone.amber => (const Color(0xFFFFF2D9), const Color(0xFFC78519)),
+      VisitRecordCategory.outpatient => (
+        '门诊病历',
+        const Color(0xFFFFF2D9),
+        const Color(0xFFC78519),
+      ),
     };
     return Row(
       children: [
@@ -569,7 +508,7 @@ class _VisitRecordRow extends StatelessWidget {
             borderRadius: BorderRadius.circular(999),
           ),
           child: Text(
-            row.tag,
+            tag,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: foreground,
               fontWeight: FontWeight.w700,
@@ -577,8 +516,16 @@ class _VisitRecordRow extends StatelessWidget {
           ),
         ),
         if (row.trailing != null) ...[
-          const Spacer(),
-          Text(row.trailing!, style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              row.trailing!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
         ],
       ],
     );
