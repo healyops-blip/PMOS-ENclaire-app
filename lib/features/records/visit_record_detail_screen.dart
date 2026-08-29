@@ -781,8 +781,8 @@ class _LabResultRow extends StatelessWidget {
                       text: result.value,
                       style: TextStyle(
                         color: status.valueColor,
-                        fontSize: 18,
-                        height: 24 / 18,
+                        fontSize: 16,
+                        height: 22 / 16,
                         fontWeight: FontWeight.w800,
                       ),
                     ),

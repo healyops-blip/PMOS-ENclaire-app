@@ -132,7 +132,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       children: [
         const Text(
           '选择材料类型',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 12),
         RadioGroup<String>(
@@ -157,7 +157,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
         const Divider(height: 30),
         const Text(
           '添加原件',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 12),
         Row(
@@ -334,7 +334,7 @@ class _OcrConfirmScreenState extends ConsumerState<OcrConfirmScreen> {
             ),
           const Text(
             '逐项确认',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 6),
           const Text('修改后的内容会与模型原值分开保存。'),
@@ -454,7 +454,7 @@ class _JsonFields extends StatelessWidget {
               child: Text(
                 label!,
                 style: const TextStyle(
-                  fontSize: 17,
+                  fontSize: 16,
                   fontWeight: FontWeight.w800,
                 ),
               ),

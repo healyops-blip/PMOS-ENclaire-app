@@ -69,7 +69,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         nickname.characters.first,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 30,
+                          fontSize: 26,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -234,7 +234,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         const Text(
                           '个人信息',
                           style: TextStyle(
-                            fontSize: 18,
+                            fontSize: 16,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -304,7 +304,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   ),
                           title: const Text(
                             '同意外部文档处理提示',
-                            style: TextStyle(fontSize: 13),
+                            style: TextStyle(fontSize: 12),
                           ),
                           controlAffinity: ListTileControlAffinity.leading,
                         ),

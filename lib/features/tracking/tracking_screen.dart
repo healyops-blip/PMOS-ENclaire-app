@@ -63,14 +63,32 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                   selectedDay: _focusedDay,
                   cycles: cycles,
                   weights: weights,
-                  onSelected: (day) => setState(() => _focusedDay = day),
+                  onSelected: (day) {
+                    final selected = DateUtils.dateOnly(day);
+                    final today = DateUtils.dateOnly(DateTime.now());
+                    setState(() {
+                      _focusedDay = selected;
+                      if (!selected.isAfter(today)) {
+                        _cycleStart = selected;
+                        _cycleEnd = null;
+                        _cycleEditorExpanded = true;
+                      }
+                    });
+                    if (selected.isAfter(today)) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('只能记录今天及之前的经期')),
+                      );
+                    }
+                  },
                   onAdd:
                       () => _addCycle(context, ref, initialStart: _focusedDay),
                 ),
                 const SizedBox(height: 14),
                 _SectionCard(
                   title: '周期统计',
-                  action: TextButton.icon(
+                  icon: Icons.water_drop_outlined,
+                  action: IconButton(
+                    tooltip: _cycleEditorExpanded ? '收起经期记录' : '记录经期',
                     onPressed:
                         () => setState(() {
                           _cycleEditorExpanded = !_cycleEditorExpanded;
@@ -81,9 +99,14 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                         }),
                     icon: Icon(
                       _cycleEditorExpanded ? Icons.remove : Icons.add,
-                      size: 17,
+                      size: 18,
                     ),
-                    label: Text(_cycleEditorExpanded ? '收起' : '记录经期'),
+                    color: pomiInk,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 44,
+                      height: 44,
+                    ),
                   ),
                   child: Column(
                     children: [
@@ -197,7 +220,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                       const Text(
                         '记录经期',
                         style: TextStyle(
-                          fontSize: 20,
+                          fontSize: 18,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -292,97 +315,24 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
   }
 
   Future<void> _addWeight(BuildContext context, WidgetRef ref) async {
-    final controller = TextEditingController();
-    DateTime date = DateTime.now();
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       builder:
-          (sheetContext) => StatefulBuilder(
-            builder:
-                (context, setSheetState) => Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    20,
-                    20,
-                    20,
-                    MediaQuery.viewInsetsOf(sheetContext).bottom + 24,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const Text(
-                        '记录体重',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('日期'),
-                        trailing: Text(
-                          date.toIso8601String().substring(0, 10),
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        onTap: () async {
-                          final value = await showDatePicker(
-                            context: context,
-                            firstDate: DateTime(2000),
-                            lastDate: DateTime.now(),
-                            initialDate: date,
-                          );
-                          if (value != null) setSheetState(() => date = value);
-                        },
-                      ),
-                      TextField(
-                        controller: controller,
-                        autofocus: true,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        decoration: const InputDecoration(
-                          labelText: '体重',
-                          suffixText: 'kg',
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      FilledButton(
-                        onPressed: () async {
-                          final value = double.tryParse(controller.text);
-                          if (value == null) return;
-                          if (date.isAfter(
-                            DateUtils.dateOnly(DateTime.now()),
-                          )) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('只能记录今天及之前的体重')),
-                            );
-                            return;
-                          }
-                          await ref
-                              .read(apiClientProvider)
-                              .post(
-                                '/api/weights',
-                                data: {
-                                  'record_date': date
-                                      .toIso8601String()
-                                      .substring(0, 10),
-                                  'weight_kg': value,
-                                },
-                              );
-                          if (sheetContext.mounted) {
-                            Navigator.pop(sheetContext, true);
-                          }
-                        },
-                        child: const Text('保存'),
-                      ),
-                    ],
-                  ),
-                ),
+          (sheetContext) => _AddWeightSheet(
+            onSave: (date, value) async {
+              await ref
+                  .read(apiClientProvider)
+                  .post(
+                    '/api/weights',
+                    data: {
+                      'record_date': date.toIso8601String().substring(0, 10),
+                      'weight_kg': value,
+                    },
+                  );
+            },
           ),
     );
-    controller.dispose();
     if (saved == true) ref.invalidate(trackingProvider);
   }
 
@@ -418,7 +368,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                           child: Text(
                             '体重记录',
                             style: TextStyle(
-                              fontSize: 20,
+                              fontSize: 18,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
@@ -489,6 +439,118 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
   }
 }
 
+class _AddWeightSheet extends StatefulWidget {
+  const _AddWeightSheet({required this.onSave});
+
+  final Future<void> Function(DateTime date, double value) onSave;
+
+  @override
+  State<_AddWeightSheet> createState() => _AddWeightSheetState();
+}
+
+class _AddWeightSheetState extends State<_AddWeightSheet> {
+  final TextEditingController _controller = TextEditingController();
+  DateTime _date = DateUtils.dateOnly(DateTime.now());
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _selectDate() async {
+    final today = DateUtils.dateOnly(DateTime.now());
+    final value = await showDatePicker(
+      context: context,
+      firstDate: DateTime(2000),
+      lastDate: today,
+      initialDate: _date,
+    );
+    if (value != null && mounted) {
+      setState(() => _date = DateUtils.dateOnly(value));
+    }
+  }
+
+  Future<void> _save() async {
+    final value = double.tryParse(_controller.text);
+    if (value == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请输入有效体重')));
+      return;
+    }
+    final today = DateUtils.dateOnly(DateTime.now());
+    if (_date.isAfter(today)) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('只能记录今天及之前的体重')));
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      await widget.onSave(_date, value);
+      if (mounted) Navigator.pop(context, true);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+    top: false,
+    child: Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        20,
+        20,
+        MediaQuery.viewInsetsOf(context).bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            '记录体重',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 14),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('日期'),
+            trailing: Text(
+              _date.toIso8601String().substring(0, 10),
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            onTap: _saving ? null : _selectDate,
+          ),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            enabled: !_saving,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: '体重',
+              suffixText: 'kg',
+            ),
+          ),
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: _saving ? null : _save,
+            child:
+                _saving
+                    ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                    : const Text('保存'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 class _HorizontalCycleCalendar extends StatefulWidget {
   const _HorizontalCycleCalendar({
     required this.selectedDay,
@@ -527,7 +589,8 @@ class _HorizontalCycleCalendarState extends State<_HorizontalCycleCalendar> {
   @override
   Widget build(BuildContext context) {
     final selected = DateUtils.dateOnly(widget.selectedDay);
-    final start = selected.subtract(const Duration(days: 14));
+    final today = DateUtils.dateOnly(DateTime.now());
+    final start = today.subtract(const Duration(days: 14));
     final dates = List.generate(
       29,
       (index) => start.add(Duration(days: index)),
@@ -551,7 +614,7 @@ class _HorizontalCycleCalendarState extends State<_HorizontalCycleCalendar> {
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         color: pomiInk,
-                        fontSize: 20,
+                        fontSize: 18,
                         height: 28 / 20,
                         fontWeight: FontWeight.w800,
                       ),
@@ -677,7 +740,7 @@ class _HorizontalCalendarDay extends StatelessWidget {
                       '${day.day}',
                       style: TextStyle(
                         color: period ? Colors.white : pomiInk,
-                        fontSize: 14,
+                        fontSize: 13,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -707,10 +770,12 @@ class _HorizontalCalendarDay extends StatelessWidget {
 class _SectionCard extends StatelessWidget {
   const _SectionCard({
     required this.title,
+    required this.icon,
     required this.child,
     required this.action,
   });
   final String title;
+  final IconData icon;
   final Widget child;
   final Widget action;
   @override
@@ -720,19 +785,25 @@ class _SectionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
+          SizedBox(
+            height: 44,
+            child: Row(
+              children: [
+                Icon(icon, size: 15, color: pomiPurple),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      height: 1,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
-              ),
-              action,
-            ],
+                action,
+              ],
+            ),
           ),
           const SizedBox(height: 8),
           child,
@@ -918,44 +989,46 @@ class _WeightTrendCard extends StatelessWidget {
 
     return PomiGlassCard(
       borderRadius: 24,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Row(
-            children: [
-              SizedBox.square(
-                dimension: 36,
-                child: Icon(
+          const SizedBox(
+            height: 44,
+            child: Row(
+              children: [
+                Icon(
                   Icons.monitor_weight_outlined,
-                  size: 36,
+                  size: 15,
                   color: pomiPurple,
                 ),
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  '体重',
-                  style: TextStyle(
-                    color: pomiInk,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w500,
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '体重',
+                    style: TextStyle(
+                      color: pomiInk,
+                      fontSize: 15,
+                      height: 1,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
-              ),
-              Text(
-                '今天',
-                style: TextStyle(
-                  color: pomiSecondaryText,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w400,
+                Text(
+                  '今天',
+                  style: TextStyle(
+                    color: pomiSecondaryText,
+                    fontSize: 12,
+                    height: 15 / 12,
+                    fontWeight: FontWeight.w400,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
           SizedBox(
-            height: 128,
+            height: 80,
             child:
                 values.isEmpty
                     ? Center(
@@ -994,7 +1067,7 @@ class _WeightTrendCard extends StatelessWidget {
                       ),
                     ),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 12),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -1006,7 +1079,7 @@ class _WeightTrendCard extends StatelessWidget {
                         text: latest == null ? '—' : _formatWeight(latest),
                         style: const TextStyle(
                           color: pomiInk,
-                          fontSize: 64,
+                          fontSize: 36,
                           height: 1,
                           fontWeight: FontWeight.w700,
                         ),
@@ -1015,7 +1088,7 @@ class _WeightTrendCard extends StatelessWidget {
                         text: ' kg',
                         style: TextStyle(
                           color: pomiSecondaryText,
-                          fontSize: 24,
+                          fontSize: 14,
                           height: 1,
                           fontWeight: FontWeight.w400,
                         ),
@@ -1061,10 +1134,19 @@ class _DataRow extends StatelessWidget {
   final String? unit;
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 7),
+    padding: const EdgeInsets.symmetric(vertical: 5),
     child: Row(
       children: [
-        Expanded(child: Text(label, style: const TextStyle(color: pomiMuted))),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: pomiMuted,
+              fontSize: 12,
+              height: 15 / 12,
+            ),
+          ),
+        ),
         Text.rich(
           TextSpan(
             children: [
@@ -1072,13 +1154,19 @@ class _DataRow extends StatelessWidget {
                 text: value,
                 style: const TextStyle(
                   color: pomiInk,
+                  fontSize: 12,
+                  height: 15 / 12,
                   fontWeight: FontWeight.w700,
                 ),
               ),
               if (unit != null)
                 TextSpan(
                   text: ' $unit',
-                  style: const TextStyle(color: pomiSecondaryText),
+                  style: const TextStyle(
+                    color: pomiSecondaryText,
+                    fontSize: 12,
+                    height: 15 / 12,
+                  ),
                 ),
             ],
           ),

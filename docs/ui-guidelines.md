@@ -5,9 +5,9 @@
 
 ## 字体与行高
 
-- 中文界面统一使用主题字体 `Noto Sans SC` 及已配置的 fallback 字体。
+- 中文界面优先使用 `PingFang SC（苹方）`，并保留已配置的中文 fallback 字体。
 - 字号和行高必须同时定义，避免不同平台的默认行高导致视觉偏移。
-- 首页问候语使用 14 px 字号、20 px 行高、Light（`FontWeight.w300`）和 `pomiMuted`。
+- 首页问候语使用 14 px 字号、15 px 行高、Light（`FontWeight.w300`）和 `pomiMuted`。
 - 单行文字与图标、头像或其他浮动控件组合时，不使用字体 baseline 猜测对齐；应明确设置行高并按视觉中线对齐。
 
 ## 全局背景
