@@ -3,12 +3,15 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pmos_enclaire/core/api_client.dart';
 import 'package:pmos_enclaire/core/theme.dart';
 import 'package:pmos_enclaire/features/dashboard/dashboard_screen.dart';
 import 'package:pmos_enclaire/features/profile/profile_screen.dart';
 import 'package:pmos_enclaire/features/records/records_screen.dart';
 import 'package:pmos_enclaire/features/tracking/tracking_screen.dart';
 import 'package:pmos_enclaire/features/upload/upload_screen.dart';
+
+import 'support/fake_api_client.dart';
 
 void main() {
   Widget app(Widget child) => MaterialApp(theme: buildPomiTheme(), home: child);
@@ -244,6 +247,75 @@ void main() {
 
     expect(find.text('暂无体重记录'), findsOneWidget);
     expect(find.text('69.8'), findsNothing);
+  });
+
+  testWidgets('tapping a past calendar day opens cycle entry for that day', (
+    tester,
+  ) async {
+    usePhoneViewport(tester);
+    final yesterday = DateUtils.dateOnly(
+      DateTime.now(),
+    ).subtract(const Duration(days: 1));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          trackingProvider.overrideWith(
+            (ref) async => {
+              'cycles': <Map<String, dynamic>>[],
+              'weights': <Map<String, dynamic>>[],
+            },
+          ),
+        ],
+        child: app(const TrackingScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('${yesterday.day}').first);
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('收起经期记录'), findsOneWidget);
+    expect(find.text('开始日期'), findsOneWidget);
+    expect(find.text('${yesterday.month}月${yesterday.day}日'), findsOneWidget);
+  });
+
+  testWidgets('today weight can be saved without a future-date warning', (
+    tester,
+  ) async {
+    usePhoneViewport(tester);
+    final api = FakeApiClient(handler: (_) => <String, dynamic>{});
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          apiClientProvider.overrideWithValue(api),
+          trackingProvider.overrideWith(
+            (ref) async => {
+              'cycles': <Map<String, dynamic>>[],
+              'weights': <Map<String, dynamic>>[],
+            },
+          ),
+        ],
+        child: app(const TrackingScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('查看体重历史'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('记录体重'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '66.5');
+    await tester.tap(find.widgetWithText(FilledButton, '保存'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('只能记录今天及之前的体重'), findsNothing);
+    final call = api.calls.singleWhere((item) => item.path == '/api/weights');
+    expect(call.method, 'POST');
+    expect(
+      (call.data as Map)['record_date'],
+      DateUtils.dateOnly(DateTime.now()).toIso8601String().substring(0, 10),
+    );
+    expect((call.data as Map)['weight_kg'], 66.5);
   });
 
   testWidgets('normal profile does not label a real account as simulated', (

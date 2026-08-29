@@ -33,32 +33,32 @@
   <link rel="manifest" href="manifest.json">
   <style>
     @font-face {
-      font-family: 'POMI Noto Sans SC Subset';
-      src: url('assets/assets/fonts/pomi_web_subset/NotoSansSC-Regular.ttf') format('truetype');
+      font-family: 'Noto Sans SC';
+      src: url('assets/assets/fonts/NotoSansSC-Regular.ttf') format('truetype');
       font-style: normal;
       font-weight: 400;
-      font-display: swap;
+      font-display: block;
     }
     @font-face {
-      font-family: 'POMI Noto Sans SC Subset';
-      src: url('assets/assets/fonts/pomi_web_subset/NotoSansSC-Medium.ttf') format('truetype');
+      font-family: 'Noto Sans SC';
+      src: url('assets/assets/fonts/NotoSansSC-Medium.ttf') format('truetype');
       font-style: normal;
       font-weight: 500;
-      font-display: swap;
+      font-display: block;
     }
     @font-face {
-      font-family: 'POMI Noto Sans SC Subset';
-      src: url('assets/assets/fonts/pomi_web_subset/NotoSansSC-Bold.ttf') format('truetype');
+      font-family: 'Noto Sans SC';
+      src: url('assets/assets/fonts/NotoSansSC-Bold.ttf') format('truetype');
       font-style: normal;
       font-weight: 700;
-      font-display: swap;
+      font-display: block;
     }
     @font-face {
-      font-family: 'POMI Noto Sans SC Subset';
-      src: url('assets/assets/fonts/pomi_web_subset/NotoSansSC-ExtraBold.ttf') format('truetype');
+      font-family: 'Noto Sans SC';
+      src: url('assets/assets/fonts/NotoSansSC-ExtraBold.ttf') format('truetype');
       font-style: normal;
       font-weight: 800;
-      font-display: swap;
+      font-display: block;
     }
     html,
     body {
@@ -75,7 +75,7 @@
       box-sizing: border-box;
       padding: 20px;
       overflow: hidden;
-      font-family: 'POMI Noto Sans SC Subset', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Noto Sans SC', sans-serif;
     }
 
     .device-frame {
@@ -105,7 +105,7 @@
       box-sizing: border-box;
       color: #111111;
       background: transparent;
-      font-family: 'POMI Noto Sans SC Subset', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Noto Sans SC', sans-serif;
       font-size: 10px;
       font-weight: 700;
       line-height: 1;
@@ -189,7 +189,7 @@
       color: #4a2e6b;
       background: rgba(255, 255, 255, 0.94);
       box-shadow: 0 6px 20px rgba(74, 46, 107, 0.12);
-      font: 600 13px/1 'POMI Noto Sans SC Subset', sans-serif;
+      font: 600 13px/1 -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Noto Sans SC', sans-serif;
       cursor: default;
       z-index: 10;
     }
@@ -224,9 +224,9 @@
   </style>
 </head>
 <body>
-  <div class="backend-switch" title="检测本地后端连接状态">
-    <span class="backend-status" id="backend-status" aria-hidden="true"></span>
-    <span id="backend-label">数据：检测中…</span>
+  <div class="backend-switch" title="Preview 使用前端内存 smoke 数据">
+    <span class="backend-status online" aria-hidden="true"></span>
+    <span>数据：Smoke</span>
   </div>
   <main class="device-frame">
     <div class="system-status-bar" aria-label="模拟手机系统状态栏">
@@ -247,7 +247,7 @@
         </svg>
       </span>
     </div>
-    <iframe src="app.html" id="pomi-app" title="Pomi Flutter mobile preview"></iframe>
+    <iframe src="app.html?v=2608271235" title="Pomi Flutter mobile preview"></iframe>
   </main>
   <script>
     const updateSystemTime = () => {
@@ -262,47 +262,8 @@
       document.querySelector('.device-frame')
         .classList.toggle('auth-mode', isAuthScreen);
     };
-
-    // 应用加载后刷新 iframe 的缓存破坏参数，避免 service worker / 浏览器缓存
-    // 命中旧版本 app.html；同时探活本地后端，动态显示数据来源徽标。
-    const appFrame = document.getElementById('pomi-app');
-    const refreshAppVersion = () => {
-      if (!appFrame) return;
-      const base = 'app.html';
-      const stamped = `${base}?v=${Date.now()}`;
-      if (appFrame.getAttribute('src') !== stamped) {
-        appFrame.setAttribute('src', stamped);
-      }
-    };
-
-    const backendStatus = document.getElementById('backend-status');
-    const backendLabel = document.getElementById('backend-label');
-    const setBackend = (label, state) => {
-      if (backendLabel) backendLabel.textContent = label;
-      if (backendStatus) {
-        backendStatus.classList.remove('online', 'offline');
-        if (state) backendStatus.classList.add(state);
-      }
-    };
-    const probeBackend = async () => {
-      try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 3000);
-        const response = await fetch('http://127.0.0.1:8000/health/live', {
-          signal: controller.signal,
-          cache: 'no-store',
-        });
-        clearTimeout(timer);
-        setBackend(response.ok ? '数据：真实后端' : '数据：演示数据', response.ok ? 'online' : 'offline');
-      } catch (_) {
-        setBackend('数据：演示数据', 'offline');
-      }
-    };
-
     updateSystemTime();
     updateStatusBarTheme();
-    refreshAppVersion();
-    probeBackend();
     setInterval(updateSystemTime, 30000);
     window.addEventListener('hashchange', updateStatusBarTheme);
   </script>

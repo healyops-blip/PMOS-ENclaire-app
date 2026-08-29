@@ -1,6 +1,5 @@
 import 'dart:ui' as ui;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 /// Primary text: Figma #141422 at 100%.
@@ -168,8 +167,9 @@ ThemeData buildPomiTheme() {
     useMaterial3: true,
     colorScheme: scheme,
     scaffoldBackgroundColor: Colors.transparent,
-    fontFamily: kIsWeb ? 'POMI Noto Sans SC Subset' : 'Noto Sans SC',
+    fontFamily: 'PingFang SC',
     fontFamilyFallback: const [
+      'PingFang SC',
       'Source Han Sans SC',
       'Noto Sans CJK SC',
       'Noto Sans SC',
@@ -183,15 +183,15 @@ ThemeData buildPomiTheme() {
       displaySmall: TextStyle(color: pomiInk),
       headlineLarge: TextStyle(color: pomiInk),
       headlineMedium: TextStyle(
-        fontSize: 24,
-        height: 32 / 24,
+        fontSize: 22,
+        height: 30 / 22,
         fontWeight: FontWeight.w800,
         color: pomiInk,
       ),
       headlineSmall: TextStyle(color: pomiInk),
       titleLarge: TextStyle(
-        fontSize: 18,
-        height: 26 / 18,
+        fontSize: 16,
+        height: 24 / 16,
         fontWeight: FontWeight.w800,
         color: pomiInk,
       ),
@@ -203,8 +203,8 @@ ThemeData buildPomiTheme() {
       ),
       titleSmall: TextStyle(color: pomiInk),
       bodyLarge: TextStyle(color: pomiInk),
-      bodyMedium: TextStyle(fontSize: 15, height: 24 / 15, color: pomiInk),
-      bodySmall: TextStyle(fontSize: 13, height: 20 / 13, color: pomiMuted),
+      bodyMedium: TextStyle(fontSize: 14, height: 15 / 14, color: pomiInk),
+      bodySmall: TextStyle(fontSize: 12, height: 15 / 12, color: pomiMuted),
       labelLarge: TextStyle(color: pomiInk),
       labelMedium: TextStyle(color: pomiSecondaryText),
       labelSmall: TextStyle(color: pomiSecondaryText),
@@ -245,7 +245,7 @@ ThemeData buildPomiTheme() {
       style: FilledButton.styleFrom(
         minimumSize: const Size(48, 50),
         shape: const StadiumBorder(),
-        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -275,7 +275,7 @@ ThemeData buildPomiTheme() {
       centerTitle: false,
       titleTextStyle: TextStyle(
         color: pomiInk,
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: FontWeight.w800,
       ),
     ),

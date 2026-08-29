@@ -150,7 +150,7 @@ class _DashboardBody extends ConsumerWidget {
                         'Hi, Pomie!',
                         style: TextStyle(
                           color: pomiMuted,
-                          fontSize: 22,
+                          fontSize: 20,
                           height: 28 / 22,
                           fontWeight: FontWeight.w800,
                         ),
@@ -166,7 +166,7 @@ class _DashboardBody extends ConsumerWidget {
                   TextSpan(
                     style: const TextStyle(
                       color: pomiInk,
-                      fontSize: 32,
+                      fontSize: 28,
                       height: 40 / 32,
                       fontWeight: FontWeight.w800,
                     ),
@@ -214,7 +214,7 @@ class _DashboardBody extends ConsumerWidget {
                         maxLines: 1,
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 14,
+                          fontSize: 13,
                           height: 20 / 14,
                           fontWeight: FontWeight.w700,
                         ),
@@ -288,7 +288,7 @@ class _HomeActionButton extends StatelessWidget {
             label,
             style: const TextStyle(
               color: pomiInk,
-              fontSize: 14,
+              fontSize: 13,
               height: 20 / 14,
               fontWeight: FontWeight.w700,
             ),
@@ -338,7 +338,7 @@ class _LatestVisitStatusCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: pomiInk,
-                      fontSize: 15,
+                      fontSize: 14,
                       height: 21 / 15,
                       fontWeight: FontWeight.w700,
                     ),
@@ -792,7 +792,7 @@ class _CurrentMedicationCard extends StatelessWidget {
                           items[index]['drug_name']?.toString() ?? '未命名用药',
                           style: Theme.of(
                             context,
-                          ).textTheme.titleMedium?.copyWith(fontSize: 15),
+                          ).textTheme.titleMedium?.copyWith(fontSize: 14),
                         ),
                         const SizedBox(height: 3),
                         if ((items[index]['dosage_text']?.toString() ?? '')
@@ -1118,7 +1118,7 @@ class _MedicationProgressCard extends StatelessWidget {
                   maxLines: 1,
                   style: TextStyle(
                     color: pomiInk,
-                    fontSize: 18,
+                    fontSize: 16,
                     height: 26 / 18,
                     fontWeight: FontWeight.w800,
                   ),
@@ -1246,7 +1246,7 @@ class _MedicationProgressRow extends ConsumerWidget {
               time,
               style: const TextStyle(
                 color: pomiSecondaryText,
-                fontSize: 13,
+                fontSize: 12,
                 height: 18 / 13,
                 fontWeight: FontWeight.w400,
               ),
@@ -1263,7 +1263,7 @@ class _MedicationProgressRow extends ConsumerWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: isPending ? pomiInk : pomiSecondaryText,
-                    fontSize: 15,
+                    fontSize: 14,
                     height: 21 / 15,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1332,7 +1332,7 @@ class _MedicationProgressRow extends ConsumerWidget {
                         '去记录',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 13,
+                          fontSize: 12,
                           height: 18 / 13,
                           fontWeight: FontWeight.w700,
                         ),
