@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 /// Primary text: Figma #141422 at 100%.
@@ -167,7 +168,7 @@ ThemeData buildPomiTheme() {
     useMaterial3: true,
     colorScheme: scheme,
     scaffoldBackgroundColor: Colors.transparent,
-    fontFamily: 'Noto Sans SC',
+    fontFamily: kIsWeb ? 'POMI Noto Sans SC Subset' : 'Noto Sans SC',
     fontFamilyFallback: const [
       'Source Han Sans SC',
       'Noto Sans CJK SC',

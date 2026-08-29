@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../medications/medication_catalog.dart';
 import '../medications/medication_repository.dart';
@@ -15,7 +16,9 @@ const _onboardingLabelGap = 8.0;
 const _onboardingSelectedColor = Color(0xFFE3D6EF);
 
 class OnboardingScreen extends ConsumerStatefulWidget {
-  const OnboardingScreen({super.key});
+  const OnboardingScreen({this.prefillDemo = smokeMode, super.key});
+
+  final bool prefillDemo;
 
   @override
   ConsumerState<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -23,15 +26,15 @@ class OnboardingScreen extends ConsumerStatefulWidget {
 
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nickname = TextEditingController();
-  final _birthYear = TextEditingController(text: '1997');
-  final _height = TextEditingController();
-  final _weight = TextEditingController();
-  final _diagnosisYear = TextEditingController(text: '2023');
-  final _lastPeriod = TextEditingController();
-  final _nextVisit = TextEditingController();
-  final _medicationSearch = TextEditingController();
-  final Set<String> _medications = {};
+  late final TextEditingController _nickname;
+  late final TextEditingController _birthYear;
+  late final TextEditingController _height;
+  late final TextEditingController _weight;
+  late final TextEditingController _diagnosisYear;
+  late final TextEditingController _lastPeriod;
+  late final TextEditingController _nextVisit;
+  late final TextEditingController _medicationSearch;
+  late final Set<String> _medications;
   final List<String> _customCycleRanges = [];
   final List<String> _customMedicationOptions = [];
   int _step = 0;
@@ -48,6 +51,31 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     '维生素 D3': '按产品说明',
     '叶酸': '按产品说明',
   };
+
+  @override
+  void initState() {
+    super.initState();
+    final demo = widget.prefillDemo;
+    final today = DateUtils.dateOnly(DateTime.now());
+    _nickname = TextEditingController(text: demo ? 'Pomi' : null);
+    _birthYear = TextEditingController(text: '1997');
+    _height = TextEditingController(text: demo ? '165' : null);
+    _weight = TextEditingController(text: demo ? '60' : null);
+    _diagnosisYear = TextEditingController(text: '2023');
+    _lastPeriod = TextEditingController(
+      text: demo ? _formatDate(today.subtract(const Duration(days: 28))) : null,
+    );
+    _nextVisit = TextEditingController(
+      text: demo ? _formatDate(today.add(const Duration(days: 14))) : null,
+    );
+    _medicationSearch = TextEditingController();
+    _medications = demo ? {'二甲双胍', '维生素 D3'} : <String>{};
+  }
+
+  String _formatDate(DateTime value) =>
+      '${value.year.toString().padLeft(4, '0')}-'
+      '${value.month.toString().padLeft(2, '0')}-'
+      '${value.day.toString().padLeft(2, '0')}';
 
   Future<void> _addCycleRange() async {
     final value = await showDialog<String>(
@@ -380,6 +408,22 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     showFrame: false,
     padding: _onboardingContentPadding,
     children: [
+      if (widget.prefillDemo) ...[
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: pomiLavender.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: const Text(
+            'Smoke 演示信息已预填，可直接进入下一步',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: pomiInk, fontWeight: FontWeight.w700),
+          ),
+        ),
+        const SizedBox(height: 12),
+      ],
       _validationSlot(
         TextFormField(
           controller: _nickname,

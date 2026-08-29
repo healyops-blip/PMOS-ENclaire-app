@@ -255,8 +255,12 @@ class SmokeApiClient extends ApiClient {
     'health_goal': '整理复诊资料，并与医生高效沟通',
     'external_ocr_notice_accepted_at': '2026-08-27T00:00:00Z',
     'onboarding_completed': true,
+    'created_at': '2026-08-27T00:00:00Z',
     'updated_at': '2026-08-27T00:00:00Z',
   };
+  Map<String, dynamic>? _onboardingBasic;
+  Map<String, dynamic>? _onboardingCycle;
+  Map<String, dynamic>? _onboardingMedications;
   final List<Map<String, dynamic>> _weights = List.generate(7, (index) {
     const values = [71.3, 70.5, 71.0, 70.7, 69.9, 70.4, 70.0];
     final timestamp =
@@ -303,6 +307,18 @@ class SmokeApiClient extends ApiClient {
 
   String _id(String prefix) => '$prefix-${_nextId++}';
 
+  String _now() => DateTime.now().toUtc().toIso8601String();
+
+  Map<String, dynamic> _onboardingDraft(String currentStep) => {
+    'id': 'smoke-onboarding',
+    'current_step': currentStep,
+    'basic': _onboardingBasic == null ? null : Map.of(_onboardingBasic!),
+    'cycle': _onboardingCycle == null ? null : Map.of(_onboardingCycle!),
+    'medications':
+        _onboardingMedications == null ? null : Map.of(_onboardingMedications!),
+    'updated_at': _now(),
+  };
+
   @override
   Future<dynamic> get(
     String path, {
@@ -314,6 +330,17 @@ class SmokeApiClient extends ApiClient {
         'account_name': 'smoke',
         'onboarding_completed': true,
       };
+    }
+    if (path == '/api/onboarding') {
+      final currentStep =
+          _onboardingMedications != null
+              ? 'complete'
+              : _onboardingCycle != null
+              ? 'medications'
+              : _onboardingBasic != null
+              ? 'cycle'
+              : 'basic';
+      return _onboardingDraft(currentStep);
     }
     if (path == '/api/patient/profile') return Map.of(_profile);
     if (path == '/api/weights') return _copyList(_weights);
@@ -427,6 +454,19 @@ class SmokeApiClient extends ApiClient {
         },
       };
     }
+    if (path == '/api/onboarding/complete') {
+      final updatedAt = _now();
+      _profile['onboarding_completed'] = true;
+      _profile['updated_at'] = updatedAt;
+      return {
+        'account': {
+          'uid': 'smoke-user',
+          'account_name': 'smoke',
+          'onboarding_completed': true,
+        },
+        'profile': Map.of(_profile),
+      };
+    }
     if (path == '/api/weights') {
       final item = {'id': _id('weight'), ...values};
       _weights.add(item);
@@ -460,6 +500,34 @@ class SmokeApiClient extends ApiClient {
     Map<String, String>? headers,
   }) async {
     final values = _map(data);
+    if (path == '/api/onboarding/steps/basic') {
+      final updatedAt = _now();
+      _onboardingBasic = {...values, 'updated_at': updatedAt};
+      _profile.addAll({
+        'nickname': values['nickname'],
+        'birth_year': values['birth_year'],
+        'diagnosis_year': values['diagnosis_year'],
+        'height_cm': values['height_cm'],
+        'updated_at': updatedAt,
+      });
+      return _onboardingDraft('cycle');
+    }
+    if (path == '/api/onboarding/steps/cycle') {
+      final updatedAt = _now();
+      _onboardingCycle = {...values, 'updated_at': updatedAt};
+      _profile.addAll({
+        'usual_cycle_min_days': values['usual_cycle_min_days'],
+        'usual_cycle_max_days': values['usual_cycle_max_days'],
+        'next_visit_date': values['next_visit_date'],
+        'updated_at': updatedAt,
+      });
+      return _onboardingDraft('medications');
+    }
+    if (path == '/api/onboarding/steps/medications') {
+      final updatedAt = _now();
+      _onboardingMedications = {...values, 'updated_at': updatedAt};
+      return _onboardingDraft('complete');
+    }
     if (path == '/api/patient/profile') {
       _profile.addAll(values);
       return Map.of(_profile);
