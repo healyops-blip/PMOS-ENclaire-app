@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import Engine
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
@@ -66,6 +67,14 @@ def create_app(*, settings: Settings | None = None, engine: Engine | None = None
 
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RequestContextMiddleware)
+    if active_settings.environment != "production":
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=False,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
     if active_settings.environment == "production":
         app.add_middleware(
             TrustedHostMiddleware,
