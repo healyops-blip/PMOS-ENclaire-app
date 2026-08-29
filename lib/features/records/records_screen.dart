@@ -1653,6 +1653,15 @@ class _ReportViewerState extends ConsumerState<ReportViewer> {
               ],
             ),
           ),
+          _ReportLayerNavigation(
+            layer: _layer,
+            onSelect: (layer) {
+              setState(() {
+                _layer = layer;
+                if (layer == 1) _selectedTrendMetricId = null;
+              });
+            },
+          ),
           Expanded(
             child: IndexedStack(
               index: _layer,
@@ -1687,6 +1696,12 @@ class _ReportViewerState extends ConsumerState<ReportViewer> {
                   labs: labs,
                   glucoseTrend: glucoseTrend,
                   selectedTrend: selectedTrend,
+                  selectedMetricId: _selectedTrendMetricId,
+                  onSelectMetric:
+                      (metricId) => setState(() {
+                        _selectedTrendMetricId = metricId;
+                        _layer = 1;
+                      }),
                   onOpenSources: () => setState(() => _layer = 2),
                 ),
                 _ReportSourceLayer(sourceGroups: sourceGroups),
@@ -1737,17 +1752,6 @@ class _ReportSummaryLayer extends StatelessWidget {
   final ValueChanged<String?> onOpenTrends;
   final VoidCallback onOpenSources;
 
-  void _jumpToSection(GlobalKey key) {
-    final targetContext = key.currentContext;
-    if (targetContext == null) return;
-    Scrollable.ensureVisible(
-      targetContext,
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeOutCubic,
-      alignment: 0.06,
-    );
-  }
-
   String get _reportAbstract {
     final weightSummary = Map<String, dynamic>.from(
       summary['weight_summary'] as Map? ?? const {},
@@ -1778,203 +1782,73 @@ class _ReportSummaryLayer extends StatelessWidget {
     _ => '暂无评估',
   };
 
+  String _shortDateRange(Map<String, dynamic> cycle) {
+    final start = DateTime.tryParse(cycle['start_date']?.toString() ?? '');
+    final end = DateTime.tryParse(cycle['end_date']?.toString() ?? '');
+    if (start == null) return '—';
+    final startText = '${start.month}/${start.day}';
+    return end == null ? '$startText 起' : '$startText–${end.month}/${end.day}';
+  }
+
   @override
   Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.fromLTRB(18, 10, 18, 32),
+    padding: const EdgeInsets.fromLTRB(18, 4, 18, 28),
     children: [
-      const Text(
-        '基本信息',
-        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+      _DoctorReportHeader(
+        name: (summary['profile'] as Map?)?['nickname']?.toString() ?? '未设置姓名',
+        height: (summary['profile'] as Map?)?['height_cm'],
+        weight: _weightSummary['latest_weight_kg'],
       ),
-      const SizedBox(height: 8),
-      PomiGlassCard(
-        padding: EdgeInsets.all(15),
-        backgroundColor: const Color(0xFFF3F3F5),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              '${(summary['profile'] as Map?)?['nickname'] ?? '未设置姓名'}',
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            Text(
-              '身高 ${(summary['profile'] as Map?)?['height_cm'] ?? '—'} cm',
-              style: const TextStyle(color: pomiMuted),
-            ),
-            Text(
-              '体重 ${_weightSummary['latest_weight_kg'] ?? '—'} kg',
-              style: const TextStyle(color: pomiMuted),
-            ),
-          ],
-        ),
+      const SizedBox(height: 12),
+      _CompactTextSection(
+        title: '患者自述',
+        text: summary['patient_statement']?.toString() ?? '未填写',
       ),
-      const SizedBox(height: 18),
-      const Text(
-        '患者自述',
-        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-      ),
-      const SizedBox(height: 8),
-      PomiGlassCard(
-        padding: const EdgeInsets.all(15),
-        backgroundColor: const Color(0xFFF3F3F5),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              summary['patient_statement']?.toString() ?? '未填写',
-              style: const TextStyle(height: 1.55),
-            ),
-          ],
-        ),
-      ),
-      const SizedBox(height: 18),
-      const Text(
-        '摘要',
-        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-      ),
-      const SizedBox(height: 8),
-      PomiGlassCard(
-        padding: const EdgeInsets.all(15),
-        backgroundColor: const Color(0xFFF3F3F5),
-        child: Text(_reportAbstract, style: const TextStyle(height: 1.6)),
-      ),
-      const SizedBox(height: 18),
-      _AbnormalMetricsSection(labs: labs, onOpenTrends: onOpenTrends),
-      const SizedBox(height: 18),
-      Column(
-        key: cycleSectionKey,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _CycleHistorySection(
-            cycles: cycles,
-            summary: Map<String, dynamic>.from(
-              summary['cycle_summary'] as Map? ?? const {},
-            ),
-          ),
-        ],
-      ),
-      const SizedBox(height: 18),
-      Column(
-        key: bmiSectionKey,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'BMI趋势',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '当前 ${_weightSummary['latest_weight_kg'] ?? '—'} kg，BMI ${_weightSummary['latest_bmi'] ?? '—'}（参考 ${_weightSummary['bmi_reference_lower'] ?? '—'} – ${_weightSummary['bmi_reference_upper'] ?? '—'}，$_bmiAssessment）',
-            style: const TextStyle(color: pomiMuted),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 350,
-            child: CustomPaint(
-              painter: _TrendChartFramePainter(),
-              child: Padding(
-                padding: const EdgeInsets.all(2),
-                child: _BmiTrendChart(weights: weights),
-              ),
-            ),
-          ),
-        ],
-      ),
-      const SizedBox(height: 18),
-      _GlucoseTrendSection(trend: glucoseTrend),
-      const SizedBox(height: 18),
+      const SizedBox(height: 12),
+      _CompactTextSection(title: '摘要', text: _reportAbstract),
+      const SizedBox(height: 14),
+      const _SectionHeading(title: '近期基础信息', trailing: '点击卡片查看完整趋势'),
+      const SizedBox(height: 7),
       KeyedSubtree(
-        key: medicationSectionKey,
-        child: _ReportSection(
-          title: '当前用药',
-          count: medicines.length,
-          children:
-              medicines
-                  .map((item) => _ReportMedicationTile(item: item))
-                  .toList(),
+        key: cycleSectionKey,
+        child: _RecentCycleCard(
+          cycleLengthDays:
+              cycles.isEmpty ? null : cycles.last['cycle_length_days'] as int?,
+          periodLengthDays:
+              cycles.isEmpty ? null : cycles.last['duration_days'] as int?,
+          periodRange: cycles.isEmpty ? '—' : _shortDateRange(cycles.last),
+          onTap: () => onOpenTrends('cycle'),
         ),
       ),
+      const SizedBox(height: 9),
+      KeyedSubtree(
+        key: bmiSectionKey,
+        child: _CompactBmiCard(
+          weights: weights,
+          weightSummary: _weightSummary,
+          assessment: _bmiAssessment,
+          onTap: () => onOpenTrends('weight'),
+        ),
+      ),
+      const SizedBox(height: 14),
       KeyedSubtree(
         key: labSectionKey,
-        child: _ReportSection(
-          title: '检查指标',
-          count: labs.length,
-          children:
-              labs
-                  .map(
-                    (item) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(item['item_name'].toString()),
-                      subtitle: Text(
-                        item['sample_date']?.toString() ??
-                            item['report_date']?.toString() ??
-                            '',
-                      ),
-                      trailing: Text(
-                        '${item['raw_value'] ?? ''} ${item['raw_unit'] ?? ''}',
-                      ),
-                    ),
-                  )
-                  .toList(),
-        ),
+        child: _KeyMetricsSection(labs: labs, onOpenTrends: onOpenTrends),
       ),
-      const SizedBox(height: 18),
-      const Text(
-        '报告数据来源（自动汇总）',
-        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+      const SizedBox(height: 14),
+      _GlucoseTrendSection(trend: glucoseTrend),
+      const SizedBox(height: 14),
+      KeyedSubtree(
+        key: medicationSectionKey,
+        child: _CompactMedicationSection(medicines: medicines),
       ),
-      const SizedBox(height: 8),
-      PomiGlassCard(
-        padding: EdgeInsets.zero,
-        child: Column(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.science_outlined, color: pomiPurple),
-              title: const Text('化验单'),
-              subtitle: Text('${labs.length} 份'),
-              trailing: const Icon(Icons.chevron_right, color: pomiMuted),
-              onTap: () => _jumpToSection(labSectionKey),
-            ),
-            const Divider(height: 1),
-            ListTile(
-              leading: const Icon(Icons.water_drop_outlined, color: pomiPurple),
-              title: const Text('经期记录'),
-              subtitle: Text('$cycleCount 次'),
-              trailing: const Icon(Icons.chevron_right, color: pomiMuted),
-              onTap: () => _jumpToSection(cycleSectionKey),
-            ),
-            const Divider(height: 1),
-            ListTile(
-              leading: const Icon(
-                Icons.monitor_weight_outlined,
-                color: pomiPurple,
-              ),
-              title: const Text('体重记录'),
-              subtitle: Text('$weightCount 个点'),
-              trailing: const Icon(Icons.chevron_right, color: pomiMuted),
-              onTap: () => _jumpToSection(bmiSectionKey),
-            ),
-            const Divider(height: 1),
-            ListTile(
-              leading: const Icon(Icons.medication_outlined, color: pomiPurple),
-              title: const Text('用药记录'),
-              subtitle: Text('${medicines.length} 项'),
-              trailing: const Icon(Icons.chevron_right, color: pomiMuted),
-              onTap: () => _jumpToSection(medicationSectionKey),
-            ),
-            const Divider(height: 1),
-            ListTile(
-              leading: const Icon(
-                Icons.local_hospital_outlined,
-                color: pomiPurple,
-              ),
-              title: const Text('就诊记录'),
-              subtitle: Text('$sourceCount 次历史，1 次当前'),
-              trailing: const Icon(Icons.chevron_right, color: pomiMuted),
-              onTap: onOpenSources,
-            ),
-          ],
-        ),
+      const SizedBox(height: 10),
+      _ReportSourceShortcut(
+        labCount: labs.length,
+        cycleCount: cycleCount,
+        weightCount: weightCount,
+        sourceCount: sourceCount,
+        onTap: onOpenSources,
       ),
       const SizedBox(height: 18),
       Text(
@@ -1985,6 +1859,428 @@ class _ReportSummaryLayer extends StatelessWidget {
   );
 }
 
+class _DoctorReportHeader extends StatelessWidget {
+  const _DoctorReportHeader({
+    required this.name,
+    required this.height,
+    required this.weight,
+  });
+
+  final String name;
+  final dynamic height;
+  final dynamic weight;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    decoration: const BoxDecoration(
+      border: Border(bottom: BorderSide(color: pomiLine)),
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            name,
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+          ),
+        ),
+        Text(
+          '身高 ${height ?? '—'} cm',
+          style: const TextStyle(color: pomiMuted, fontSize: 12),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          '体重 ${weight ?? '—'} kg',
+          style: const TextStyle(color: pomiMuted, fontSize: 12),
+        ),
+      ],
+    ),
+  );
+}
+
+class _SectionHeading extends StatelessWidget {
+  const _SectionHeading({required this.title, this.trailing});
+  final String title;
+  final String? trailing;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Expanded(
+        child: Text(
+          title,
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+        ),
+      ),
+      if (trailing != null)
+        Text(trailing!, style: const TextStyle(color: pomiMuted, fontSize: 10)),
+    ],
+  );
+}
+
+class _CompactTextSection extends StatelessWidget {
+  const _CompactTextSection({required this.title, required this.text});
+  final String title;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      _SectionHeading(title: title),
+      const SizedBox(height: 5),
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(12, 9, 12, 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF6F6F7),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: pomiLine),
+        ),
+        child: Text(text, style: const TextStyle(height: 1.45, fontSize: 12)),
+      ),
+    ],
+  );
+}
+
+class _RecentCycleCard extends StatelessWidget {
+  const _RecentCycleCard({
+    required this.cycleLengthDays,
+    required this.periodLengthDays,
+    required this.periodRange,
+    required this.onTap,
+  });
+  final int? cycleLengthDays;
+  final int? periodLengthDays;
+  final String periodRange;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => PomiGlassCard(
+    padding: const EdgeInsets.fromLTRB(12, 11, 12, 10),
+    backgroundColor: const Color(0xFFF7F6F8),
+    child: Row(
+      children: [
+        Expanded(
+          child: _CycleStat(
+            label: '周期时长',
+            value: '${cycleLengthDays ?? '—'} 天',
+          ),
+        ),
+        Expanded(
+          child: _CycleStat(
+            label: '月经长度',
+            value: '${periodLengthDays ?? '—'} 天',
+          ),
+        ),
+        Expanded(child: _CycleStat(label: '月经时间', value: periodRange)),
+        const Icon(Icons.chevron_right_rounded, color: pomiMuted, size: 18),
+      ],
+    ),
+  );
+}
+
+class _CycleStat extends StatelessWidget {
+  const _CycleStat({required this.label, required this.value});
+  final String label;
+  final String value;
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(label, style: const TextStyle(color: pomiMuted, fontSize: 10)),
+      const SizedBox(height: 2),
+      Text(
+        value,
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+      ),
+    ],
+  );
+}
+
+class _CompactBmiCard extends StatelessWidget {
+  const _CompactBmiCard({
+    required this.weights,
+    required this.weightSummary,
+    required this.assessment,
+    required this.onTap,
+  });
+  final List<Map<String, dynamic>> weights;
+  final Map<String, dynamic> weightSummary;
+  final String assessment;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => PomiGlassCard(
+    onTap: onTap,
+    padding: const EdgeInsets.fromLTRB(12, 10, 10, 8),
+    backgroundColor: const Color(0xFFF7F6F8),
+    child: Row(
+      children: [
+        SizedBox(
+          width: 96,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'BMI 趋势',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                '${weightSummary['latest_bmi'] ?? '—'}',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Text(
+                '$assessment · ${weightSummary['latest_weight_kg'] ?? '—'} kg',
+                style: const TextStyle(color: pomiMuted, fontSize: 10),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: SizedBox(height: 78, child: _BmiMiniChart(weights: weights)),
+        ),
+        const Icon(Icons.chevron_right_rounded, color: pomiMuted, size: 18),
+      ],
+    ),
+  );
+}
+
+class _BmiMiniChart extends StatelessWidget {
+  const _BmiMiniChart({required this.weights});
+  final List<Map<String, dynamic>> weights;
+  @override
+  Widget build(BuildContext context) {
+    final points = weights.where((item) => item['bmi'] is num).toList();
+    final visible =
+        points.length > 6 ? points.sublist(points.length - 6) : points;
+    return CustomPaint(
+      painter: _TrendLinePainter(
+        visible.map((item) => (item['bmi'] as num).toDouble()).toList(),
+        visible.map((_) => '').toList(),
+        fractionDigits: 1,
+      ),
+      child: const SizedBox.expand(),
+    );
+  }
+}
+
+class _KeyMetricsSection extends StatelessWidget {
+  const _KeyMetricsSection({required this.labs, required this.onOpenTrends});
+  final List<Map<String, dynamic>> labs;
+  final ValueChanged<String?> onOpenTrends;
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const _SectionHeading(title: '近期关键指标', trailing: '异常优先 · 点击查看趋势'),
+      const SizedBox(height: 7),
+      if (labs.isEmpty)
+        const PomiGlassCard(padding: EdgeInsets.all(12), child: Text('暂无已确认指标'))
+      else
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+          childAspectRatio: 1.78,
+          children:
+              labs
+                  .take(6)
+                  .map(
+                    (item) => _MetricSummaryCard(
+                      item: item,
+                      onTap: () => onOpenTrends(item['metric_id']?.toString()),
+                    ),
+                  )
+                  .toList(),
+        ),
+    ],
+  );
+}
+
+class _MetricSummaryCard extends StatelessWidget {
+  const _MetricSummaryCard({required this.item, required this.onTap});
+  final Map<String, dynamic> item;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    final status = item['abnormal_status']?.toString();
+    final abnormal = status == 'high' || status == 'low';
+    final statusText =
+        status == 'high'
+            ? '偏高'
+            : status == 'low'
+            ? '偏低'
+            : '范围内';
+    return PomiGlassCard(
+      onTap: onTap,
+      padding: const EdgeInsets.fromLTRB(10, 8, 8, 7),
+      backgroundColor:
+          abnormal ? const Color(0xFFFFF5F3) : const Color(0xFFF7F8F7),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  item['item_name']?.toString() ?? '指标',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: pomiMuted, fontSize: 10),
+                ),
+              ),
+              Text(
+                statusText,
+                style: TextStyle(
+                  color: abnormal ? pomiCoral : pomiSuccess,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const Spacer(),
+          Text(
+            '${item['raw_value'] ?? '—'} ${item['raw_unit'] ?? ''}',
+            style: TextStyle(
+              color: abnormal ? pomiCoral : pomiInk,
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          Text(
+            item['sample_date']?.toString() ?? '',
+            style: const TextStyle(color: pomiMuted, fontSize: 9),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CompactMedicationSection extends StatelessWidget {
+  const _CompactMedicationSection({required this.medicines});
+  final List<Map<String, dynamic>> medicines;
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      _SectionHeading(title: '当前用药', trailing: '${medicines.length} 项'),
+      const SizedBox(height: 6),
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF7F6F8),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: pomiLine),
+        ),
+        child: Text(
+          medicines.isEmpty
+              ? '暂无当前用药'
+              : medicines
+                  .map((item) => item['drug_name']?.toString() ?? '用药')
+                  .join(' · '),
+          style: const TextStyle(fontSize: 12),
+        ),
+      ),
+    ],
+  );
+}
+
+class _ReportSourceShortcut extends StatelessWidget {
+  const _ReportSourceShortcut({
+    required this.labCount,
+    required this.cycleCount,
+    required this.weightCount,
+    required this.sourceCount,
+    required this.onTap,
+  });
+  final int labCount;
+  final int cycleCount;
+  final int weightCount;
+  final int sourceCount;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(10),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          const Icon(Icons.source_outlined, size: 17, color: pomiPurple),
+          const SizedBox(width: 7),
+          const Expanded(
+            child: Text(
+              '报告数据来源',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+          ),
+          Text(
+            '$labCount 项检查 · $cycleCount 次经期 · $weightCount 个体重 · $sourceCount 份材料',
+            style: const TextStyle(color: pomiMuted, fontSize: 9),
+          ),
+          const Icon(Icons.chevron_right_rounded, size: 16, color: pomiMuted),
+        ],
+      ),
+    ),
+  );
+}
+
+class _ReportLayerNavigation extends StatelessWidget {
+  const _ReportLayerNavigation({required this.layer, required this.onSelect});
+  final int layer;
+  final ValueChanged<int> onSelect;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(18, 2, 18, 8),
+    child: Row(
+      children: [
+        for (final entry in const [
+          (0, '1  摘要'),
+          (1, '2  趋势'),
+          (2, '3  原始数据'),
+        ]) ...[
+          Expanded(
+            child: InkWell(
+              onTap: () => onSelect(entry.$1),
+              borderRadius: BorderRadius.circular(8),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                height: 32,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color:
+                      layer == entry.$1 ? pomiPurple : const Color(0xFFF1EFF4),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  entry.$2,
+                  style: TextStyle(
+                    color: layer == entry.$1 ? Colors.white : pomiMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (entry.$1 != 2) const SizedBox(width: 7),
+        ],
+      ],
+    ),
+  );
+}
+
+// ignore: unused_element
 class _AbnormalMetricsSection extends StatelessWidget {
   const _AbnormalMetricsSection({
     required this.labs,
@@ -2090,6 +2386,7 @@ class _AbnormalMetricsSection extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _CycleHistorySection extends StatelessWidget {
   const _CycleHistorySection({required this.cycles, required this.summary});
 
@@ -2813,6 +3110,7 @@ class _GlucoseTrendSection extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _ReportMedicationTile extends StatelessWidget {
   const _ReportMedicationTile({required this.item});
   final Map<String, dynamic> item;
@@ -2960,100 +3258,62 @@ class _ReportTrendLayer extends StatelessWidget {
     required this.cycles,
     required this.labs,
     required this.glucoseTrend,
+    required this.selectedMetricId,
     required this.selectedTrend,
+    required this.onSelectMetric,
     required this.onOpenSources,
   });
   final List<Map<String, dynamic>> weights;
   final List<Map<String, dynamic>> cycles;
   final List<Map<String, dynamic>> labs;
   final Map<String, dynamic>? glucoseTrend;
+  final String? selectedMetricId;
   final Map<String, dynamic>? selectedTrend;
+  final ValueChanged<String> onSelectMetric;
   final VoidCallback onOpenSources;
 
   @override
   Widget build(BuildContext context) {
-    final children =
-        selectedTrend != null
-            ? <Widget>[_SelectedLabTrendSection(trend: selectedTrend!)]
-            : <Widget>[
-              const Text(
-                '完整趋势',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 5),
-              const Text(
-                '按时间查看确认后的记录；点开来源可追溯原始材料。',
-                style: TextStyle(color: pomiMuted),
-              ),
-              const SizedBox(height: 16),
-              _TrendCard(
-                icon: Icons.monitor_weight_outlined,
-                title: '体重',
-                subtitle:
-                    weights.isEmpty
-                        ? '暂无数据'
-                        : '${weights.length} 个记录点 · 最新 ${weights.last['weight_kg']} kg',
-                values:
-                    weights.reversed
-                        .take(6)
-                        .map(
-                          (item) =>
-                              '${item['record_date'].toString().substring(0, 10)}  ${item['weight_kg']} kg',
-                        )
-                        .toList(),
-              ),
-              const SizedBox(height: 10),
-              _TrendCard(
-                icon: Icons.water_drop_outlined,
-                title: '经期',
-                subtitle: cycles.isEmpty ? '暂无数据' : '${cycles.length} 个周期记录',
-                values:
-                    cycles
-                        .take(6)
-                        .map(
-                          (item) =>
-                              '${item['start_date']}  至  ${item['end_date'] ?? '进行中'}',
-                        )
-                        .toList(),
-              ),
-              const SizedBox(height: 10),
-              _TrendCard(
-                icon: Icons.science_outlined,
-                title: '检查指标',
-                subtitle: labs.isEmpty ? '暂无数据' : '${labs.length} 个已确认指标',
-                values:
-                    labs
-                        .take(8)
-                        .map(
-                          (item) =>
-                              '${item['item_name']}  ${item['raw_value'] ?? ''} ${item['raw_unit'] ?? ''}',
-                        )
-                        .toList(),
-                onTap: onOpenSources,
-              ),
-              const SizedBox(height: 10),
-              _GlucoseTrendSection(trend: glucoseTrend),
-              const SizedBox(height: 10),
-              _TrendCard(
-                icon: Icons.show_chart_rounded,
-                title: '总睾酮趋势',
-                subtitle:
-                    '${labs.where((item) => (item['item_name']?.toString() ?? '').contains('睾酮')).length} 个已确认数据点',
-                values:
-                    labs
-                        .where(
-                          (item) => (item['item_name']?.toString() ?? '')
-                              .contains('睾酮'),
-                        )
-                        .take(6)
-                        .map(
-                          (item) =>
-                              '${item['sample_date'] ?? item['report_date'] ?? ''}  ${item['raw_value'] ?? ''} ${item['raw_unit'] ?? ''}',
-                        )
-                        .toList(),
-                onTap: onOpenSources,
-              ),
-            ];
+    final children = <Widget>[
+      Row(
+        children: [
+          const Expanded(
+            child: Text(
+              '完整趋势',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+            ),
+          ),
+          TextButton.icon(
+            onPressed: onOpenSources,
+            icon: const Icon(Icons.source_outlined, size: 16),
+            label: const Text('原始数据'),
+          ),
+        ],
+      ),
+      const Text(
+        '一次只查看一个指标；点击下方数据节点可继续追溯来源。',
+        style: TextStyle(color: pomiMuted, fontSize: 11),
+      ),
+      const SizedBox(height: 12),
+      if (selectedMetricId == 'cycle')
+        _CycleTrendDetail(cycles: cycles, onOpenSources: onOpenSources)
+      else if (selectedMetricId == 'weight')
+        _WeightTrendDetail(weights: weights, onOpenSources: onOpenSources)
+      else if (selectedTrend != null) ...[
+        if (selectedMetricId == 'glucose')
+          _GlucoseTrendSection(trend: glucoseTrend)
+        else
+          _SelectedLabTrendSection(trend: selectedTrend!),
+        const SizedBox(height: 10),
+        _LabTrendPoints(trend: selectedTrend!, onOpenSources: onOpenSources),
+      ] else
+        _TrendMetricIndex(
+          labs: labs,
+          hasCycles: cycles.isNotEmpty,
+          hasWeights: weights.isNotEmpty,
+          onSelectMetric: onSelectMetric,
+        ),
+    ];
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 10, 18, 32),
       children: children,
@@ -3061,22 +3321,242 @@ class _ReportTrendLayer extends StatelessWidget {
   }
 }
 
+class _TrendMetricIndex extends StatelessWidget {
+  const _TrendMetricIndex({
+    required this.labs,
+    required this.hasCycles,
+    required this.hasWeights,
+    required this.onSelectMetric,
+  });
+  final List<Map<String, dynamic>> labs;
+  final bool hasCycles;
+  final bool hasWeights;
+  final ValueChanged<String> onSelectMetric;
+  @override
+  Widget build(BuildContext context) {
+    final items =
+        <(String, String, String)>[
+          if (hasCycles) ('cycle', '经期周期', '查看周期时长与月经记录'),
+          if (hasWeights) ('weight', 'BMI / 体重', '查看完整 BMI 趋势'),
+          ...labs.map(
+            (item) => (
+              item['metric_id']?.toString() ?? '',
+              item['item_name']?.toString() ?? '检查指标',
+              '${item['raw_value'] ?? '—'} ${item['raw_unit'] ?? ''}',
+            ),
+          ),
+        ].where((item) => item.$1.isNotEmpty).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionHeading(title: '选择指标'),
+        const SizedBox(height: 7),
+        PomiGlassCard(
+          padding: EdgeInsets.zero,
+          backgroundColor: const Color(0xFFF7F6F8),
+          child: Column(
+            children: [
+              for (var i = 0; i < items.length; i++) ...[
+                ListTile(
+                  dense: true,
+                  title: Text(
+                    items[i].$2,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: Text(
+                    items[i].$3,
+                    style: const TextStyle(fontSize: 10),
+                  ),
+                  trailing: const Icon(
+                    Icons.chevron_right_rounded,
+                    color: pomiMuted,
+                  ),
+                  onTap: () => onSelectMetric(items[i].$1),
+                ),
+                if (i != items.length - 1) const Divider(height: 1),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CycleTrendDetail extends StatelessWidget {
+  const _CycleTrendDetail({required this.cycles, required this.onOpenSources});
+  final List<Map<String, dynamic>> cycles;
+  final VoidCallback onOpenSources;
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const _SectionHeading(title: '经期周期趋势', trailing: '点击记录查看来源'),
+      const SizedBox(height: 7),
+      PomiGlassCard(
+        padding: EdgeInsets.zero,
+        child: Column(
+          children:
+              cycles.reversed
+                  .take(8)
+                  .map(
+                    (item) => ListTile(
+                      dense: true,
+                      title: Text(
+                        '${item['start_date'] ?? '—'} 至 ${item['end_date'] ?? '进行中'}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      subtitle: Text(
+                        '周期 ${item['cycle_length_days'] ?? '—'} 天 · 月经 ${item['duration_days'] ?? '—'} 天',
+                        style: const TextStyle(fontSize: 10),
+                      ),
+                      trailing: const Icon(
+                        Icons.source_outlined,
+                        size: 17,
+                        color: pomiPurple,
+                      ),
+                      onTap: onOpenSources,
+                    ),
+                  )
+                  .toList(),
+        ),
+      ),
+    ],
+  );
+}
+
+class _WeightTrendDetail extends StatelessWidget {
+  const _WeightTrendDetail({
+    required this.weights,
+    required this.onOpenSources,
+  });
+  final List<Map<String, dynamic>> weights;
+  final VoidCallback onOpenSources;
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const _SectionHeading(title: 'BMI / 体重趋势', trailing: '点击记录查看来源'),
+      const SizedBox(height: 7),
+      SizedBox(
+        height: 240,
+        child: CustomPaint(
+          painter: _TrendChartFramePainter(),
+          child: Padding(
+            padding: const EdgeInsets.all(2),
+            child: _BmiTrendChart(weights: weights),
+          ),
+        ),
+      ),
+      const SizedBox(height: 9),
+      PomiGlassCard(
+        padding: EdgeInsets.zero,
+        child: Column(
+          children:
+              weights.reversed
+                  .take(8)
+                  .map(
+                    (item) => ListTile(
+                      dense: true,
+                      title: Text(
+                        item['record_date']?.toString() ?? '—',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'BMI ${item['bmi'] ?? '—'}',
+                        style: const TextStyle(fontSize: 10),
+                      ),
+                      trailing: Text(
+                        '${item['weight_kg'] ?? '—'} kg',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      onTap: onOpenSources,
+                    ),
+                  )
+                  .toList(),
+        ),
+      ),
+    ],
+  );
+}
+
+class _LabTrendPoints extends StatelessWidget {
+  const _LabTrendPoints({required this.trend, required this.onOpenSources});
+  final Map<String, dynamic> trend;
+  final VoidCallback onOpenSources;
+  @override
+  Widget build(BuildContext context) {
+    final points = List<Map<String, dynamic>>.from(
+      (trend['points'] as List? ?? const []).map(
+        (item) => Map<String, dynamic>.from(item as Map),
+      ),
+    );
+    return PomiGlassCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children:
+            points.reversed.take(8).map((point) {
+              final value =
+                  point['normalized_value'] ??
+                  point['numeric_value'] ??
+                  point['raw_value'] ??
+                  '—';
+              final unit =
+                  point['normalized_unit'] ??
+                  point['original_unit'] ??
+                  trend['unit'] ??
+                  '';
+              final abnormal =
+                  point['abnormal_status'] == 'high' ||
+                  point['abnormal_status'] == 'low';
+              return ListTile(
+                dense: true,
+                title: Text(
+                  point['date']?.toString() ?? '—',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                subtitle: Text(
+                  point['facility']?.toString() ?? '点击查看原始报告',
+                  style: const TextStyle(fontSize: 10),
+                ),
+                trailing: Text(
+                  '$value $unit',
+                  style: TextStyle(
+                    color: abnormal ? pomiCoral : pomiInk,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                onTap: onOpenSources,
+              );
+            }).toList(),
+      ),
+    );
+  }
+}
+
+// ignore: unused_element, unused_element_parameter
 class _TrendCard extends StatelessWidget {
   const _TrendCard({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.values,
-    this.onTap,
   });
   final IconData icon;
   final String title;
   final String subtitle;
   final List<String> values;
-  final VoidCallback? onTap;
   @override
   Widget build(BuildContext context) => PomiGlassCard(
-    onTap: onTap,
     padding: const EdgeInsets.all(14),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3104,8 +3584,6 @@ class _TrendCard extends StatelessWidget {
                 ],
               ),
             ),
-            if (onTap != null)
-              const Icon(Icons.chevron_right, color: pomiPurple),
           ],
         ),
         if (values.isNotEmpty) ...[
@@ -3189,6 +3667,7 @@ class _ReportSourceLayer extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _ReportSection extends StatelessWidget {
   const _ReportSection({
     required this.title,
