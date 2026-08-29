@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../medications/medication_catalog.dart';
+import '../medications/medication_repository.dart';
+import 'onboarding_repository.dart';
 
 const _onboardingContentPadding = EdgeInsets.all(16);
 const _onboardingFieldSlotHeight = 76.0;
@@ -29,11 +30,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _diagnosisYear = TextEditingController(text: '2023');
   final _lastPeriod = TextEditingController();
   final _nextVisit = TextEditingController();
+  final _medicationSearch = TextEditingController();
   final Set<String> _medications = {};
   final List<String> _customCycleRanges = [];
   final List<String> _customMedicationOptions = [];
   int _step = 0;
   String _cycleRange = '35-45 天';
+  String _periodDuration = '4-5 天';
   bool _saving = false;
 
   static const _cycleOptions = ['21-28 天', '28-35 天', '35-45 天', '45 天以上'];
@@ -111,6 +114,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       _diagnosisYear,
       _lastPeriod,
       _nextVisit,
+      _medicationSearch,
     ]) {
       controller.dispose();
     }
@@ -252,53 +256,51 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
-      final api = ref.read(apiClientProvider);
-      await api.put(
-        '/api/patient/profile',
-        data: {
-          'nickname': _nickname.text.trim(),
-          'birth_date': '${_birthYear.text.trim()}-01-01',
-          'height_cm': double.tryParse(_height.text),
-          'diagnosis_year': int.tryParse(_diagnosisYear.text),
-          'next_visit_date': _nextVisit.text.isEmpty ? null : _nextVisit.text,
-          'health_goal': '整理复诊资料，并与医生高效沟通',
-          'external_ocr_notice_accepted': true,
-        },
+      final onboarding = ref.read(onboardingRepositoryProvider);
+      await onboarding.saveBasic(
+        OnboardingBasicDraft(
+          nickname: _nickname.text.trim(),
+          birthYear: int.parse(_birthYear.text.trim()),
+          diagnosisYear: int.tryParse(_diagnosisYear.text.trim()),
+          heightCm: double.tryParse(_height.text.trim()),
+          weightKg: double.tryParse(_weight.text.trim()),
+        ),
       );
-      final weight = double.tryParse(_weight.text.trim());
-      if (weight != null) {
-        await api.post(
-          '/api/weights',
-          data: {
-            'measured_at': DateTime.now().toUtc().toIso8601String(),
-            'weight_kg': weight,
-            'note': '初始化资料',
-          },
-        );
-      }
-      if (_lastPeriod.text.isNotEmpty) {
-        await api.post(
-          '/api/cycles',
-          data: {
-            'start_date': _lastPeriod.text,
-            'end_date': null,
-            'flow_level': 'medium',
-            'symptoms': <String>[],
-            'note': '初始化记录 · 通常周期 $_cycleRange',
-          },
-        );
-      }
-      for (final name in _medications) {
-        await api.post(
-          '/api/medications',
-          data: {
-            'drug_name': name,
-            'dosage_text': _medicationOptions[name] ?? '用户自定义',
-            'frequency': null,
-            'current_status': 'active',
-          },
-        );
-      }
+      final range = RegExp(r'^(\d+)(?:-(\d+))?').firstMatch(_cycleRange);
+      await onboarding.saveCycle(
+        OnboardingCycleDraft(
+          lastMenstrualStartDate:
+              _lastPeriod.text.isEmpty ? null : _lastPeriod.text,
+          usualCycleMinDays: range == null ? null : int.parse(range.group(1)!),
+          usualCycleMaxDays:
+              range == null || range.group(2) == null
+                  ? (_cycleRange.startsWith('45') ? null : null)
+                  : int.parse(range.group(2)!),
+          periodDurationDays: int.tryParse(
+            RegExp(r'^(\d+)').firstMatch(_periodDuration)?.group(1) ?? '',
+          ),
+          nextVisitDate: _nextVisit.text.isEmpty ? null : _nextVisit.text,
+        ),
+      );
+      await onboarding.saveMedications(
+        OnboardingMedicationsDraft(
+          items:
+              _medications
+                  .map(
+                    (name) => OnboardingMedicationDraft(
+                      drugName: name,
+                      sourceCategory:
+                          _medicationOptions.containsKey(name)
+                              ? MedicationSourceCategory.prescribed
+                              : MedicationSourceCategory.otherLongTerm,
+                    ),
+                  )
+                  .toList(),
+        ),
+      );
+      await onboarding.complete(
+        idempotencyKey: 'onboarding-${DateTime.now().microsecondsSinceEpoch}',
+      );
       if (mounted) context.go('/home');
     } catch (error) {
       if (mounted) {
@@ -314,69 +316,59 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [pomiLavender, Color(0xFFFAF8FC), Colors.white],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 520),
-              child: Column(
-                children: [
-                  _OnboardingHeader(
-                    step: _step,
-                    onBack:
-                        _step == 0 || _saving
-                            ? null
-                            : () => setState(() => _step -= 1),
-                  ),
-                  Expanded(
-                    child: Form(
-                      key: _formKey,
-                      child: Align(
-                        alignment: Alignment.topCenter,
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 220),
-                          child: SingleChildScrollView(
-                            key: ValueKey(_step),
-                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-                            child:
-                                [
-                                  _basicStep(),
-                                  _cycleStep(),
-                                  _medicationStep(),
-                                ][_step],
-                          ),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Column(
+              children: [
+                _OnboardingHeader(
+                  step: _step,
+                  onBack:
+                      _step == 0 || _saving
+                          ? null
+                          : () => setState(() => _step -= 1),
+                ),
+                Expanded(
+                  child: Form(
+                    key: _formKey,
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 220),
+                        child: SingleChildScrollView(
+                          key: ValueKey(_step),
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+                          child:
+                              [
+                                _basicStep(),
+                                _cycleStep(),
+                                _medicationStep(),
+                              ][_step],
                         ),
                       ),
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed:
-                            _saving ? null : (_step == 2 ? _save : _next),
-                        child:
-                            _saving
-                                ? const SizedBox.square(
-                                  dimension: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                                : Text(_step == 2 ? '进入首页' : '下一步'),
-                      ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _saving ? null : (_step == 2 ? _save : _next),
+                      child:
+                          _saving
+                              ? const SizedBox.square(
+                                dimension: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                              : Text(_step == 2 ? '进入首页' : '下一步'),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -560,6 +552,28 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               ),
       ),
       const SizedBox(height: _onboardingSectionGap),
+      const Text('经期持续天数', style: TextStyle(fontWeight: FontWeight.w700)),
+      const SizedBox(height: _onboardingLabelGap),
+      Wrap(
+        spacing: _onboardingLabelGap,
+        runSpacing: _onboardingLabelGap,
+        children:
+            ['1-3 天', '4-5 天', '6-7 天', '7 天以上']
+                .map(
+                  (value) => ChoiceChip(
+                    label: Text(value),
+                    selected: _periodDuration == value,
+                    showCheckmark: false,
+                    backgroundColor: Colors.white,
+                    selectedColor: _onboardingSelectedColor,
+                    shape: const StadiumBorder(),
+                    side: const BorderSide(color: pomiLine),
+                    onSelected: (_) => setState(() => _periodDuration = value),
+                  ),
+                )
+                .toList(),
+      ),
+      const SizedBox(height: _onboardingSectionGap),
       const Text('下次就诊', style: TextStyle(fontWeight: FontWeight.w700)),
       const SizedBox(height: _onboardingLabelGap),
       _validationSlot(
@@ -582,11 +596,26 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     showFrame: false,
     padding: _onboardingContentPadding,
     children: [
+      TextFormField(
+        controller: _medicationSearch,
+        decoration: const InputDecoration(
+          labelText: '搜索并添加药品',
+          hintText: '例如搜索「优思明」或「二甲双胍」',
+          prefixIcon: Icon(Icons.search_rounded),
+        ),
+        onChanged: (_) => setState(() {}),
+      ),
+      const SizedBox(height: 14),
       Wrap(
         spacing: _onboardingLabelGap,
         runSpacing: _onboardingLabelGap,
         children:
             [..._medicationOptions.keys, ..._customMedicationOptions]
+                .where(
+                  (name) => name.toLowerCase().contains(
+                    _medicationSearch.text.trim().toLowerCase(),
+                  ),
+                )
                 .map<Widget>(
                   (name) => FilterChip(
                     label: Text(name),
@@ -1027,6 +1056,6 @@ class _StepCard extends StatelessWidget {
         children: children,
       ),
     );
-    return showFrame ? Card(child: content) : content;
+    return showFrame ? PomiGlassCard(child: content) : content;
   }
 }

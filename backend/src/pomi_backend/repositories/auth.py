@@ -46,6 +46,11 @@ class AuthRepository:
             select(UserAccount).where(UserAccount.account_name == account_name)
         )
 
+    def get_account_by_phone(self, phone_number: str) -> UserAccount | None:
+        return self._session.scalar(
+            select(UserAccount).where(UserAccount.phone_number == phone_number)
+        )
+
     def create_session(
         self,
         *,

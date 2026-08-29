@@ -58,6 +58,20 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Set up Android NDK 30
+        shell: bash
+        run: |
+          sdkmanager="${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$sdkmanager" --licenses >/dev/null || true
+          "$sdkmanager" "ndk;30.0.16138531"
+
+      - name: Use the official Gradle distribution on GitHub runners
+        shell: bash
+        run: |
+          sed -i \
+            's#mirrors.cloud.tencent.com/gradle#services.gradle.org/distributions#' \
+            android/gradle/wrapper/gradle-wrapper.properties
+
       - name: Validate Flutter project
         shell: bash
         run: |

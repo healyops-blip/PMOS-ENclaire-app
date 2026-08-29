@@ -1,117 +1,103 @@
 import 'dart:convert';
-import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pmos_enclaire/core/api_client.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() {
+    FlutterSecureStorage.setMockInitialValues({
+      sessionIdStorageKey: 'session-token',
+      sessionExpiresAtStorageKey: '2026-09-01T00:00:00Z',
+    });
+  });
+
   test(
-    'API client supports raw auth responses, envelopes, bearer, and 204',
+    'unwraps the business envelope and sends session plus query data',
     () async {
-      FlutterSecureStorage.setMockInitialValues({
-        sessionIdStorageKey: 'local-session',
-        sessionExpiresAtStorageKey: '2099-01-01T00:00:00Z',
-      });
-      const storage = FlutterSecureStorage();
-      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      addTearDown(() => server.close(force: true));
-
-      String? authorization;
-      server.listen((request) async {
-        request.response.headers.contentType = ContentType.json;
-        switch (request.uri.path) {
-          case '/raw':
-            request.response.write(jsonEncode({'session_id': 'raw-session'}));
-          case '/wrapped':
-            request.response.write(
-              jsonEncode({
-                'data': {'ok': true},
-              }),
-            );
-          case '/business':
-            request.response.headers.set('X-Request-ID', 'header-request-id');
-            request.response.write(
-              jsonEncode({
-                'success': true,
-                'data': {'ok': true, 'source': 'business-envelope'},
-                'request_id': 'body-request-id',
-                'error': null,
-              }),
-            );
-          case '/business-error':
-            request.response.statusCode = HttpStatus.unprocessableEntity;
-            request.response.headers.set('X-Request-ID', 'header-error-id');
-            request.response.write(
-              jsonEncode({
-                'success': false,
-                'data': null,
-                'request_id': 'body-error-id',
-                'error': {
-                  'code': 'VALIDATION_ERROR',
-                  'message': 'The request contains invalid fields.',
-                  'retryable': false,
-                  'details': {},
-                },
-              }),
-            );
-          case '/me':
-            authorization = request.headers.value(
-              HttpHeaders.authorizationHeader,
-            );
-            request.response.write(jsonEncode({'uid': 'account-uid'}));
-          case '/logout':
-            request.response.statusCode = HttpStatus.noContent;
-          case '/expired':
-            request.response.statusCode = HttpStatus.unauthorized;
-            request.response.write(
-              jsonEncode({
-                'error': {
-                  'code': 'AUTHENTICATION_REQUIRED',
-                  'message': 'Authentication is required.',
-                },
-              }),
-            );
-          default:
-            request.response.statusCode = HttpStatus.notFound;
-        }
-        await request.response.close();
+      final storage = const FlutterSecureStorage();
+      final client = ApiClient(storage, baseUrl: 'https://api.example.test');
+      RequestOptions? captured;
+      client.dio.httpClientAdapter = CallbackAdapter((options) {
+        captured = options;
+        return _jsonResponse(200, {
+          'success': true,
+          'data': {'value': 42},
+          'request_id': 'req_success',
+          'error': null,
+        });
       });
 
-      final client = ApiClient(
-        storage,
-        baseUrl: 'http://${server.address.address}:${server.port}',
+      final value = await client.get(
+        '/api/example',
+        queryParameters: {'page': 2},
       );
-      expect(await client.get('/raw'), {'session_id': 'raw-session'});
-      expect(await client.get('/wrapped'), {'ok': true});
-      expect(await client.get('/business'), {
-        'ok': true,
-        'source': 'business-envelope',
-      });
-      expect(await client.get('/me'), {'uid': 'account-uid'});
-      expect(authorization, 'Bearer local-session');
-      expect(await client.post('/logout'), isNull);
+
+      expect(value, {'value': 42});
+      expect(captured?.path, '/api/example');
+      expect(captured?.queryParameters, {'page': 2});
+      expect(captured?.headers['Authorization'], 'Bearer session-token');
+    },
+  );
+
+  test(
+    'preserves error code and request id and clears an invalid session',
+    () async {
+      final storage = const FlutterSecureStorage();
+      final client = ApiClient(storage, baseUrl: 'https://api.example.test');
+      client.dio.httpClientAdapter = CallbackAdapter(
+        (_) => _jsonResponse(401, {
+          'success': false,
+          'data': null,
+          'request_id': 'req_auth',
+          'error': {
+            'code': 'AUTHENTICATION_REQUIRED',
+            'message': 'expired',
+            'retryable': false,
+          },
+        }),
+      );
 
       await expectLater(
-        client.get('/expired'),
+        client.get('/api/private'),
         throwsA(
           isA<ApiFailure>()
               .having((error) => error.code, 'code', 'AUTHENTICATION_REQUIRED')
-              .having((error) => error.statusCode, 'statusCode', 401),
+              .having((error) => error.statusCode, 'statusCode', 401)
+              .having((error) => error.requestId, 'requestId', 'req_auth'),
         ),
       );
       expect(await storage.read(key: sessionIdStorageKey), isNull);
       expect(await storage.read(key: sessionExpiresAtStorageKey), isNull);
-
-      await expectLater(
-        client.get('/business-error'),
-        throwsA(
-          isA<ApiFailure>()
-              .having((error) => error.code, 'code', 'VALIDATION_ERROR')
-              .having((error) => error.statusCode, 'statusCode', 422)
-              .having((error) => error.requestId, 'requestId', 'body-error-id'),
-        ),
-      );
     },
   );
+}
+
+ResponseBody _jsonResponse(int status, Map<String, dynamic> body) =>
+    ResponseBody.fromString(
+      jsonEncode(body),
+      status,
+      headers: {
+        Headers.contentTypeHeader: ['application/json'],
+      },
+    );
+
+class CallbackAdapter implements HttpClientAdapter {
+  CallbackAdapter(this.callback);
+
+  final ResponseBody Function(RequestOptions options) callback;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async => callback(options);
+
+  @override
+  void close({bool force = false}) {}
 }

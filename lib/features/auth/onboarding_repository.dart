@@ -1,6 +1,8 @@
 import '../../core/api_client.dart';
 import '../../core/json_value.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../medications/medication_repository.dart';
 import '../profile/patient_repository.dart';
 import 'auth_controller.dart';
@@ -29,7 +31,7 @@ class OnboardingBasicDraft {
   const OnboardingBasicDraft({
     required this.nickname,
     required this.birthYear,
-    required this.diagnosisYear,
+    this.diagnosisYear,
     this.heightCm,
     this.weightKg,
     this.updatedAt,
@@ -40,7 +42,7 @@ class OnboardingBasicDraft {
     return OnboardingBasicDraft(
       nickname: jsonString(json, 'nickname'),
       birthYear: jsonInt(json, 'birth_year'),
-      diagnosisYear: jsonInt(json, 'diagnosis_year'),
+      diagnosisYear: jsonIntOrNull(json, 'diagnosis_year'),
       heightCm: jsonDoubleOrNull(json, 'height_cm'),
       weightKg: jsonDoubleOrNull(json, 'weight_kg'),
       updatedAt: jsonDateTimeOrNull(json, 'updated_at'),
@@ -49,7 +51,7 @@ class OnboardingBasicDraft {
 
   final String nickname;
   final int birthYear;
-  final int diagnosisYear;
+  final int? diagnosisYear;
   final double? heightCm;
   final double? weightKg;
   final DateTime? updatedAt;
@@ -69,6 +71,7 @@ class OnboardingCycleDraft {
     this.lastMenstrualStartDate,
     this.usualCycleMinDays,
     this.usualCycleMaxDays,
+    this.periodDurationDays,
     this.nextVisitDate,
     this.updatedAt,
   });
@@ -82,6 +85,7 @@ class OnboardingCycleDraft {
       ),
       usualCycleMinDays: jsonIntOrNull(json, 'usual_cycle_min_days'),
       usualCycleMaxDays: jsonIntOrNull(json, 'usual_cycle_max_days'),
+      periodDurationDays: jsonIntOrNull(json, 'period_duration_days'),
       nextVisitDate: jsonStringOrNull(json, 'next_visit_date'),
       updatedAt: jsonDateTimeOrNull(json, 'updated_at'),
     );
@@ -90,6 +94,7 @@ class OnboardingCycleDraft {
   final String? lastMenstrualStartDate;
   final int? usualCycleMinDays;
   final int? usualCycleMaxDays;
+  final int? periodDurationDays;
   final String? nextVisitDate;
   final DateTime? updatedAt;
 
@@ -97,6 +102,7 @@ class OnboardingCycleDraft {
     'last_menstrual_start_date': lastMenstrualStartDate,
     'usual_cycle_min_days': usualCycleMinDays,
     'usual_cycle_max_days': usualCycleMaxDays,
+    'period_duration_days': periodDurationDays,
     'next_visit_date': nextVisitDate,
     'updated_at': updatedAt?.toUtc().toIso8601String(),
   };

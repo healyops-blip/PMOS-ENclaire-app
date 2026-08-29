@@ -1,285 +1,211 @@
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pmos_enclaire/core/api_client.dart';
 import 'package:pmos_enclaire/core/json_value.dart';
-import 'package:pmos_enclaire/features/auth/onboarding_repository.dart';
 import 'package:pmos_enclaire/features/dashboard/dashboard_repository.dart';
 import 'package:pmos_enclaire/features/medications/medication_repository.dart';
 import 'package:pmos_enclaire/features/profile/patient_repository.dart';
 import 'package:pmos_enclaire/features/tracking/tracking_repository.dart';
 
+import 'support/fake_api_client.dart';
+
 void main() {
-  TestWidgetsFlutterBinding.ensureInitialized();
-
   test(
-    'onboarding sends step payload and completion idempotency key',
+    'patient profile accepts nullable pre-onboarding fields and preserves clear semantics',
     () async {
-      final api = _RecordingApiClient({
-        'PUT /api/onboarding/steps/basic': _onboardingDraft,
-        'POST /api/onboarding/complete': {
-          'account': {
-            'uid': 'user-1',
-            'account_name': 'pomi-user',
-            'onboarding_completed': true,
-          },
-          'profile': _profile,
+      late ApiCall updateCall;
+      final api = FakeApiClient(
+        handler: (call) {
+          if (call.method == 'GET') return _profile();
+          updateCall = call;
+          return {..._profile(), 'nickname': 'Alice'};
         },
-      });
-      final repository = OnboardingRepository(api);
+      );
+      final repository = PatientRepository(api);
 
-      final draft = await repository.saveBasic(
-        const OnboardingBasicDraft(
-          nickname: 'Pomi',
-          birthYear: 1997,
-          diagnosisYear: 2023,
+      final profile = await repository.getProfile();
+      expect(profile.nickname, isNull);
+      expect(profile.birthYear, isNull);
+      expect(profile.diagnosisYear, isNull);
+      expect(profile.periodDurationDays, isNull);
+
+      final updated = await repository.updateProfile(
+        PatientProfileUpdate(
+          updatedAt: profile.updatedAt,
+          nickname: 'Alice',
+          periodDurationDays: const JsonPatchField<int>.value(5),
+          nextVisitDate: const JsonPatchField<String>.value(null),
         ),
       );
-      final result = await repository.complete(idempotencyKey: 'complete-1');
 
-      expect(draft.currentStep, OnboardingStep.cycle);
-      expect(api.requests.first.data, containsPair('birth_year', 1997));
-      expect(api.requests.last.headers, {'Idempotency-Key': 'complete-1'});
-      expect(result.account.onboardingCompleted, isTrue);
-      expect(result.profile.nickname, 'Pomi');
-    },
-  );
-
-  test('profile update can explicitly clear nullable values', () async {
-    final api = _RecordingApiClient({'PUT /api/patient/profile': _profile});
-    final repository = PatientRepository(api);
-
-    await repository.updateProfile(
-      PatientProfileUpdate(
-        updatedAt: DateTime.utc(2026, 8, 27),
-        nickname: 'Pomi',
-        heightCm: const JsonPatchField.value(null),
-        nextVisitDate: const JsonPatchField.value(null),
-      ),
-    );
-
-    expect(api.requests.single.data, containsPair('height_cm', null));
-    expect(api.requests.single.data, containsPair('next_visit_date', null));
-    expect(api.requests.single.data, isNot(contains('health_goal')));
-  });
-
-  test(
-    'medication and tracking repositories use phase-one wire fields',
-    () async {
-      final api = _RecordingApiClient({
-        'GET /api/medications': {
-          'server_date': '2026-08-27',
-          'items': [_medication],
-          'next_cursor': null,
-          'has_more': false,
-        },
-        'POST /api/cycles': _cycle,
-        'POST /api/weights': _weight,
-      });
-
-      final medications = await MedicationRepository(
-        api,
-      ).list(status: MedicationStatus.active, cursor: 'next', limit: 10);
-      final tracking = TrackingRepository(api);
-      await tracking.createCycle(
-        CycleInput(
-          startDate: DateTime(2026, 8, 1),
-          flowLevel: CycleFlowLevel.medium,
-        ),
-      );
-      await tracking.createOrUpdateWeight(
-        recordDate: DateTime(2026, 8, 27),
-        weightKg: 55.2,
-      );
-
-      expect(medications.items.single.drugName, '二甲双胍');
-      expect(api.requests[0].query, {
-        'status': 'active',
-        'cursor': 'next',
-        'limit': 10,
-      });
-      expect(api.requests[1].data, containsPair('source_type', 'manual'));
-      expect(api.requests[2].data, {
-        'record_date': '2026-08-27',
-        'weight_kg': 55.2,
+      expect(updated.nickname, 'Alice');
+      expect(updateCall.path, '/api/patient/profile');
+      expect(updateCall.data, {
+        'nickname': 'Alice',
+        'period_duration_days': 5,
+        'next_visit_date': null,
+        'updated_at': '2026-08-28T01:02:03.000Z',
       });
     },
   );
 
-  test('dashboard parses independent section states', () async {
-    final api = _RecordingApiClient({
-      'GET /api/dashboard': {
-        'server_date': '2026-08-27',
-        'data_as_of': '2026-08-27T12:00:00Z',
-        'follow_up': {
-          'status': 'ok',
-          'data': {'date': '2026-09-10', 'timing': 'future', 'days': 14},
-          'error_code': null,
+  test(
+    'medication repository uses the direct item contract and idempotency header',
+    () async {
+      const testRequestKey = 'repeatable-test-request';
+      late ApiCall createCall;
+      final api = FakeApiClient(
+        handler: (call) {
+          createCall = call;
+          return _medication();
         },
-        'today_medications': {
-          'status': 'empty',
-          'data': <dynamic>[],
-          'error_code': null,
-        },
-        'monthly_medication_summary': {
-          'status': 'error',
-          'data': null,
-          'error_code': 'SUMMARY_UNAVAILABLE',
-        },
-        'tracking_summary': {
-          'status': 'ok',
-          'data': {'latest_cycle': _cycle, 'latest_weight': _weight},
-          'error_code': null,
-        },
-        'document_summary': {
-          'status': 'ok',
-          'data': {'confirmed': 2, 'total': 3},
-          'error_code': null,
-        },
-        'latest_report': {'status': 'empty', 'data': null, 'error_code': null},
-      },
-    });
+      );
 
-    final dashboard = await DashboardRepository(
-      api,
-    ).get(date: DateTime(2026, 8, 27));
+      final medication = await MedicationRepository(api).create(
+        const MedicationCreateInput(
+          drugName: '二甲双胍',
+          sourceCategory: MedicationSourceCategory.prescribed,
+          dosageValue: 500,
+          dosageUnit: 'mg',
+        ),
+        idempotencyKey: testRequestKey,
+      );
 
-    expect(dashboard.followUp.data!.days, 14);
-    expect(dashboard.todayMedications.status, DashboardSectionStatus.empty);
-    expect(dashboard.monthlyMedicationSummary.errorCode, 'SUMMARY_UNAVAILABLE');
-    expect(dashboard.trackingSummary.data!.latestWeight!.weightKg, 55.2);
-    expect(api.requests.single.query, {'date': '2026-08-27'});
-  });
+      expect(medication.currentStatus, MedicationStatus.active);
+      expect(createCall.path, '/api/medications');
+      expect(createCall.headers, {'Idempotency-Key': testRequestKey});
+      expect((createCall.data as Map)['drug_name'], '二甲双胍');
+    },
+  );
+
+  test(
+    'tracking update sends optimistic-lock time and parses weight response',
+    () async {
+      late ApiCall call;
+      final api = FakeApiClient(
+        handler: (value) {
+          call = value;
+          return _weight();
+        },
+      );
+      final updatedAt = DateTime.parse('2026-08-28T01:02:03Z');
+
+      final weight = await TrackingRepository(api).updateWeight(
+        id: 'weight-1',
+        recordDate: DateTime(2026, 8, 29),
+        weightKg: 63.2,
+        updatedAt: updatedAt,
+      );
+
+      expect(weight.weightKg, 63.2);
+      expect(call.path, '/api/weights/weight-1');
+      expect(call.data, {
+        'record_date': '2026-08-29',
+        'weight_kg': 63.2,
+        'updated_at': updatedAt.toIso8601String(),
+      });
+    },
+  );
+
+  test(
+    'dashboard parses the current follow-up and monthly summary fields',
+    () async {
+      final api = FakeApiClient(handler: (_) => _dashboard());
+
+      final dashboard = await DashboardRepository(api).get();
+
+      expect(dashboard.serverDate, '2026-08-28');
+      expect(dashboard.followUp.data?.nextVisitDate, '2026-09-01');
+      expect(dashboard.followUp.data?.state, 'upcoming');
+      expect(dashboard.followUp.data?.daysRemaining, 4);
+      expect(dashboard.monthlyMedicationSummary.data?.takenCount, 12);
+      expect(
+        dashboard.todayMedications.data?.single.intakeStatus,
+        MedicationDailyStatus.taken,
+      );
+    },
+  );
 }
 
-const _onboardingDraft = {
-  'id': 'draft-1',
-  'current_step': 'cycle',
-  'basic': {
-    'nickname': 'Pomi',
-    'birth_year': 1997,
-    'diagnosis_year': 2023,
-    'height_cm': null,
-    'weight_kg': null,
-    'updated_at': '2026-08-27T12:00:00Z',
-  },
-  'cycle': null,
-  'medications': null,
-  'updated_at': '2026-08-27T12:00:00Z',
-};
-
-const _profile = {
-  'id': 'profile-1',
-  'nickname': 'Pomi',
-  'birth_year': 1997,
-  'diagnosis_year': 2023,
+Map<String, dynamic> _profile() => {
+  'id': 'patient-1',
+  'nickname': null,
+  'birth_year': null,
+  'diagnosis_year': null,
   'height_cm': null,
-  'usual_cycle_min_days': 28,
-  'usual_cycle_max_days': 32,
+  'usual_cycle_min_days': null,
+  'usual_cycle_max_days': null,
+  'period_duration_days': null,
   'next_visit_date': null,
   'health_goal': null,
-  'onboarding_completed': true,
-  'created_at': '2026-08-27T12:00:00Z',
-  'updated_at': '2026-08-27T12:00:00Z',
+  'onboarding_completed': false,
+  'created_at': '2026-08-28T01:02:03Z',
+  'updated_at': '2026-08-28T01:02:03Z',
 };
 
-const _medication = {
+Map<String, dynamic> _medication() => {
   'id': 'medication-1',
   'drug_name': '二甲双胍',
   'source_category': 'prescribed',
+  'specification': null,
+  'dosage_value': 500,
+  'dosage_unit': 'mg',
+  'frequency': '每日两次',
+  'route': null,
   'current_status': 'active',
-  'created_at': '2026-08-27T12:00:00Z',
-  'updated_at': '2026-08-27T12:00:00Z',
+  'start_date': '2026-08-26',
+  'created_at': '2026-08-28T01:02:03Z',
+  'updated_at': '2026-08-28T01:02:03Z',
 };
 
-const _cycle = {
-  'id': 'cycle-1',
-  'start_date': '2026-08-01',
-  'end_date': null,
-  'flow_level': 'medium',
-  'note': null,
-  'source_type': 'manual',
-  'updated_at': '2026-08-27T12:00:00Z',
-  'cycle_length_days': null,
-  'duration_days': null,
-  'created_at': '2026-08-27T12:00:00Z',
-};
-
-const _weight = {
+Map<String, dynamic> _weight() => {
   'id': 'weight-1',
-  'record_date': '2026-08-27',
-  'weight_kg': 55.2,
-  'created_at': '2026-08-27T12:00:00Z',
-  'updated_at': '2026-08-27T12:00:00Z',
+  'record_date': '2026-08-29',
+  'weight_kg': 63.2,
+  'created_at': '2026-08-28T01:02:03Z',
+  'updated_at': '2026-08-28T02:03:04Z',
 };
 
-class _RecordedRequest {
-  const _RecordedRequest({
-    required this.method,
-    required this.path,
-    this.data,
-    this.query,
-    this.headers,
-  });
-
-  final String method;
-  final String path;
-  final dynamic data;
-  final Map<String, dynamic>? query;
-  final Map<String, String>? headers;
-}
-
-class _RecordingApiClient extends ApiClient {
-  _RecordingApiClient(this.responses)
-    : super(const FlutterSecureStorage(), baseUrl: 'http://example.invalid');
-
-  final Map<String, dynamic> responses;
-  final List<_RecordedRequest> requests = [];
-
-  dynamic _response(String method, String path) => responses['$method $path'];
-
-  @override
-  Future<dynamic> get(
-    String path, {
-    Map<String, dynamic>? queryParameters,
-  }) async {
-    requests.add(
-      _RecordedRequest(method: 'GET', path: path, query: queryParameters),
-    );
-    return _response('GET', path);
-  }
-
-  @override
-  Future<dynamic> post(
-    String path, {
-    Object? data,
-    Map<String, String>? headers,
-  }) async {
-    requests.add(
-      _RecordedRequest(
-        method: 'POST',
-        path: path,
-        data: data,
-        headers: headers,
-      ),
-    );
-    return _response('POST', path);
-  }
-
-  @override
-  Future<dynamic> put(
-    String path, {
-    Object? data,
-    Map<String, String>? headers,
-  }) async {
-    requests.add(
-      _RecordedRequest(method: 'PUT', path: path, data: data, headers: headers),
-    );
-    return _response('PUT', path);
-  }
-
-  @override
-  Future<dynamic> delete(String path, {Object? data}) async {
-    requests.add(_RecordedRequest(method: 'DELETE', path: path, data: data));
-    return _response('DELETE', path);
-  }
-}
+Map<String, dynamic> _dashboard() => {
+  'server_date': '2026-08-28',
+  'data_as_of': '2026-08-28T01:02:03Z',
+  'follow_up': {
+    'status': 'ok',
+    'data': {
+      'next_visit_date': '2026-09-01',
+      'state': 'upcoming',
+      'days_remaining': 4,
+    },
+    'error_code': null,
+  },
+  'today_medications': {
+    'status': 'ok',
+    'data': [
+      {
+        'medication_id': 'medication-1',
+        'drug_name': '二甲双胍',
+        'specification': null,
+        'dosage_text': '500mg',
+        'frequency': '每日两次',
+        'intake_status': 'taken',
+        'recorded_at': '2026-08-28T01:00:00Z',
+      },
+    ],
+    'error_code': null,
+  },
+  'monthly_medication_summary': {
+    'status': 'ok',
+    'data': {
+      'month': '2026-08',
+      'taken_count': 12,
+      'missed_count': 1,
+      'unrecorded_count': 3,
+    },
+    'error_code': null,
+  },
+  'tracking_summary': {'status': 'empty', 'data': null, 'error_code': null},
+  'document_summary': {
+    'status': 'ok',
+    'data': {'confirmed': 2, 'total': 3},
+    'error_code': null,
+  },
+  'latest_report': {'status': 'empty', 'data': null, 'error_code': null},
+};

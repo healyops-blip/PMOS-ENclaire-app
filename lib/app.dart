@@ -14,6 +14,9 @@ class PomiApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: buildPomiTheme(),
       routerConfig: ref.watch(routerProvider),
+      builder:
+          (context, child) =>
+              PomiAppBackground(child: child ?? const SizedBox.shrink()),
     );
   }
 }

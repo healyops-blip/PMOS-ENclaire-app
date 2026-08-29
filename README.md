@@ -3,7 +3,8 @@
 PMOS ENclaire mobile application built with Flutter for iOS and Android, with a
 FastAPI and SQLite backend in the same repository. See
 [`docs/architecture.md`](docs/architecture.md) for directory boundaries and
-security rules.
+security rules, and [`docs/ui-guidelines.md`](docs/ui-guidelines.md) for Flutter
+visual and layout rules.
 
 ## Repository layout
 
@@ -13,7 +14,7 @@ security rules.
 - `backend/`: FastAPI API, SQLite migrations, and the OCR worker
 - `contracts/`: OpenAPI and JSON Schema contracts shared across components
 - `deploy/`: Nginx and systemd deployment assets
-- `docs/`: architecture, API, privacy, and technical decisions
+- `docs/`: architecture, API, UI, privacy, and technical decisions
 - `.github/workflows/`: required CI and security checks
 
 ## Requirements

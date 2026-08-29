@@ -1,5 +1,6 @@
 import '../../core/api_client.dart';
 import '../../core/json_value.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final patientRepositoryProvider = Provider<PatientRepository>(
@@ -9,15 +10,16 @@ final patientRepositoryProvider = Provider<PatientRepository>(
 class PatientProfile {
   const PatientProfile({
     required this.id,
-    required this.nickname,
-    required this.birthYear,
-    required this.diagnosisYear,
+    this.nickname,
+    this.birthYear,
+    this.diagnosisYear,
     required this.onboardingCompleted,
     required this.createdAt,
     required this.updatedAt,
     this.heightCm,
     this.usualCycleMinDays,
     this.usualCycleMaxDays,
+    this.periodDurationDays,
     this.nextVisitDate,
     this.healthGoal,
   });
@@ -26,12 +28,13 @@ class PatientProfile {
     final json = jsonObject(value, 'patient profile');
     return PatientProfile(
       id: jsonString(json, 'id'),
-      nickname: jsonString(json, 'nickname'),
-      birthYear: jsonInt(json, 'birth_year'),
-      diagnosisYear: jsonInt(json, 'diagnosis_year'),
+      nickname: jsonStringOrNull(json, 'nickname'),
+      birthYear: jsonIntOrNull(json, 'birth_year'),
+      diagnosisYear: jsonIntOrNull(json, 'diagnosis_year'),
       heightCm: jsonDoubleOrNull(json, 'height_cm'),
       usualCycleMinDays: jsonIntOrNull(json, 'usual_cycle_min_days'),
       usualCycleMaxDays: jsonIntOrNull(json, 'usual_cycle_max_days'),
+      periodDurationDays: jsonIntOrNull(json, 'period_duration_days'),
       nextVisitDate: jsonStringOrNull(json, 'next_visit_date'),
       healthGoal: jsonStringOrNull(json, 'health_goal'),
       onboardingCompleted: jsonBool(json, 'onboarding_completed'),
@@ -41,12 +44,13 @@ class PatientProfile {
   }
 
   final String id;
-  final String nickname;
-  final int birthYear;
-  final int diagnosisYear;
+  final String? nickname;
+  final int? birthYear;
+  final int? diagnosisYear;
   final double? heightCm;
   final int? usualCycleMinDays;
   final int? usualCycleMaxDays;
+  final int? periodDurationDays;
   final String? nextVisitDate;
   final String? healthGoal;
   final bool onboardingCompleted;
@@ -63,6 +67,7 @@ class PatientProfileUpdate {
     this.heightCm = const JsonPatchField.absent(),
     this.usualCycleMinDays = const JsonPatchField.absent(),
     this.usualCycleMaxDays = const JsonPatchField.absent(),
+    this.periodDurationDays = const JsonPatchField.absent(),
     this.nextVisitDate = const JsonPatchField.absent(),
     this.healthGoal = const JsonPatchField.absent(),
   });
@@ -74,6 +79,7 @@ class PatientProfileUpdate {
   final JsonPatchField<double> heightCm;
   final JsonPatchField<int> usualCycleMinDays;
   final JsonPatchField<int> usualCycleMaxDays;
+  final JsonPatchField<int> periodDurationDays;
   final JsonPatchField<String> nextVisitDate;
   final JsonPatchField<String> healthGoal;
 
@@ -86,6 +92,8 @@ class PatientProfileUpdate {
       'usual_cycle_min_days': usualCycleMinDays.value,
     if (usualCycleMaxDays.isPresent)
       'usual_cycle_max_days': usualCycleMaxDays.value,
+    if (periodDurationDays.isPresent)
+      'period_duration_days': periodDurationDays.value,
     if (nextVisitDate.isPresent) 'next_visit_date': nextVisitDate.value,
     if (healthGoal.isPresent) 'health_goal': healthGoal.value,
     'updated_at': updatedAt.toUtc().toIso8601String(),

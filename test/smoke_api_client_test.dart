@@ -17,7 +17,7 @@ void main() {
           as Map,
     );
     expect(login['session_id'], 'smoke-session');
-    expect((login['account'] as Map)['onboarding_completed'], isFalse);
+    expect((login['account'] as Map)['onboarding_completed'], isTrue);
 
     await api.put(
       '/api/patient/profile',
@@ -43,9 +43,22 @@ void main() {
     final dashboard = Map<String, dynamic>.from(
       await api.get('/api/dashboard') as Map,
     );
-    expect((dashboard['profile'] as Map)['nickname'], '小波米');
-    expect((dashboard['latest_weight'] as Map)['weight_kg'], 55.0);
-    expect((dashboard['latest_cycle'] as Map)['start_date'], '2026-08-20');
-    expect((dashboard['medications'] as List), hasLength(1));
+    final profile = Map<String, dynamic>.from(
+      await api.get('/api/patient/profile') as Map,
+    );
+    final tracking = Map<String, dynamic>.from(
+      (dashboard['tracking_summary'] as Map)['data'] as Map,
+    );
+    final medications = List<Map<String, dynamic>>.from(
+      (dashboard['today_medications'] as Map)['data'] as List,
+    );
+
+    expect(profile['nickname'], '小波米');
+    expect((tracking['latest_weight'] as Map)['weight_kg'], 55.0);
+    expect((tracking['latest_cycle'] as Map)['start_date'], '2026-08-20');
+    expect(
+      medications.where((item) => item['drug_name'] == '肌醇'),
+      hasLength(1),
+    );
   });
 }

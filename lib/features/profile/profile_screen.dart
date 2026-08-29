@@ -12,165 +12,181 @@ final profileProvider = FutureProvider.autoDispose<Map<String, dynamic>>((
   return Map<String, dynamic>.from(value as Map);
 });
 
-class ProfileScreen extends ConsumerWidget {
-  const ProfileScreen({super.key});
+class ProfileScreen extends ConsumerStatefulWidget {
+  const ProfileScreen({this.onOpenRecords, super.key});
+
+  final VoidCallback? onOpenRecords;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  bool _darkMode = true;
+
+  @override
+  Widget build(BuildContext context) {
     final profile = ref.watch(profileProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('我的')),
       body: profile.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stack) => Center(child: Text(error.toString())),
         data: (data) {
           final nickname = data['nickname']?.toString() ?? '未设置称呼';
-          final birth = DateTime.tryParse(data['birth_date']?.toString() ?? '');
-          final age = birth == null ? null : DateTime.now().year - birth.year;
+          final birthYear = data['birth_year'] as int?;
+          final age =
+              birthYear == null ? null : DateTime.now().year - birthYear;
           final diagnosisYear = data['diagnosis_year'] as int?;
           final diagnosedYears =
               diagnosisYear == null
                   ? null
                   : DateTime.now().year - diagnosisYear;
+          final profileSummary = [
+            if (age != null) '$age 岁',
+            if (diagnosedYears != null) '已确诊 PCOS $diagnosedYears 年',
+          ];
           return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 96),
             children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: pomiHeroGradient,
-                  borderRadius: BorderRadius.circular(20),
-                ),
+              Text('我的', style: Theme.of(context).textTheme.headlineMedium),
+              const SizedBox(height: 24),
+              Center(
                 child: Column(
                   children: [
-                    CircleAvatar(
-                      radius: 34,
-                      backgroundColor: Colors.white.withValues(alpha: .2),
-                      foregroundColor: Colors.white,
+                    Container(
+                      width: 76,
+                      height: 76,
+                      alignment: Alignment.center,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [pomiPurple, pomiPurpleSoft],
+                        ),
+                      ),
                       child: Text(
                         nickname.characters.first,
                         style: const TextStyle(
+                          color: Colors.white,
                           fontSize: 26,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
                     const SizedBox(height: 10),
+                    OutlinedButton(
+                      onPressed: () => _showComingSoon(context, '头像修改'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: pomiPurple,
+                        side: BorderSide(
+                          color: pomiPurple.withValues(alpha: .20),
+                        ),
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 5,
+                        ),
+                        shape: const StadiumBorder(),
+                      ),
+                      child: const Text('修改头像'),
+                    ),
+                    const SizedBox(height: 4),
                     Text(
                       nickname,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                      ),
+                      style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: 3),
-                    Text(
-                      [
-                        'PCOS',
-                        if (age != null) '$age 岁',
-                        if (diagnosedYears != null) '确诊 $diagnosedYears 年',
-                      ].join(' · '),
-                      style: const TextStyle(
-                        color: Color(0xD9FFFFFF),
-                        fontSize: 13,
+                    if (profileSummary.isNotEmpty)
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 12,
+                        children:
+                            profileSummary
+                                .map(
+                                  (item) => Text(
+                                    item,
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                )
+                                .toList(),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        side: const BorderSide(color: Color(0x80FFFFFF)),
-                      ),
-                      onPressed: () => _editProfile(context, ref, data),
-                      icon: const Icon(Icons.edit_outlined, size: 17),
-                      label: const Text('编辑个人信息'),
-                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: 18),
-              _ProfileSection(
-                title: '健康档案',
+              const SizedBox(height: 22),
+              _ProfileSettingsCard(
                 children: [
-                  _ProfileTile(
-                    label: '出生日期',
-                    value: data['birth_date']?.toString() ?? '未填写',
+                  _ProfileSettingsRow(
+                    title: '个人信息',
+                    subtitle: '身高 / 下次就诊日期等',
+                    onTap: () => _editProfile(context, ref, data),
                   ),
-                  _ProfileTile(
-                    label: '身高',
-                    value:
-                        data['height_cm'] == null
-                            ? '未填写'
-                            : '${data['height_cm']} cm',
+                  _ProfileSettingsRow(
+                    title: '全部就诊记录',
+                    onTap: widget.onOpenRecords,
                   ),
-                  _ProfileTile(
-                    label: '确诊年份',
-                    value: data['diagnosis_year']?.toString() ?? '未填写',
+                  const _ProfileSettingsDivider(sectionBreak: true),
+                  _ProfileSettingsRow(
+                    title: '账户安全',
+                    subtitle: '密码 / 人脸 / 设备',
+                    onTap: () => _showComingSoon(context, '账户安全'),
                   ),
-                  _ProfileTile(
-                    label: '下次就诊',
-                    value: data['next_visit_date']?.toString() ?? '未安排',
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              _ProfileSection(
-                title: '设置与数据',
-                children: [
-                  _SettingsTile(
-                    icon: Icons.notifications_none_rounded,
+                  _ProfileSettingsRow(
                     title: '通知',
-                    subtitle: '用药提醒与就诊提醒将在 Android 通知模块接入',
+                    subtitle: '用药提醒 / 就诊提醒',
+                    onTap: () => _showComingSoon(context, '通知设置'),
                   ),
-                  _SettingsTile(
-                    icon:
-                        data['external_ocr_notice_accepted_at'] == null
-                            ? Icons.gpp_maybe_outlined
-                            : Icons.verified_user_outlined,
-                    title: '外部文档处理提示',
-                    subtitle:
-                        data['external_ocr_notice_accepted_at'] == null
-                            ? '尚未确认，不能创建识别任务'
-                            : '已确认；识别结果仍须手动核对',
-                    color:
-                        data['external_ocr_notice_accepted_at'] == null
-                            ? pomiCoral
-                            : pomiSuccess,
+                  _ProfileSettingsRow(
+                    title: '设置语言',
+                    subtitle: '简体中文',
+                    onTap: () => _showComingSoon(context, '语言设置'),
                   ),
-                  const _SettingsTile(
-                    icon: Icons.verified_outlined,
-                    title: '来源存证演示',
-                    subtitle: '仅保存在本机，不代表医院签发或真实上链',
+                  _ProfileSettingsRow(
+                    title: '夜间模式',
+                    subtitle: '深色配色（即将上线）',
+                    trailing: Switch(
+                      value: _darkMode,
+                      onChanged: (value) => setState(() => _darkMode = value),
+                      activeTrackColor: pomiMint,
+                      activeThumbColor: Colors.white,
+                    ),
                   ),
-                  const _SettingsTile(
-                    icon: Icons.info_outline_rounded,
+                  const _ProfileSettingsDivider(sectionBreak: true),
+                  _ProfileSettingsRow(
+                    title: '隐私与数据管理',
+                    onTap: () => _showComingSoon(context, '隐私与数据管理'),
+                  ),
+                  _ProfileSettingsRow(
+                    title: '存证与签署',
+                    subtitle: '文件版本存证 + 材料签署',
+                    onTap: () => _showComingSoon(context, '存证与签署'),
+                  ),
+                  _ProfileSettingsRow(
                     title: '关于 Pomi',
                     subtitle: 'PCOS 就诊准备工具',
+                    onTap: () => _showComingSoon(context, '关于 Pomi'),
                   ),
                 ],
               ),
-              const SizedBox(height: 22),
-              OutlinedButton.icon(
+              const SizedBox(height: 18),
+              TextButton.icon(
                 onPressed: () => _logout(context, ref),
                 icon: const Icon(Icons.logout),
                 label: const Text('退出登录'),
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                'Pomi 用于整理你确认过的复诊资料，不提供诊断或治疗建议。',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: pomiMuted,
-                  height: 16 / 11,
-                ),
               ),
             ],
           );
         },
       ),
     );
+  }
+
+  void _showComingSoon(BuildContext context, String feature) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('$feature即将上线')));
   }
 
   Future<void> _editProfile(
@@ -182,7 +198,7 @@ class ProfileScreen extends ConsumerWidget {
       text: profile['nickname']?.toString(),
     );
     final birth = TextEditingController(
-      text: profile['birth_date']?.toString(),
+      text: profile['birth_year']?.toString(),
     );
     final height = TextEditingController(
       text: profile['height_cm']?.toString(),
@@ -218,7 +234,7 @@ class ProfileScreen extends ConsumerWidget {
                         const Text(
                           '个人信息',
                           style: TextStyle(
-                            fontSize: 18,
+                            fontSize: 16,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -288,7 +304,7 @@ class ProfileScreen extends ConsumerWidget {
                                   ),
                           title: const Text(
                             '同意外部文档处理提示',
-                            style: TextStyle(fontSize: 13),
+                            style: TextStyle(fontSize: 12),
                           ),
                           controlAffinity: ListTileControlAffinity.leading,
                         ),
@@ -301,10 +317,9 @@ class ProfileScreen extends ConsumerWidget {
                                   '/api/patient/profile',
                                   data: {
                                     'nickname': nickname.text.trim(),
-                                    'birth_date':
-                                        birth.text.trim().isEmpty
-                                            ? null
-                                            : birth.text.trim(),
+                                    'birth_year': int.tryParse(
+                                      birth.text.trim(),
+                                    ),
                                     'height_cm': double.tryParse(height.text),
                                     'diagnosis_year': int.tryParse(
                                       diagnosisYear.text,
@@ -317,7 +332,7 @@ class ProfileScreen extends ConsumerWidget {
                                         goal.text.trim().isEmpty
                                             ? null
                                             : goal.text.trim(),
-                                    'external_ocr_notice_accepted': accepted,
+                                    'updated_at': profile['updated_at'],
                                   },
                                 );
                             if (sheetContext.mounted) {
@@ -370,60 +385,93 @@ class ProfileScreen extends ConsumerWidget {
   }
 }
 
-class _ProfileSection extends StatelessWidget {
-  const _ProfileSection({required this.title, required this.children});
-  final String title;
+class _ProfileSettingsCard extends StatelessWidget {
+  const _ProfileSettingsCard({required this.children});
+
   final List<Widget> children;
+
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Padding(
-        padding: const EdgeInsets.only(left: 2, bottom: 8),
-        child: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+  Widget build(BuildContext context) {
+    return PomiGlassCard(
+      borderRadius: 22,
+      backgroundOpacity: .30,
+      child: Column(
+        children: [
+          for (var index = 0; index < children.length; index++) ...[
+            children[index],
+            if (index != children.length - 1 &&
+                children[index] is! _ProfileSettingsDivider &&
+                children[index + 1] is! _ProfileSettingsDivider)
+              const Divider(height: 1, color: pomiLine),
+          ],
+        ],
       ),
-      Card(
-        child: Column(
-          children: List.generate(
-            children.length * 2 - 1,
-            (index) => index.isOdd ? const Divider() : children[index ~/ 2],
-          ),
+    );
+  }
+}
+
+class _ProfileSettingsDivider extends StatelessWidget {
+  const _ProfileSettingsDivider({this.sectionBreak = false});
+
+  final bool sectionBreak;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    height: sectionBreak ? 14 : 1,
+    color: sectionBreak ? Colors.transparent : pomiLine,
+    alignment: Alignment.center,
+    child:
+        sectionBreak
+            ? const Divider(height: 1, color: pomiLine)
+            : const SizedBox.shrink(),
+  );
+}
+
+class _ProfileSettingsRow extends StatelessWidget {
+  const _ProfileSettingsRow({
+    required this.title,
+    this.subtitle,
+    this.onTap,
+    this.trailing,
+  });
+
+  final String title;
+  final String? subtitle;
+  final VoidCallback? onTap;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Text(title, style: Theme.of(context).textTheme.bodyMedium),
+            const SizedBox(width: 12),
+            if (subtitle != null)
+              Expanded(
+                child: Text(
+                  subtitle!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.right,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              )
+            else
+              const Spacer(),
+            const SizedBox(width: 8),
+            trailing ??
+                const Icon(
+                  Icons.chevron_right,
+                  color: pomiSecondaryText,
+                  size: 19,
+                ),
+          ],
         ),
       ),
-    ],
-  );
-}
-
-class _ProfileTile extends StatelessWidget {
-  const _ProfileTile({required this.label, required this.value});
-  final String label;
-  final String value;
-  @override
-  Widget build(BuildContext context) => ListTile(
-    title: Text(label),
-    trailing: Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
-  );
-}
-
-class _SettingsTile extends StatelessWidget {
-  const _SettingsTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    this.color = pomiPurple,
-  });
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color color;
-  @override
-  Widget build(BuildContext context) => ListTile(
-    leading: CircleAvatar(
-      backgroundColor: color.withValues(alpha: .1),
-      foregroundColor: color,
-      child: Icon(icon, size: 20),
-    ),
-    title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-    subtitle: Text(subtitle, style: const TextStyle(fontSize: 11)),
-  );
+    );
+  }
 }

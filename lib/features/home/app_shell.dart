@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
+import '../../core/api_client.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../profile/profile_screen.dart';
 import '../records/records_screen.dart';
@@ -16,8 +17,39 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _index = 0;
-  int _recordsTab = 0;
-  void _openTab(int index) => setState(() => _index = index);
+  // The navigation entry opens the complete reports list by default.
+  int _recordsTab = 1;
+  void _openTab(int index) {
+    if (index == 2) {
+      _showUploadDialog();
+      return;
+    }
+    setState(() => _index = index);
+  }
+
+  Future<void> _showUploadDialog() async {
+    await showDialog<void>(
+      context: context,
+      barrierColor: pomiInk.withValues(alpha: .22),
+      builder:
+          (dialogContext) => Dialog(
+            backgroundColor: Colors.transparent,
+            surfaceTintColor: Colors.transparent,
+            elevation: 0,
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 18,
+              vertical: 34,
+            ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(dialogContext).height * .84,
+              ),
+              child: const UploadScreen(modal: true),
+            ),
+          ),
+    );
+  }
+
   void _openRecords({bool reports = false}) => setState(() {
     _recordsTab = reports ? 1 : 0;
     _index = 3;
@@ -28,16 +60,24 @@ class _AppShellState extends State<AppShell> {
     final pages = [
       DashboardScreen(onOpenTab: _openTab, onOpenRecords: _openRecords),
       const TrackingScreen(),
-      const UploadScreen(),
+      const SizedBox.shrink(),
       RecordsScreen(
         key: ValueKey('records-$_recordsTab'),
         initialTab: _recordsTab,
+        onBack:
+            () => setState(() {
+              _recordsTab = 0;
+              _index = 0;
+            }),
       ),
-      const ProfileScreen(),
+      ProfileScreen(onOpenRecords: _openRecords),
     ];
     return Scaffold(
       body: IndexedStack(index: _index, children: pages),
-      bottomNavigationBar: _PomiBottomNav(index: _index, onSelected: _openTab),
+      bottomNavigationBar:
+          smokeMode && _index == 3 && _recordsTab == 1
+              ? null
+              : _PomiBottomNav(index: _index, onSelected: _openTab),
     );
   }
 }
@@ -56,90 +96,82 @@ class _PomiBottomNav extends StatelessWidget {
       (Icons.folder_open_outlined, Icons.folder_rounded, '记录'),
       (Icons.person_outline_rounded, Icons.person_rounded, '我的'),
     ];
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: pomiLine)),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x14000000),
-            blurRadius: 16,
-            offset: Offset(0, -4),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 68,
-          child: Row(
-            children: List.generate(items.length, (itemIndex) {
-              final item = items[itemIndex];
-              final selected = index == itemIndex;
-              if (itemIndex == 2) {
-                return Expanded(
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      child: SizedBox(
+        height: 56,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            PomiGlassCard(
+              borderRadius: 28,
+              child: SizedBox(
+                height: 56,
+                child: Row(
+                  children: List.generate(items.length, (itemIndex) {
+                    final item = items[itemIndex];
+                    final selected = index == itemIndex;
+                    if (itemIndex == 2) {
+                      return const Expanded(child: SizedBox.shrink());
+                    }
+                    return Expanded(
+                      child: Semantics(
+                        button: true,
+                        selected: selected,
+                        label: item.$3,
+                        child: InkWell(
+                          onTap: () => onSelected(itemIndex),
+                          child: Center(
+                            child: Icon(
+                              selected ? item.$2 : item.$1,
+                              color: pomiSecondaryText,
+                              size: 25,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+            ),
+            Positioned.fill(
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: Transform.translate(
+                  offset: const Offset(0, -8),
                   child: Semantics(
                     button: true,
                     label: '上传资料',
                     child: InkResponse(
-                      onTap: () => onSelected(itemIndex),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            margin: const EdgeInsets.only(top: 2),
-                            decoration: const BoxDecoration(
-                              color: pomiPurple,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Color(0x556A4C93),
-                                  blurRadius: 14,
-                                  offset: Offset(0, 4),
-                                ),
-                              ],
+                      onTap: () => onSelected(2),
+                      child: Container(
+                        width: 48,
+                        height: 48,
+                        decoration: const BoxDecoration(
+                          color: pomiPurple,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Color(0x556A4C93),
+                              blurRadius: 14,
+                              offset: Offset(0, 4),
                             ),
-                            child: const Icon(
-                              Icons.add_rounded,
-                              color: Colors.white,
-                              size: 28,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.camera_alt_rounded,
+                          color: Colors.white,
+                          size: 28,
+                        ),
                       ),
                     ),
                   ),
-                );
-              }
-              return Expanded(
-                child: InkWell(
-                  onTap: () => onSelected(itemIndex),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        selected ? item.$2 : item.$1,
-                        color: selected ? pomiPurple : pomiMuted,
-                        size: 23,
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        item.$3,
-                        style: TextStyle(
-                          color: selected ? pomiPurple : pomiMuted,
-                          fontSize: 10,
-                          fontWeight:
-                              selected ? FontWeight.w700 : FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
-              );
-            }),
-          ),
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -34,6 +34,9 @@ flutter:
     - assets/brand/POMI-logo.svg
     - assets/brand/POMI-logo-mark.svg
     - assets/data/pomi_medications_v2.json
+    - assets/images/pomie_thinking.gif
+    - assets/images/pomie_questioning.gif
+    - assets/images/pomi_verified_stamp.png
   fonts:
     - family: Noto Sans SC
       fonts:

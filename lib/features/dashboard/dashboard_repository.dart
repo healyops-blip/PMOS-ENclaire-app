@@ -1,6 +1,8 @@
 import '../../core/api_client.dart';
 import '../../core/json_value.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../medications/medication_repository.dart';
 
 final dashboardRepositoryProvider = Provider<DashboardRepository>(
@@ -48,23 +50,23 @@ class DashboardSection<T> {
 
 class FollowUpSummary {
   const FollowUpSummary({
-    required this.date,
-    required this.timing,
-    required this.days,
+    required this.nextVisitDate,
+    required this.state,
+    required this.daysRemaining,
   });
 
   factory FollowUpSummary.fromJson(dynamic value) {
     final json = jsonObject(value, 'follow-up summary');
     return FollowUpSummary(
-      date: jsonString(json, 'date'),
-      timing: jsonString(json, 'timing'),
-      days: jsonInt(json, 'days'),
+      nextVisitDate: jsonString(json, 'next_visit_date'),
+      state: jsonString(json, 'state'),
+      daysRemaining: jsonInt(json, 'days_remaining'),
     );
   }
 
-  final String date;
-  final String timing;
-  final int days;
+  final String nextVisitDate;
+  final String state;
+  final int daysRemaining;
 }
 
 class TodayMedication {
@@ -212,7 +214,7 @@ class LatestReportSummary {
   factory LatestReportSummary.fromJson(dynamic value) {
     final json = jsonObject(value, 'latest report summary');
     return LatestReportSummary(
-      id: jsonString(json, 'id'),
+      id: jsonString(json, 'report_id'),
       status: jsonString(json, 'status'),
       generatedAt: jsonDateTime(json, 'generated_at'),
     );

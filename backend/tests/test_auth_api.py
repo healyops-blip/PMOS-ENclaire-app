@@ -20,13 +20,14 @@ def register_account(
     *,
     account_name: str = "new-user",
     password: str = "aaaaaaaa1",
+    phone_number: str = "+8613812345678",
 ) -> dict[str, object]:
     response = client.post(
         "/api/auth/register",
         json={
             "account_name": account_name,
             "password": password,
-            "phone_number": "+8613812345678",
+            "phone_number": phone_number,
         },
     )
     assert response.status_code == 201
@@ -85,6 +86,17 @@ def test_register_rejects_duplicate_and_invalid_fields(api_client: TestClient) -
         }
     }
 
+    duplicate_phone = api_client.post(
+        "/api/auth/register",
+        json={
+            "account_name": "another-user",
+            "password": "bbbbbbbb2",
+            "phone_number": "+8613812345678",
+        },
+    )
+    assert duplicate_phone.status_code == 409
+    assert duplicate_phone.json()["error"]["code"] == "PHONE_NUMBER_TAKEN"
+
     invalid = api_client.post(
         "/api/auth/register",
         json={
@@ -117,6 +129,12 @@ def test_login_returns_plaintext_once_and_stores_only_digest(
         assert stored.client_platform == "android"
         assert account is not None
         assert account.last_login_at is not None
+
+
+def test_login_accepts_registered_phone_number(api_client: TestClient) -> None:
+    register_account(api_client)
+    result = login_account(api_client, account_name="+8613812345678")
+    assert result["account"]["account_name"] == "new-user"
 
 
 def test_login_does_not_reveal_account_existence_and_rejects_disabled_account(
@@ -152,7 +170,11 @@ def test_bearer_session_authentication_and_uid_cannot_override_identity(
     api_client: TestClient,
 ) -> None:
     first = register_account(api_client, account_name="first-user")
-    register_account(api_client, account_name="second-user")
+    register_account(
+        api_client,
+        account_name="second-user",
+        phone_number="+8613812345679",
+    )
     login = login_account(api_client, account_name="first-user")
     headers = {"Authorization": f"Bearer {login['session_id']}"}
 

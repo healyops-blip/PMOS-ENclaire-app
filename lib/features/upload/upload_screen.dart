@@ -10,7 +10,9 @@ import '../../core/api_client.dart';
 import '../../core/theme.dart';
 
 class UploadScreen extends ConsumerStatefulWidget {
-  const UploadScreen({super.key});
+  const UploadScreen({this.modal = false, super.key});
+
+  final bool modal;
 
   @override
   ConsumerState<UploadScreen> createState() => _UploadScreenState();
@@ -19,6 +21,7 @@ class UploadScreen extends ConsumerStatefulWidget {
 class _UploadScreenState extends ConsumerState<UploadScreen> {
   String _documentType = 'lab';
   File? _file;
+  String? _idempotencyKey;
   String? _status;
   bool _working = false;
 
@@ -35,7 +38,13 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       allowedExtensions: const ['jpg', 'jpeg', 'png', 'pdf'],
     );
     final path = file?.path;
-    if (path != null) setState(() => _file = File(path));
+    if (path != null) {
+      setState(() {
+        _file = File(path);
+        _idempotencyKey = null;
+      });
+      await _start();
+    }
   }
 
   Future<void> _takePhoto() async {
@@ -45,7 +54,13 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       maxWidth: 4096,
       maxHeight: 4096,
     );
-    if (result != null) setState(() => _file = File(result.path));
+    if (result != null) {
+      setState(() {
+        _file = File(result.path);
+        _idempotencyKey = null;
+      });
+      await _start();
+    }
   }
 
   Future<void> _start() async {
@@ -57,59 +72,39 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     });
     try {
       final api = ref.read(apiClientProvider);
-      final document = await api.upload(
-        '/api/documents',
+      final result = await api.recognizeOcr(
         file: file,
-        documentType: _documentType,
+        materialType: _wireMaterialType,
+        promptVersion: 'pomi-ocr-v1',
+        consentVersion: 'pomi-external-processing-v1',
+        idempotencyKey:
+            _idempotencyKey ??= 'ocr-${DateTime.now().microsecondsSinceEpoch}',
       );
       if (!mounted) return;
-      setState(() => _status = '等待识别任务');
-      final task = await api.post(
-        '/api/ocr/tasks',
-        data: {'document_id': document['id']},
-      );
-      Map<String, dynamic>? result;
-      for (var attempt = 0; attempt < 60; attempt++) {
-        await Future<void>.delayed(const Duration(seconds: 2));
-        final taskState = await api.get('/api/ocr/tasks/${task['id']}');
-        final status = taskState['task_status'].toString();
-        if (!mounted) return;
-        setState(() => _status = _statusLabel(status));
-        if (const {'succeeded', 'fallback', 'confirmed'}.contains(status)) {
-          result = Map<String, dynamic>.from(
-            await api.get('/api/ocr/tasks/${task['id']}/result') as Map,
-          );
-          break;
-        }
-        if (const {'failed', 'timeout'}.contains(status)) {
-          throw ApiFailure(
-            taskState['error_code']?.toString() ?? 'OCR_FAILED',
-            taskState['error_message']?.toString() ?? '识别失败',
-          );
-        }
+      setState(() => _status = '识别完成');
+      final resultId = result['ocr_result_id']?.toString();
+      if (resultId == null) {
+        throw const FormatException('识别结果缺少确认所需的版本信息，请重新识别');
       }
-      final readyResult = result;
-      if (readyResult == null) {
-        throw ApiFailure('OCR_TIMEOUT', '识别等待超时，请稍后在记录中查看');
-      }
-      if (!mounted) return;
+      final draft = Map<String, dynamic>.from(result)
+        ..removeWhere((key, _) => _ocrMetadataKeys.contains(key));
       final confirmed = await Navigator.of(context).push<bool>(
         MaterialPageRoute(
           builder:
-              (context) => OcrConfirmScreen(
-                taskId: task['id'].toString(),
-                documentType: _documentType,
-                resultSource: readyResult['result_source'].toString(),
-                draft: Map<String, dynamic>.from(readyResult['draft'] as Map),
+              (_) => OcrConfirmScreen(
+                resultId: resultId,
+                resultSource: result['result_source']?.toString() ?? 'qwen3-vl',
+                draft: draft,
               ),
         ),
       );
-      if (confirmed == true && mounted) {
+      if (mounted && confirmed == true) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('资料已确认，可在“记录”中查看和认证')));
         setState(() {
           _file = null;
+          _idempotencyKey = null;
           _status = null;
         });
       }
@@ -124,131 +119,158 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     }
   }
 
-  String _statusLabel(String status) => switch (status) {
-    'pending' => '任务排队中',
-    'processing' => '正在识别材料',
-    'fallback' => '已生成演示兜底草稿',
-    'succeeded' => '识别完成，正在加载',
-    _ => status,
+  String get _wireMaterialType => switch (_documentType) {
+    'lab' => 'lab_report',
+    'medical_order' => 'medical_order',
+    'imaging' => 'imaging_text_report',
+    _ => 'outpatient_record',
   };
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('上传资料')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(18, 8, 18, 96),
-        children: [
-          const Text(
-            '选择材料类型',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+    final form = ListView(
+      padding: EdgeInsets.fromLTRB(18, 8, 18, widget.modal ? 24 : 96),
+      children: [
+        const Text(
+          '选择材料类型',
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 12),
+        RadioGroup<String>(
+          groupValue: _documentType,
+          onChanged: (value) {
+            if (!_working && value != null) {
+              setState(() => _documentType = value);
+            }
+          },
+          child: Column(
+            children: [
+              for (final entry in typeLabels.entries)
+                RadioListTile<String>(
+                  value: entry.key,
+                  enabled: !_working,
+                  title: Text(entry.value),
+                  contentPadding: EdgeInsets.zero,
+                ),
+            ],
           ),
-          const SizedBox(height: 12),
-          RadioGroup<String>(
-            groupValue: _documentType,
-            onChanged: (value) {
-              if (!_working && value != null) {
-                setState(() => _documentType = value);
-              }
-            },
-            child: Column(
+        ),
+        const Divider(height: 30),
+        const Text(
+          '添加原件',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _working ? null : _takePhoto,
+                icon: const Icon(Icons.photo_camera_outlined),
+                label: const Text('拍照'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _working ? null : _pickFile,
+                icon: const Icon(Icons.folder_open_outlined),
+                label: const Text('相册 / 文件'),
+              ),
+            ),
+          ],
+        ),
+        if (_file != null) ...[
+          const SizedBox(height: 14),
+          PomiGlassCard(
+            child: ListTile(
+              leading: Icon(
+                _file!.path.toLowerCase().endsWith('.pdf')
+                    ? Icons.picture_as_pdf
+                    : Icons.image_outlined,
+              ),
+              title: Text(
+                _file!.uri.pathSegments.last,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              trailing: IconButton(
+                tooltip: '移除',
+                onPressed:
+                    _working
+                        ? null
+                        : () => setState(() {
+                          _file = null;
+                          _idempotencyKey = null;
+                        }),
+                icon: const Icon(Icons.close),
+              ),
+            ),
+          ),
+        ],
+        if (_working) ...[
+          const SizedBox(height: 22),
+          const LinearProgressIndicator(),
+          const SizedBox(height: 8),
+          Text(_status ?? '处理中', textAlign: TextAlign.center),
+        ],
+        const SizedBox(height: 24),
+        FilledButton.icon(
+          onPressed: _file == null || _working ? null : _start,
+          icon: const Icon(Icons.document_scanner_outlined),
+          label: const Text('开始识别'),
+        ),
+      ],
+    );
+
+    if (!widget.modal) {
+      return Scaffold(appBar: AppBar(title: const Text('上传资料')), body: form);
+    }
+
+    return PomiGlassCard(
+      borderRadius: 28,
+      backgroundOpacity: 1,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 10, 8),
+            child: Row(
               children: [
-                for (final entry in typeLabels.entries)
-                  RadioListTile<String>(
-                    value: entry.key,
-                    enabled: !_working,
-                    title: Text(entry.value),
-                    contentPadding: EdgeInsets.zero,
-                  ),
+                const Spacer(),
+                IconButton(
+                  tooltip: '关闭上传弹窗',
+                  onPressed: _working ? null : () => Navigator.pop(context),
+                  icon: const Icon(Icons.close_rounded),
+                ),
               ],
             ),
           ),
-          const Divider(height: 30),
-          const Text(
-            '添加原件',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _working ? null : _takePhoto,
-                  icon: const Icon(Icons.photo_camera_outlined),
-                  label: const Text('拍照'),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _working ? null : _pickFile,
-                  icon: const Icon(Icons.folder_open_outlined),
-                  label: const Text('相册 / 文件'),
-                ),
-              ),
-            ],
-          ),
-          if (_file != null) ...[
-            const SizedBox(height: 14),
-            Card(
-              child: ListTile(
-                leading: Icon(
-                  _file!.path.toLowerCase().endsWith('.pdf')
-                      ? Icons.picture_as_pdf
-                      : Icons.image_outlined,
-                ),
-                title: Text(
-                  _file!.uri.pathSegments.last,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                trailing: IconButton(
-                  tooltip: '移除',
-                  onPressed:
-                      _working ? null : () => setState(() => _file = null),
-                  icon: const Icon(Icons.close),
-                ),
-              ),
-            ),
-          ],
-          if (_working) ...[
-            const SizedBox(height: 22),
-            const LinearProgressIndicator(),
-            const SizedBox(height: 8),
-            Text(_status ?? '处理中', textAlign: TextAlign.center),
-          ],
-          const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: _file == null || _working ? null : _start,
-            icon: const Icon(Icons.document_scanner_outlined),
-            label: const Text('开始识别'),
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            '支持 JPG、PNG 和单页 PDF，最大 20 MB。识别结果必须经你确认后才会进入报告。',
-            style: TextStyle(
-              color: Color(0xFF686E6A),
-              fontSize: 13,
-              height: 20 / 13,
-            ),
-          ),
+          const Divider(),
+          Expanded(child: form),
         ],
       ),
     );
   }
 }
 
+const _ocrMetadataKeys = {
+  'ocr_task_id',
+  'ocr_result_id',
+  'document_id',
+  'document_revision_id',
+  'material_type',
+  'result_source',
+};
+
 class OcrConfirmScreen extends ConsumerStatefulWidget {
   const OcrConfirmScreen({
-    required this.taskId,
-    required this.documentType,
+    required this.resultId,
     required this.resultSource,
     required this.draft,
     super.key,
   });
 
-  final String taskId;
-  final String documentType;
+  final String resultId;
   final String resultSource;
   final Map<String, dynamic> draft;
 
@@ -274,8 +296,8 @@ class _OcrConfirmScreenState extends ConsumerState<OcrConfirmScreen> {
       await ref
           .read(apiClientProvider)
           .post(
-            '/api/ocr/tasks/${widget.taskId}/confirm',
-            data: {'result': _draft},
+            '/api/ocr/results/${widget.resultId}/confirm',
+            data: buildOcrConfirmationPayload(_draft),
           );
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
@@ -297,26 +319,23 @@ class _OcrConfirmScreenState extends ConsumerState<OcrConfirmScreen> {
         padding: const EdgeInsets.fromLTRB(18, 8, 18, 100),
         children: [
           if (widget.resultSource == 'fallback')
-            Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF2D6),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFE7C878)),
-              ),
-              child: const Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.info_outline, color: Color(0xFF8A6410)),
-                  SizedBox(width: 10),
-                  Expanded(child: Text('当前为演示兜底结果，不是外部模型的实时识别。请逐项对照原件。')),
-                ],
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: PomiGlassCard(
+                padding: const EdgeInsets.all(14),
+                child: const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.info_outline, color: Color(0xFF8A6410)),
+                    SizedBox(width: 10),
+                    Expanded(child: Text('当前为演示兜底结果，不是外部模型的实时识别。请逐项对照原件。')),
+                  ],
+                ),
               ),
             ),
           const Text(
             '逐项确认',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 6),
           const Text('修改后的内容会与模型原值分开保存。'),
@@ -352,16 +371,34 @@ class _JsonFields extends StatelessWidget {
     'sample_date': '采样日期',
     'report_date': '报告日期',
     'observations': '检查项目',
+    'items': '检查项目',
     'orders': '药品医嘱',
+    'hospital_name': '医院',
+    'department_name': '科室',
+    'doctor_name': '医生',
+    'prescribed_at': '开具日期',
+    'examined_at': '检查日期',
+    'reported_at': '报告日期',
+    'examination_name': '检查名称',
+    'body_part': '检查部位',
+    'examination_method': '检查方法',
     'item_name': '项目名称',
+    'item_code': '项目代码',
     'raw_value': '原始数值',
     'numeric_value': '数值',
     'unit': '单位',
+    'raw_unit': '原始单位',
+    'normalized_unit': '标准单位',
     'reference_range': '参考范围',
+    'reference_range_text': '参考范围',
+    'reference_low': '参考下限',
+    'reference_high': '参考上限',
     'source_text': '医嘱原文',
     'drug_name': '药名',
     'specification': '规格',
     'dosage_text': '单次剂量',
+    'dosage_value': '剂量数值',
+    'dosage_unit': '剂量单位',
     'frequency': '频次',
     'duration': '疗程',
     'route': '给药途径',
@@ -372,6 +409,14 @@ class _JsonFields extends StatelessWidget {
     'diagnosis_summary': '诊断摘要',
     'treatment_plan': '处理意见',
     'medical_advice': '医嘱',
+    'hospital': '医院',
+    'department': '科室',
+    'examinations': '检查项目',
+    'medication_suggestions': '用药建议',
+    'dosage': '剂量',
+    'instruction': '用药说明',
+    'start_date': '开始日期',
+    'source_category': '药物分类',
   };
 
   @override
@@ -410,28 +455,25 @@ class _JsonFields extends StatelessWidget {
               child: Text(
                 label!,
                 style: const TextStyle(
-                  fontSize: 17,
+                  fontSize: 16,
                   fontWeight: FontWeight.w800,
                 ),
               ),
             ),
           ...List.generate(
             list.length,
-            (index) => Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border.all(color: pomiLine),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: _JsonFields(
-                label: '${label ?? '项目'} ${index + 1}',
-                value: list[index],
-                onChanged: (next) {
-                  list[index] = next;
-                  onChanged(list);
-                },
+            (index) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: PomiGlassCard(
+                padding: const EdgeInsets.all(14),
+                child: _JsonFields(
+                  label: '${label ?? '项目'} ${index + 1}',
+                  value: list[index],
+                  onChanged: (next) {
+                    list[index] = next;
+                    onChanged(list);
+                  },
+                ),
               ),
             ),
           ),
@@ -456,4 +498,43 @@ class _JsonFields extends StatelessWidget {
 
   bool _longField(String? name) =>
       const {'医嘱原文', '检查所见', '检查结论', '主诉', '诊断摘要', '处理意见', '医嘱'}.contains(name);
+}
+
+Map<String, dynamic> buildOcrConfirmationPayload(Map<String, dynamic> draft) {
+  final examinations = (draft['examinations'] as List? ?? const [])
+      .whereType<Map>()
+      .toList(growable: false);
+  final medications = (draft['medication_suggestions'] as List? ?? const [])
+      .whereType<Map>()
+      .toList(growable: false);
+  return {
+    'visit_date': draft['visit_date'],
+    'examinations': [
+      for (var index = 0; index < examinations.length; index++)
+        {
+          'source_index': index,
+          'item_name': examinations[index]['item_name'],
+          'value': examinations[index]['value'],
+          'unit': examinations[index]['unit'],
+          'reference_range': examinations[index]['reference_range'],
+          if (examinations[index]['note'] != null)
+            'note': examinations[index]['note'],
+        },
+    ],
+    'medication_suggestions': [
+      for (var index = 0; index < medications.length; index++)
+        {
+          'source_index': index,
+          'drug_name': medications[index]['drug_name'],
+          'dosage': medications[index]['dosage'],
+          'frequency': medications[index]['frequency'],
+          'duration': medications[index]['duration'],
+          'instruction': medications[index]['instruction'],
+          'source_text': medications[index]['source_text'],
+          'source_category':
+              medications[index]['source_category'] ?? 'prescribed',
+          'start_date': medications[index]['start_date'] ?? draft['visit_date'],
+        },
+    ],
+  };
 }

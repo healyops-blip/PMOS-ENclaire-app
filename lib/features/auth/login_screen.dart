@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import 'auth_controller.dart';
 
@@ -14,8 +15,8 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _account = TextEditingController();
-  final _password = TextEditingController();
+  final _account = TextEditingController(text: smokeMode ? 'smoke' : null);
+  final _password = TextEditingController(text: smokeMode ? 'Pomi1234' : null);
   bool _agreedToTerms = false;
   bool _isRegisterMode = false;
 
@@ -53,124 +54,132 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final auth = ref.watch(authControllerProvider);
     return Scaffold(
-      body: Container(
-        color: Colors.white,
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(32, 18, 32, 24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 460),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Align(
-                        child: Container(
-                          width: 96,
-                          height: 96,
-                          margin: const EdgeInsets.only(bottom: 12),
-                          color: Colors.transparent,
-                          child: Opacity(
-                            opacity: 0.7,
-                            child: SvgPicture.asset(
-                              'assets/brand/POMI-logo-mark.svg',
-                              fit: BoxFit.contain,
-                              semanticsLabel: 'POMI Logo',
-                            ),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(32, 18, 32, 24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 460),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Align(
+                      child: Container(
+                        width: 96,
+                        height: 96,
+                        margin: const EdgeInsets.only(bottom: 12),
+                        color: Colors.transparent,
+                        child: Opacity(
+                          opacity: 0.7,
+                          child: SvgPicture.asset(
+                            'assets/brand/POMI-logo-mark.svg',
+                            fit: BoxFit.contain,
+                            semanticsLabel: 'POMI Logo',
                           ),
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text(
-                            '戳戳POMI，翻译你的身体',
+                    ),
+                    const SizedBox(height: 20),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          '戳戳POMI，翻译你的身体',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: pomiInk,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        if (smokeMode) ...[
+                          const Text(
+                            'Smoke 演示账号：smoke / Pomi1234',
                             textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: pomiInk,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
+                            style: TextStyle(
+                              color: pomiMuted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w300,
                             ),
                           ),
-                          const SizedBox(height: 16),
-                          _GlassField(
-                            controller: _account,
-                            hint: '账   号',
-                            textInputAction: TextInputAction.next,
-                            validator: _validateAccountName,
+                          const SizedBox(height: 12),
+                        ],
+                        _GlassField(
+                          controller: _account,
+                          hint: '账   号',
+                          textInputAction: TextInputAction.next,
+                          validator: _validateAccountName,
+                        ),
+                        const SizedBox(height: 24),
+                        _GlassField(
+                          controller: _password,
+                          hint: '密   码',
+                          obscureText: true,
+                          onSubmitted: (_) => _submit(),
+                          validator: _validatePassword,
+                        ),
+                        const SizedBox(height: 14),
+                        _AgreementRow(
+                          value: _agreedToTerms,
+                          registering: _isRegisterMode,
+                          onChanged:
+                              (value) => setState(
+                                () => _agreedToTerms = value ?? false,
+                              ),
+                        ),
+                        const SizedBox(height: 16),
+                        FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: pomiPurple,
+                            foregroundColor: Colors.white,
+                            textStyle: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
-                          const SizedBox(height: 24),
-                          _GlassField(
-                            controller: _password,
-                            hint: '密   码',
-                            obscureText: true,
-                            onSubmitted: (_) => _submit(),
-                            validator: _validatePassword,
-                          ),
-                          const SizedBox(height: 14),
-                          _AgreementRow(
-                            value: _agreedToTerms,
-                            registering: _isRegisterMode,
-                            onChanged:
-                                (value) => setState(
-                                  () => _agreedToTerms = value ?? false,
-                                ),
-                          ),
-                          const SizedBox(height: 16),
-                          FilledButton(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: pomiPurple,
-                              foregroundColor: Colors.white,
-                              textStyle: const TextStyle(
-                                fontSize: 16,
+                          onPressed: auth.isLoading ? null : _submit,
+                          child:
+                              auth.isLoading
+                                  ? const SizedBox.square(
+                                    dimension: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                  : Text(
+                                    _isRegisterMode ? '注册并登录' : '登录',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                        ),
+                        const SizedBox(height: 10),
+                        Center(
+                          child: TextButton(
+                            onPressed:
+                                auth.isLoading
+                                    ? null
+                                    : () => setState(
+                                      () => _isRegisterMode = !_isRegisterMode,
+                                    ),
+                            child: Text(
+                              _isRegisterMode ? '已有账号？直接登录' : '还没有账号？注册新账号',
+                              style: const TextStyle(
+                                color: pomiMuted,
+                                fontSize: 14,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
-                            onPressed: auth.isLoading ? null : _submit,
-                            child:
-                                auth.isLoading
-                                    ? const SizedBox.square(
-                                      dimension: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                    : Text(
-                                      _isRegisterMode ? '注册并登录' : '登录',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
                           ),
-                          const SizedBox(height: 10),
-                          Center(
-                            child: TextButton(
-                              onPressed:
-                                  auth.isLoading
-                                      ? null
-                                      : () => setState(
-                                        () =>
-                                            _isRegisterMode = !_isRegisterMode,
-                                      ),
-                              child: Text(
-                                _isRegisterMode ? '已有账号？直接登录' : '还没有账号？注册新账号',
-                                style: const TextStyle(
-                                  color: pomiMuted,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -182,6 +191,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   String? _validateAccountName(String? value) {
     final accountName = value?.trim().toLowerCase() ?? '';
+    if (!_isRegisterMode && RegExp(r'^\+?[0-9]{7,20}$').hasMatch(accountName)) {
+      return null;
+    }
     if (accountName.length < 3 || accountName.length > 64) {
       return '账号长度需为 3～64 个字符';
     }
@@ -221,12 +233,12 @@ class _AgreementRow extends StatelessWidget {
   Widget build(BuildContext context) {
     const normalStyle = TextStyle(color: pomiInk, fontSize: 10, height: 1.55);
     const policyStyle = TextStyle(
-      color: pomiPurple,
+      color: pomiInk,
       fontSize: 10,
       height: 1.55,
       fontWeight: FontWeight.w600,
       decoration: TextDecoration.underline,
-      decorationColor: pomiPurple,
+      decorationColor: pomiInk,
     );
 
     return Container(

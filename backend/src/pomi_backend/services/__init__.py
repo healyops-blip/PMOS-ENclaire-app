@@ -1,5 +1,23 @@
 """Backend application services."""
 
 from pomi_backend.services.auth import AuthService
+from pomi_backend.services.cycles import CycleService
+from pomi_backend.services.dashboard import DashboardService
+from pomi_backend.services.documents import DocumentService
+from pomi_backend.services.medications import MedicationService
+from pomi_backend.services.ocr import OCRTaskService
+from pomi_backend.services.patient import PatientProfileService
+from pomi_backend.services.patient_notes import PatientNoteService
+from pomi_backend.services.reports import ReportSnapshotService
 
-__all__ = ["AuthService"]
+__all__ = [
+    "AuthService",
+    "CycleService",
+    "DashboardService",
+    "DocumentService",
+    "MedicationService",
+    "OCRTaskService",
+    "PatientNoteService",
+    "PatientProfileService",
+    "ReportSnapshotService",
+]
