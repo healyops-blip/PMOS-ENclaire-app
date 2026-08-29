@@ -45,9 +45,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           final birthYear = data['birth_year'] as int?;
           final age =
               birthYear == null ? null : DateTime.now().year - birthYear;
-          final profileSummary = [
-            if (age != null) '$age 岁',
-          ];
+          final profileSummary = [if (age != null) '$age 岁'];
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 96),
             children: [
@@ -591,6 +589,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
     var accepted = profile['external_ocr_notice_accepted_at'] != null;
     var saving = false;
+    String? heightError;
     final pageContext = context;
     final saved = await showModalBottomSheet<bool>(
       context: context,
@@ -634,10 +633,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               child: TextField(
                                 controller: height,
                                 keyboardType: TextInputType.number,
+                                onChanged: (_) {
+                                  if (heightError != null) {
+                                    setSheetState(() => heightError = null);
+                                  }
+                                },
                                 decoration: const InputDecoration(
-                                  labelText: '身高',
+                                  labelText: '身高（必填）',
                                   suffixText: 'cm',
-                                ),
+                                ).copyWith(errorText: heightError),
                               ),
                             ),
                             const SizedBox(width: 10),
@@ -701,6 +705,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         const SizedBox(height: 10),
                         FilledButton(
                           onPressed: () async {
+                            final heightValue = double.tryParse(
+                              height.text.trim(),
+                            );
+                            if (height.text.trim().isEmpty) {
+                              setSheetState(() {
+                                heightError = '请输入身高';
+                              });
+                              return;
+                            }
+                            if (heightValue == null || heightValue <= 0) {
+                              setSheetState(() {
+                                heightError = '请输入有效身高';
+                              });
+                              return;
+                            }
                             setSheetState(() => saving = true);
                             try {
                               await ref
@@ -712,7 +731,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                       'birth_year': int.tryParse(
                                         birth.text.trim(),
                                       ),
-                                      'height_cm': double.tryParse(height.text),
+                                      'height_cm': heightValue,
                                       'diagnosis_year': int.tryParse(
                                         diagnosisYear.text,
                                       ),
@@ -861,11 +880,7 @@ class _ProfileSettingsDivider extends StatelessWidget {
 }
 
 class _ProfileSettingsRow extends StatelessWidget {
-  const _ProfileSettingsRow({
-    required this.title,
-    this.onTap,
-    this.trailing,
-  });
+  const _ProfileSettingsRow({required this.title, this.onTap, this.trailing});
 
   final String title;
   final VoidCallback? onTap;
