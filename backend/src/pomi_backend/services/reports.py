@@ -1130,7 +1130,7 @@ class ReportSnapshotService:
     ) -> dict[str, Any]:
         return {
             **cls._list_item(report, has_updates=has_updates, reused=reused),
-            "snapshot": report.snapshot_json,
+            "snapshot": report.snapshot_json or {},
             "date_sources": report.date_source_json or {},
             "data_freshness": report.freshness_result_json or {},
         }

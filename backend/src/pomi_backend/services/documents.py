@@ -139,6 +139,10 @@ class DocumentService:
                     if value is not None
                 }
         return {
+            # OCR 草稿只补充临床字段，绝不能覆盖数据库的权威字段（id、
+            # document_type、latest_ocr_status、display_asset 等）。供应商响应
+            # 未做 Schema 校验且模型可能多吐同名键，因此最先展开、优先级最低。
+            **ocr_draft,
             **document_data(document, current_revision),
             "latest_ocr_task_id": latest_task.id if latest_task is not None else None,
             "latest_ocr_status": latest_task.status if latest_task is not None else None,
@@ -146,7 +150,6 @@ class DocumentService:
                 latest_task.result_source if latest_task is not None else None
             ),
             "display_asset": display_asset_data(display_asset),
-            **ocr_draft,
         }
 
     def upload(

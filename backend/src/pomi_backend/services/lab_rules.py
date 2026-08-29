@@ -149,6 +149,17 @@ def parse_number(value: Any) -> Decimal | None:
     return parsed if parsed.is_finite() else None
 
 
+_LEADING_NUMBER_PATTERN = re.compile(r"^\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*(.*)$", re.DOTALL)
+
+
+def _split_number_and_unit(raw: Any) -> tuple[Decimal | None, str | None]:
+    """Split a glued "<number> <unit>" value, e.g. "6 ×10^9/L" -> (6, "×10^9/L")."""
+    match = _LEADING_NUMBER_PATTERN.match(str(raw).replace(",", ""))
+    if match is None:
+        return None, None
+    return parse_number(match.group(1)), (match.group(2).strip() or None)
+
+
 def normalize_unit(value: Any) -> str | None:
     if value is None:
         return None
@@ -228,6 +239,14 @@ def normalize_lab_item(
         )
     raw_value = str(item.get("value") or "").strip()
     numeric = parse_number(item.get("value"))
+    inline_unit: str | None = None
+    if numeric is None and raw_value:
+        # 模型有时把「数值 单位」写在同一个字段里（如 "6 ×10^9/L"、"146 g/L"）。
+        # 取前导数字作为数值，尾部留作单位候选（仅在单位字段为空时采用），
+        # 并把 raw_value 归一为纯数字，避免展示时单位重复。
+        numeric, inline_unit = _split_number_and_unit(raw_value)
+        if numeric is not None:
+            raw_value = str(numeric)
     if not raw_value:
         # 数值缺失：项目无记录价值，跳过该条但不让整体确认失败；
         # 若项目名也缺失（issues 非空）则仍然报错。
@@ -242,18 +261,27 @@ def normalize_lab_item(
         issues.append(
             FieldIssue(f"{prefix}.value", "LAB_VALUE_TOO_LONG", "原始数值不能超过 100 个字符。")
         )
-    raw_unit = str(item.get("unit") or "").strip()
-    unit = normalize_unit(item.get("unit"))
+    spec = METRIC_BY_ALIAS.get(_key(name)) if name else None
+    raw_unit = str(item.get("unit") or "").strip() or (inline_unit or "")
+    unit = normalize_unit(raw_unit or None)
     if not raw_unit:
-        # 单位缺失：允许入库，保留空串，由前端展示为「—」。
-        raw_unit = ""
+        # 单位缺失：未映射指标允许入库，保留空串由前端展示为「—」；
+        # 已映射为标准指标的项目必须有单位，否则数值无法安全换算到
+        # 标准趋势线，会与其他单位的点混在一起。
         unit = None
+        if spec is not None:
+            issues.append(
+                FieldIssue(
+                    f"{prefix}.unit",
+                    "LAB_UNIT_REQUIRED",
+                    "该项目已识别为标准指标，请补充单位。",
+                )
+            )
     elif unit is None:
         issues.append(FieldIssue(f"{prefix}.unit", "LAB_UNIT_UNSUPPORTED", "单位不在允许范围内。"))
     elif len(raw_unit) > 40:
         issues.append(FieldIssue(f"{prefix}.unit", "LAB_UNIT_TOO_LONG", "单位不能超过 40 个字符。"))
 
-    spec = METRIC_BY_ALIAS.get(_key(name)) if name else None
     factor = Decimal("1")
     standard_unit = unit or raw_unit
     if spec is not None and unit is not None:
@@ -352,9 +380,14 @@ def p0_evaluation(
     total = len(items) * 3
     valid = 0
     for item in items:
+        value = item.get("value")
+        number = parse_number(value)
+        inline_unit: str | None = None
+        if number is None:
+            number, inline_unit = _split_number_and_unit(value)
         valid += int(bool(str(item.get("name") or "").strip()))
-        valid += int(parse_number(item.get("value")) is not None)
-        valid += int(normalize_unit(item.get("unit")) is not None)
+        valid += int(number is not None)
+        valid += int(normalize_unit(str(item.get("unit") or "").strip() or inline_unit) is not None)
     output: dict[str, int | float] = {
         "total_fields": total,
         "valid_fields": valid,
