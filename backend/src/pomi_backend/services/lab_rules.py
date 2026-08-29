@@ -131,6 +131,8 @@ UNIT_ALIASES = {
     "10^12/l": "10^12/L",
     "10*12/l": "10^12/L",
     "10¹²/l": "10^12/L",
+    "μmol/l": "μmol/L",
+    "µmol/l": "μmol/L",
 }
 
 
@@ -150,8 +152,15 @@ def parse_number(value: Any) -> Decimal | None:
 def normalize_unit(value: Any) -> str | None:
     if value is None:
         return None
-    text = unicodedata.normalize("NFKC", str(value)).strip().replace(" ", "")
+    text = str(value).strip().replace(" ", "")
+    # 把上标数量级 10⁹ / 10¹² 先规范成 10^9 / 10^12（必须在 NFKC 之前执行，
+    # 否则 NFKC 会把上标并进数字，10⁹/L 变成 109/L 而丢失幂号）。
+    sup = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹", "0123456789")
+    text = re.sub(r"[⁰¹²³⁴⁵⁶⁷⁸⁹]+", lambda m: "^" + m.group(0).translate(sup), text)
+    text = unicodedata.normalize("NFKC", text).strip()
     text = text.replace("μ", "μ").replace("µ", "µ")
+    # 容忍常见的 "×10^9/L" 前导乘号（模型常以 ×/x/✕ 开头书写数量级）。
+    text = re.sub(r"^[×xX✕✖*]", "", text)
     return UNIT_ALIASES.get(text.casefold())
 
 

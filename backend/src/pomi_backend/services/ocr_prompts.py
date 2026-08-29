@@ -298,6 +298,8 @@ def prompt_for(material_type: str) -> str:
         "路径使用 hospital_name 或 items[0].item_name 形式。"
         "看不清时保留 null 并说明原因。"
         "输出必须是紧凑的单行 JSON：禁止换行、缩进和多余空格。"
+        "单位使用标准写法：细胞计数量级写成 10^9/L、10^12/L，不要加 × 或 * 前缀；"
+        "浓度单位用 mmol/L、μmol/L、mg/dL、ng/mL、U/L 等标准符号。"
     )
     if material_type != "medical_order":
         return base

@@ -244,6 +244,7 @@ class ApiClient {
     'OCR_RESPONSE_TRUNCATED' => '报告内容较多，识别结果被截断，请重试或分段拍摄',
     'OCR_HTTP_400' => '图片内容无法识别，请拍清楚一点后重试',
     'OCR_HTTP_429' => '识别请求过于频繁，请稍后重试',
+    'OCR_CONFIRMATION_INVALID' => '报告中有项目未通过校验（如单位无法识别），请修正后重试',
     _ => '请求失败，请稍后重试',
   };
 }
