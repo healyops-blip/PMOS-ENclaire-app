@@ -1,5 +1,4 @@
 import 'dart:typed_data';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -67,17 +66,8 @@ class RecordsScreen extends ConsumerWidget {
             }
             return _ReportsList(reports: reports);
           }
-          final hasClinicalMetadata = documents.any(
-            (item) =>
-                item['visit_date'] != null ||
-                item['sample_date'] != null ||
-                item['exam_date'] != null ||
-                item['report_date'] != null,
-          );
-          return _DocumentsList(
-            documents: documents,
-            visitLayout: smokeMode || hasClinicalMetadata,
-          );
+          if (smokeMode) return const VisitRecordsPage();
+          return _DocumentsList(documents: documents);
         },
       ),
     );
@@ -154,7 +144,7 @@ class VisitRecordsPage extends StatelessWidget {
               children: [
                 Text(
                   '筛选记录',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                 ),
                 SizedBox(width: double.infinity),
                 FilterChip(label: Text('全部'), selected: true, onSelected: null),
@@ -200,21 +190,12 @@ class VisitRecordsPage extends StatelessWidget {
   );
 }
 
-class _DocumentsList extends StatefulWidget {
-  const _DocumentsList({required this.documents, this.visitLayout = false});
+class _DocumentsList extends StatelessWidget {
+  const _DocumentsList({required this.documents});
 
   final List<Map<String, dynamic>> documents;
-  final bool visitLayout;
-
-  @override
-  State<_DocumentsList> createState() => _DocumentsListState();
-}
-
-class _DocumentsListState extends State<_DocumentsList> {
-  String? _selectedType;
 
   static const labels = {
-    null: '全部',
     'lab_report': '化验 / 检测',
     'medical_order': '医嘱 / 处方',
     'imaging_text_report': '影像文字报告',
@@ -223,28 +204,18 @@ class _DocumentsListState extends State<_DocumentsList> {
 
   @override
   Widget build(BuildContext context) {
-    final filtered =
-        _selectedType == null
-            ? widget.documents
-            : widget.documents
-                .where((item) => item['document_type'] == _selectedType)
-                .toList(growable: false);
+    if (documents.isEmpty) {
+      return const _EmptyState(
+        icon: Icons.folder_open_outlined,
+        text: '还没有上传医疗资料',
+      );
+    }
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 96),
-      itemCount: filtered.isEmpty ? 2 : filtered.length + 1,
+      itemCount: documents.length,
       separatorBuilder: (context, index) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
-        if (index == 0) return _buildHeader(context, filtered.length);
-        if (filtered.isEmpty) {
-          return const _EmptyState(
-            icon: Icons.folder_open_outlined,
-            text: '没有符合条件的医疗资料',
-          );
-        }
-        final document = filtered[index - 1];
-        if (widget.visitLayout) {
-          return _DatasetDocumentCard(document: document);
-        }
+        final document = documents[index];
         return PomiGlassCard(
           child: ListTile(
             contentPadding: const EdgeInsets.symmetric(
@@ -275,74 +246,6 @@ class _DocumentsListState extends State<_DocumentsList> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, int count) => Row(
-    children: [
-      Expanded(
-        child: Text(
-          _selectedType == null ? '全部记录' : labels[_selectedType]!,
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-      ),
-      if (_selectedType != null)
-        Padding(
-          padding: const EdgeInsets.only(right: 4),
-          child: Text('$count 条', style: Theme.of(context).textTheme.bodySmall),
-        ),
-      TextButton.icon(
-        key: const ValueKey('records-filter-button'),
-        onPressed: _showFilters,
-        icon: const Icon(Icons.filter_alt_outlined, size: 19),
-        label: const Text('筛选'),
-      ),
-    ],
-  );
-
-  Future<void> _showFilters() async {
-    final selected = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder:
-          (context) => SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('筛选记录', style: Theme.of(context).textTheme.titleLarge),
-                  const SizedBox(height: 10),
-                  for (final entry in labels.entries)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                        entry.key == null
-                            ? Icons.all_inbox_outlined
-                            : _DocumentIcon.iconForType(entry.key!),
-                        color: pomiPurple,
-                      ),
-                      title: Text(entry.value),
-                      trailing:
-                          _selectedType == entry.key
-                              ? const Icon(
-                                Icons.check_circle,
-                                color: pomiPurple,
-                              )
-                              : null,
-                      onTap:
-                          () =>
-                              Navigator.of(context).pop(entry.key ?? '__all__'),
-                    ),
-                ],
-              ),
-            ),
-          ),
-    );
-    if (!mounted) return;
-    final nextType = selected == '__all__' ? null : selected;
-    if (nextType == _selectedType) return;
-    setState(() => _selectedType = nextType);
-  }
-
   static String _statusLabel(String? status) => switch (status) {
     'confirmed' => '已确认',
     'succeeded' || 'fallback' => '待确认',
@@ -353,167 +256,19 @@ class _DocumentsListState extends State<_DocumentsList> {
   };
 }
 
-class _DatasetDocumentCard extends StatelessWidget {
-  const _DatasetDocumentCard({required this.document});
-
-  final Map<String, dynamic> document;
-
-  @override
-  Widget build(BuildContext context) {
-    final type = document['document_type']?.toString() ?? '';
-    final date =
-        (type == 'lab_report'
-                ? (document['sample_date'] ?? document['visit_date'])
-                : (document['visit_date'] ?? document['exam_date']))
-            ?.toString() ??
-        '日期未记录';
-    final status = document['latest_ocr_status']?.toString();
-    final verified = status == 'confirmed';
-    final item = VisitRecordSummaryItem(
-      title: switch (type) {
-        'lab_report' => '化验单',
-        'medical_order' => '医嘱',
-        'imaging_text_report' => '影像报告',
-        'outpatient_record' => '门诊病历',
-        _ => '医疗资料',
-      },
-      category: switch (type) {
-        'lab_report' => VisitRecordCategory.lab,
-        'medical_order' => VisitRecordCategory.order,
-        'imaging_text_report' => VisitRecordCategory.imaging,
-        'outpatient_record' => VisitRecordCategory.outpatient,
-        _ => VisitRecordCategory.outpatient,
-      },
-      // The visit date is already shown in the card header. Keep only the
-      // clinically distinct sampling date for lab reports.
-      trailing: type == 'lab_report' ? '采样 $date' : null,
-    );
-    return PomiGlassCard(
-      key: ValueKey('dataset-document-${document['id']}'),
-      onTap:
-          () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => DocumentDetailScreen(document: document),
-            ),
-          ),
-      borderRadius: 20,
-      backgroundOpacity: .36,
-      child: Stack(
-        children: [
-          Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                date,
-                                style: Theme.of(context).textTheme.titleLarge,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 3),
-                          Wrap(
-                            spacing: 12,
-                            runSpacing: 2,
-                            children: [
-                              if (document['hospital'] != null)
-                                Text(
-                                  document['hospital'].toString(),
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              if (document['department'] != null)
-                                Text(
-                                  document['department'].toString(),
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Column(
-                      children: [
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          color: pomiSecondaryText,
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          '详情',
-                          style: TextStyle(
-                            color: pomiSecondaryText,
-                            fontSize: 10,
-                            height: 14 / 10,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1, color: pomiLine),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _VisitRecordRow(row: item),
-                    const SizedBox(height: 7),
-                    const Align(
-                      alignment: Alignment.bottomRight,
-                      child: _BlockchainSupportLabel(),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          if (verified)
-            Positioned(
-              right: 28,
-              top: 4,
-              child: Opacity(
-                opacity: .50,
-                child: Transform.rotate(
-                  angle: -math.pi / 12,
-                  child: Image.asset(
-                    'assets/images/pomi_verified_stamp.png',
-                    width: 88,
-                    height: 88,
-                    filterQuality: FilterQuality.high,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
 class _DocumentIcon extends StatelessWidget {
   const _DocumentIcon({required this.type});
 
   final String type;
 
-  static IconData iconForType(String type) => switch (type) {
-    'lab_report' => Icons.science_outlined,
-    'medical_order' => Icons.medication_outlined,
-    'imaging_text_report' => Icons.image_search_outlined,
-    _ => Icons.description_outlined,
-  };
-
   @override
   Widget build(BuildContext context) {
-    final icon = iconForType(type);
+    final icon = switch (type) {
+      'lab_report' => Icons.science_outlined,
+      'medical_order' => Icons.medication_outlined,
+      'imaging_text_report' => Icons.image_search_outlined,
+      _ => Icons.description_outlined,
+    };
     return CircleAvatar(
       backgroundColor: pomiMint.withValues(alpha: .15),
       foregroundColor: pomiTeal,
@@ -539,105 +294,96 @@ class _VisitRecordCard extends StatelessWidget {
           ),
       borderRadius: 20,
       backgroundOpacity: .36,
-      child: Stack(
+      child: Column(
         children: [
-          Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
-                          Row(
-                            children: [
-                              Text(
-                                visit.sampleDate ?? visit.date,
-                                style: Theme.of(context).textTheme.titleLarge,
-                              ),
-                              const SizedBox(width: 8),
-                              Flexible(
-                                child: _VisitStatusBadge(
-                                  text: visit.verificationLabel,
-                                  tone: visit.verificationState,
-                                ),
-                              ),
-                            ],
+                          Text(
+                            visit.date,
+                            style: Theme.of(context).textTheme.titleLarge,
                           ),
-                          const SizedBox(height: 3),
-                          _VisitMetadataFields(visit: visit),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: _VisitStatusBadge(
+                              text: visit.verificationLabel,
+                              tone: visit.verificationState,
+                            ),
+                          ),
                         ],
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Column(
-                      children: [
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          color: pomiSecondaryText,
-                        ),
-                        SizedBox(height: 2),
+                      const SizedBox(height: 3),
+                      _VisitMetadataFields(visit: visit),
+                      if (visit.historyNote != null) ...[
+                        const SizedBox(height: 5),
                         Text(
-                          '详情',
-                          style: TextStyle(
-                            color: pomiSecondaryText,
-                            fontSize: 10,
-                            height: 14 / 10,
+                          '超过 6 个月 · 仅供参考',
+                          style: Theme.of(
+                            context,
+                          ).textTheme.labelSmall?.copyWith(
+                            color: const Color(0xFF9B6818),
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ],
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1, color: pomiLine),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    for (
-                      var index = 0;
-                      index < visit.summaryItems.length;
-                      index++
-                    ) ...[
-                      _VisitRecordRow(row: visit.summaryItems[index]),
-                      if (index != visit.summaryItems.length - 1)
-                        const SizedBox(height: 10),
+                      const SizedBox(height: 3),
+                      const Align(
+                        alignment: Alignment.center,
+                        child: Text(
+                          '区块链技术支持',
+                          style: TextStyle(
+                            color: pomiPurple,
+                            fontSize: 10,
+                            height: 14 / 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
                     ],
-                    const SizedBox(height: 7),
-                    const Align(
-                      alignment: Alignment.bottomRight,
-                      child: _BlockchainSupportLabel(),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          if (visit.verificationState == VisitVerificationState.verified)
-            Positioned(
-              right: 28,
-              top: 4,
-              child: Semantics(
-                image: true,
-                label: '该就诊记录已核验',
-                child: Opacity(
-                  opacity: .50,
-                  child: Transform.rotate(
-                    angle: -math.pi / 12,
-                    child: Image.asset(
-                      'assets/images/pomi_verified_stamp.png',
-                      width: 88,
-                      height: 88,
-                      filterQuality: FilterQuality.high,
-                    ),
                   ),
                 ),
-              ),
+                const SizedBox(width: 8),
+                const Column(
+                  children: [
+                    Icon(Icons.chevron_right_rounded, color: pomiSecondaryText),
+                    SizedBox(height: 2),
+                    Text(
+                      '详情',
+                      style: TextStyle(
+                        color: pomiSecondaryText,
+                        fontSize: 10,
+                        height: 14 / 10,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
+          ),
+          const Divider(height: 1, color: pomiLine),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+            child: Column(
+              children: [
+                for (
+                  var index = 0;
+                  index < visit.summaryItems.length;
+                  index++
+                ) ...[
+                  _VisitRecordRow(row: visit.summaryItems[index]),
+                  if (index != visit.summaryItems.length - 1)
+                    const SizedBox(height: 10),
+                ],
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -677,35 +423,6 @@ class _VisitMetadataFields extends StatelessWidget {
             style: Theme.of(context).textTheme.bodySmall,
           ),
       ],
-    );
-  }
-}
-
-class _BlockchainSupportLabel extends StatelessWidget {
-  const _BlockchainSupportLabel();
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      '区块链技术支持',
-      style: TextStyle(
-        color: pomiPurple,
-        fontSize: 10,
-        height: 14 / 10,
-        fontWeight: FontWeight.w700,
-        shadows: [
-          Shadow(
-            offset: const Offset(-0.7, -0.7),
-            blurRadius: 0.5,
-            color: Colors.white.withValues(alpha: .72),
-          ),
-          Shadow(
-            offset: const Offset(0.8, 0.8),
-            blurRadius: 1.2,
-            color: pomiPurple.withValues(alpha: .42),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -771,8 +488,8 @@ class _VisitRecordRow extends StatelessWidget {
       ),
       VisitRecordCategory.imaging => (
         '影像报告',
-        const Color(0xFFEDE5FF),
-        pomiPurple,
+        const Color(0xFFEAF2FF),
+        const Color(0xFF3D70B2),
       ),
       VisitRecordCategory.outpatient => (
         '门诊病历',
@@ -782,29 +499,27 @@ class _VisitRecordRow extends StatelessWidget {
     };
     return Row(
       children: [
-        if (row.category != VisitRecordCategory.imaging)
-          SizedBox(
-            width: 88,
-            child: Text(
-              row.title,
-              style: Theme.of(context).textTheme.titleMedium,
+        SizedBox(
+          width: 88,
+          child: Text(
+            row.title,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            tag,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: foreground,
+              fontWeight: FontWeight.w700,
             ),
           ),
-        if (tag != row.title || row.category == VisitRecordCategory.imaging)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-            decoration: BoxDecoration(
-              color: background,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              tag,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: foreground,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
+        ),
         if (row.trailing != null) ...[
           const SizedBox(width: 8),
           Expanded(
@@ -834,6 +549,7 @@ class DocumentDetailScreen extends ConsumerStatefulWidget {
 
 class _DocumentDetailScreenState extends ConsumerState<DocumentDetailScreen> {
   CertificationRecord? _certification;
+  bool _certifying = false;
 
   String get documentId => widget.document['id'].toString();
   String get revisionId => widget.document['current_revision_id'].toString();
@@ -851,6 +567,25 @@ class _DocumentDetailScreenState extends ConsumerState<DocumentDetailScreen> {
     if (mounted) setState(() => _certification = value);
   }
 
+  Future<void> _certify() async {
+    setState(() {
+      _certifying = true;
+      _certification = CertificationRecord(
+        status: CertificationStatus.processing,
+        updatedAt: DateTime.now(),
+      );
+    });
+    final result = await ref
+        .read(certificationRepositoryProvider)
+        .start(documentId, revisionId);
+    if (mounted) {
+      setState(() {
+        _certification = result;
+        _certifying = false;
+      });
+    }
+  }
+
   Future<void> _openOriginal() async {
     final bytes = await ref
         .read(apiClientProvider)
@@ -863,10 +598,6 @@ class _DocumentDetailScreenState extends ConsumerState<DocumentDetailScreen> {
               bytes: Uint8List.fromList(bytes),
               mimeType: widget.document['mime_type'].toString(),
               fileName: widget.document['original_file_name'].toString(),
-              certified:
-                  _certification?.status == CertificationStatus.succeeded ||
-                  widget.document['latest_ocr_status'] == 'confirmed',
-              hospitalName: widget.document['hospital']?.toString(),
             ),
       ),
     );
@@ -900,76 +631,57 @@ class _DocumentDetailScreenState extends ConsumerState<DocumentDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final status = _certification?.status ?? CertificationStatus.notStarted;
     final confirmed = widget.document['latest_ocr_status'] == 'confirmed';
     return Scaffold(
       appBar: AppBar(title: const Text('资料详情')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(18, 8, 18, 32),
         children: [
+          if (status == CertificationStatus.succeeded)
+            Container(
+              padding: const EdgeInsets.all(14),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE4F1ED),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFB8D8CE)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.verified_outlined, color: pomiTeal),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      '本机认证演示 · 已完成\n未真实上链，不代表医院签发',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Text(
             widget.document['original_file_name'].toString(),
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 18),
           _DetailRow(
             label: '材料类型',
-            value: _documentTypeLabel(
-              widget.document['document_type']?.toString(),
-            ),
+            value: widget.document['document_type'].toString(),
           ),
           _DetailRow(
             label: '上传时间',
             value: widget.document['uploaded_at'].toString(),
           ),
-          if (widget.document['file_size_bytes'] != null)
-            _DetailRow(
-              label: '文件大小',
-              value: '${widget.document['file_size_bytes']} bytes',
-            ),
+          _DetailRow(
+            label: '文件大小',
+            value: '${widget.document['file_size_bytes']} bytes',
+          ),
           _DetailRow(
             label: '识别状态',
             value: widget.document['latest_ocr_status']?.toString() ?? '未识别',
           ),
           _DetailRow(label: '修订标识', value: revisionId),
-          if (widget.document['hospital'] != null ||
-              widget.document['department'] != null ||
-              widget.document['visit_date'] != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: PomiGlassCard(
-                child: Column(
-                  children: [
-                    if (widget.document['hospital'] != null)
-                      _DetailRow(
-                        label: '医院',
-                        value: widget.document['hospital'].toString(),
-                      ),
-                    if (widget.document['department'] != null)
-                      _DetailRow(
-                        label: '科室',
-                        value: widget.document['department'].toString(),
-                      ),
-                    if (widget.document['visit_date'] != null)
-                      _DetailRow(
-                        label: '就诊日期',
-                        value: widget.document['visit_date'].toString(),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          if ((widget.document['diagnosis_summary']?.toString() ?? '')
-              .isNotEmpty)
-            _DocumentSection(
-              title: '诊断摘要',
-              child: Text(widget.document['diagnosis_summary'].toString()),
-            ),
-          if ((widget.document['medical_advice']?.toString() ?? '').isNotEmpty)
-            _DocumentSection(
-              title: '医疗建议',
-              child: Text(widget.document['medical_advice'].toString()),
-            ),
-          ..._documentSections(),
           const SizedBox(height: 20),
           OutlinedButton.icon(
             onPressed: _openOriginal,
@@ -986,11 +698,23 @@ class _DocumentDetailScreenState extends ConsumerState<DocumentDetailScreen> {
             ),
             const SizedBox(height: 10),
           ],
+          if (confirmed && status != CertificationStatus.succeeded)
+            FilledButton.icon(
+              onPressed: _certifying ? null : _certify,
+              icon:
+                  _certifying
+                      ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                      : const Icon(Icons.verified_outlined),
+              label: Text(_certifying ? '认证处理中' : '医院认证'),
+            ),
           if (confirmed)
             const Padding(
               padding: EdgeInsets.only(top: 8),
               child: Text(
-                '区块链存证',
+                '提供区块链技术支持（当前仅为本地界面演示）',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 11, color: pomiSecondaryText),
               ),
@@ -999,110 +723,6 @@ class _DocumentDetailScreenState extends ConsumerState<DocumentDetailScreen> {
       ),
     );
   }
-
-  List<Widget> _documentSections() {
-    final sections = <Widget>[];
-    final examinations = _documentItems('examinations');
-    if (examinations.isNotEmpty) {
-      sections.add(
-        _DocumentSection(
-          title: '检查指标',
-          child: Column(
-            children: [
-              for (final item in examinations)
-                ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(item['item_name']?.toString() ?? '检查项目'),
-                  subtitle: Text(
-                    [item['reference_range'], item['source_text']]
-                        .where(
-                          (value) =>
-                              value != null && value.toString().isNotEmpty,
-                        )
-                        .join(' · '),
-                  ),
-                  trailing: Text(
-                    [item['value'], item['unit']]
-                        .where(
-                          (value) =>
-                              value != null && value.toString().isNotEmpty,
-                        )
-                        .join(' '),
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      );
-    }
-    final medications = _documentItems('medication_suggestions');
-    if (medications.isNotEmpty) {
-      sections.add(
-        _DocumentSection(
-          title: '用药建议',
-          child: Column(
-            children: [
-              for (final item in medications)
-                ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(item['drug_name']?.toString() ?? '药品'),
-                  subtitle: Text(
-                    [item['frequency'], item['duration'], item['instruction']]
-                        .where(
-                          (value) =>
-                              value != null && value.toString().isNotEmpty,
-                        )
-                        .join(' · '),
-                  ),
-                  trailing: Text(item['dosage']?.toString() ?? ''),
-                ),
-            ],
-          ),
-        ),
-      );
-    }
-    return sections;
-  }
-
-  String _documentTypeLabel(String? type) => switch (type) {
-    'lab_report' => '化验 / 检测',
-    'medical_order' => '医嘱 / 处方',
-    'imaging_text_report' => '影像文字报告',
-    'outpatient_record' => '门诊病历',
-    _ => type ?? '未分类',
-  };
-
-  List<Map<String, dynamic>> _documentItems(String key) {
-    final value = widget.document[key];
-    if (value is! List) return const [];
-    return value
-        .whereType<Map>()
-        .map((item) => Map<String, dynamic>.from(item))
-        .toList(growable: false);
-  }
-}
-
-class _DocumentSection extends StatelessWidget {
-  const _DocumentSection({required this.title, required this.child});
-
-  final String title;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 18),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
-        PomiGlassCard(padding: const EdgeInsets.all(15), child: child),
-      ],
-    ),
-  );
 }
 
 class ReconciliationScreen extends ConsumerStatefulWidget {
@@ -1172,7 +792,7 @@ class _ReconciliationScreenState extends ConsumerState<ReconciliationScreen> {
         children: [
           const Text(
             '逐项核对新旧医嘱',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 6),
           const Text('旧药未出现在新医嘱中，不会自动标记停药。'),
@@ -1191,7 +811,7 @@ class _ReconciliationScreenState extends ConsumerState<ReconciliationScreen> {
                       Text(
                         item['drug_name'].toString(),
                         style: const TextStyle(
-                          fontSize: 17,
+                          fontSize: 16,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -1293,16 +913,12 @@ class OriginalFileScreen extends StatelessWidget {
     required this.bytes,
     required this.mimeType,
     required this.fileName,
-    this.certified = false,
-    this.hospitalName,
     super.key,
   });
 
   final Uint8List bytes;
   final String mimeType;
   final String fileName;
-  final bool certified;
-  final String? hospitalName;
 
   @override
   Widget build(BuildContext context) {
@@ -1319,80 +935,17 @@ class OriginalFileScreen extends StatelessWidget {
             ),
         ],
       ),
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child:
-                mimeType == 'application/pdf'
-                    ? PdfPreview(
-                      build: (format) async => bytes,
-                      canChangePageFormat: false,
-                    )
-                    : InteractiveViewer(
-                      minScale: 0.8,
-                      maxScale: 5,
-                      child: Center(child: Image.memory(bytes)),
-                    ),
-          ),
-          if (certified)
-            Positioned.fill(
-              child: IgnorePointer(
-                child: Center(
-                  child: Transform.rotate(
-                    angle: -0.18,
-                    child: Container(
-                      key: const ValueKey('blockchain-evidence-watermark'),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: .18),
-                        border: Border.all(
-                          color: pomiTeal.withValues(alpha: .62),
-                          width: 2,
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '区块链存证',
-                            style: TextStyle(
-                              color: pomiTeal.withValues(alpha: .68),
-                              fontSize: 24,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 2,
-                            ),
-                          ),
-                          if (hospitalName != null && hospitalName!.isNotEmpty)
-                            Text(
-                              hospitalName!,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: pomiTeal.withValues(alpha: .62),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          Text(
-                            '已存证 · ${DateTime.now().toIso8601String().substring(0, 10)}',
-                            style: TextStyle(
-                              color: pomiTeal.withValues(alpha: .62),
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+      body:
+          mimeType == 'application/pdf'
+              ? PdfPreview(
+                build: (format) async => bytes,
+                canChangePageFormat: false,
+              )
+              : InteractiveViewer(
+                minScale: 0.8,
+                maxScale: 5,
+                child: Center(child: Image.memory(bytes)),
               ),
-            ),
-        ],
-      ),
     );
   }
 }
@@ -1476,7 +1029,7 @@ class _ReportsList extends ConsumerWidget {
               children: [
                 const Text(
                   '患者自述',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 6),
                 const Text('可补充患者自述；指标看板会自动汇总已上传的检验单和其他资料。'),
@@ -1574,6 +1127,14 @@ class _ReportViewerState extends ConsumerState<ReportViewer> {
     );
     summary['patient_name'] = profile['nickname'];
     summary['patient_statement'] = summary['patient_note_text'];
+    final records = Map<String, dynamic>.from(
+      snapshot['records'] as Map? ?? const {},
+    );
+    final medicationEvents = List<Map<String, dynamic>>.from(
+      (records['medication_events'] as List? ?? const []).map(
+        (item) => Map<String, dynamic>.from(item as Map),
+      ),
+    );
     final trends = Map<String, dynamic>.from(snapshot['trends'] as Map);
     final medicines = List<Map<String, dynamic>>.from(
       (summary['current_medications'] as List? ?? []).map((item) {
@@ -1584,6 +1145,16 @@ class _ReportViewerState extends ConsumerState<ReportViewer> {
             dosageValue == null
                 ? value['specification']
                 : '$dosageValue$dosageUnit';
+        if (value['source_type'] == null) {
+          for (final event in medicationEvents.reversed) {
+            if (event['medication_id'] == value['id'] &&
+                event['source_type'] != null) {
+              value['source_type'] = event['source_type'];
+              break;
+            }
+          }
+        }
+        value['report_date'] = widget.report['generated_at'];
         return value;
       }),
     );
@@ -1674,10 +1245,20 @@ class _ReportViewerState extends ConsumerState<ReportViewer> {
                     alignment: Alignment.centerRight,
                     child: Padding(
                       padding: EdgeInsets.only(right: 16),
-                      child: Text(
-                        'POMI报告',
+                      child: Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(text: 'POMI'),
+                            TextSpan(
+                              text: '报告',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                          ],
+                        ),
                         style: TextStyle(
+                          color: pomiPurple,
                           fontSize: 20,
+                          height: 28 / 22,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -1705,6 +1286,7 @@ class _ReportViewerState extends ConsumerState<ReportViewer> {
                   summary: summary,
                   medicines: medicines,
                   labs: labs,
+                  labTrends: labTrends,
                   glucoseTrend: glucoseTrend,
                   weights: weights,
                   cycles: cycles,
@@ -1725,12 +1307,15 @@ class _ReportViewerState extends ConsumerState<ReportViewer> {
                       .join('\n'),
                 ),
                 _ReportTrendLayer(
+                  reportDate:
+                      _tryReportDate(widget.report['generated_at']) ??
+                      DateTime.now(),
                   weights: weights,
                   cycles: cycles,
                   labs: labs,
                   glucoseTrend: glucoseTrend,
-                  selectedTrend: selectedTrend,
                   selectedMetricId: _selectedTrendMetricId,
+                  selectedTrend: selectedTrend,
                   onSelectMetric:
                       (metricId) => setState(() {
                         _selectedTrendMetricId = metricId;
@@ -1748,12 +1333,131 @@ class _ReportViewerState extends ConsumerState<ReportViewer> {
   }
 }
 
+class _ReportLayerNavigation extends StatelessWidget {
+  const _ReportLayerNavigation({required this.layer, required this.onSelect});
+
+  final int layer;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.fromLTRB(18, 0, 18, 8),
+    decoration: const BoxDecoration(
+      border: Border(bottom: BorderSide(color: pomiLine)),
+    ),
+    child: Row(
+      children: [
+        _ReportLayerTab(
+          label: '摘要',
+          selected: layer == 0,
+          onTap: () => onSelect(0),
+        ),
+        _ReportLayerTab(
+          label: '趋势',
+          selected: layer == 1,
+          onTap: () => onSelect(1),
+        ),
+        _ReportLayerTab(
+          label: '原始数据',
+          selected: layer == 2,
+          onTap: () => onSelect(2),
+        ),
+      ],
+    ),
+  );
+}
+
+class _ReportLayerTab extends StatelessWidget {
+  const _ReportLayerTab({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Semantics(
+      button: true,
+      selected: selected,
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox(
+          height: 38,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: selected ? pomiPurple : pomiMuted,
+                  fontSize: 12,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                width: selected ? 28 : 0,
+                height: 2,
+                decoration: BoxDecoration(
+                  color: selected ? pomiPurple : Colors.transparent,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+extension on DateTime {
+  String get reportDateLabel =>
+      '$year-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
+
+  String get reportMonthLabel => '$year-${month.toString().padLeft(2, '0')}';
+}
+
+DateTime? _tryReportDate(dynamic raw) {
+  final parsed = DateTime.tryParse(raw?.toString() ?? '');
+  return parsed == null
+      ? null
+      : DateTime(parsed.year, parsed.month, parsed.day);
+}
+
+class _AttentionSection extends StatelessWidget {
+  const _AttentionSection({required this.lines});
+
+  final List<String> lines;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const _SectionHeading(title: '本次关注'),
+      const SizedBox(height: 6),
+      ...lines.map(
+        (line) => Padding(
+          padding: const EdgeInsets.only(bottom: 3),
+          child: Text(line, style: const TextStyle(fontSize: 12, height: 1.35)),
+        ),
+      ),
+    ],
+  );
+}
+
 class _ReportSummaryLayer extends StatelessWidget {
   const _ReportSummaryLayer({
     required this.report,
     required this.summary,
     required this.medicines,
     required this.labs,
+    required this.labTrends,
     required this.glucoseTrend,
     required this.weights,
     required this.cycles,
@@ -1772,6 +1476,7 @@ class _ReportSummaryLayer extends StatelessWidget {
   final Map<String, dynamic> summary;
   final List<Map<String, dynamic>> medicines;
   final List<Map<String, dynamic>> labs;
+  final List<Map<String, dynamic>> labTrends;
   final Map<String, dynamic>? glucoseTrend;
   final List<Map<String, dynamic>> weights;
   final List<Map<String, dynamic>> cycles;
@@ -1786,25 +1491,113 @@ class _ReportSummaryLayer extends StatelessWidget {
   final ValueChanged<String?> onOpenTrends;
   final VoidCallback onOpenSources;
 
-  String get _reportAbstract {
-    final weightSummary = Map<String, dynamic>.from(
-      summary['weight_summary'] as Map? ?? const {},
-    );
-    final weight = weightSummary['latest_weight_kg'];
-    final bmi = weightSummary['latest_bmi'];
-    final glucosePoints = glucoseTrend?['points'] as List? ?? const [];
-    final glucose =
-        glucosePoints.isEmpty
-            ? null
-            : Map<String, dynamic>.from(glucosePoints.last as Map);
-    final glucoseText =
-        glucose == null
-            ? ''
-            : '最新空腹血糖 ${glucose['normalized_value'] ?? glucose['numeric_value'] ?? glucose['raw_value'] ?? '—'} ${glucose['normalized_unit'] ?? glucoseTrend?['unit'] ?? glucose['original_unit'] ?? ''}。';
-    return '本次报告汇总 $cycleCount 次经期记录、$weightCount 个体重数据点、${labs.length} 项检查指标和 ${medicines.length} 项当前用药。'
-        '${weight == null ? '' : '当前体重 $weight kg${bmi == null ? '' : '，BMI $bmi'}。'}'
-        '$glucoseText';
+  Map<String, dynamic> get _profile =>
+      Map<String, dynamic>.from(summary['profile'] as Map? ?? const {});
+
+  DateTime get _reportDate =>
+      _tryReportDate(report['generated_at']) ?? DateTime.now();
+
+  int? get _age {
+    final birthDate = _tryReportDate(_profile['birth_date']);
+    if (birthDate == null) return null;
+    var age = _reportDate.year - birthDate.year;
+    if (_reportDate.month < birthDate.month ||
+        (_reportDate.month == birthDate.month &&
+            _reportDate.day < birthDate.day)) {
+      age--;
+    }
+    return age < 0 ? null : age;
   }
+
+  String get _dataRange {
+    final dates = <DateTime>[];
+    for (final cycle in cycles) {
+      final date = _tryReportDate(cycle['start_date']);
+      if (date != null) dates.add(date);
+    }
+    for (final weight in weights) {
+      final date = _tryReportDate(weight['record_date']);
+      if (date != null) dates.add(date);
+    }
+    for (final trend in labTrends) {
+      for (final point in trend['points'] as List? ?? const []) {
+        final date = _tryReportDate((point as Map)['date']);
+        if (date != null) dates.add(date);
+      }
+    }
+    if (dates.isEmpty) return '数据范围未记录';
+    dates.sort();
+    return '数据 ${dates.first.reportMonthLabel} ~ ${dates.last.reportMonthLabel}';
+  }
+
+  String get _diagnosisLine {
+    final diagnosisYear = int.tryParse(
+      _profile['diagnosis_year']?.toString() ?? '',
+    );
+    final duration =
+        diagnosisYear == null
+            ? null
+            : (_reportDate.year - diagnosisYear).clamp(0, 99);
+    final diagnosisText =
+        duration == null ? '已确诊 PCOS · 确诊时间未记录' : '已确诊 PCOS $duration 年';
+    return '$diagnosisText · 当前无备孕计划';
+  }
+
+  String get _cycleAttentionLine {
+    final start = _tryReportDate(_latestCycle?['start_date']);
+    if (start == null) return '末次月经未记录 · 周期天数未记录';
+    final day = _reportDate.difference(start).inDays + 1;
+    return '末次月经 ${start.reportDateLabel} · 周期第 ${day < 1 ? 1 : day} 天';
+  }
+
+  String get _abnormalAttentionLine {
+    final abnormal =
+        labs.where((item) {
+            final status = item['abnormal_status']?.toString();
+            return status == 'high' || status == 'low';
+          }).toList()
+          ..sort((a, b) {
+            final aDate = _tryReportDate(a['sample_date']);
+            final bDate = _tryReportDate(b['sample_date']);
+            return (bDate ?? DateTime(0)).compareTo(aDate ?? DateTime(0));
+          });
+    if (abnormal.isEmpty) {
+      return '近期已确认指标未见超出报告参考范围';
+    }
+    final descriptions = abnormal.take(2).map((item) {
+      final status = item['abnormal_status'] == 'high' ? '↑' : '↓';
+      final date = _tryReportDate(item['sample_date']);
+      final days =
+          date == null
+              ? null
+              : _reportDate.difference(date).inDays.clamp(0, 9999);
+      final value =
+          item['normalized_value'] ??
+          item['raw_value'] ??
+          item['numeric_value'] ??
+          '—';
+      final unit =
+          item['normalized_unit'] ??
+          item['raw_unit'] ??
+          item['original_unit'] ??
+          '';
+      final facility = item['facility'] ?? item['hospital_name'] ?? '医院未记录';
+      return '${item['item_name'] ?? '指标'} $value $unit $status｜${days == null ? '日期未记录' : '$days 天前'}｜$facility';
+    });
+    return '近期异常：${descriptions.join('；')}';
+  }
+
+  String get _medicationAttentionLine {
+    if (medicines.isEmpty) return '当前用药：暂无记录';
+    return '当前用药：${medicines.map((item) => item['drug_name'] ?? '用药').join('、')}';
+  }
+
+  List<String> get _attentionLines => [
+    _diagnosisLine,
+    _cycleAttentionLine,
+    _abnormalAttentionLine,
+    _medicationAttentionLine,
+  ];
 
   Map<String, dynamic> get _weightSummary =>
       Map<String, dynamic>.from(summary['weight_summary'] as Map? ?? const {});
@@ -1816,12 +1609,34 @@ class _ReportSummaryLayer extends StatelessWidget {
     _ => '暂无评估',
   };
 
-  String _shortDateRange(Map<String, dynamic> cycle) {
-    final start = DateTime.tryParse(cycle['start_date']?.toString() ?? '');
-    final end = DateTime.tryParse(cycle['end_date']?.toString() ?? '');
-    if (start == null) return '—';
-    final startText = '${start.month}/${start.day}';
-    return end == null ? '$startText 起' : '$startText–${end.month}/${end.day}';
+  Map<String, dynamic>? get _latestCycle => cycles.isEmpty ? null : cycles.last;
+
+  int? get _latestCompletedCycleLength {
+    for (final cycle in cycles.reversed) {
+      final value = cycle['cycle_length_days'];
+      if (value is int) return value;
+    }
+    return null;
+  }
+
+  int? get _currentCycleDays {
+    final start = _tryReportDate(_latestCycle?['start_date']);
+    if (start == null) return null;
+    final days = _reportDate.difference(start).inDays + 1;
+    return days < 1 ? 1 : days;
+  }
+
+  String _shortDate(dynamic raw) {
+    final date = DateTime.tryParse(raw?.toString() ?? '');
+    return date == null ? '—' : '${date.month}/${date.day}';
+  }
+
+  String get _latestPeriodRange {
+    final cycle = _latestCycle;
+    if (cycle == null) return '—';
+    final start = _shortDate(cycle['start_date']);
+    final end = _shortDate(cycle['end_date']);
+    return end == '—' ? '$start 起' : '$start–$end';
   }
 
   @override
@@ -1829,9 +1644,11 @@ class _ReportSummaryLayer extends StatelessWidget {
     padding: const EdgeInsets.fromLTRB(18, 4, 18, 28),
     children: [
       _DoctorReportHeader(
-        name: (summary['profile'] as Map?)?['nickname']?.toString() ?? '未设置姓名',
-        height: (summary['profile'] as Map?)?['height_cm'],
+        name: _profile['nickname']?.toString() ?? '未设置姓名',
+        age: _age,
+        height: _profile['height_cm'],
         weight: _weightSummary['latest_weight_kg'],
+        dataRange: _dataRange,
       ),
       const SizedBox(height: 12),
       _CompactTextSection(
@@ -1839,18 +1656,18 @@ class _ReportSummaryLayer extends StatelessWidget {
         text: summary['patient_statement']?.toString() ?? '未填写',
       ),
       const SizedBox(height: 12),
-      _CompactTextSection(title: '摘要', text: _reportAbstract),
+      _AttentionSection(lines: _attentionLines),
       const SizedBox(height: 14),
-      const _SectionHeading(title: '近期基础信息', trailing: '点击卡片查看完整趋势'),
+      const _SectionHeading(title: '近期基础信息', trailing: '点击查看完整趋势'),
       const SizedBox(height: 7),
       KeyedSubtree(
         key: cycleSectionKey,
         child: _RecentCycleCard(
-          cycleLengthDays:
-              cycles.isEmpty ? null : cycles.last['cycle_length_days'] as int?,
-          periodLengthDays:
-              cycles.isEmpty ? null : cycles.last['duration_days'] as int?,
-          periodRange: cycles.isEmpty ? '—' : _shortDateRange(cycles.last),
+          cycleLengthDays: _latestCompletedCycleLength,
+          periodLengthDays: _latestCycle?['duration_days'] as int?,
+          periodRange: _latestPeriodRange,
+          currentStartDate: _latestCycle?['start_date']?.toString(),
+          currentCycleDays: _currentCycleDays,
           onTap: () => onOpenTrends('cycle'),
         ),
       ),
@@ -1870,8 +1687,6 @@ class _ReportSummaryLayer extends StatelessWidget {
         child: _KeyMetricsSection(labs: labs, onOpenTrends: onOpenTrends),
       ),
       const SizedBox(height: 14),
-      _GlucoseTrendSection(trend: glucoseTrend),
-      const SizedBox(height: 14),
       KeyedSubtree(
         key: medicationSectionKey,
         child: _CompactMedicationSection(medicines: medicines),
@@ -1884,7 +1699,7 @@ class _ReportSummaryLayer extends StatelessWidget {
         sourceCount: sourceCount,
         onTap: onOpenSources,
       ),
-      const SizedBox(height: 18),
+      const SizedBox(height: 12),
       Text(
         medicalBoundary,
         style: const TextStyle(color: pomiMuted, fontSize: 11),
@@ -1896,13 +1711,17 @@ class _ReportSummaryLayer extends StatelessWidget {
 class _DoctorReportHeader extends StatelessWidget {
   const _DoctorReportHeader({
     required this.name,
+    required this.age,
     required this.height,
     required this.weight,
+    required this.dataRange,
   });
 
   final String name;
+  final int? age;
   final dynamic height;
   final dynamic weight;
+  final String dataRange;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -1910,23 +1729,15 @@ class _DoctorReportHeader extends StatelessWidget {
     decoration: const BoxDecoration(
       border: Border(bottom: BorderSide(color: pomiLine)),
     ),
-    child: Row(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Text(
-            name,
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-          ),
-        ),
         Text(
-          '身高 ${height ?? '—'} cm',
-          style: const TextStyle(color: pomiMuted, fontSize: 12),
+          '$name · ${age ?? '—'} 岁 · ${height ?? '—'} cm · ${weight ?? '—'} kg',
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
         ),
-        const SizedBox(width: 12),
-        Text(
-          '体重 ${weight ?? '—'} kg',
-          style: const TextStyle(color: pomiMuted, fontSize: 12),
-        ),
+        const SizedBox(height: 3),
+        Text(dataRange, style: const TextStyle(color: pomiMuted, fontSize: 11)),
       ],
     ),
   );
@@ -1934,6 +1745,7 @@ class _DoctorReportHeader extends StatelessWidget {
 
 class _SectionHeading extends StatelessWidget {
   const _SectionHeading({required this.title, this.trailing});
+
   final String title;
   final String? trailing;
 
@@ -1954,6 +1766,7 @@ class _SectionHeading extends StatelessWidget {
 
 class _CompactTextSection extends StatelessWidget {
   const _CompactTextSection({required this.title, required this.text});
+
   final String title;
   final String text;
 
@@ -1982,54 +1795,178 @@ class _RecentCycleCard extends StatelessWidget {
     required this.cycleLengthDays,
     required this.periodLengthDays,
     required this.periodRange,
+    required this.currentStartDate,
+    required this.currentCycleDays,
     required this.onTap,
   });
+
   final int? cycleLengthDays;
   final int? periodLengthDays;
   final String periodRange;
+  final String? currentStartDate;
+  final int? currentCycleDays;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) => PomiGlassCard(
+    onTap: onTap,
     padding: const EdgeInsets.fromLTRB(12, 11, 12, 10),
     backgroundColor: const Color(0xFFF7F6F8),
-    child: Row(
+    child: Column(
       children: [
-        Expanded(
-          child: _CycleStat(
-            label: '周期时长',
-            value: '${cycleLengthDays ?? '—'} 天',
+        Row(
+          children: [
+            _ClinicalStat(label: '周期时长', value: '${cycleLengthDays ?? '—'} 天'),
+            _ClinicalStat(label: '月经长度', value: '${periodLengthDays ?? '—'} 天'),
+            _ClinicalStat(label: '月经时间', value: periodRange),
+            const Icon(Icons.chevron_right_rounded, color: pomiMuted, size: 18),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 56,
+          width: double.infinity,
+          child: CustomPaint(
+            painter: _CycleSundialPainter(
+              cycleLengthDays: currentCycleDays ?? cycleLengthDays ?? 56,
+              periodLengthDays: periodLengthDays ?? 0,
+              startLabel: _monthDay(currentStartDate),
+            ),
           ),
         ),
-        Expanded(
-          child: _CycleStat(
-            label: '月经长度',
-            value: '${periodLengthDays ?? '—'} 天',
-          ),
+      ],
+    ),
+  );
+
+  static String _monthDay(String? raw) {
+    final date = DateTime.tryParse(raw ?? '');
+    return date == null
+        ? '未记录'
+        : '${date.month.toString().padLeft(2, '0')}–${date.day.toString().padLeft(2, '0')}';
+  }
+}
+
+class _ClinicalStat extends StatelessWidget {
+  const _ClinicalStat({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: pomiMuted, fontSize: 10)),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
         ),
-        Expanded(child: _CycleStat(label: '月经时间', value: periodRange)),
-        const Icon(Icons.chevron_right_rounded, color: pomiMuted, size: 18),
       ],
     ),
   );
 }
 
-class _CycleStat extends StatelessWidget {
-  const _CycleStat({required this.label, required this.value});
-  final String label;
-  final String value;
+class _CycleSundialPainter extends CustomPainter {
+  const _CycleSundialPainter({
+    required this.cycleLengthDays,
+    required this.periodLengthDays,
+    required this.startLabel,
+  });
+
+  final int cycleLengthDays;
+  final int periodLengthDays;
+  final String startLabel;
+
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(label, style: const TextStyle(color: pomiMuted, fontSize: 10)),
-      const SizedBox(height: 2),
-      Text(
-        value,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+  void paint(Canvas canvas, Size size) {
+    const left = 4.0;
+    final right = size.width - 4;
+    final y = size.height * .58;
+    final roundedDays = (cycleLengthDays + 6) ~/ 7 * 7;
+    final maxDays = roundedDays < 56 ? 56 : roundedDays;
+    final grid = Paint()..color = const Color(0xFFE7E4EB);
+    for (var day = 0; day <= maxDays; day += 7) {
+      final x = left + (right - left) * day / maxDays;
+      canvas.drawLine(Offset(x, 13), Offset(x, size.height - 4), grid);
+      _paintText(canvas, '$day', Offset(x, 0), center: true);
+    }
+    final track =
+        Paint()
+          ..color = const Color(0xFFE8DFF2)
+          ..strokeWidth = 8
+          ..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(left, y), Offset(right, y), track);
+    final periodEnd =
+        left + (right - left) * periodLengthDays.clamp(0, maxDays) / maxDays;
+    final period =
+        Paint()
+          ..color = pomiPurple
+          ..strokeWidth = 8
+          ..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(left, y), Offset(periodEnd, y), period);
+    final cycleEnd =
+        left + (right - left) * cycleLengthDays.clamp(1, maxDays) / maxDays;
+    final active =
+        Paint()
+          ..color = pomiPurple.withValues(alpha: .45)
+          ..strokeWidth = 1.5;
+    _drawDashedLine(
+      canvas,
+      Offset(periodEnd + 5, y),
+      Offset(cycleEnd, y),
+      active,
+    );
+    _paintText(canvas, '当前周期  $startLabel', Offset(left, y + 10));
+    _paintText(
+      canvas,
+      '进行中',
+      Offset(right, y + 10),
+      rightAligned: true,
+      accent: true,
+    );
+  }
+
+  void _drawDashedLine(Canvas canvas, Offset start, Offset end, Paint paint) {
+    for (var x = start.dx; x < end.dx; x += 7) {
+      canvas.drawLine(
+        Offset(x, start.dy),
+        Offset((x + 4).clamp(x, end.dx), end.dy),
+        paint,
+      );
+    }
+  }
+
+  void _paintText(
+    Canvas canvas,
+    String text,
+    Offset offset, {
+    bool center = false,
+    bool rightAligned = false,
+    bool accent = false,
+  }) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(color: accent ? pomiPurple : pomiMuted, fontSize: 8),
       ),
-    ],
-  );
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final dx =
+        center
+            ? offset.dx - painter.width / 2
+            : rightAligned
+            ? offset.dx - painter.width
+            : offset.dx;
+    painter.paint(canvas, Offset(dx, offset.dy));
+  }
+
+  @override
+  bool shouldRepaint(covariant _CycleSundialPainter oldDelegate) =>
+      oldDelegate.cycleLengthDays != cycleLengthDays ||
+      oldDelegate.periodLengthDays != periodLengthDays ||
+      oldDelegate.startLabel != startLabel;
 }
 
 class _CompactBmiCard extends StatelessWidget {
@@ -2039,6 +1976,7 @@ class _CompactBmiCard extends StatelessWidget {
     required this.assessment,
     required this.onTap,
   });
+
   final List<Map<String, dynamic>> weights;
   final Map<String, dynamic> weightSummary;
   final String assessment;
@@ -2087,6 +2025,7 @@ class _CompactBmiCard extends StatelessWidget {
 class _BmiMiniChart extends StatelessWidget {
   const _BmiMiniChart({required this.weights});
   final List<Map<String, dynamic>> weights;
+
   @override
   Widget build(BuildContext context) {
     final points = weights.where((item) => item['bmi'] is num).toList();
@@ -2105,8 +2044,10 @@ class _BmiMiniChart extends StatelessWidget {
 
 class _KeyMetricsSection extends StatelessWidget {
   const _KeyMetricsSection({required this.labs, required this.onOpenTrends});
+
   final List<Map<String, dynamic>> labs;
   final ValueChanged<String?> onOpenTrends;
+
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -2142,6 +2083,7 @@ class _MetricSummaryCard extends StatelessWidget {
   const _MetricSummaryCard({required this.item, required this.onTap});
   final Map<String, dynamic> item;
   final VoidCallback onTap;
+
   @override
   Widget build(BuildContext context) {
     final status = item['abnormal_status']?.toString();
@@ -2189,9 +2131,20 @@ class _MetricSummaryCard extends StatelessWidget {
               fontWeight: FontWeight.w800,
             ),
           ),
-          Text(
-            item['sample_date']?.toString() ?? '',
-            style: const TextStyle(color: pomiMuted, fontSize: 9),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  item['sample_date']?.toString() ?? '',
+                  style: const TextStyle(color: pomiMuted, fontSize: 9),
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: pomiMuted,
+                size: 14,
+              ),
+            ],
           ),
         ],
       ),
@@ -2202,31 +2155,165 @@ class _MetricSummaryCard extends StatelessWidget {
 class _CompactMedicationSection extends StatelessWidget {
   const _CompactMedicationSection({required this.medicines});
   final List<Map<String, dynamic>> medicines;
+
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       _SectionHeading(title: '当前用药', trailing: '${medicines.length} 项'),
       const SizedBox(height: 6),
-      Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF7F6F8),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: pomiLine),
+      if (medicines.isEmpty)
+        const _MedicationEmptyState()
+      else
+        ...medicines.map(
+          (item) => Padding(
+            padding: const EdgeInsets.only(bottom: 7),
+            child: _MedicationSummaryTile(item: item),
+          ),
         ),
-        child: Text(
-          medicines.isEmpty
-              ? '暂无当前用药'
-              : medicines
-                  .map((item) => item['drug_name']?.toString() ?? '用药')
-                  .join(' · '),
-          style: const TextStyle(fontSize: 12),
-        ),
-      ),
     ],
   );
+}
+
+class _MedicationEmptyState extends StatelessWidget {
+  const _MedicationEmptyState();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF7F6F8),
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: pomiLine),
+    ),
+    child: const Text('暂无当前用药', style: TextStyle(fontSize: 12)),
+  );
+}
+
+class _MedicationSummaryTile extends StatelessWidget {
+  const _MedicationSummaryTile({required this.item});
+
+  final Map<String, dynamic> item;
+
+  bool get _isMedicalOrder => const {
+    'medical_order',
+    'outpatient_record',
+  }.contains(item['source_type']?.toString());
+
+  double? get _completion {
+    final value = item['completion_percent'];
+    if (value is! num) return null;
+    return value.toDouble().clamp(0, 100);
+  }
+
+  String get _usage {
+    final parts = <String>[
+      if ((item['route']?.toString() ?? '').isNotEmpty)
+        item['route'].toString(),
+      if ((item['frequency']?.toString() ?? '').isNotEmpty)
+        item['frequency'].toString(),
+      if ((item['dosage_text']?.toString() ?? '').isNotEmpty)
+        item['dosage_text'].toString(),
+    ];
+    return parts.isEmpty ? '服用方式未记录' : parts.join(' · ');
+  }
+
+  String get _patientMedicationDuration {
+    final start = _tryReportDate(item['start_date']);
+    final end = _tryReportDate(item['report_date']) ?? DateTime.now();
+    if (start == null) return '开始日期未记录 · 已服用天数未记录';
+    final days = end.difference(start).inDays + 1;
+    return '始于 ${start.reportDateLabel} · 已服用 ${days < 1 ? 1 : days} 天';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final completion = _completion;
+    final taken = item['taken_units'];
+    final planned = item['planned_total_units'];
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F6F8),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: pomiLine),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  item['drug_name']?.toString() ?? '用药',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Text(
+                _isMedicalOrder ? '医嘱用药' : '患者自用',
+                style: const TextStyle(color: pomiMuted, fontSize: 9),
+              ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          Text(_usage, style: const TextStyle(color: pomiMuted, fontSize: 10)),
+          if (_isMedicalOrder) ...[
+            const SizedBox(height: 6),
+            if (completion == null)
+              const Text(
+                '完成率待后端同步',
+                style: TextStyle(color: pomiMuted, fontSize: 10),
+              )
+            else ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        minHeight: 5,
+                        value: completion / 100,
+                        backgroundColor: const Color(0xFFE5E0EA),
+                        color: pomiPurple,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '完成率 ${completion.round()}%',
+                    style: const TextStyle(
+                      color: pomiPurple,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              if (taken is num && planned is num)
+                Padding(
+                  padding: const EdgeInsets.only(top: 3),
+                  child: Text(
+                    '已服用 ${taken.toInt()} / 疗程 ${planned.toInt()} 颗',
+                    style: const TextStyle(color: pomiMuted, fontSize: 9),
+                  ),
+                ),
+            ],
+          ] else ...[
+            const SizedBox(height: 3),
+            Text(
+              _patientMedicationDuration,
+              style: const TextStyle(color: pomiMuted, fontSize: 10),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 class _ReportSourceShortcut extends StatelessWidget {
@@ -2242,6 +2329,7 @@ class _ReportSourceShortcut extends StatelessWidget {
   final int weightCount;
   final int sourceCount;
   final VoidCallback onTap;
+
   @override
   Widget build(BuildContext context) => InkWell(
     onTap: onTap,
@@ -2259,7 +2347,7 @@ class _ReportSourceShortcut extends StatelessWidget {
             ),
           ),
           Text(
-            '$labCount 项检查 · $cycleCount 次经期 · $weightCount 个体重 · $sourceCount 份材料',
+            '$labCount 项检查 · $cycleCount 次经期 · $weightCount 个体重点 · $sourceCount 份材料',
             style: const TextStyle(color: pomiMuted, fontSize: 9),
           ),
           const Icon(Icons.chevron_right_rounded, size: 16, color: pomiMuted),
@@ -2269,333 +2357,30 @@ class _ReportSourceShortcut extends StatelessWidget {
   );
 }
 
-class _ReportLayerNavigation extends StatelessWidget {
-  const _ReportLayerNavigation({required this.layer, required this.onSelect});
-  final int layer;
-  final ValueChanged<int> onSelect;
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(18, 2, 18, 8),
-    child: Row(
-      children: [
-        for (final entry in const [
-          (0, '1  摘要'),
-          (1, '2  趋势'),
-          (2, '3  原始数据'),
-        ]) ...[
-          Expanded(
-            child: InkWell(
-              onTap: () => onSelect(entry.$1),
-              borderRadius: BorderRadius.circular(8),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                height: 32,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color:
-                      layer == entry.$1 ? pomiPurple : const Color(0xFFF1EFF4),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  entry.$2,
-                  style: TextStyle(
-                    color: layer == entry.$1 ? Colors.white : pomiMuted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          if (entry.$1 != 2) const SizedBox(width: 7),
-        ],
-      ],
-    ),
-  );
-}
-
-// ignore: unused_element
-class _AbnormalMetricsSection extends StatelessWidget {
-  const _AbnormalMetricsSection({
-    required this.labs,
-    required this.onOpenTrends,
-  });
-
-  final List<Map<String, dynamic>> labs;
-  final ValueChanged<String?> onOpenTrends;
-
-  @override
-  Widget build(BuildContext context) {
-    final abnormal =
-        labs
-            .where(
-              (item) =>
-                  item['abnormal_status'] == 'high' ||
-                  item['abnormal_status'] == 'low',
-            )
-            .take(4)
-            .toList();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          '异常指标',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 8),
-        if (abnormal.isEmpty)
-          const PomiGlassCard(
-            padding: EdgeInsets.all(15),
-            child: Text('本次报告暂无异常指标'),
-          )
-        else
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: 1.55,
-            children:
-                abnormal.map((item) {
-                  final value = item['raw_value']?.toString() ?? '—';
-                  final unit = item['raw_unit']?.toString() ?? '';
-                  final status =
-                      item['abnormal_status'] == 'high' ? '偏高' : '偏低';
-                  final name = item['item_name']?.toString() ?? '指标';
-                  return Semantics(
-                    button: true,
-                    label: '查看$name趋势',
-                    onTap: () => onOpenTrends(item['metric_id']?.toString()),
-                    child: PomiGlassCard(
-                      onTap: () => onOpenTrends(item['metric_id']?.toString()),
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  name,
-                                  style: const TextStyle(color: pomiMuted),
-                                ),
-                              ),
-                              Text(
-                                status,
-                                style: const TextStyle(
-                                  color: pomiCoral,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const Spacer(),
-                          Text(
-                            '$value $unit',
-                            style: const TextStyle(
-                              color: pomiCoral,
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          Text(
-                            item['sample_date']?.toString() ??
-                                item['report_date']?.toString() ??
-                                '',
-                            style: const TextStyle(
-                              color: pomiMuted,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }).toList(),
-          ),
-      ],
-    );
-  }
-}
-
-// ignore: unused_element
-class _CycleHistorySection extends StatelessWidget {
-  const _CycleHistorySection({required this.cycles, required this.summary});
-
-  final List<Map<String, dynamic>> cycles;
-  final Map<String, dynamic> summary;
-
-  String _date(String? value, {bool includeYear = true}) {
-    final parsed = value == null ? null : DateTime.tryParse(value);
-    if (parsed == null) return '—';
-    return '${includeYear ? '${parsed.year} 年 ' : ''}${parsed.month} 月 ${parsed.day} 日';
-  }
-
-  List<(String, String, String, String)> get _rows {
-    final descending = cycles.reversed.toList();
-    int? previousYear;
-    return descending.map((item) {
-      final start = DateTime.tryParse(item['start_date']?.toString() ?? '');
-      final year = start?.year;
-      final yearLabel = year != null && year != previousYear ? '$year 年' : '';
-      previousYear = year;
-      final cycleEnd = item['cycle_end_date']?.toString();
-      final duration =
-          cycleEnd == null
-              ? '开始时间：${_date(item['start_date']?.toString(), includeYear: false)}'
-              : '${_date(item['start_date']?.toString(), includeYear: year != DateTime.tryParse(cycleEnd)?.year)}至${_date(cycleEnd, includeYear: false)}';
-      return (
-        yearLabel,
-        duration,
-        item['cycle_length_days'] == null
-            ? '—'
-            : '${item['cycle_length_days']} 天',
-        item['duration_days'] == null ? '—' : '${item['duration_days']} 天',
-      );
-    }).toList();
-  }
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const Text(
-        '经期历史',
-        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-      ),
-      const SizedBox(height: 5),
-      Text(
-        '${_date(summary['range_start']?.toString())}－${_date(summary['range_end']?.toString())}',
-        style: const TextStyle(color: pomiMuted, fontSize: 12),
-      ),
-      const SizedBox(height: 8),
-      PomiGlassCard(
-        padding: const EdgeInsets.all(12),
-        backgroundColor: const Color(0xFFF3F3F5),
-        child: Table(
-          columnWidths: const {
-            0: FixedColumnWidth(48),
-            1: FlexColumnWidth(),
-            2: FixedColumnWidth(52),
-            3: FixedColumnWidth(52),
-          },
-          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-          border: const TableBorder(
-            horizontalInside: BorderSide(color: pomiLine),
-          ),
-          children: [
-            TableRow(
-              decoration: BoxDecoration(
-                color: pomiPurple.withValues(alpha: .06),
-              ),
-              children: const [
-                _CycleHistoryCell('年份', isHeader: true),
-                _CycleHistoryCell('周期持续时间', isHeader: true),
-                _CycleHistoryCell('周期长度', isHeader: true),
-                _CycleHistoryCell('月经长度', isHeader: true),
-              ],
-            ),
-            ..._rows.map(
-              (row) => TableRow(
-                children: [
-                  _CycleHistoryCell(row.$1),
-                  _CycleHistoryCell(row.$2),
-                  _CycleHistoryCell(row.$3),
-                  _CycleHistoryCell(row.$4),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    ],
-  );
-}
-
-class _CycleHistoryCell extends StatelessWidget {
-  const _CycleHistoryCell(this.text, {this.isHeader = false});
-
-  final String text;
-  final bool isHeader;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 9),
-    child: Text(
-      text,
-      style: TextStyle(
-        color: isHeader ? pomiMuted : pomiInk,
-        fontSize: isHeader ? 10 : 10.5,
-        height: 1.35,
-        fontWeight: isHeader ? FontWeight.w700 : FontWeight.w400,
-      ),
-    ),
-  );
-}
-
-class _BmiTrendChart extends StatefulWidget {
+class _BmiTrendChart extends StatelessWidget {
   const _BmiTrendChart({required this.weights});
   final List<Map<String, dynamic>> weights;
 
   @override
-  State<_BmiTrendChart> createState() => _BmiTrendChartState();
-}
-
-class _BmiTrendChartState extends State<_BmiTrendChart> {
-  final _scrollController = ScrollController();
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final allPoints =
-        widget.weights.where((item) => item['bmi'] is num).toList();
+    final allPoints = weights.where((item) => item['bmi'] is num).toList();
     final points =
-        allPoints.length <= 8
+        allPoints.length <= 6
             ? allPoints
-            : allPoints.sublist(allPoints.length - 8);
+            : allPoints.sublist(allPoints.length - 6);
     final values = points.map((e) => (e['bmi'] as num).toDouble()).toList();
     final labels =
         points
             .map((e) => e['record_date']?.toString().substring(0, 10) ?? '')
             .toList();
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final desiredWidth = values.length * 96.0;
-        final chartWidth =
-            desiredWidth > constraints.maxWidth
-                ? desiredWidth
-                : constraints.maxWidth;
-        return Scrollbar(
-          controller: _scrollController,
-          thumbVisibility: chartWidth > constraints.maxWidth,
-          scrollbarOrientation: ScrollbarOrientation.bottom,
-          child: SingleChildScrollView(
-            controller: _scrollController,
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.only(bottom: 12),
-            child: SizedBox(
-              width: chartWidth,
-              height: constraints.maxHeight - 12,
-              child: CustomPaint(
-                painter: _TrendLinePainter(
-                  values,
-                  labels,
-                  unitLabel: 'BMI',
-                  fractionDigits: 1,
-                ),
-                child: const SizedBox.expand(),
-              ),
-            ),
-          ),
-        );
-      },
+    return CustomPaint(
+      painter: _TrendLinePainter(
+        values,
+        labels,
+        unitLabel: 'BMI',
+        fractionDigits: 1,
+      ),
+      child: const SizedBox.expand(),
     );
   }
 }
@@ -2710,64 +2495,34 @@ class _TrendLinePainter extends CustomPainter {
       oldDelegate.fractionDigits != fractionDigits;
 }
 
-class _GlucoseTrendChart extends StatefulWidget {
+class _GlucoseTrendChart extends StatelessWidget {
   const _GlucoseTrendChart({required this.points, required this.unit});
 
   final List<Map<String, dynamic>> points;
   final String unit;
 
   @override
-  State<_GlucoseTrendChart> createState() => _GlucoseTrendChartState();
-}
-
-class _GlucoseTrendChartState extends State<_GlucoseTrendChart> {
-  final _scrollController = ScrollController();
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) {
-      final points = <_GlucosePoint>[];
-      for (var i = 0; i < widget.points.length; i++) {
-        final point = _GlucosePoint.fromBackend(widget.points[i], i);
-        if (point != null) points.add(point);
-      }
-      final desiredWidth = points.length * 96.0;
-      final chartWidth =
-          desiredWidth > constraints.maxWidth
-              ? desiredWidth
-              : constraints.maxWidth;
-      return CustomPaint(
-        painter: _TrendChartFramePainter(),
-        child: Padding(
-          padding: const EdgeInsets.all(2),
-          child: Scrollbar(
-            controller: _scrollController,
-            thumbVisibility: chartWidth > constraints.maxWidth,
-            scrollbarOrientation: ScrollbarOrientation.bottom,
-            child: SingleChildScrollView(
-              controller: _scrollController,
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.only(bottom: 12),
-              child: SizedBox(
-                width: chartWidth,
-                height: constraints.maxHeight - 16,
-                child: CustomPaint(
-                  painter: _GlucoseTrendPainter(points, widget.unit),
-                  child: const SizedBox.expand(),
-                ),
-              ),
-            ),
-          ),
+  Widget build(BuildContext context) {
+    final parsedPoints = <_GlucosePoint>[];
+    for (var i = 0; i < points.length; i++) {
+      final point = _GlucosePoint.fromBackend(points[i], i);
+      if (point != null) parsedPoints.add(point);
+    }
+    final visiblePoints =
+        parsedPoints.length <= 6
+            ? parsedPoints
+            : parsedPoints.sublist(parsedPoints.length - 6);
+    return CustomPaint(
+      painter: _TrendChartFramePainter(),
+      child: Padding(
+        padding: const EdgeInsets.all(2),
+        child: CustomPaint(
+          painter: _GlucoseTrendPainter(visiblePoints, unit),
+          child: const SizedBox.expand(),
         ),
-      );
-    },
-  );
+      ),
+    );
+  }
 }
 
 class _TrendChartFramePainter extends CustomPainter {
@@ -3124,7 +2879,7 @@ class _GlucoseTrendSection extends StatelessWidget {
       children: [
         const Text(
           '空腹血糖（FPG）趋势',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 8),
         Text('单位：$unit', style: const TextStyle(color: pomiMuted)),
@@ -3136,78 +2891,10 @@ class _GlucoseTrendSection extends StatelessWidget {
           )
         else
           SizedBox(
-            height: 350,
+            height: 230,
             child: _GlucoseTrendChart(points: points, unit: unit),
           ),
       ],
-    );
-  }
-}
-
-// ignore: unused_element
-class _ReportMedicationTile extends StatelessWidget {
-  const _ReportMedicationTile({required this.item});
-  final Map<String, dynamic> item;
-
-  @override
-  Widget build(BuildContext context) {
-    final adherence = Map<String, dynamic>.from(
-      item['adherence'] as Map? ?? const {},
-    );
-    final percent = (adherence['adherence_percent'] as num?)?.toDouble();
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  item['drug_name']?.toString() ?? '用药',
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              if (percent != null)
-                Text(
-                  '${percent.round()}%',
-                  style: const TextStyle(
-                    fontSize: 17,
-                    color: pomiPurple,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '${item['dosage_text'] ?? item['specification'] ?? ''} · ${item['frequency'] ?? ''}',
-            style: const TextStyle(color: pomiMuted),
-          ),
-          const SizedBox(height: 8),
-          if (percent != null) ...[
-            LinearProgressIndicator(
-              value: percent / 100,
-              minHeight: 8,
-              borderRadius: BorderRadius.circular(8),
-              color: pomiMint,
-              backgroundColor: pomiLine,
-            ),
-            const SizedBox(height: 5),
-            Text(
-              '已服用 ${adherence['taken'] ?? 0} 天 · 主动漏服 ${adherence['missed'] ?? 0} 天 · 未记录 ${adherence['unrecorded'] ?? 0} 天',
-              style: const TextStyle(color: pomiMuted, fontSize: 12),
-            ),
-          ] else
-            const Text(
-              '暂无服药记录',
-              style: TextStyle(color: pomiMuted, fontSize: 12),
-            ),
-        ],
-      ),
     );
   }
 }
@@ -3247,7 +2934,7 @@ class _SelectedLabTrendSection extends StatelessWidget {
       children: [
         Text(
           '$name趋势',
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
         ),
         if (unit.isNotEmpty) ...[
           const SizedBox(height: 5),
@@ -3288,6 +2975,7 @@ class _SelectedLabTrendSection extends StatelessWidget {
 
 class _ReportTrendLayer extends StatelessWidget {
   const _ReportTrendLayer({
+    required this.reportDate,
     required this.weights,
     required this.cycles,
     required this.labs,
@@ -3297,6 +2985,7 @@ class _ReportTrendLayer extends StatelessWidget {
     required this.onSelectMetric,
     required this.onOpenSources,
   });
+  final DateTime reportDate;
   final List<Map<String, dynamic>> weights;
   final List<Map<String, dynamic>> cycles;
   final List<Map<String, dynamic>> labs;
@@ -3330,9 +3019,9 @@ class _ReportTrendLayer extends StatelessWidget {
       ),
       const SizedBox(height: 12),
       if (selectedMetricId == 'cycle')
-        _CycleTrendDetail(cycles: cycles, onOpenSources: onOpenSources)
+        _CycleTrendDetail(cycles: cycles, reportDate: reportDate)
       else if (selectedMetricId == 'weight')
-        _WeightTrendDetail(weights: weights, onOpenSources: onOpenSources)
+        _WeightTrendDetail(weights: weights)
       else if (selectedTrend != null) ...[
         if (selectedMetricId == 'glucose')
           _GlucoseTrendSection(trend: glucoseTrend)
@@ -3362,24 +3051,25 @@ class _TrendMetricIndex extends StatelessWidget {
     required this.hasWeights,
     required this.onSelectMetric,
   });
+
   final List<Map<String, dynamic>> labs;
   final bool hasCycles;
   final bool hasWeights;
   final ValueChanged<String> onSelectMetric;
+
   @override
   Widget build(BuildContext context) {
-    final items =
-        <(String, String, String)>[
-          if (hasCycles) ('cycle', '经期周期', '查看周期时长与月经记录'),
-          if (hasWeights) ('weight', 'BMI / 体重', '查看完整 BMI 趋势'),
-          ...labs.map(
-            (item) => (
-              item['metric_id']?.toString() ?? '',
-              item['item_name']?.toString() ?? '检查指标',
-              '${item['raw_value'] ?? '—'} ${item['raw_unit'] ?? ''}',
-            ),
-          ),
-        ].where((item) => item.$1.isNotEmpty).toList();
+    final items = <(String, String, String)>[
+      if (hasCycles) ('cycle', '经期周期', '查看周期时长与月经记录'),
+      if (hasWeights) ('weight', 'BMI / 体重', '查看完整 BMI 趋势'),
+      ...labs.map(
+        (item) => (
+          item['metric_id']?.toString() ?? '',
+          item['item_name']?.toString() ?? '检查指标',
+          '${item['raw_value'] ?? '—'} ${item['raw_unit'] ?? ''}',
+        ),
+      ),
+    ].where((item) => item.$1.isNotEmpty);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -3394,18 +3084,18 @@ class _TrendMetricIndex extends StatelessWidget {
                 ListTile(
                   dense: true,
                   title: Text(
-                    items[i].$2,
+                    items.elementAt(i).$2,
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   subtitle: Text(
-                    items[i].$3,
+                    items.elementAt(i).$3,
                     style: const TextStyle(fontSize: 10),
                   ),
                   trailing: const Icon(
                     Icons.chevron_right_rounded,
                     color: pomiMuted,
                   ),
-                  onTap: () => onSelectMetric(items[i].$1),
+                  onTap: () => onSelectMetric(items.elementAt(i).$1),
                 ),
                 if (i != items.length - 1) const Divider(height: 1),
               ],
@@ -3418,200 +3108,243 @@ class _TrendMetricIndex extends StatelessWidget {
 }
 
 class _CycleTrendDetail extends StatelessWidget {
-  const _CycleTrendDetail({required this.cycles, required this.onOpenSources});
+  const _CycleTrendDetail({required this.cycles, required this.reportDate});
+
   final List<Map<String, dynamic>> cycles;
-  final VoidCallback onOpenSources;
+  final DateTime reportDate;
+
   @override
   Widget build(BuildContext context) {
-    final latest = cycles.isEmpty ? null : cycles.last;
-    int? completedLength;
-    for (final cycle in cycles.reversed) {
-      final value = cycle['cycle_length_days'];
-      if (value is num) {
-        completedLength = value.toInt();
-        break;
-      }
-    }
-    final duration = latest?['duration_days'];
+    final rows = _CycleChartRow.fromCycles(cycles, reportDate);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionHeading(title: '经期周期趋势', trailing: '点击记录查看来源'),
+        const _SectionHeading(title: '经期周期趋势', trailing: '当前周期 + 近期 5 个完整周期'),
         const SizedBox(height: 7),
         PomiGlassCard(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
           backgroundColor: const Color(0xFFF7F6F8),
-          child: SizedBox(
-            height: 72,
-            width: double.infinity,
-            child: CustomPaint(
-              painter: _CycleSundialPainter(
-                cycleLengthDays: completedLength ?? 56,
-                periodLengthDays: duration is num ? duration.toInt() : 0,
-                startLabel: _monthDay(latest?['start_date']?.toString()),
-              ),
-            ),
+          child:
+              rows.isEmpty
+                  ? const Text('暂无经期记录')
+                  : _CycleHistoryChart(rows: rows),
+        ),
+      ],
+    );
+  }
+}
+
+class _CycleChartRow {
+  const _CycleChartRow({
+    required this.label,
+    required this.dateLabel,
+    required this.periodDays,
+    required this.totalDays,
+    required this.current,
+  });
+
+  final String label;
+  final String dateLabel;
+  final int periodDays;
+  final int totalDays;
+  final bool current;
+
+  static List<_CycleChartRow> fromCycles(
+    List<Map<String, dynamic>> cycles,
+    DateTime reportDate,
+  ) {
+    if (cycles.isEmpty) return const [];
+    final sorted = [...cycles]..sort(
+      (a, b) => (a['start_date'] ?? '').toString().compareTo(
+        (b['start_date'] ?? '').toString(),
+      ),
+    );
+    final latest = sorted.last;
+    final latestStart = _tryReportDate(latest['start_date']);
+    final currentDays =
+        latestStart == null ? 1 : reportDate.difference(latestStart).inDays + 1;
+    final completed =
+        sorted
+            .take(sorted.length - 1)
+            .where((item) => item['cycle_length_days'] is num)
+            .toList()
+            .reversed
+            .take(5)
+            .toList();
+    return [
+      _CycleChartRow(
+        label: '当前周期',
+        dateLabel: _RecentCycleCard._monthDay(latest['start_date']?.toString()),
+        periodDays: (latest['duration_days'] as num?)?.toInt() ?? 0,
+        totalDays: currentDays < 1 ? 1 : currentDays,
+        current: true,
+      ),
+      for (var i = 0; i < completed.length; i++)
+        _CycleChartRow(
+          label: '前 ${i + 1} 周期',
+          dateLabel: _RecentCycleCard._monthDay(
+            completed[i]['start_date']?.toString(),
+          ),
+          periodDays: (completed[i]['duration_days'] as num?)?.toInt() ?? 0,
+          totalDays: (completed[i]['cycle_length_days'] as num?)?.toInt() ?? 1,
+          current: false,
+        ),
+    ];
+  }
+}
+
+class _CycleHistoryChart extends StatelessWidget {
+  const _CycleHistoryChart({required this.rows});
+
+  final List<_CycleChartRow> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    final longest = rows
+        .map((row) => row.totalDays)
+        .reduce((a, b) => a > b ? a : b);
+    final roundedDays = (longest + 6) ~/ 7 * 7;
+    final maxDays = roundedDays < 56 ? 56 : roundedDays;
+    final ticks = [for (var day = 0; day <= maxDays; day += 7) day];
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 70),
+          child: Row(
+            children: [
+              for (final tick in ticks)
+                Expanded(
+                  child: Text(
+                    '$tick',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: pomiMuted, fontSize: 8),
+                  ),
+                ),
+            ],
           ),
         ),
-        const SizedBox(height: 9),
-        PomiGlassCard(
-          padding: EdgeInsets.zero,
-          child: Column(
-            children:
-                cycles.reversed.take(8).map((item) {
-                  final range =
-                      '${item['start_date'] ?? '—'} 至 ${item['end_date'] ?? '进行中'}';
-                  final details =
-                      '周期 ${item['cycle_length_days'] ?? '—'} 天 · 月经 ${item['duration_days'] ?? '—'} 天';
-                  return ListTile(
-                    dense: true,
-                    title: Text(
-                      range,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
+        const SizedBox(height: 4),
+        ...rows.map(
+          (row) => Padding(
+            padding: const EdgeInsets.only(bottom: 7),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 66,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        row.label,
+                        style: const TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        row.dateLabel,
+                        style: const TextStyle(color: pomiMuted, fontSize: 8),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: SizedBox(
+                    height: 26,
+                    child: CustomPaint(
+                      painter: _CycleHistoryRowPainter(
+                        row: row,
+                        maxDays: maxDays,
                       ),
                     ),
-                    subtitle: Text(
-                      details,
-                      style: const TextStyle(fontSize: 10),
-                    ),
-                    trailing: const Icon(
-                      Icons.source_outlined,
-                      size: 17,
-                      color: pomiPurple,
-                    ),
-                    onTap: onOpenSources,
-                  );
-                }).toList(),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
     );
   }
-
-  static String _monthDay(String? raw) {
-    final date = DateTime.tryParse(raw ?? '');
-    return date == null
-        ? '未记录'
-        : '${date.month.toString().padLeft(2, '0')}–${date.day.toString().padLeft(2, '0')}';
-  }
 }
 
-class _CycleSundialPainter extends CustomPainter {
-  const _CycleSundialPainter({
-    required this.cycleLengthDays,
-    required this.periodLengthDays,
-    required this.startLabel,
-  });
+class _CycleHistoryRowPainter extends CustomPainter {
+  const _CycleHistoryRowPainter({required this.row, required this.maxDays});
 
-  final int cycleLengthDays;
-  final int periodLengthDays;
-  final String startLabel;
+  final _CycleChartRow row;
+  final int maxDays;
 
   @override
   void paint(Canvas canvas, Size size) {
-    const left = 4.0;
-    final right = size.width - 4;
-    final y = size.height * .58;
-    final maxDays = cycleLengthDays.clamp(28, 56);
-    final grid = Paint()..color = const Color(0xFFE7E4EB);
-    for (var day = 0; day <= 56; day += 7) {
-      final x = left + (right - left) * day / 56;
-      canvas.drawLine(Offset(x, 13), Offset(x, size.height - 4), grid);
-      _paintText(canvas, '$day', Offset(x, 0), center: true);
+    const y = 9.0;
+    final grid =
+        Paint()
+          ..color = const Color(0xFFE7E4EB)
+          ..strokeWidth = 1;
+    for (var day = 0; day <= maxDays; day += 7) {
+      final x = size.width * day / maxDays;
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), grid);
     }
-    final track =
+    final periodEnd = size.width * row.periodDays.clamp(0, maxDays) / maxDays;
+    canvas.drawLine(
+      const Offset(0, y),
+      Offset(periodEnd, y),
+      Paint()
+        ..color = pomiPurple
+        ..strokeWidth = 8
+        ..strokeCap = StrokeCap.round,
+    );
+    final cycleEnd = size.width * row.totalDays.clamp(1, maxDays) / maxDays;
+    final remaining =
         Paint()
-          ..color = const Color(0xFFE8DFF2)
-          ..strokeWidth = 8
-          ..strokeCap = StrokeCap.round;
-    canvas.drawLine(Offset(left, y), Offset(right, y), track);
-    final periodEnd =
-        left + (right - left) * periodLengthDays.clamp(0, 56) / 56;
-    final period =
-        Paint()
-          ..color = pomiPurple
-          ..strokeWidth = 8
-          ..strokeCap = StrokeCap.round;
-    canvas.drawLine(Offset(left, y), Offset(periodEnd, y), period);
-    final cycleEnd = left + (right - left) * maxDays / 56;
-    final active =
-        Paint()
-          ..color = pomiPurple.withValues(alpha: .45)
+          ..color =
+              row.current
+                  ? pomiPurple.withValues(alpha: .38)
+                  : const Color(0xFFC8C1CD)
           ..strokeWidth = 1.5;
-    _drawDashedLine(
-      canvas,
-      Offset(periodEnd + 5, y),
-      Offset(cycleEnd, y),
-      active,
-    );
-    _paintText(canvas, '当前周期  $startLabel', Offset(left, y + 10));
-    _paintText(
-      canvas,
-      '进行中',
-      Offset(right, y + 10),
-      rightAligned: true,
-      accent: true,
-    );
-  }
-
-  void _drawDashedLine(Canvas canvas, Offset start, Offset end, Paint paint) {
-    for (var x = start.dx; x < end.dx; x += 7) {
+    for (var x = periodEnd + 5; x < cycleEnd; x += 7) {
       canvas.drawLine(
-        Offset(x, start.dy),
-        Offset((x + 4).clamp(x, end.dx), end.dy),
-        paint,
+        Offset(x, y),
+        Offset((x + 4).clamp(x, cycleEnd), y),
+        remaining,
       );
     }
-  }
-
-  void _paintText(
-    Canvas canvas,
-    String text,
-    Offset offset, {
-    bool center = false,
-    bool rightAligned = false,
-    bool accent = false,
-  }) {
-    final painter = TextPainter(
+    canvas.drawCircle(Offset(cycleEnd, y), 2.5, Paint()..color = pomiPurple);
+    final label = row.current ? '进行中' : '${row.totalDays} 天';
+    final text = TextPainter(
       text: TextSpan(
-        text: text,
-        style: TextStyle(color: accent ? pomiPurple : pomiMuted, fontSize: 8),
+        text: label,
+        style: TextStyle(
+          color: row.current ? pomiPurple : pomiMuted,
+          fontSize: 8,
+        ),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-    final dx =
-        center
-            ? offset.dx - painter.width / 2
-            : rightAligned
-            ? offset.dx - painter.width
-            : offset.dx;
-    painter.paint(canvas, Offset(dx, offset.dy));
+    text.paint(
+      canvas,
+      Offset((cycleEnd + 4).clamp(0, size.width - text.width), y + 5),
+    );
   }
 
   @override
-  bool shouldRepaint(covariant _CycleSundialPainter oldDelegate) =>
-      oldDelegate.cycleLengthDays != cycleLengthDays ||
-      oldDelegate.periodLengthDays != periodLengthDays ||
-      oldDelegate.startLabel != startLabel;
+  bool shouldRepaint(covariant _CycleHistoryRowPainter oldDelegate) =>
+      oldDelegate.row != row || oldDelegate.maxDays != maxDays;
 }
 
 class _WeightTrendDetail extends StatelessWidget {
-  const _WeightTrendDetail({
-    required this.weights,
-    required this.onOpenSources,
-  });
+  const _WeightTrendDetail({required this.weights});
+
   final List<Map<String, dynamic>> weights;
-  final VoidCallback onOpenSources;
+
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const _SectionHeading(title: 'BMI / 体重趋势', trailing: '点击记录查看来源'),
+      const _SectionHeading(title: 'BMI / 体重趋势', trailing: '近期 6 个可比数据点'),
       const SizedBox(height: 7),
       SizedBox(
-        height: 240,
+        height: 205,
         child: CustomPaint(
           painter: _TrendChartFramePainter(),
           child: Padding(
@@ -3620,56 +3353,16 @@ class _WeightTrendDetail extends StatelessWidget {
           ),
         ),
       ),
-      const SizedBox(height: 9),
-      PomiGlassCard(
-        padding: EdgeInsets.zero,
-        child: Column(
-          children:
-              weights.reversed
-                  .take(8)
-                  .map(
-                    (item) => ListTile(
-                      dense: true,
-                      title: Text(
-                        item['record_date']?.toString() ?? '—',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      subtitle: Text(
-                        'BMI ${item['bmi'] ?? '—'}',
-                        style: const TextStyle(fontSize: 10),
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '${item['weight_kg'] ?? '—'} kg',
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          const SizedBox(width: 6),
-                          const Icon(
-                            Icons.source_outlined,
-                            size: 17,
-                            color: pomiPurple,
-                          ),
-                        ],
-                      ),
-                      onTap: onOpenSources,
-                    ),
-                  )
-                  .toList(),
-        ),
-      ),
     ],
   );
 }
 
 class _LabTrendPoints extends StatelessWidget {
   const _LabTrendPoints({required this.trend, required this.onOpenSources});
+
   final Map<String, dynamic> trend;
   final VoidCallback onOpenSources;
+
   @override
   Widget build(BuildContext context) {
     final points = List<Map<String, dynamic>>.from(
@@ -3734,63 +3427,6 @@ class _LabTrendPoints extends StatelessWidget {
   }
 }
 
-// ignore: unused_element, unused_element_parameter
-class _TrendCard extends StatelessWidget {
-  const _TrendCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.values,
-  });
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final List<String> values;
-  @override
-  Widget build(BuildContext context) => PomiGlassCard(
-    padding: const EdgeInsets.all(14),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: pomiLavender,
-              foregroundColor: pomiPurple,
-              child: Icon(icon),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(color: pomiMuted, fontSize: 11),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        if (values.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          ...values.map(
-            (value) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Text(value, style: const TextStyle(fontSize: 12)),
-            ),
-          ),
-        ],
-      ],
-    ),
-  );
-}
-
 class _ReportSourceLayer extends StatelessWidget {
   const _ReportSourceLayer({required this.sourceGroups});
   final Map<String, List<Map<String, dynamic>>> sourceGroups;
@@ -3804,7 +3440,7 @@ class _ReportSourceLayer extends StatelessWidget {
       children: [
         const Text(
           '报告数据来源',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 5),
         const Text(
@@ -3855,32 +3491,6 @@ class _ReportSourceLayer extends StatelessWidget {
   static String _shortId(dynamic value) {
     final text = value?.toString() ?? '无';
     return text.length > 8 ? '${text.substring(0, 8)}…' : text;
-  }
-}
-
-// ignore: unused_element
-class _ReportSection extends StatelessWidget {
-  const _ReportSection({
-    required this.title,
-    required this.count,
-    required this.children,
-  });
-
-  final String title;
-  final int count;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return ExpansionTile(
-      tilePadding: EdgeInsets.zero,
-      initiallyExpanded: true,
-      title: Text(
-        '$title（$count）',
-        style: const TextStyle(fontWeight: FontWeight.w800),
-      ),
-      children: children,
-    );
   }
 }
 

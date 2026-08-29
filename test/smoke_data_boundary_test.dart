@@ -1,14 +1,15 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pmos_enclaire/core/api_client.dart';
 import 'package:pmos_enclaire/core/theme.dart';
 import 'package:pmos_enclaire/features/dashboard/dashboard_screen.dart';
 import 'package:pmos_enclaire/features/profile/profile_screen.dart';
 import 'package:pmos_enclaire/features/records/records_screen.dart';
 import 'package:pmos_enclaire/features/tracking/tracking_screen.dart';
 import 'package:pmos_enclaire/features/upload/upload_screen.dart';
+
+import 'support/fake_api_client.dart';
 
 void main() {
   Widget app(Widget child) => MaterialApp(theme: buildPomiTheme(), home: child);
@@ -51,143 +52,6 @@ void main() {
     expect(find.text('真实化验单.pdf'), findsOneWidget);
     expect(find.text('模拟数据'), findsNothing);
     expect(find.textContaining('模拟医院'), findsNothing);
-  });
-
-  testWidgets('records filter narrows documents by material type', (
-    tester,
-  ) async {
-    usePhoneViewport(tester);
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          recordsProvider.overrideWith(
-            (ref) async => {
-              'documents': {
-                'items': [
-                  {
-                    'id': 'lab-1',
-                    'document_type': 'lab_report',
-                    'original_file_name': '化验单.jpg',
-                    'latest_ocr_status': 'confirmed',
-                  },
-                  {
-                    'id': 'order-1',
-                    'document_type': 'medical_order',
-                    'original_file_name': '医嘱单.jpg',
-                    'latest_ocr_status': 'confirmed',
-                  },
-                ],
-              },
-              'reports': {'items': <Map<String, dynamic>>[]},
-            },
-          ),
-        ],
-        child: app(const RecordsScreen()),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('化验单.jpg'), findsOneWidget);
-    expect(find.text('医嘱单.jpg'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('records-filter-button')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('医嘱 / 处方'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('医嘱单.jpg'), findsOneWidget);
-    expect(find.text('化验单.jpg'), findsNothing);
-    expect(find.text('1 条'), findsOneWidget);
-  });
-
-  testWidgets('stored original overlays blockchain evidence watermark', (tester) async {
-    usePhoneViewport(tester);
-    await tester.pumpWidget(
-      app(
-        OriginalFileScreen(
-          bytes: Uint8List.fromList(const [
-            0x89,
-            0x50,
-            0x4E,
-            0x47,
-            0x0D,
-            0x0A,
-            0x1A,
-            0x0A,
-            0x00,
-            0x00,
-            0x00,
-            0x0D,
-            0x49,
-            0x48,
-            0x44,
-            0x52,
-            0x00,
-            0x00,
-            0x00,
-            0x01,
-            0x00,
-            0x00,
-            0x00,
-            0x01,
-            0x08,
-            0x06,
-            0x00,
-            0x00,
-            0x00,
-            0x1F,
-            0x15,
-            0xC4,
-            0x89,
-            0x00,
-            0x00,
-            0x00,
-            0x0D,
-            0x49,
-            0x44,
-            0x41,
-            0x54,
-            0x78,
-            0x9C,
-            0x63,
-            0xF8,
-            0xCF,
-            0xC0,
-            0x00,
-            0x00,
-            0x03,
-            0x01,
-            0x01,
-            0x00,
-            0x18,
-            0xDD,
-            0x8D,
-            0xB1,
-            0x00,
-            0x00,
-            0x00,
-            0x00,
-            0x49,
-            0x45,
-            0x4E,
-            0x44,
-            0xAE,
-            0x42,
-            0x60,
-            0x82,
-          ]),
-          mimeType: 'image/jpeg',
-          fileName: '原件.jpg',
-          certified: true,
-          hospitalName: '示例医院',
-        ),
-      ),
-    );
-    expect(
-      find.byKey(const ValueKey('blockchain-evidence-watermark')),
-      findsOneWidget,
-    );
-    expect(find.text('区块链存证'), findsOneWidget);
-    expect(find.text('示例医院'), findsOneWidget);
   });
 
   testWidgets('normal dashboard hides the fixed Smoke visit preview', (
@@ -277,6 +141,75 @@ void main() {
 
     expect(find.text('暂无体重记录'), findsOneWidget);
     expect(find.text('69.8'), findsNothing);
+  });
+
+  testWidgets('tapping a past calendar day opens cycle entry for that day', (
+    tester,
+  ) async {
+    usePhoneViewport(tester);
+    final yesterday = DateUtils.dateOnly(
+      DateTime.now(),
+    ).subtract(const Duration(days: 1));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          trackingProvider.overrideWith(
+            (ref) async => {
+              'cycles': <Map<String, dynamic>>[],
+              'weights': <Map<String, dynamic>>[],
+            },
+          ),
+        ],
+        child: app(const TrackingScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('${yesterday.day}').first);
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('收起经期记录'), findsOneWidget);
+    expect(find.text('开始日期'), findsOneWidget);
+    expect(find.text('${yesterday.month}月${yesterday.day}日'), findsOneWidget);
+  });
+
+  testWidgets('today weight can be saved without a future-date warning', (
+    tester,
+  ) async {
+    usePhoneViewport(tester);
+    final api = FakeApiClient(handler: (_) => <String, dynamic>{});
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          apiClientProvider.overrideWithValue(api),
+          trackingProvider.overrideWith(
+            (ref) async => {
+              'cycles': <Map<String, dynamic>>[],
+              'weights': <Map<String, dynamic>>[],
+            },
+          ),
+        ],
+        child: app(const TrackingScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('查看体重历史'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('记录体重'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '66.5');
+    await tester.tap(find.widgetWithText(FilledButton, '保存'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('只能记录今天及之前的体重'), findsNothing);
+    final call = api.calls.singleWhere((item) => item.path == '/api/weights');
+    expect(call.method, 'POST');
+    expect(
+      (call.data as Map)['record_date'],
+      DateUtils.dateOnly(DateTime.now()).toIso8601String().substring(0, 10),
+    );
+    expect((call.data as Map)['weight_kg'], 66.5);
   });
 
   testWidgets('normal profile does not label a real account as simulated', (

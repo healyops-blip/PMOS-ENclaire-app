@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -8,15 +9,6 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import 'certification_repository.dart';
-
-class _PickedUpload {
-  const _PickedUpload(this.name, this._loader);
-
-  final String name;
-  final Future<dynamic> Function() _loader;
-
-  Future<dynamic> readAsBytes() => _loader();
-}
 
 class UploadScreen extends ConsumerStatefulWidget {
   const UploadScreen({this.modal = false, super.key});
@@ -29,7 +21,7 @@ class UploadScreen extends ConsumerStatefulWidget {
 
 class _UploadScreenState extends ConsumerState<UploadScreen> {
   String _documentType = 'lab';
-  _PickedUpload? _file;
+  File? _file;
   String? _idempotencyKey;
   String? _status;
   bool _working = false;
@@ -47,9 +39,10 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       type: FileType.custom,
       allowedExtensions: const ['jpg', 'jpeg', 'png', 'pdf'],
     );
-    if (file != null) {
+    final path = file?.path;
+    if (path != null) {
       setState(() {
-        _file = _PickedUpload(file.name, file.readAsBytes);
+        _file = File(path);
         _idempotencyKey = null;
         _autoEvidenceAfterCapture = false;
       });
@@ -66,7 +59,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     );
     if (result != null) {
       setState(() {
-        _file = _PickedUpload(result.name, result.readAsBytes);
+        _file = File(result.path);
         _idempotencyKey = null;
         _autoEvidenceAfterCapture = true;
       });
@@ -84,8 +77,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     try {
       final api = ref.read(apiClientProvider);
       final result = await api.recognizeOcr(
-        bytes: await file.readAsBytes(),
-        fileName: file.name,
+        file: file,
         materialType: _wireMaterialType,
         promptVersion: 'pomi-ocr-v1',
         consentVersion: 'pomi-external-processing-v1',
@@ -105,11 +97,6 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
           builder:
               (_) => OcrConfirmScreen(
                 resultId: resultId,
-                taskId: result['ocr_task_id']?.toString() ?? '',
-                expectedRevisionId:
-                    result['document_revision_id']?.toString() ?? '',
-                materialType:
-                    result['material_type']?.toString() ?? _wireMaterialType,
                 resultSource: result['result_source']?.toString() ?? 'qwen3-vl',
                 draft: draft,
               ),
@@ -219,12 +206,12 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
           PomiGlassCard(
             child: ListTile(
               leading: Icon(
-                _file!.name.toLowerCase().endsWith('.pdf')
+                _file!.path.toLowerCase().endsWith('.pdf')
                     ? Icons.picture_as_pdf
                     : Icons.image_outlined,
               ),
               title: Text(
-                _file!.name,
+                _file!.uri.pathSegments.last,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -299,18 +286,12 @@ const _ocrMetadataKeys = {
 class OcrConfirmScreen extends ConsumerStatefulWidget {
   const OcrConfirmScreen({
     required this.resultId,
-    required this.taskId,
-    required this.expectedRevisionId,
-    required this.materialType,
     required this.resultSource,
     required this.draft,
     super.key,
   });
 
   final String resultId;
-  final String taskId;
-  final String expectedRevisionId;
-  final String materialType;
   final String resultSource;
   final Map<String, dynamic> draft;
 
@@ -333,21 +314,11 @@ class _OcrConfirmScreenState extends ConsumerState<OcrConfirmScreen> {
   Future<void> _confirm() async {
     setState(() => _saving = true);
     try {
-      final endpoint =
-          widget.materialType == 'imaging_text_report' ||
-                  widget.materialType == 'outpatient_record'
-              ? '/api/ocr/tasks/${widget.taskId}/confirm'
-              : '/api/ocr/results/${widget.resultId}/confirm';
       await ref
           .read(apiClientProvider)
           .post(
-            endpoint,
-            data: buildOcrConfirmationPayload(
-              _draft,
-              resultId: widget.resultId,
-              expectedRevisionId: widget.expectedRevisionId,
-              materialType: widget.materialType,
-            ),
+            '/api/ocr/results/${widget.resultId}/confirm',
+            data: buildOcrConfirmationPayload(_draft),
           );
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
@@ -550,57 +521,7 @@ class _JsonFields extends StatelessWidget {
       const {'医嘱原文', '检查所见', '检查结论', '主诉', '诊断摘要', '处理意见', '医嘱'}.contains(name);
 }
 
-Map<String, dynamic> buildOcrConfirmationPayload(
-  Map<String, dynamic> draft, {
-  String? resultId,
-  String? expectedRevisionId,
-  String? materialType,
-}) {
-  if (materialType == 'imaging_text_report' ||
-      materialType == 'outpatient_record') {
-    final source = Map<String, dynamic>.from(draft);
-    final allowed =
-        materialType == 'imaging_text_report'
-            ? const {
-              'examination_name',
-              'body_part',
-              'examination_method',
-              'findings_text',
-              'conclusion_text',
-              'examined_at',
-              'reported_at',
-            }
-            : const {
-              'hospital_name',
-              'department_name',
-              'doctor_name',
-              'visit_date',
-              'chief_complaint',
-              'diagnosis_summary',
-              'treatment_plan',
-              'medical_advice',
-            };
-    final confirmed = <String, dynamic>{
-      for (final key in allowed)
-        if (source[key] != null) key: source[key],
-    };
-    if (materialType == 'outpatient_record') {
-      confirmed['hospital_name'] ??= source['hospital'];
-      confirmed['department_name'] ??= source['department'];
-      confirmed['treatment_plan'] ??= source['medical_advice'];
-    }
-    return {
-      'result_id': resultId,
-      'expected_revision_id': expectedRevisionId,
-      'document_type': materialType,
-      'confirmed_data': confirmed,
-      // Local/demo OCR entries do not carry backend field-evidence paths.
-      // The clinical confirmation service still validates all required
-      // values in confirmed_data, so leave this optional list empty.
-      'field_confirmations': const [],
-      'confirm_all': true,
-    };
-  }
+Map<String, dynamic> buildOcrConfirmationPayload(Map<String, dynamic> draft) {
   final examinations = (draft['examinations'] as List? ?? const [])
       .whereType<Map>()
       .toList(growable: false);

@@ -75,10 +75,11 @@ flutter run -d chrome \
   --dart-define=POMI_SMOKE_MODE=true
 ```
 
-### 3. 连接已部署后端进行预览
+### 3. 连接后端进行预览
 
 浏览器联调使用同源 Preview 代理：API 请求先发送到本地 Preview，再由代理转发至
-HTTPS 后端，从而避免浏览器 CORS 限制。以下命令不会部署或启动本地后端。
+目标后端，从而避免浏览器 CORS 限制。构建时不添加 `POMI_SMOKE_MODE=true`，否则
+App 会使用前端内存数据，不会发出任何后端请求。
 
 终端 1——将 Preview 地址设为 App 的 API Base URL 并构建：
 
@@ -106,6 +107,31 @@ python3 tools/web_preview_proxy.py \
 curl http://127.0.0.1:3001/__preview/backend
 ```
 
+#### 本地前后端联调（当前开发分支）
+
+先启动本地 FastAPI（默认使用 `backend/runtime/pomi.db`）：
+
+```bash
+cd backend
+alembic upgrade head
+uvicorn pomi_backend.main:app --host 127.0.0.1 --port 8000
+```
+
+再在仓库根目录构建并启动 Preview 代理：
+
+```bash
+flutter build web \
+  --dart-define=POMI_API_BASE_URL=http://127.0.0.1:3001
+python3 tools/web_preview_proxy.py \
+  --root build/web \
+  --backend local \
+  --local-upstream http://127.0.0.1:8000 \
+  --port 3001
+```
+
+打开 <http://127.0.0.1:3001/>，登录本地账号后，页面请求会经 3001 转发到 8000。
+可用 `curl http://127.0.0.1:3001/__preview/backend` 检查当前代理模式。
+
 仅在开发者明确需要本地后端时，可使用：
 
 ```bash
@@ -117,6 +143,12 @@ python3 tools/web_preview_proxy.py \
 ```
 
 本地后端是可选项；正常前端开发应使用 Smoke 数据或已部署后端。
+
+#### 本地数据与 GitHub
+
+`backend/runtime/` 仅用于本机 SQLite、上传文件和 OCR 运行时数据，已加入
+`.gitignore`，不会随 PR 提交。开发者账号及其医疗演示数据只保存在本地数据库，
+不会上传 GitHub；PR 仅包含代码、迁移、测试和可公开的 Smoke fixture。
 
 ### 4. 常见问题
 

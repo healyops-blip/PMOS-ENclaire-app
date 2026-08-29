@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
@@ -9,9 +11,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 const apiBaseUrl = String.fromEnvironment(
   'POMI_API_BASE_URL',
-  // Browser development runs on the host; Android Emulator users can still
-  // override this with --dart-define=POMI_API_BASE_URL=http://10.0.2.2:8000.
-  defaultValue: 'http://127.0.0.1:8000',
+  defaultValue: 'http://10.0.2.2:8000',
 );
 const smokeMode = bool.fromEnvironment('POMI_SMOKE_MODE');
 const sessionIdStorageKey = 'pomi_session_id';
@@ -106,27 +106,31 @@ class ApiClient {
 
   Future<dynamic> upload(
     String path, {
-    required Uint8List bytes,
-    required String fileName,
+    required File file,
     required String documentType,
   }) async {
     final data = FormData.fromMap({
       'document_type': documentType,
-      'file': MultipartFile.fromBytes(bytes, filename: fileName),
+      'file': await MultipartFile.fromFile(
+        file.path,
+        filename: file.uri.pathSegments.last,
+      ),
     });
     return _request(() => dio.post(path, data: data));
   }
 
   Future<Map<String, dynamic>> recognizeOcr({
-    required Uint8List bytes,
-    required String fileName,
+    required File file,
     required String materialType,
     required String promptVersion,
     required String consentVersion,
     required String idempotencyKey,
   }) async {
     final data = FormData.fromMap({
-      'file': MultipartFile.fromBytes(bytes, filename: fileName),
+      'file': await MultipartFile.fromFile(
+        file.path,
+        filename: file.uri.pathSegments.last,
+      ),
       'material_type': materialType,
       'prompt_version': promptVersion,
     });
@@ -227,9 +231,6 @@ class ApiClient {
     'VALIDATION_ERROR' => '账号或密码格式不符合要求，请检查后重试',
     'AUTH_RATE_LIMITED' when retryAfter != null => '请求过于频繁，请在 $retryAfter 秒后重试',
     'AUTH_RATE_LIMITED' => '请求过于频繁，请稍后重试',
-    'OCR_CONFIRMATION_INVALID' => '请补全必填识别字段后再入库',
-    'OCR_CONFIRMATION_VERSION_CONFLICT' => '识别结果已变化，请重新扫描',
-    'OCR_NOT_CONFIGURED' => 'OCR 服务尚未配置，当前请使用本地模拟数据',
     _ => '请求失败，请稍后重试',
   };
 }
@@ -599,19 +600,17 @@ class SmokeApiClient extends ApiClient {
   @override
   Future<dynamic> upload(
     String path, {
-    required Uint8List bytes,
-    required String fileName,
+    required File file,
     required String documentType,
   }) async => {
     'id': _id('document'),
     'document_type': documentType,
-    'original_file_name': fileName,
+    'original_file_name': file.uri.pathSegments.last,
   };
 
   @override
   Future<Map<String, dynamic>> recognizeOcr({
-    required Uint8List bytes,
-    required String fileName,
+    required File file,
     required String materialType,
     required String promptVersion,
     required String consentVersion,
@@ -640,7 +639,7 @@ class SmokeApiClient extends ApiClient {
       'medical_advice': source['medical_advice'],
       'examinations': source['examinations'],
       'medication_suggestions': source['medication_suggestions'],
-      'original_file_name': fileName,
+      'original_file_name': file.uri.pathSegments.last,
       'dataset_source_file': source['dataset_json_asset'],
     };
   }

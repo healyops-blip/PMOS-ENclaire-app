@@ -125,7 +125,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('此数据超过 6 个月'), findsNothing);
+    expect(find.textContaining('此数据超过 6 个月'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.text('维生素 D'),
