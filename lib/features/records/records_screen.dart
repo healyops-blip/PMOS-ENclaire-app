@@ -93,9 +93,10 @@ class _ApiReportViewer extends ConsumerWidget {
 }
 
 class VisitRecordsPage extends StatelessWidget {
-  const VisitRecordsPage({super.key});
+  const VisitRecordsPage({this.visitsOverride, super.key});
 
   static const visits = smokeVisitRecordDetails;
+  final List<VisitRecordDetailData>? visitsOverride;
 
   @override
   Widget build(BuildContext context) {
@@ -123,9 +124,14 @@ class VisitRecordsPage extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              for (var index = 0; index < visits.length; index++) ...[
-                _VisitRecordCard(visit: visits[index]),
-                if (index != visits.length - 1) const SizedBox(height: 16),
+              for (
+                var index = 0;
+                index < (visitsOverride ?? visits).length;
+                index++
+              ) ...[
+                _VisitRecordCard(visit: (visitsOverride ?? visits)[index]),
+                if (index != (visitsOverride ?? visits).length - 1)
+                  const SizedBox(height: 16),
               ],
             ],
           ),
@@ -945,12 +951,16 @@ class OriginalFileScreen extends StatelessWidget {
     required this.bytes,
     required this.mimeType,
     required this.fileName,
+    this.certified = false,
+    this.hospitalName,
     super.key,
   });
 
   final Uint8List bytes;
   final String mimeType;
   final String fileName;
+  final bool certified;
+  final String? hospitalName;
 
   @override
   Widget build(BuildContext context) {
@@ -967,7 +977,8 @@ class OriginalFileScreen extends StatelessWidget {
             ),
         ],
       ),
-      body:
+      body: Stack(
+        children: [
           mimeType == 'application/pdf'
               ? PdfPreview(
                 build: (format) async => bytes,
@@ -978,6 +989,22 @@ class OriginalFileScreen extends StatelessWidget {
                 maxScale: 5,
                 child: Center(child: Image.memory(bytes)),
               ),
+          if (certified)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 24,
+              child: Container(
+                key: const ValueKey('hospital-certification-watermark'),
+                padding: const EdgeInsets.all(12),
+                color: Colors.white.withValues(alpha: .9),
+                child: Text(
+                  '医院认证${hospitalName == null ? '' : ' · $hospitalName'}',
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

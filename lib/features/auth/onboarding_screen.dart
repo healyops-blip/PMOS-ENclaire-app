@@ -16,7 +16,9 @@ const _onboardingLabelGap = 8.0;
 const _onboardingSelectedColor = Color(0xFFE3D6EF);
 
 class OnboardingScreen extends ConsumerStatefulWidget {
-  const OnboardingScreen({super.key});
+  const OnboardingScreen({this.prefillDemo = false, super.key});
+
+  final bool prefillDemo;
 
   @override
   ConsumerState<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -39,6 +41,22 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   String _cycleRange = '35-45 天';
   String _periodDuration = '4-5 天';
   bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.prefillDemo) {
+      _nickname.text = 'Pomi';
+      _height.text = '165';
+      _weight.text = '60';
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Smoke 演示信息已预填，可直接进入下一步')),
+          );
+      });
+    }
+  }
 
   static const _cycleOptions = ['21-28 天', '28-35 天', '35-45 天', '45 天以上'];
 
