@@ -241,6 +241,7 @@ class ApiClient {
     'OCR_NETWORK_ERROR' => '识别服务网络异常，请稍后重试',
     'OCR_FILE_INVALID' => '图片无法读取，请重新拍摄或选择更清晰的照片',
     'OCR_RESPONSE_INVALID' => '识别结果解析失败，请重试',
+    'OCR_RESPONSE_TRUNCATED' => '报告内容较多，识别结果被截断，请重试或分段拍摄',
     'OCR_HTTP_400' => '图片内容无法识别，请拍清楚一点后重试',
     'OCR_HTTP_429' => '识别请求过于频繁，请稍后重试',
     _ => '请求失败，请稍后重试',
