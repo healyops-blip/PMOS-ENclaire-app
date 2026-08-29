@@ -243,6 +243,26 @@ def test_sync_confirmation_is_atomic_idempotent_and_owned(
         assert session.get(OCRTask, recognized["ocr_task_id"]).status == "confirmed"
 
 
+def test_sync_confirmation_rejects_lab_metric_as_medication(
+    api_client: TestClient, monkeypatch: MonkeyPatch
+) -> None:
+    """OCR 常把化验项目误放进用药建议；名字明显是化验指标的不予入库。"""
+    monkeypatch.setattr("pomi_backend.api.ocr.Qwen3VLOCRProvider", FakeProvider)
+    owner = _headers(api_client, "sync-confirm-labmed")
+    recognized = _recognize(api_client, owner, key="sync-confirm-labmed-001")
+    endpoint = f"/api/ocr/results/{recognized['ocr_result_id']}/confirm"
+
+    response = api_client.post(
+        endpoint,
+        headers=owner,
+        json=_confirmation(drug_name="白细胞计数"),
+    )
+    assert response.status_code == 422
+    error = response.json()["error"]
+    assert error["code"] == "OCR_CONFIRMATION_INVALID"
+    assert error["details"]["fields"][0]["code"] == "MEDICATION_LOOKS_LIKE_LAB_METRIC"
+
+
 def test_sync_confirmation_accepts_unmapped_drug_and_free_text_dosage(
     api_client: TestClient, monkeypatch: MonkeyPatch
 ) -> None:

@@ -44,12 +44,12 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     for (final cycle in cycles) {
       final start = DateTime.tryParse(cycle['start_date']?.toString() ?? '');
       if (start == null) continue;
-      final end =
-          DateTime.tryParse(cycle['end_date']?.toString() ?? '') ?? start;
-      if (!target.isBefore(DateUtils.dateOnly(start)) &&
-          !target.isAfter(DateUtils.dateOnly(end))) {
-        return cycle;
-      }
+      // 无结束日期 = 进行中，后端按「无限延伸」处理，这里也一样：start 及之后都算。
+      final end = DateTime.tryParse(cycle['end_date']?.toString() ?? '');
+      final inRange =
+          !target.isBefore(DateUtils.dateOnly(start)) &&
+          (end == null || !target.isAfter(DateUtils.dateOnly(end)));
+      if (inRange) return cycle;
     }
     return null;
   }
@@ -810,11 +810,13 @@ class _HorizontalCycleCalendarState extends State<_HorizontalCycleCalendar> {
 
   bool _isPeriodDay(DateTime day) {
     final target = DateUtils.dateOnly(day);
+    final today = DateUtils.dateOnly(DateTime.now());
     return widget.cycles.any((cycle) {
       final start = DateTime.tryParse(cycle['start_date'].toString());
       if (start == null) return false;
+      // 无结束日期（进行中）：标记到今天为止。
       final end =
-          DateTime.tryParse(cycle['end_date']?.toString() ?? '') ?? start;
+          DateTime.tryParse(cycle['end_date']?.toString() ?? '') ?? today;
       return !target.isBefore(DateUtils.dateOnly(start)) &&
           !target.isAfter(DateUtils.dateOnly(end));
     });

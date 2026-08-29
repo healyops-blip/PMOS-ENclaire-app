@@ -34,6 +34,7 @@ from pomi_backend.repositories import (
 from pomi_backend.schemas.ocr_recognize import OCRResultConfirmRequest
 from pomi_backend.services.lab_rules import (
     FieldIssue,
+    looks_like_lab_metric,
     normalize_lab_item,
     p0_evaluation,
     parse_number,
@@ -407,6 +408,16 @@ class OCRTaskService:
                     )
                 )
             identifier = standard_drug_id(item.drug_name.strip())
+            # OCR 常把化验单里的检验项目误放进用药建议。名字明显是化验指标的，
+            # 不写进正式用药，让用户从确认列表里移除。
+            if identifier is None and looks_like_lab_metric(item.drug_name):
+                issues.append(
+                    FieldIssue(
+                        f"medication_suggestions.{index}.drug_name",
+                        "MEDICATION_LOOKS_LIKE_LAB_METRIC",
+                        f"「{item.drug_name.strip()}」看起来是化验项目而不是药品，请从用药清单中移除。",
+                    )
+                )
             # 未映射药名不再硬阻塞入库：标准词库未收录的药品（如地屈孕酮、肌醇等）
             # 仍可确认，仅保留 standard_drug_id=None 供后续人工复核。
             dosage_value, dosage_unit = _dosage_parts(item.dosage)

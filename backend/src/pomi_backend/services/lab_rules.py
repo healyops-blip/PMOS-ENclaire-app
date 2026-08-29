@@ -108,6 +108,54 @@ METRICS = (
 )
 
 METRIC_BY_ALIAS = {alias: spec for spec in METRICS for alias in spec.aliases}
+
+# 化验/检验项目名里高度专属的词，用于识别「被 OCR 误当成药品」的化验指标。
+# 只收会明确出现在检验单、几乎不会出现在药名里的词，避免误伤真实药物。
+_LAB_METRIC_HINTS = (
+    "计数",
+    "转氨酶",
+    "转肽酶",
+    "脱氢酶",
+    "磷酸酶",
+    "淀粉酶",
+    "肌酸激酶",
+    "血红蛋白",
+    "血小板",
+    "白细胞",
+    "红细胞",
+    "中性粒",
+    "淋巴细胞",
+    "单核细胞",
+    "嗜酸性",
+    "嗜碱性",
+    "网织红",
+    "红细胞压积",
+    "血细胞比容",
+    "脂蛋白",
+    "胆固醇",
+    "甘油三酯",
+    "尿酸",
+    "肌酐",
+    "尿素氮",
+    "胆红素",
+    "c反应蛋白",
+    "空腹血糖",
+    "餐后血糖",
+    "随机血糖",
+    "糖化血红蛋白",
+    "同型半胱氨酸",
+    "d-二聚体",
+)
+
+
+def looks_like_lab_metric(name: str | None) -> bool:
+    """名称是否明显是化验/检验项目而非药品。"""
+    if not name:
+        return False
+    text = unicodedata.normalize("NFKC", name).casefold()
+    return any(hint in text for hint in _LAB_METRIC_HINTS)
+
+
 UNIT_ALIASES = {
     "mmol/l": "mmol/L",
     "mg/dl": "mg/dL",
