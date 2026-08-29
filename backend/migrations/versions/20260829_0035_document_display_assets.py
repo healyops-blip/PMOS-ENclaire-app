@@ -1,7 +1,7 @@
 """add private document display derivatives
 
-Revision ID: 20260829_0034
-Revises: 20260828_0033
+Revision ID: 20260829_0035
+Revises: 20260829_0034
 """
 
 from collections.abc import Sequence
@@ -9,8 +9,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "20260829_0034"
-down_revision: str | None = "20260828_0033"
+revision: str = "20260829_0035"
+down_revision: str | None = "20260829_0034"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
