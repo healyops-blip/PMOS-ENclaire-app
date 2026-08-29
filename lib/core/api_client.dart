@@ -231,6 +231,10 @@ class ApiClient {
     'VALIDATION_ERROR' => '账号或密码格式不符合要求，请检查后重试',
     'AUTH_RATE_LIMITED' when retryAfter != null => '请求过于频繁，请在 $retryAfter 秒后重试',
     'AUTH_RATE_LIMITED' => '请求过于频繁，请稍后重试',
+    'CYCLE_DATE_ORDER_INVALID' => '经期开始日期不能晚于结束日期',
+    'CYCLE_DATE_OVERLAP' => '该日期与已有经期记录重叠，请先结束或修改已有记录',
+    'CYCLE_VERSION_CONFLICT' => '经期记录已在其他设备更新，请刷新后重试',
+    'CYCLE_NOT_FOUND' => '经期记录不存在，可能已被删除',
     _ => '请求失败，请稍后重试',
   };
 }

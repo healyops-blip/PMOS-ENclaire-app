@@ -187,6 +187,12 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
           );
       ref.invalidate(trackingProvider);
       if (mounted) setState(() => _cycleEditorExpanded = false);
+    } on ApiFailure catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
     } finally {
       if (mounted) setState(() => _savingCycle = false);
     }
@@ -285,21 +291,29 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                             );
                             return;
                           }
-                          await ref
-                              .read(apiClientProvider)
-                              .post(
-                                '/api/cycles',
-                                data: {
-                                  'start_date': start
-                                      .toIso8601String()
-                                      .substring(0, 10),
-                                  'end_date': end?.toIso8601String().substring(
-                                    0,
-                                    10,
-                                  ),
-                                  'flow_level': flow,
-                                },
+                          try {
+                            await ref
+                                .read(apiClientProvider)
+                                .post(
+                                  '/api/cycles',
+                                  data: {
+                                    'start_date': start
+                                        .toIso8601String()
+                                        .substring(0, 10),
+                                    'end_date': end
+                                        ?.toIso8601String()
+                                        .substring(0, 10),
+                                    'flow_level': flow,
+                                  },
+                                );
+                          } on ApiFailure catch (error) {
+                            if (sheetContext.mounted) {
+                              ScaffoldMessenger.of(sheetContext).showSnackBar(
+                                SnackBar(content: Text(error.message)),
                               );
+                            }
+                            return;
+                          }
                           if (sheetContext.mounted) {
                             Navigator.pop(sheetContext, true);
                           }
