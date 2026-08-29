@@ -57,7 +57,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
               await ref.read(trackingProvider.future);
             },
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 28),
               children: [
                 _HorizontalCycleCalendar(
                   selectedDay: _focusedDay,
@@ -586,18 +586,30 @@ class _HorizontalCycleCalendar extends StatefulWidget {
 }
 
 class _HorizontalCycleCalendarState extends State<_HorizontalCycleCalendar> {
-  late final ScrollController _controller;
+  final ScrollController _controller = ScrollController();
 
-  @override
-  void initState() {
-    super.initState();
-    _controller = ScrollController(initialScrollOffset: 620);
-  }
+  // 每个日期格宽 48 + 间隔 7。
+  static const double _itemExtent = 55;
+  DateTime? _centeredOn;
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  /// 把选中日滚到可视区中间（首帧 + 选中日变化时各做一次，不干扰手动滑动）。
+  void _centerSelected(DateTime start, DateTime selected) {
+    if (_centeredOn == selected || !_controller.hasClients) return;
+    final index = selected.difference(start).inDays;
+    if (index < 0) return;
+    final viewport = _controller.position.viewportDimension;
+    final target = (index * _itemExtent + _itemExtent / 2 - viewport / 2).clamp(
+      0.0,
+      _controller.position.maxScrollExtent,
+    );
+    _centeredOn = selected;
+    _controller.jumpTo(target);
   }
 
   @override
@@ -611,6 +623,9 @@ class _HorizontalCycleCalendarState extends State<_HorizontalCycleCalendar> {
       (index) => start.add(Duration(days: index)),
     );
     final weekday = const ['一', '二', '三', '四', '五', '六', '日'];
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _centerSelected(start, selected),
+    );
 
     return PomiGlassCard(
       borderRadius: 24,
@@ -629,7 +644,7 @@ class _HorizontalCycleCalendarState extends State<_HorizontalCycleCalendar> {
                     style: const TextStyle(
                       color: pomiInk,
                       fontSize: 18,
-                      height: 28 / 20,
+                      height: 26 / 18,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -748,17 +763,20 @@ class _HorizontalCalendarDay extends StatelessWidget {
             AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               width: 48,
-              height: selected ? 76 : 68,
+              height: 72,
               decoration: BoxDecoration(
                 color:
                     selected
                         ? pomiPurple.withValues(alpha: .13)
                         : const Color(0xFFF1EFF5),
                 borderRadius: BorderRadius.circular(26),
-                border:
-                    selected
-                        ? Border.all(color: pomiPurple.withValues(alpha: .22))
-                        : null,
+                border: Border.all(
+                  color:
+                      selected
+                          ? pomiPurple.withValues(alpha: .35)
+                          : Colors.transparent,
+                  width: 1.5,
+                ),
               ),
               child: Stack(
                 alignment: Alignment.center,

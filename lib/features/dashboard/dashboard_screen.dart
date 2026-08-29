@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
@@ -583,27 +584,20 @@ class MedicationManagementScreen extends ConsumerWidget {
               items
                   .where((item) => item['current_status'] != 'active')
                   .toList();
-          final reminders =
-              active
-                  .map(
-                    (item) => _MedicationReminder(
-                      name: _shortMedicationName(
-                        medicationDisplayName(
-                          item['drug_name'],
-                          standardDrugId: item['standard_drug_id'],
-                        ),
-                      ),
-                      time:
-                          item['scheduled_time']
-                                      ?.toString()
-                                      .trim()
-                                      .isNotEmpty ==
-                                  true
-                              ? item['scheduled_time'].toString()
-                              : '未设置',
-                    ),
-                  )
-                  .toList();
+          final reminders = [
+            for (final item in active)
+              _MedicationReminder(
+                medicationId: item['id']?.toString() ?? '',
+                name: _shortMedicationName(
+                  medicationDisplayName(
+                    item['drug_name'],
+                    standardDrugId: item['standard_drug_id'],
+                  ),
+                ),
+                doseCount: _dosesPerDay(item['frequency']?.toString()),
+                frequencyLabel: item['frequency']?.toString(),
+              ),
+          ];
           final monthlyStatus = ref
               .watch(monthlyMedicationStatusProvider)
               .maybeWhen(
@@ -887,10 +881,139 @@ class _MedicationPageHeading extends StatelessWidget {
 }
 
 class _MedicationReminder {
-  const _MedicationReminder({required this.name, required this.time});
+  const _MedicationReminder({
+    required this.medicationId,
+    required this.name,
+    required this.doseCount,
+    this.frequencyLabel,
+  });
 
+  final String medicationId;
   final String name;
-  final String time;
+
+  /// 每天服用次数（由 frequency 解析，1–4）。
+  final int doseCount;
+  final String? frequencyLabel;
+}
+
+/// 由「每日两次」「每天3次」「BID/TID」等 frequency 文案推断每天服用次数。
+int _dosesPerDay(String? frequency) {
+  final raw = (frequency ?? '').toLowerCase().trim();
+  if (raw.isEmpty) return 1;
+  if (raw.contains('qid') || raw.contains('每日四') || raw.contains('每天四')) {
+    return 4;
+  }
+  if (raw.contains('tid') ||
+      raw.contains('三次') ||
+      raw.contains('3次') ||
+      raw.contains('每日三') ||
+      raw.contains('每天三') ||
+      raw.contains('每8小时') ||
+      raw.contains('每八小时')) {
+    return 3;
+  }
+  if (raw.contains('bid') ||
+      raw.contains('两次') ||
+      raw.contains('二次') ||
+      raw.contains('2次') ||
+      raw.contains('每日两') ||
+      raw.contains('每天两') ||
+      raw.contains('每12小时') ||
+      raw.contains('早晚')) {
+    return 2;
+  }
+  final match = RegExp(r'(\d+)\s*次').firstMatch(raw);
+  if (match != null) {
+    final n = int.tryParse(match.group(1)!) ?? 1;
+    return n.clamp(1, 4);
+  }
+  return 1;
+}
+
+/// 每天 N 次的默认提醒时间。
+List<TimeOfDay> _defaultReminderTimes(int count) => switch (count) {
+  >= 4 => const [
+    TimeOfDay(hour: 8, minute: 0),
+    TimeOfDay(hour: 12, minute: 0),
+    TimeOfDay(hour: 16, minute: 0),
+    TimeOfDay(hour: 20, minute: 0),
+  ],
+  3 => const [
+    TimeOfDay(hour: 8, minute: 0),
+    TimeOfDay(hour: 13, minute: 0),
+    TimeOfDay(hour: 19, minute: 0),
+  ],
+  2 => const [TimeOfDay(hour: 8, minute: 0), TimeOfDay(hour: 20, minute: 0)],
+  _ => const [TimeOfDay(hour: 8, minute: 0)],
+};
+
+String _formatTimeOfDay(TimeOfDay t) =>
+    '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+/// 用药提醒的本地设置（后端无对应字段），按 medication_id + slot 序号存
+/// SharedPreferences：`pomi_med_reminder_<id>_<i>` = "HH:mm" 或 "off"。
+class _MedicationReminderStore {
+  static String _key(String id, int slot) => 'pomi_med_reminder_${id}_$slot';
+
+  static Future<List<_ReminderSlot>> load(
+    String medicationId,
+    int doseCount,
+  ) async {
+    final defaults = _defaultReminderTimes(doseCount);
+    final fallback = [
+      for (final t in defaults) _ReminderSlot(time: t, enabled: true),
+    ];
+    if (medicationId.isEmpty) return fallback;
+    final SharedPreferences prefs;
+    try {
+      prefs = await SharedPreferences.getInstance();
+    } catch (_) {
+      return fallback;
+    }
+    return [
+      for (var i = 0; i < defaults.length; i++)
+        () {
+          final stored = prefs.getString(_key(medicationId, i));
+          if (stored == 'off') {
+            return _ReminderSlot(time: defaults[i], enabled: false);
+          }
+          final parts = stored?.split(':');
+          if (parts != null && parts.length == 2) {
+            final h = int.tryParse(parts[0]);
+            final m = int.tryParse(parts[1]);
+            if (h != null && m != null) {
+              return _ReminderSlot(
+                time: TimeOfDay(hour: h, minute: m),
+                enabled: true,
+              );
+            }
+          }
+          return _ReminderSlot(time: defaults[i], enabled: true);
+        }(),
+    ];
+  }
+
+  static Future<void> save(
+    String medicationId,
+    int slot,
+    _ReminderSlot value,
+  ) async {
+    if (medicationId.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _key(medicationId, slot),
+      value.enabled ? _formatTimeOfDay(value.time) : 'off',
+    );
+  }
+}
+
+class _ReminderSlot {
+  const _ReminderSlot({required this.time, required this.enabled});
+  final TimeOfDay time;
+  final bool enabled;
+
+  _ReminderSlot copyWith({TimeOfDay? time, bool? enabled}) =>
+      _ReminderSlot(time: time ?? this.time, enabled: enabled ?? this.enabled);
 }
 
 class _ReminderCard extends StatefulWidget {
@@ -903,10 +1026,43 @@ class _ReminderCard extends StatefulWidget {
 }
 
 class _ReminderCardState extends State<_ReminderCard> {
-  late final List<bool> _enabled = List<bool>.filled(
-    widget.reminders.length,
-    true,
-  );
+  /// medicationId -> 各次的提醒设置。
+  final Map<String, List<_ReminderSlot>> _slots = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAll();
+  }
+
+  Future<void> _loadAll() async {
+    for (final reminder in widget.reminders) {
+      final slots = await _MedicationReminderStore.load(
+        reminder.medicationId,
+        reminder.doseCount,
+      );
+      if (!mounted) return;
+      setState(() => _slots[reminder.medicationId] = slots);
+    }
+  }
+
+  Future<void> _updateSlot(
+    _MedicationReminder reminder,
+    int index,
+    _ReminderSlot value,
+  ) async {
+    setState(() {
+      final list = List<_ReminderSlot>.from(
+        _slots[reminder.medicationId] ??
+            _defaultReminderTimes(
+              reminder.doseCount,
+            ).map((t) => _ReminderSlot(time: t, enabled: true)),
+      );
+      list[index] = value;
+      _slots[reminder.medicationId] = list;
+    });
+    await _MedicationReminderStore.save(reminder.medicationId, index, value);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -916,10 +1072,16 @@ class _ReminderCardState extends State<_ReminderCard> {
       child: Column(
         children: [
           for (var index = 0; index < widget.reminders.length; index++) ...[
-            _ReminderRow(
+            _MedicationReminderTile(
               reminder: widget.reminders[index],
-              enabled: _enabled[index],
-              onChanged: (value) => setState(() => _enabled[index] = value),
+              slots:
+                  _slots[widget.reminders[index].medicationId] ??
+                  _defaultReminderTimes(
+                    widget.reminders[index].doseCount,
+                  ).map((t) => _ReminderSlot(time: t, enabled: true)).toList(),
+              onSlotChanged:
+                  (slotIndex, value) =>
+                      _updateSlot(widget.reminders[index], slotIndex, value),
             ),
             if (index != widget.reminders.length - 1)
               const Divider(height: 1, color: pomiLine),
@@ -930,85 +1092,130 @@ class _ReminderCardState extends State<_ReminderCard> {
   }
 }
 
-class _ReminderRow extends StatelessWidget {
-  const _ReminderRow({
+class _MedicationReminderTile extends StatelessWidget {
+  const _MedicationReminderTile({
     required this.reminder,
-    required this.enabled,
-    required this.onChanged,
+    required this.slots,
+    required this.onSlotChanged,
   });
 
   final _MedicationReminder reminder;
-  final bool enabled;
-  final ValueChanged<bool> onChanged;
+  final List<_ReminderSlot> slots;
+  final void Function(int index, _ReminderSlot value) onSlotChanged;
 
   @override
   Widget build(BuildContext context) {
+    final freqText =
+        reminder.doseCount > 1
+            ? '每日 ${reminder.doseCount} 次'
+            : (reminder.frequencyLabel?.trim().isNotEmpty == true
+                ? reminder.frequencyLabel!.trim()
+                : '每日提醒');
     return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  reminder.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 2),
-                Text('每日提醒', style: Theme.of(context).textTheme.bodySmall),
-              ],
-            ),
+          Text(
+            reminder.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleMedium,
           ),
-          Container(
-            height: 44,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: .34),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: pomiPurple.withValues(alpha: .20)),
+          const SizedBox(height: 2),
+          Text(freqText, style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(height: 10),
+          for (var i = 0; i < slots.length; i++)
+            Padding(
+              padding: EdgeInsets.only(bottom: i == slots.length - 1 ? 0 : 8),
+              child: _ReminderRow(
+                slot: slots[i],
+                label: slots.length > 1 ? '第 ${i + 1} 次' : null,
+                onTimeTap: () async {
+                  final picked = await showTimePicker(
+                    context: context,
+                    initialTime: slots[i].time,
+                  );
+                  if (picked != null) {
+                    onSlotChanged(i, slots[i].copyWith(time: picked));
+                  }
+                },
+                onEnabledChanged:
+                    (v) => onSlotChanged(i, slots[i].copyWith(enabled: v)),
+              ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  reminder.time,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: pomiPurple,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                const Icon(Icons.schedule, color: pomiInk, size: 19),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Switch(
-            value: enabled,
-            onChanged: onChanged,
-            activeTrackColor: pomiMint,
-            activeThumbColor: Colors.white,
-          ),
-          const SizedBox(width: 4),
-          IconButton(
-            tooltip: '提醒设置',
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('提醒时间设置将在通知服务接通后可用')),
-              );
-            },
-            style: IconButton.styleFrom(
-              backgroundColor: pomiLavender.withValues(alpha: .85),
-              foregroundColor: pomiPurple,
-              minimumSize: const Size(42, 42),
-            ),
-            icon: const Icon(Icons.settings_outlined, size: 21),
-          ),
         ],
       ),
+    );
+  }
+}
+
+class _ReminderRow extends StatelessWidget {
+  const _ReminderRow({
+    required this.slot,
+    required this.onTimeTap,
+    required this.onEnabledChanged,
+    this.label,
+  });
+
+  final _ReminderSlot slot;
+  final String? label;
+  final VoidCallback onTimeTap;
+  final ValueChanged<bool> onEnabledChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        if (label != null)
+          Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: Text(label!, style: Theme.of(context).textTheme.bodySmall),
+          ),
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: InkWell(
+              onTap: onTimeTap,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                height: 40,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: .34),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: pomiPurple.withValues(alpha: .20)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _formatTimeOfDay(slot.time),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: slot.enabled ? pomiPurple : pomiSecondaryText,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.schedule,
+                      color: slot.enabled ? pomiInk : pomiSecondaryText,
+                      size: 18,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Switch(
+          value: slot.enabled,
+          onChanged: onEnabledChanged,
+          activeTrackColor: pomiMint,
+          activeThumbColor: Colors.white,
+        ),
+      ],
     );
   }
 }
@@ -1058,6 +1265,9 @@ Future<void> _showMonthlyMedicationDetails(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
+    constraints: BoxConstraints(
+      maxHeight: MediaQuery.sizeOf(context).height * 0.88,
+    ),
     builder:
         (_) => _MonthlyMedicationDetailsSheet(
           medicationName: summary.name,
@@ -1308,7 +1518,10 @@ class _DateListSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final labels = dates.map((date) => '${int.parse(date.substring(8, 10))}日');
+    final labels = dates.map(
+      (date) =>
+          '${int.parse(date.substring(5, 7))}月${int.parse(date.substring(8, 10))}日',
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
