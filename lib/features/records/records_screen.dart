@@ -369,7 +369,9 @@ class _DatasetDocumentCard extends StatelessWidget {
         'outpatient_record' => VisitRecordCategory.outpatient,
         _ => VisitRecordCategory.outpatient,
       },
-      trailing: type == 'lab_report' ? '采样 $date' : date,
+      // The visit date is already shown in the card header. Keep only the
+      // clinically distinct sampling date for lab reports.
+      trailing: type == 'lab_report' ? '采样 $date' : null,
     );
     return PomiGlassCard(
       key: ValueKey('dataset-document-${document['id']}'),
