@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -285,108 +286,135 @@ class _VisitRecordCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PomiGlassCard(
-      key: ValueKey('visit-record-${visit.id}'),
-      onTap:
-          () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (context) => VisitRecordDetailScreen(visit: visit),
-            ),
-          ),
-      borderRadius: 20,
-      backgroundOpacity: .36,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        PomiGlassCard(
+          key: ValueKey('visit-record-${visit.id}'),
+          onTap:
+              () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (context) => VisitRecordDetailScreen(visit: visit),
+                ),
+              ),
+          borderRadius: 20,
+          backgroundOpacity: .36,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            visit.date,
-                            style: Theme.of(context).textTheme.titleLarge,
+                          Row(
+                            children: [
+                              Text(
+                                visit.date,
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: _VisitStatusBadge(
+                                  text: visit.verificationLabel,
+                                  tone: visit.verificationState,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: _VisitStatusBadge(
-                              text: visit.verificationLabel,
-                              tone: visit.verificationState,
+                          const SizedBox(height: 3),
+                          _VisitMetadataFields(visit: visit),
+                          if (visit.historyNote != null) ...[
+                            const SizedBox(height: 5),
+                            Text(
+                              '超过 6 个月 · 仅供参考',
+                              style: Theme.of(
+                                context,
+                              ).textTheme.labelSmall?.copyWith(
+                                color: const Color(0xFF9B6818),
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 3),
+                          const Align(
+                            alignment: Alignment.center,
+                            child: Text(
+                              '区块链技术支持',
+                              style: TextStyle(
+                                color: pomiPurple,
+                                fontSize: 10,
+                                height: 14 / 10,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 3),
-                      _VisitMetadataFields(visit: visit),
-                      if (visit.historyNote != null) ...[
-                        const SizedBox(height: 5),
+                    ),
+                    const SizedBox(width: 8),
+                    const Column(
+                      children: [
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: pomiSecondaryText,
+                        ),
+                        SizedBox(height: 2),
                         Text(
-                          '超过 6 个月 · 仅供参考',
-                          style: Theme.of(
-                            context,
-                          ).textTheme.labelSmall?.copyWith(
-                            color: const Color(0xFF9B6818),
-                            fontWeight: FontWeight.w700,
+                          '详情',
+                          style: TextStyle(
+                            color: pomiSecondaryText,
+                            fontSize: 10,
+                            height: 14 / 10,
                           ),
                         ),
                       ],
-                      const SizedBox(height: 3),
-                      const Align(
-                        alignment: Alignment.center,
-                        child: Text(
-                          '区块链技术支持',
-                          style: TextStyle(
-                            color: pomiPurple,
-                            fontSize: 10,
-                            height: 14 / 10,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Column(
-                  children: [
-                    Icon(Icons.chevron_right_rounded, color: pomiSecondaryText),
-                    SizedBox(height: 2),
-                    Text(
-                      '详情',
-                      style: TextStyle(
-                        color: pomiSecondaryText,
-                        fontSize: 10,
-                        height: 14 / 10,
-                      ),
                     ),
                   ],
                 ),
-              ],
+              ),
+              const Divider(height: 1, color: pomiLine),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                child: Column(
+                  children: [
+                    for (
+                      var index = 0;
+                      index < visit.summaryItems.length;
+                      index++
+                    ) ...[
+                      _VisitRecordRow(row: visit.summaryItems[index]),
+                      if (index != visit.summaryItems.length - 1)
+                        const SizedBox(height: 10),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        Positioned(
+          right: 8,
+          top: 8,
+          child: IgnorePointer(
+            child: Opacity(
+              opacity: .58,
+              child: Transform.rotate(
+                angle: -math.pi / 12,
+                child: Image.asset(
+                  'assets/images/pomi_verified_stamp.png',
+                  key: ValueKey('pomi-verified-stamp-${visit.id}'),
+                  width: 62,
+                  height: 62,
+                  filterQuality: FilterQuality.high,
+                ),
+              ),
             ),
           ),
-          const Divider(height: 1, color: pomiLine),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-            child: Column(
-              children: [
-                for (
-                  var index = 0;
-                  index < visit.summaryItems.length;
-                  index++
-                ) ...[
-                  _VisitRecordRow(row: visit.summaryItems[index]),
-                  if (index != visit.summaryItems.length - 1)
-                    const SizedBox(height: 10),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
