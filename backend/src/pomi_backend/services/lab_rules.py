@@ -229,8 +229,10 @@ def normalize_lab_item(
     raw_value = str(item.get("value") or "").strip()
     numeric = parse_number(item.get("value"))
     if not raw_value:
-        issues.append(FieldIssue(f"{prefix}.value", "LAB_VALUE_REQUIRED", "数值不能为空。"))
-    elif numeric is None:
+        # 数值缺失：项目无记录价值，跳过该条但不让整体确认失败；
+        # 若项目名也缺失（issues 非空）则仍然报错。
+        return None, issues
+    if numeric is None:
         issues.append(FieldIssue(f"{prefix}.value", "LAB_VALUE_INVALID", "数值格式无法解析。"))
     elif abs(numeric) > MAX_NUMERIC_ABS:
         issues.append(
@@ -243,7 +245,9 @@ def normalize_lab_item(
     raw_unit = str(item.get("unit") or "").strip()
     unit = normalize_unit(item.get("unit"))
     if not raw_unit:
-        issues.append(FieldIssue(f"{prefix}.unit", "LAB_UNIT_REQUIRED", "单位不能为空。"))
+        # 单位缺失：允许入库，保留空串，由前端展示为「—」。
+        raw_unit = ""
+        unit = None
     elif unit is None:
         issues.append(FieldIssue(f"{prefix}.unit", "LAB_UNIT_UNSUPPORTED", "单位不在允许范围内。"))
     elif len(raw_unit) > 40:
@@ -309,8 +313,7 @@ def normalize_lab_item(
 
     if issues:
         return None, issues
-    assert numeric is not None and unit is not None
-    converted = numeric * factor
+    converted = numeric * factor if numeric is not None else None
     priority = ("sample_date", "exam_date", "report_date", "visit_date")
     trend_source = next((field for field in priority if parsed_dates[field] is not None), None)
     return (

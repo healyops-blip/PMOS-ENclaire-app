@@ -30,6 +30,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     'lab': '化验 / 检测',
     'medical_order': '医嘱 / 处方',
     'imaging': '影像文字报告',
+    'outpatient': '门诊病历',
   };
 
   Future<void> _pickFile() async {
@@ -112,6 +113,10 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       if (resultId == null) {
         throw const FormatException('识别结果缺少确认所需的版本信息，请重新识别');
       }
+      final taskId = result['ocr_task_id']?.toString();
+      final revisionId = result['document_revision_id']?.toString();
+      final materialType =
+          result['material_type']?.toString() ?? _wireMaterialType;
       final draft = Map<String, dynamic>.from(result)
         ..removeWhere((key, _) => _ocrMetadataKeys.contains(key));
       final confirmed = await Navigator.of(context).push<bool>(
@@ -119,6 +124,9 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
           builder:
               (_) => OcrConfirmScreen(
                 resultId: resultId,
+                taskId: taskId,
+                revisionId: revisionId,
+                materialType: materialType,
                 resultSource: result['result_source']?.toString() ?? 'qwen3-vl',
                 draft: draft,
               ),
@@ -150,6 +158,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     'lab' => 'lab_report',
     'medical_order' => 'medical_order',
     'imaging' => 'imaging_text_report',
+    'outpatient' => 'outpatient_record',
     _ => 'imaging_text_report',
   };
 
@@ -288,6 +297,7 @@ const _ocrMetadataKeys = {
   'document_revision_id',
   'material_type',
   'result_source',
+  'evidence',
 };
 
 class OcrConfirmScreen extends ConsumerStatefulWidget {
@@ -295,12 +305,18 @@ class OcrConfirmScreen extends ConsumerStatefulWidget {
     required this.resultId,
     required this.resultSource,
     required this.draft,
+    this.taskId,
+    this.revisionId,
+    this.materialType = 'lab_report',
     super.key,
   });
 
   final String resultId;
   final String resultSource;
   final Map<String, dynamic> draft;
+  final String? taskId;
+  final String? revisionId;
+  final String materialType;
 
   @override
   ConsumerState<OcrConfirmScreen> createState() => _OcrConfirmScreenState();
@@ -321,12 +337,21 @@ class _OcrConfirmScreenState extends ConsumerState<OcrConfirmScreen> {
   Future<void> _confirm() async {
     setState(() => _saving = true);
     try {
-      await ref
-          .read(apiClientProvider)
-          .post(
-            '/api/ocr/results/${widget.resultId}/confirm',
-            data: buildOcrConfirmationPayload(_draft),
-          );
+      final api = ref.read(apiClientProvider);
+      final materialType = widget.materialType;
+      final endpoint =
+          materialType == 'imaging_text_report' ||
+              materialType == 'outpatient_record'
+          ? '/api/ocr/tasks/${widget.taskId}/confirm'
+          : '/api/ocr/results/${widget.resultId}/confirm';
+      final payload = buildOcrConfirmationPayload(
+        _draft,
+        materialType: materialType,
+        taskId: widget.taskId,
+        revisionId: widget.revisionId,
+        resultId: widget.resultId,
+      );
+      await api.post(endpoint, data: payload);
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
       if (mounted) {
@@ -528,13 +553,65 @@ class _JsonFields extends StatelessWidget {
       const {'医嘱原文', '检查所见', '检查结论', '主诉', '诊断摘要', '处理意见', '医嘱'}.contains(name);
 }
 
-Map<String, dynamic> buildOcrConfirmationPayload(Map<String, dynamic> draft) {
+/// 按材料类型构造「确认并入库」请求体。
+///
+/// - lab_report：走 /api/ocr/results/{result_id}/confirm（OCRResultConfirmRequest，
+///   examinations/medication_suggestions 扁平结构，front-end 只编辑名称/值/单位/参考范围）。
+/// - medical_order：走 /api/ocr/results/{result_id}/confirm，但 draft 中药品在
+///   medication_suggestions 列表里，dosage 等字段一并透传。
+/// - imaging_text_report / outpatient_record：走 /api/ocr/tasks/{task_id}/confirm
+///   （ClinicalTextConfirmRequest：document_type + confirmed_data + field_confirmations）。
+Map<String, dynamic> buildOcrConfirmationPayload(
+  Map<String, dynamic> draft, {
+  String materialType = 'lab_report',
+  String? taskId,
+  String? revisionId,
+  String? resultId,
+}) {
   final examinations = (draft['examinations'] as List? ?? const [])
       .whereType<Map>()
       .toList(growable: false);
   final medications = (draft['medication_suggestions'] as List? ?? const [])
       .whereType<Map>()
       .toList(growable: false);
+
+  // 影像文字报告 / 门诊病历：临床文本确认契约。
+  if (materialType == 'imaging_text_report' ||
+      materialType == 'outpatient_record') {
+    final confirmedData = <String, dynamic>{
+      for (final key in const [
+        'examination_name',
+        'body_part',
+        'examination_method',
+        'findings_text',
+        'conclusion_text',
+        'examined_at',
+        'reported_at',
+        'hospital_name',
+        'department_name',
+        'doctor_name',
+        'visit_date',
+        'chief_complaint',
+        'diagnosis_summary',
+        'treatment_plan',
+        'medical_advice',
+      ])
+        if (draft[key] != null) key: draft[key],
+      // 识别响应顶层统一用 hospital/department，schema 用 *_name。
+      if (draft['hospital'] != null) 'hospital_name': draft['hospital'],
+      if (draft['department'] != null) 'department_name': draft['department'],
+    };
+    return {
+      'result_id': resultId,
+      'expected_revision_id': revisionId,
+      'document_type': materialType,
+      'confirmed_data': confirmedData,
+      'field_confirmations': <Map<String, dynamic>>[],
+      'confirm_all': true,
+    };
+  }
+
+  // 化验 / 医嘱：扁平确认契约。
   return {
     'visit_date': draft['visit_date'],
     'examinations': [

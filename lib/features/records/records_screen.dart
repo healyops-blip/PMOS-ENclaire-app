@@ -17,7 +17,33 @@ final recordsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((
     ref.read(apiClientProvider).get('/api/documents'),
     ref.read(apiClientProvider).get('/api/reports'),
   ]);
-  return {'documents': values[0], 'reports': values[1]};
+  final documentPage = Map<String, dynamic>.from(values[0] as Map);
+  final items = List<Map<String, dynamic>>.from(
+    (documentPage['items'] as List? ?? const []).map(
+      (item) => Map<String, dynamic>.from(item as Map),
+    ),
+  );
+  final documents = await Future.wait(
+    items.map((item) async {
+      final id = item['document_id']?.toString();
+      if (id == null) return item;
+      try {
+        final detail = await ref.read(apiClientProvider).get('/api/documents/$id');
+        return {...item, ...Map<String, dynamic>.from(detail as Map)};
+      } catch (_) {
+        return item;
+      }
+    }),
+  );
+  return {'documents': documents, 'reports': values[1]};
+});
+
+final labObservationsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  final value = await ref.read(apiClientProvider).get('/api/lab-observations');
+  final page = Map<String, dynamic>.from(value as Map);
+  return List<Map<String, dynamic>>.from(
+    (page['items'] as List? ?? const []).map((item) => Map<String, dynamic>.from(item as Map)),
+  );
 });
 
 final reportDetailProvider = FutureProvider.autoDispose
@@ -37,20 +63,13 @@ class RecordsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(recordsProvider);
+    final labsState = ref.watch(labObservationsProvider);
     return Scaffold(
       appBar: null,
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stack) => Center(child: Text(error.toString())),
         data: (data) {
-          final documentPage = Map<String, dynamic>.from(
-            data['documents'] as Map,
-          );
-          final documents = List<Map<String, dynamic>>.from(
-            (documentPage['items'] as List).map(
-              (item) => Map<String, dynamic>.from(item as Map),
-            ),
-          );
           final reportPage = Map<String, dynamic>.from(data['reports'] as Map);
           final reports = List<Map<String, dynamic>>.from(
             (reportPage['items'] as List).map(
@@ -66,8 +85,18 @@ class RecordsScreen extends ConsumerWidget {
             }
             return _ReportsList(reports: reports);
           }
-          if (smokeMode) return const VisitRecordsPage();
-          return _DocumentsList(documents: documents);
+          // The production records entry intentionally uses only the Smoke
+          // visit timeline and detail presentation. The old document-list UI
+          // is not part of this product surface.
+          return VisitRecordsPage(
+            labs: labsState.maybeWhen(data: (value) => value, orElse: () => const []),
+            onRecordsChanged: () => ref.invalidate(recordsProvider),
+            documents: List<Map<String, dynamic>>.from(
+              (data['documents'] as List? ?? const []).map(
+                (item) => Map<String, dynamic>.from(item as Map),
+              ),
+            ),
+          );
         },
       ),
     );
@@ -91,9 +120,201 @@ class _ApiReportViewer extends ConsumerWidget {
 }
 
 class VisitRecordsPage extends StatelessWidget {
-  const VisitRecordsPage({super.key});
+  const VisitRecordsPage({
+    this.documents = const [],
+    this.labs = const [],
+    this.onRecordsChanged,
+    super.key,
+  });
 
-  static const visits = smokeVisitRecordDetails;
+  final List<Map<String, dynamic>> documents;
+  final List<Map<String, dynamic>> labs;
+  final VoidCallback? onRecordsChanged;
+
+  List<VisitRecordDetailData> get visits => documents.isEmpty
+      ? (smokeMode ? smokeVisitRecordDetails : const [])
+      : documents.map((document) => _documentToVisit(document, labs)).toList();
+
+  static VisitRecordDetailData _documentToVisit(
+    Map<String, dynamic> document,
+    List<Map<String, dynamic>> observations,
+  ) {
+    final type = document['document_type']?.toString() ?? '医疗资料';
+    final name = document['original_file_name']?.toString() ?? type;
+    final date = document['uploaded_at']?.toString().split('T').first ?? '最新上传';
+    final documentId = document['document_id']?.toString();
+    final labs = observations
+        .where((item) => item['document_id']?.toString() == documentId)
+        .map(
+          (item) => VisitLabResult(
+            name: item['original_item_name']?.toString() ?? '检查项目',
+            value: item['raw_value']?.toString() ?? item['numeric_value']?.toString() ?? '—',
+            unit: item['standard_unit']?.toString() ?? item['original_unit']?.toString() ?? '',
+            reference: item['reference_range_raw']?.toString() ?? '—',
+            status: switch (item['abnormal_status']?.toString()) {
+              'high' => VisitLabStatus.high,
+              'low' => VisitLabStatus.low,
+              _ => VisitLabStatus.normal,
+            },
+          ),
+        )
+        .toList();
+
+    // 影像文字报告：检查所见/结论/部位/检查方式等专属字段。
+    if (type == 'imaging_text_report') {
+      final findings = document['findings_text']?.toString();
+      final conclusion = document['conclusion_text']?.toString();
+      final fields = <VisitClinicalField>[
+        if (_nonEmpty(document['examination_name']))
+          VisitClinicalField(label: '检查名称', value: document['examination_name']!),
+        if (_nonEmpty(document['body_part']))
+          VisitClinicalField(label: '检查部位', value: document['body_part']!),
+        if (_nonEmpty(document['examination_method']))
+          VisitClinicalField(label: '检查方法', value: document['examination_method']!),
+        if (findings != null)
+          VisitClinicalField(label: '检查所见', value: findings),
+        if (conclusion != null)
+          VisitClinicalField(label: '检查结论', value: conclusion),
+      ];
+      return VisitRecordDetailData(
+        id: documentId ?? name,
+        date: date,
+        hospital: document['hospital_name']?.toString() ?? document['hospital']?.toString() ?? '上传资料',
+        department: document['department_name']?.toString() ?? document['department']?.toString() ?? '影像检查',
+        doctor: document['attending_doctor']?.toString() ?? '待核验',
+        verificationState: VisitVerificationState.unverified,
+        verificationLabel: '待核验',
+        verificationTitle: '影像报告 · 已上传',
+        verificationDetail: name,
+        summaryItems: [
+          VisitRecordSummaryItem(
+            title: '影像报告',
+            category: VisitRecordCategory.lab,
+            trailing: labs.isEmpty
+                ? (findings != null ? '已识别检查所见' : '已上传')
+                : '${labs.length} 项结果',
+          ),
+        ],
+        clinicalFields: fields,
+        labs: labs,
+      );
+    }
+
+    // 门诊病历：主诉/诊断/处理意见/医嘱等专属字段。
+    if (type == 'outpatient_record') {
+      final fields = <VisitClinicalField>[
+        if (_nonEmpty(document['chief_complaint']))
+          VisitClinicalField(label: '主诉', value: document['chief_complaint']!),
+        if (_nonEmpty(document['diagnosis_summary']))
+          VisitClinicalField(label: '诊断摘要', value: document['diagnosis_summary']!),
+        if (_nonEmpty(document['treatment_plan']))
+          VisitClinicalField(label: '处理意见', value: document['treatment_plan']!),
+        if (_nonEmpty(document['medical_advice']))
+          VisitClinicalField(label: '医嘱', value: document['medical_advice']!),
+        if (_nonEmpty(document['doctor_name']))
+          VisitClinicalField(label: '医生', value: document['doctor_name']!),
+      ];
+      return VisitRecordDetailData(
+        id: documentId ?? name,
+        date: document['visit_date']?.toString().split('T').first ?? date,
+        hospital: document['hospital_name']?.toString() ?? document['hospital']?.toString() ?? '上传资料',
+        department: document['department_name']?.toString() ?? document['department']?.toString() ?? '门诊',
+        doctor: document['doctor_name']?.toString() ?? '待核验',
+        verificationState: VisitVerificationState.unverified,
+        verificationLabel: '待核验',
+        verificationTitle: '门诊病历 · 已上传',
+        verificationDetail: name,
+        summaryItems: [
+          VisitRecordSummaryItem(
+            title: '门诊病历',
+            category: VisitRecordCategory.outpatient,
+            trailing: _nonEmpty(document['diagnosis_summary'])
+                ? '已识别诊断'
+                : '已上传',
+          ),
+        ],
+        clinicalFields: fields,
+        labs: labs,
+      );
+    }
+
+    // 医嘱 / 处方：药品清单。
+    final medications = (document['medication_suggestions'] as List? ?? const [])
+        .whereType<Map>()
+        .toList(growable: false);
+    if (type == 'medical_order') {
+      final orders = <VisitOrderItem>[
+        for (final item in medications)
+          VisitOrderItem(
+            name: item['drug_name']?.toString() ?? '药品',
+            dosage: item['dosage']?.toString() ?? item['dosage_text']?.toString() ?? '未注明',
+            frequency: item['frequency']?.toString() ?? '未注明',
+            change: VisitOrderChange.added,
+            note: item['instruction']?.toString(),
+          ),
+      ];
+      return VisitRecordDetailData(
+        id: documentId ?? name,
+        date: date,
+        hospital: document['hospital_name']?.toString() ?? document['hospital']?.toString() ?? '上传资料',
+        department: document['department_name']?.toString() ?? document['department']?.toString() ?? '医嘱处方',
+        doctor: document['doctor_name']?.toString() ?? '待核验',
+        verificationState: VisitVerificationState.unverified,
+        verificationLabel: '待核验',
+        verificationTitle: '医嘱处方 · 已上传',
+        verificationDetail: name,
+        summaryItems: [
+          VisitRecordSummaryItem(
+            title: '医嘱',
+            category: VisitRecordCategory.order,
+            trailing: orders.isEmpty ? '已上传' : '${orders.length} 项药品',
+          ),
+        ],
+        clinicalFields: [
+          if (_nonEmpty(document['diagnosis_summary']))
+            VisitClinicalField(label: '诊断摘要', value: document['diagnosis_summary']!),
+          if (_nonEmpty(document['medical_advice']))
+            VisitClinicalField(label: '医嘱', value: document['medical_advice']!),
+        ],
+        orders: orders,
+      );
+    }
+
+    // 化验 / 检测报告：医院/日期 + 化验项列表。
+    final clinical = <VisitClinicalField>[
+      if (_nonEmpty(document['hospital_name']))
+        VisitClinicalField(label: '医院', value: document['hospital_name']!),
+      if (_nonEmpty(document['report_date']))
+        VisitClinicalField(label: '报告日期', value: document['report_date']!),
+      if (_nonEmpty(document['sample_date']))
+        VisitClinicalField(label: '采样日期', value: document['sample_date']!),
+    ];
+    return VisitRecordDetailData(
+      id: documentId ?? name,
+      date: date,
+      hospital: document['hospital_name']?.toString() ?? document['hospital']?.toString() ?? '上传资料',
+      department: document['department_name']?.toString() ?? document['department']?.toString() ?? type,
+      doctor: '待核验',
+      verificationState: VisitVerificationState.unverified,
+      verificationLabel: '待核验',
+      verificationTitle: '资料已上传，来源待核验',
+      verificationDetail: name,
+      summaryItems: [
+        VisitRecordSummaryItem(
+          title: name,
+          category: VisitRecordCategory.lab,
+          trailing: '${labs.length} 项结果',
+        ),
+      ],
+      clinicalFields: clinical,
+      labs: labs,
+    );
+  }
+
+  static bool _nonEmpty(Object? value) {
+    final text = value?.toString().trim() ?? '';
+    return text.isNotEmpty && text != 'null' && text != 'None';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -169,7 +390,8 @@ class VisitRecordsPage extends StatelessWidget {
         ),
   );
 
-  Future<void> _showUpload(BuildContext context) => showDialog<void>(
+  Future<void> _showUpload(BuildContext context) async {
+    await showDialog<void>(
     context: context,
     barrierColor: pomiInk.withValues(alpha: .22),
     builder:
@@ -188,8 +410,11 @@ class VisitRecordsPage extends StatelessWidget {
           ),
         ),
   );
+    onRecordsChanged?.call();
+  }
 }
 
+// ignore: unused_element
 class _DocumentsList extends StatelessWidget {
   const _DocumentsList({required this.documents});
 

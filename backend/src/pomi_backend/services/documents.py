@@ -17,6 +17,7 @@ from pomi_backend.db.models import (
     Document,
     DocumentDisplayAsset,
     DocumentRevision,
+    OCRResult,
     OCRTask,
     UserAccount,
 )
@@ -121,6 +122,22 @@ class DocumentService:
             if revision is not None
             else None
         )
+        # 把最新 OCR 结果的 validated_draft（识别出的临床字段）合并进文档详情，
+        # 使记录页能展示影像检查所见/结论、门诊主诉/诊断、医嘱药品等丰富字段。
+        ocr_draft: dict[str, Any] = {}
+        if latest_task is not None:
+            latest_result = self.session.scalar(
+                select(OCRResult)
+                .where(OCRResult.task_id == latest_task.id)
+                .order_by(OCRResult.created_at.desc())
+                .limit(1)
+            )
+            if latest_result is not None and isinstance(latest_result.validated_draft, dict):
+                ocr_draft = {
+                    key: value
+                    for key, value in latest_result.validated_draft.items()
+                    if value is not None
+                }
         return {
             **document_data(document, current_revision),
             "latest_ocr_task_id": latest_task.id if latest_task is not None else None,
@@ -129,6 +146,7 @@ class DocumentService:
                 latest_task.result_source if latest_task is not None else None
             ),
             "display_asset": display_asset_data(display_asset),
+            **ocr_draft,
         }
 
     def upload(

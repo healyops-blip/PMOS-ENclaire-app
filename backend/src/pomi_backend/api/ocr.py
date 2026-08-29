@@ -69,8 +69,7 @@ def recognize(
         str | None, Header(alias="X-External-Processing-Consent-Version")
     ] = None,
 ) -> dict:
-    # 移除“门诊病历(outpatient_record)”支持，确保不接受该材料类型
-    allowed = {"lab_report", "medical_order", "imaging_text_report"}
+    allowed = {"lab_report", "medical_order", "imaging_text_report", "outpatient_record"}
     if material_type not in allowed:
         raise BusinessError("OCR_MATERIAL_TYPE_INVALID", "Unsupported OCR material type.", 422)
     if prompt_version != "pomi-ocr-v1":

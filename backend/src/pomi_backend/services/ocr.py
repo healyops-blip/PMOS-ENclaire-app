@@ -138,6 +138,12 @@ def normalize_algorithm_payload(payload: dict[str, Any], original_file_name: str
             "medication_suggestions": draft.get("medication_suggestions")
             or draft.get("orders", []),
         }
+        # Imaging text reports and outpatient records carry material-specific
+        # fields that must survive normalization; the generic envelope above
+        # drops them, so forward the whole draft's extra keys verbatim.
+        for key, value in draft.items():
+            if key not in payload and key not in {"examinations", "items", "orders", "medication_suggestions"}:
+                payload[key] = value
     payload["original_file_name"] = original_file_name
     if evidence is not None:
         payload["evidence"] = evidence
@@ -400,23 +406,14 @@ class OCRTaskService:
                     )
                 )
             identifier = standard_drug_id(item.drug_name.strip())
-            if identifier is None:
-                issues.append(
-                    FieldIssue(
-                        f"medication_suggestions.{index}.drug_name",
-                        "DRUG_MAPPING_REQUIRED",
-                        "药品不在确定性词库中，请手动添加或取消本次导入。",
-                    )
-                )
+            # 未映射药名不再硬阻塞入库：标准词库未收录的药品（如地屈孕酮、肌醇等）
+            # 仍可确认，仅保留 standard_drug_id=None 供后续人工复核。
             dosage_value, dosage_unit = _dosage_parts(item.dosage)
+            # 剂量缺空或无法解析为「数值+单位」时不再硬阻塞：保留原始文本，
+            # 由用户后续在用药详情中修正，避免「确认并入库」因剂量格式失败。
             if item.dosage and (dosage_value is None or dosage_unit is None):
-                issues.append(
-                    FieldIssue(
-                        f"medication_suggestions.{index}.dosage",
-                        "DOSAGE_INVALID",
-                        "剂量必须包含可识别的数值和单位，例如 500mg。",
-                    )
-                )
+                dosage_value = None
+                dosage_unit = None
             medication_values.append((item, identifier, dosage_value, dosage_unit))
         if issues:
             raise BusinessError(
