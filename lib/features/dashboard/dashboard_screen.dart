@@ -325,83 +325,112 @@ class _LatestVisitStatusCard extends StatelessWidget {
     borderRadius: 20,
     backgroundOpacity: .36,
     padding: EdgeInsets.zero,
-    child: Column(
+    child: Stack(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '2026-08-25',
-                      style: Theme.of(context).textTheme.titleLarge,
+        Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '2026-08-25',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '仁和医院',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 3),
+                        const Align(
+                          alignment: Alignment.center,
+                          child: Text(
+                            '区块链技术支持',
+                            style: TextStyle(
+                              color: pomiPurple,
+                              fontSize: 10,
+                              height: 14 / 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 3),
-                    Text('仁和医院', style: Theme.of(context).textTheme.bodySmall),
-                    const SizedBox(height: 3),
-                    const Align(
-                      alignment: Alignment.center,
-                      child: Text(
-                        '区块链技术支持',
+                  ),
+                  const SizedBox(width: 8),
+                  const Column(
+                    children: [
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: pomiSecondaryText,
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        '详情',
                         style: TextStyle(
-                          color: pomiPurple,
+                          color: pomiSecondaryText,
                           fontSize: 10,
                           height: 14 / 10,
-                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              const Column(
+            ),
+            const Divider(height: 1, color: pomiLine),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+              child: Row(
                 children: [
-                  Icon(Icons.chevron_right_rounded, color: pomiSecondaryText),
-                  SizedBox(height: 2),
-                  Text(
-                    '详情',
-                    style: TextStyle(
-                      color: pomiSecondaryText,
-                      fontSize: 10,
-                      height: 14 / 10,
+                  SizedBox(
+                    width: 88,
+                    child: Text(
+                      '化验单',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: pomiPurple.withValues(alpha: .09),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '化验/检测',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: pomiPurple,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-        const Divider(height: 1, color: pomiLine),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-          child: Row(
-            children: [
-              SizedBox(
+        Positioned(
+          right: 28,
+          top: 4,
+          child: Opacity(
+            opacity: .50,
+            child: Transform.rotate(
+              angle: -math.pi / 12,
+              child: Image.asset(
+                'assets/images/pomi_verified_stamp.png',
                 width: 88,
-                child: Text(
-                  '化验单',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
+                height: 88,
+                filterQuality: FilterQuality.high,
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                decoration: BoxDecoration(
-                  color: pomiPurple.withValues(alpha: .09),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  '化验/检测',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: pomiPurple,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ],
