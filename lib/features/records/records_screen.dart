@@ -593,6 +593,9 @@ class _DocumentDetailScreenState extends ConsumerState<DocumentDetailScreen> {
               bytes: Uint8List.fromList(bytes),
               mimeType: widget.document['mime_type'].toString(),
               fileName: widget.document['original_file_name'].toString(),
+              certified:
+                  _certification?.status == CertificationStatus.succeeded,
+              hospitalName: widget.document['hospital']?.toString(),
             ),
       ),
     );
@@ -908,12 +911,16 @@ class OriginalFileScreen extends StatelessWidget {
     required this.bytes,
     required this.mimeType,
     required this.fileName,
+    this.certified = false,
+    this.hospitalName,
     super.key,
   });
 
   final Uint8List bytes;
   final String mimeType;
   final String fileName;
+  final bool certified;
+  final String? hospitalName;
 
   @override
   Widget build(BuildContext context) {
@@ -930,17 +937,80 @@ class OriginalFileScreen extends StatelessWidget {
             ),
         ],
       ),
-      body:
-          mimeType == 'application/pdf'
-              ? PdfPreview(
-                build: (format) async => bytes,
-                canChangePageFormat: false,
-              )
-              : InteractiveViewer(
-                minScale: 0.8,
-                maxScale: 5,
-                child: Center(child: Image.memory(bytes)),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child:
+                mimeType == 'application/pdf'
+                    ? PdfPreview(
+                      build: (format) async => bytes,
+                      canChangePageFormat: false,
+                    )
+                    : InteractiveViewer(
+                      minScale: 0.8,
+                      maxScale: 5,
+                      child: Center(child: Image.memory(bytes)),
+                    ),
+          ),
+          if (certified)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Center(
+                  child: Transform.rotate(
+                    angle: -0.18,
+                    child: Container(
+                      key: const ValueKey('hospital-certification-watermark'),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: .18),
+                        border: Border.all(
+                          color: pomiTeal.withValues(alpha: .62),
+                          width: 2,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '医院认证',
+                            style: TextStyle(
+                              color: pomiTeal.withValues(alpha: .68),
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 2,
+                            ),
+                          ),
+                          if (hospitalName != null && hospitalName!.isNotEmpty)
+                            Text(
+                              hospitalName!,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: pomiTeal.withValues(alpha: .62),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          Text(
+                            '已核验 · ${DateTime.now().toIso8601String().substring(0, 10)}',
+                            style: TextStyle(
+                              color: pomiTeal.withValues(alpha: .62),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
+            ),
+        ],
+      ),
     );
   }
 }

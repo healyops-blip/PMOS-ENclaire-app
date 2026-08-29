@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -49,6 +51,97 @@ void main() {
     expect(find.text('真实化验单.pdf'), findsOneWidget);
     expect(find.text('模拟数据'), findsNothing);
     expect(find.textContaining('模拟医院'), findsNothing);
+  });
+
+  testWidgets('certified original overlays hospital watermark', (tester) async {
+    usePhoneViewport(tester);
+    await tester.pumpWidget(
+      app(
+        OriginalFileScreen(
+          bytes: Uint8List.fromList(const [
+            0x89,
+            0x50,
+            0x4E,
+            0x47,
+            0x0D,
+            0x0A,
+            0x1A,
+            0x0A,
+            0x00,
+            0x00,
+            0x00,
+            0x0D,
+            0x49,
+            0x48,
+            0x44,
+            0x52,
+            0x00,
+            0x00,
+            0x00,
+            0x01,
+            0x00,
+            0x00,
+            0x00,
+            0x01,
+            0x08,
+            0x06,
+            0x00,
+            0x00,
+            0x00,
+            0x1F,
+            0x15,
+            0xC4,
+            0x89,
+            0x00,
+            0x00,
+            0x00,
+            0x0D,
+            0x49,
+            0x44,
+            0x41,
+            0x54,
+            0x78,
+            0x9C,
+            0x63,
+            0xF8,
+            0xCF,
+            0xC0,
+            0x00,
+            0x00,
+            0x03,
+            0x01,
+            0x01,
+            0x00,
+            0x18,
+            0xDD,
+            0x8D,
+            0xB1,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x49,
+            0x45,
+            0x4E,
+            0x44,
+            0xAE,
+            0x42,
+            0x60,
+            0x82,
+          ]),
+          mimeType: 'image/jpeg',
+          fileName: '原件.jpg',
+          certified: true,
+          hospitalName: '示例医院',
+        ),
+      ),
+    );
+    expect(
+      find.byKey(const ValueKey('hospital-certification-watermark')),
+      findsOneWidget,
+    );
+    expect(find.text('医院认证'), findsOneWidget);
+    expect(find.text('示例医院'), findsOneWidget);
   });
 
   testWidgets('normal dashboard hides the fixed Smoke visit preview', (
