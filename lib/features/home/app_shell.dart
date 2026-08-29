@@ -17,13 +17,15 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _index = 0;
-  // The navigation entry opens the complete reports list by default.
-  int _recordsTab = 1;
+  // Bottom-navigation entry opens the visit-record list by default;
+  // the report viewer is reached explicitly via the dashboard's "指标看板".
+  int _recordsTab = 0;
   void _openTab(int index) {
     if (index == 2) {
       _showUploadDialog();
       return;
     }
+    if (index == 3) _recordsTab = 0;
     setState(() => _index = index);
   }
 
