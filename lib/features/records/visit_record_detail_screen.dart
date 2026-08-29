@@ -77,6 +77,7 @@ class VisitRecordDetailData {
     required this.summaryItems,
     this.contextLabel,
     this.historyNote,
+    this.isDemo = false,
     this.clinicalFields = const [],
     this.labs = const [],
     this.orders = const [],
@@ -95,6 +96,9 @@ class VisitRecordDetailData {
   final String verificationDetail;
   final String? historyNote;
   final List<VisitRecordSummaryItem> summaryItems;
+
+  /// 是否为演示（Smoke）数据。真实后端导入的记录为 false。
+  final bool isDemo;
   final List<VisitClinicalField> clinicalFields;
   final List<VisitLabResult> labs;
   final List<VisitOrderItem> orders;
@@ -125,6 +129,7 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
         trailing: '2026-08-26',
       ),
     ],
+    isDemo: true,
     clinicalFields: [
       VisitClinicalField(label: '就诊原因', value: '复诊评估代谢指标与当前用药'),
       VisitClinicalField(label: '医生记录', value: '结合近期检测结果调整方案，按期复查。'),
@@ -198,6 +203,7 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
       ),
       VisitRecordSummaryItem(title: '医嘱', category: VisitRecordCategory.order),
     ],
+    isDemo: true,
     clinicalFields: [
       VisitClinicalField(label: '主诉', value: '月经周期延长，近两月痤疮增多'),
       VisitClinicalField(label: '记录摘要', value: '建议完成激素与代谢相关检测后复诊。'),
@@ -237,6 +243,7 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
         trailing: '采样 2026-06-18',
       ),
     ],
+    isDemo: true,
     labs: [
       VisitLabResult(
         name: '促黄体生成素',
@@ -278,6 +285,7 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
         category: VisitRecordCategory.outpatient,
       ),
     ],
+    isDemo: true,
     clinicalFields: [
       VisitClinicalField(label: '主诉', value: '月经周期不规律'),
       VisitClinicalField(label: '记录摘要', value: '建议记录周期变化并按计划复诊。'),
@@ -303,6 +311,7 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
         trailing: '采样 2025-12-14',
       ),
     ],
+    isDemo: true,
     labs: [
       VisitLabResult(
         name: '空腹胰岛素',
@@ -448,7 +457,7 @@ class _VisitHeroCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '就诊记录 · 演示数据',
+                          visit.isDemo ? '就诊记录 · 演示数据' : '就诊记录',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],
@@ -483,29 +492,31 @@ class _VisitHeroCard extends StatelessWidget {
               ),
             ],
           ),
-          Positioned(
-            key: const ValueKey('pomi-verified-stamp-position'),
-            right: -4,
-            top: 0,
-            child: Semantics(
-              image: true,
-              label: '该报告已核验',
-              child: Opacity(
-                opacity: .88,
-                child: Transform.rotate(
-                  key: const ValueKey('pomi-verified-stamp-rotation'),
-                  angle: -math.pi / 4,
-                  child: Image.asset(
-                    'assets/images/pomi_verified_stamp.png',
-                    key: const ValueKey('pomi-verified-stamp'),
-                    width: 132,
-                    height: 132,
-                    filterQuality: FilterQuality.high,
+          if (visit.isDemo ||
+              visit.verificationState == VisitVerificationState.verified)
+            Positioned(
+              key: const ValueKey('pomi-verified-stamp-position'),
+              right: -4,
+              top: 0,
+              child: Semantics(
+                image: true,
+                label: '该报告已核验',
+                child: Opacity(
+                  opacity: .88,
+                  child: Transform.rotate(
+                    key: const ValueKey('pomi-verified-stamp-rotation'),
+                    angle: -math.pi / 4,
+                    child: Image.asset(
+                      'assets/images/pomi_verified_stamp.png',
+                      key: const ValueKey('pomi-verified-stamp'),
+                      width: 132,
+                      height: 132,
+                      filterQuality: FilterQuality.high,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -744,8 +755,8 @@ class _LabResultRow extends StatelessWidget {
                       text: result.value,
                       style: TextStyle(
                         color: status.valueColor,
-                        fontSize: 18,
-                        height: 24 / 18,
+                        fontSize: 16,
+                        height: 22 / 16,
                         fontWeight: FontWeight.w800,
                       ),
                     ),

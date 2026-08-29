@@ -55,6 +55,12 @@ double? jsonDoubleOrNull(Map<String, dynamic> json, String key) {
   final value = json[key];
   if (value == null) return null;
   if (value is num) return value.toDouble();
+  // Tolerate numeric strings (e.g. legacy drafts where Decimal was
+  // serialized as a string) so a server formatting drift never crashes.
+  if (value is String) {
+    final parsed = double.tryParse(value);
+    if (parsed != null) return parsed;
+  }
   throw ApiFailure('INVALID_RESPONSE', '服务字段 $key 格式异常');
 }
 

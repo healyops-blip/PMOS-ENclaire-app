@@ -13,13 +13,53 @@ const smokeReportDetail = <String, dynamic>{
   'missing_sections': <String>[],
   'snapshot': {
     'summary': {
-      'profile': {'nickname': '林晓晴', 'height_cm': 162.0, 'weight_kg': 67.5},
+      'profile': {
+        'nickname': '林晓晴',
+        'birth_date': '1997-05-18',
+        'diagnosis_year': 2023,
+        'height_cm': 162.0,
+        'weight_kg': 67.5,
+      },
       'patient_note_text': '近 3 个月月经周期不规律，最近间隔达 51 天。',
       'disclaimers': ['仅供参考，不构成诊断或治疗建议'],
-      'current_medications': <Map<String, dynamic>>[],
+      'current_medications': <Map<String, dynamic>>[
+        {
+          'drug_name': '二甲双胍',
+          'source_type': 'medical_order',
+          'route': '口服',
+          'frequency': '每日 2 次',
+          'dosage_value': 500,
+          'dosage_unit': 'mg',
+          'start_date': '2026-08-01',
+          'completion_percent': 72,
+          'taken_units': 52,
+          'planned_total_units': 72,
+        },
+        {
+          'drug_name': '达英-35',
+          'source_type': 'outpatient_record',
+          'route': '口服',
+          'frequency': '每日 1 次',
+          'dosage_value': 1,
+          'dosage_unit': '片',
+          'start_date': '2026-08-08',
+          'completion_percent': 95,
+          'taken_units': 20,
+          'planned_total_units': 21,
+        },
+        {
+          'drug_name': '叶酸',
+          'source_type': 'manual',
+          'route': '口服',
+          'frequency': '每日 1 次',
+          'dosage_value': 0.4,
+          'dosage_unit': 'mg',
+          'start_date': '2026-07-20',
+        },
+      ],
       'cycle_summary': {
-        'count': 5,
-        'range_start': '2025-09-13',
+        'count': 6,
+        'range_start': '2025-07-01',
         'range_end': '2026-08-28',
       },
       'weight_summary': {
@@ -199,6 +239,13 @@ const smokeReportDetail = <String, dynamic>{
         },
       ],
       'cycles': [
+        {
+          'start_date': '2025-07-01',
+          'end_date': '2025-07-05',
+          'cycle_end_date': '2025-09-12',
+          'cycle_length_days': 74,
+          'duration_days': 5,
+        },
         {
           'start_date': '2025-09-13',
           'end_date': '2025-09-17',

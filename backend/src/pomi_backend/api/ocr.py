@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, File, Form, Header, Request, UploadFile, status
@@ -32,12 +31,15 @@ from pomi_backend.services.ocr import (
     task_data,
 )
 from pomi_backend.services.ocr_provider import (
-    LocalDatasetOCRProvider,
     OCRProviderError,
     OCRProviderRequest,
     Qwen3VLOCRProvider,
 )
 from pomi_backend.services.orders import medical_order_data, medical_order_p0
+from pomi_backend.services.watermarks import (
+    display_asset_data,
+    generate_watermark_after_ocr,
+)
 
 router = APIRouter(prefix="/api/ocr/tasks", tags=["ocr"])
 
@@ -101,17 +103,25 @@ def recognize(
         existing_result = repository.result(existing.id)
         if existing_result is None:
             raise BusinessError("OCR_RESULT_NOT_READY", "OCR result is not ready.", 409)
-        return success(request, sync_result_data(existing, existing_result))
-    if settings.environment != "production" and settings.local_ocr_dataset_enabled:
-        dataset_root = Path(__file__).resolve().parents[4] / "assets" / "data" / "smoke_dataset"
-        provider = LocalDatasetOCRProvider(dataset_root)
-    else:
-        provider = Qwen3VLOCRProvider(
-            api_base_url=settings.ocr_api_base_url,
-            api_key=settings.ocr_api_key,
-            model=settings.ocr_model or DEFAULT_OCR_MODEL,
-            timeout_seconds=settings.ocr_request_timeout_seconds,
+        display_asset = generate_watermark_after_ocr(
+            session,
+            settings.storage_root,
+            document,
+            revision,
         )
+        return success(
+            request,
+            {
+                **sync_result_data(existing, existing_result),
+                "display_asset": display_asset_data(display_asset),
+            },
+        )
+    provider = Qwen3VLOCRProvider(
+        api_base_url=settings.ocr_api_base_url,
+        api_key=settings.ocr_api_key,
+        model=settings.ocr_model or DEFAULT_OCR_MODEL,
+        timeout_seconds=settings.ocr_request_timeout_seconds,
+    )
     try:
         response = provider.recognize(
             OCRProviderRequest(
@@ -174,7 +184,19 @@ def recognize(
                 )
             )
     session.commit()
-    return success(request, sync_result_data(task, result))
+    display_asset = generate_watermark_after_ocr(
+        session,
+        settings.storage_root,
+        document,
+        revision,
+    )
+    return success(
+        request,
+        {
+            **sync_result_data(task, result),
+            "display_asset": display_asset_data(display_asset),
+        },
+    )
 
 
 class CreateOCRTaskRequest(BaseModel):

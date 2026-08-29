@@ -80,6 +80,13 @@ def test_upload_revision_private_download_and_delete(api_client: TestClient) -> 
     assert uploaded["mime_type"] == "image/jpeg"
     assert uploaded["pixel_count"] == 800
     assert len(uploaded["file_hash"]) == 64
+    display_endpoint = (
+        f"/api/documents/{uploaded['id']}/revisions/{uploaded['current_revision_id']}/display"
+    )
+    assert data(api_client.get(display_endpoint, headers=headers)) is None
+    premature = api_client.post(f"{display_endpoint}/retry", headers=headers)
+    assert premature.status_code == 409
+    assert premature.json()["error"]["code"] == "WATERMARK_OCR_NOT_READY"
 
     original = api_client.get(
         f"/api/documents/{uploaded['id']}/revisions/{uploaded['current_revision_id']}/file",

@@ -156,6 +156,20 @@ class Qwen3VLOCRProvider:
             if self.client is None and "active_client" in locals():
                 active_client.close()
         try:
+            finish_reason = raw["choices"][0].get("finish_reason")
+        except (KeyError, IndexError, TypeError):
+            finish_reason = None
+        if finish_reason == "length":
+            # The provider hit its output token cap mid-JSON; the payload can
+            # never parse, so fail fast with an explicit retryable code
+            # instead of a generic "invalid response".
+            raise OCRProviderError(
+                "response_format",
+                "OCR_RESPONSE_TRUNCATED",
+                "OCR response was truncated by the provider output token limit.",
+                retryable=True,
+            )
+        try:
             content = raw["choices"][0]["message"]["content"]
             if isinstance(content, str) and content.startswith("```"):
                 content = content.strip("`")
