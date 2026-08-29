@@ -56,7 +56,9 @@ final medicationsProvider =
 
 final medicationCatalogProvider =
     FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-      final data = await ref.read(apiClientProvider).get('/api/medication-catalog');
+      final data = await ref
+          .read(apiClientProvider)
+          .get('/api/medication-catalog');
       final page = Map<String, dynamic>.from(data as Map);
       return List<Map<String, dynamic>>.from(
         (page['items'] as List? ?? const []).map(
@@ -320,115 +322,86 @@ class _LatestVisitStatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => PomiGlassCard(
     onTap: onTap,
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+    borderRadius: 20,
+    backgroundOpacity: .36,
+    padding: EdgeInsets.zero,
     child: Column(
       children: [
-        Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: pomiPurple.withValues(alpha: .08),
-                borderRadius: BorderRadius.circular(14),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '2026-08-25',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 3),
+                    Text('仁和医院', style: Theme.of(context).textTheme.bodySmall),
+                    const SizedBox(height: 3),
+                    const Align(
+                      alignment: Alignment.center,
+                      child: Text(
+                        '区块链技术支持',
+                        style: TextStyle(
+                          color: pomiPurple,
+                          fontSize: 10,
+                          height: 14 / 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              child: const Icon(
-                Icons.description_outlined,
-                color: pomiPurple,
-                size: 21,
-              ),
-            ),
-            const SizedBox(width: 10),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              const SizedBox(width: 8),
+              const Column(
                 children: [
+                  Icon(Icons.chevron_right_rounded, color: pomiSecondaryText),
+                  SizedBox(height: 2),
                   Text(
-                    '激素六项化验单',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: pomiInk,
-                      fontSize: 15,
-                      height: 21 / 15,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  SizedBox(height: 3),
-                  Text(
-                    '医院：仁和医院',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    '详情',
                     style: TextStyle(
                       color: pomiSecondaryText,
-                      fontSize: 11,
-                      height: 16 / 11,
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                  Text(
-                    '日期：2026-08-25',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: pomiSecondaryText,
-                      fontSize: 11,
-                      height: 16 / 11,
-                      fontWeight: FontWeight.w400,
+                      fontSize: 10,
+                      height: 14 / 10,
                     ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 9,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0x143B86C8),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: const Color(0x333B86C8)),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.schedule_outlined,
-                        color: Color(0xFF337EBB),
-                        size: 14,
-                      ),
-                      SizedBox(width: 4),
-                      Text(
-                        '未核验',
-                        style: TextStyle(
-                          color: Color(0xFF337EBB),
-                          fontSize: 11,
-                          height: 16 / 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
+            ],
+          ),
+        ),
+        const Divider(height: 1, color: pomiLine),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 88,
+                child: Text(
+                  '化验单',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                decoration: BoxDecoration(
+                  color: pomiPurple.withValues(alpha: .09),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '化验/检测',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: pomiPurple,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        const Center(
-          child: Text(
-            '区块链技术支持',
-            style: TextStyle(
-              color: pomiPurple,
-              fontSize: 10,
-              height: 14 / 10,
-              fontWeight: FontWeight.w600,
-            ),
+              ),
+            ],
           ),
         ),
       ],
@@ -606,12 +579,14 @@ class MedicationManagementScreen extends ConsumerWidget {
                             style: Theme.of(sheetContext).textTheme.bodySmall,
                           ),
                           const SizedBox(height: 16),
-                          if (snapshot.connectionState == ConnectionState.waiting)
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting)
                             const LinearProgressIndicator(),
                           if (candidates.isNotEmpty) ...[
                             const SizedBox(height: 10),
                             DropdownButtonFormField<String>(
-                              initialValue: selectedCandidate?['id']?.toString(),
+                              initialValue:
+                                  selectedCandidate?['id']?.toString(),
                               isExpanded: true,
                               decoration: const InputDecoration(
                                 labelText: 'Pomi 候选药品（可选）',
@@ -632,16 +607,25 @@ class MedicationManagementScreen extends ConsumerWidget {
                                 ),
                               ],
                               onChanged: (id) {
-                                final candidate = candidates
-                                    .where((item) => item['id']?.toString() == id)
-                                    .firstOrNull;
+                                final candidate =
+                                    candidates
+                                        .where(
+                                          (item) =>
+                                              item['id']?.toString() == id,
+                                        )
+                                        .firstOrNull;
                                 setSheetState(() {
                                   selectedCandidate = candidate;
                                   if (candidate != null) {
-                                    name.text = candidate['name']?.toString() ?? '';
-                                    route.text = candidate['route']?.toString() ?? '';
-                                    final strengths = candidate['strength_candidates'] as List?;
-                                    if (strengths != null && strengths.isNotEmpty) {
+                                    name.text =
+                                        candidate['name']?.toString() ?? '';
+                                    route.text =
+                                        candidate['route']?.toString() ?? '';
+                                    final strengths =
+                                        candidate['strength_candidates']
+                                            as List?;
+                                    if (strengths != null &&
+                                        strengths.isNotEmpty) {
                                       dose.text = strengths.first.toString();
                                     }
                                   }
@@ -654,13 +638,16 @@ class MedicationManagementScreen extends ConsumerWidget {
                               padding: const EdgeInsets.only(top: 8),
                               child: Text(
                                 '候选库暂时不可用，仍可继续自定义添加。',
-                                style: Theme.of(sheetContext).textTheme.bodySmall,
+                                style:
+                                    Theme.of(sheetContext).textTheme.bodySmall,
                               ),
                             ),
                           const SizedBox(height: 10),
                           TextField(
                             controller: name,
-                            decoration: const InputDecoration(labelText: '药品名称'),
+                            decoration: const InputDecoration(
+                              labelText: '药品名称',
+                            ),
                           ),
                           const SizedBox(height: 10),
                           TextField(
@@ -690,29 +677,36 @@ class MedicationManagementScreen extends ConsumerWidget {
                           FilledButton(
                             onPressed: () async {
                               if (name.text.trim().isEmpty) return;
-                              await ref.read(apiClientProvider).post(
-                                '/api/medications',
-                                headers: {
-                                  'Idempotency-Key':
-                                      'manual-${DateTime.now().microsecondsSinceEpoch}',
-                                },
-                                data: {
-                                  'drug_name': name.text.trim(),
-                                  'standard_drug_id': selectedCandidate?['id'],
-                                  'source_category': _sourceCategoryForCandidate(
-                                    selectedCandidate,
-                                  ),
-                                  'specification': dose.text.trim().isEmpty
-                                      ? null
-                                      : dose.text.trim(),
-                                  'frequency': frequency.text.trim().isEmpty
-                                      ? null
-                                      : frequency.text.trim(),
-                                  'route': route.text.trim().isEmpty
-                                      ? null
-                                      : route.text.trim(),
-                                },
-                              );
+                              await ref
+                                  .read(apiClientProvider)
+                                  .post(
+                                    '/api/medications',
+                                    headers: {
+                                      'Idempotency-Key':
+                                          'manual-${DateTime.now().microsecondsSinceEpoch}',
+                                    },
+                                    data: {
+                                      'drug_name': name.text.trim(),
+                                      'standard_drug_id':
+                                          selectedCandidate?['id'],
+                                      'source_category':
+                                          _sourceCategoryForCandidate(
+                                            selectedCandidate,
+                                          ),
+                                      'specification':
+                                          dose.text.trim().isEmpty
+                                              ? null
+                                              : dose.text.trim(),
+                                      'frequency':
+                                          frequency.text.trim().isEmpty
+                                              ? null
+                                              : frequency.text.trim(),
+                                      'route':
+                                          route.text.trim().isEmpty
+                                              ? null
+                                              : route.text.trim(),
+                                    },
+                                  );
                               if (sheetContext.mounted) {
                                 Navigator.pop(sheetContext, true);
                               }
