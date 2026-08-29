@@ -748,14 +748,15 @@ class _VisitRecordRow extends StatelessWidget {
     };
     return Row(
       children: [
-        SizedBox(
-          width: 88,
-          child: Text(
-            row.title,
-            style: Theme.of(context).textTheme.titleMedium,
+        if (row.category != VisitRecordCategory.imaging)
+          SizedBox(
+            width: 88,
+            child: Text(
+              row.title,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
           ),
-        ),
-        if (tag != row.title)
+        if (tag != row.title || row.category == VisitRecordCategory.imaging)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
             decoration: BoxDecoration(
