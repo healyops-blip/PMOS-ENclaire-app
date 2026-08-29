@@ -6,6 +6,7 @@ import 'package:printing/printing.dart';
 
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
+import '../medications/medication_catalog.dart';
 import '../upload/certification_repository.dart';
 import '../upload/upload_screen.dart';
 import 'visit_record_detail_screen.dart';
@@ -809,7 +810,10 @@ class _ReconciliationScreenState extends ConsumerState<ReconciliationScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        item['drug_name'].toString(),
+                        medicationDisplayName(
+                          item['drug_name'],
+                          standardDrugId: item['standard_drug_id'],
+                        ),
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
@@ -1589,7 +1593,7 @@ class _ReportSummaryLayer extends StatelessWidget {
 
   String get _medicationAttentionLine {
     if (medicines.isEmpty) return '当前用药：暂无记录';
-    return '当前用药：${medicines.map((item) => item['drug_name'] ?? '用药').join('、')}';
+    return '当前用药：${medicines.map((item) => medicationDisplayName(item['drug_name'], standardDrugId: item['standard_drug_id'])).join('、')}';
   }
 
   List<String> get _attentionLines => [
@@ -2247,7 +2251,10 @@ class _MedicationSummaryTile extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  item['drug_name']?.toString() ?? '用药',
+                  medicationDisplayName(
+                    item['drug_name'],
+                    standardDrugId: item['standard_drug_id'],
+                  ),
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
@@ -3463,12 +3470,16 @@ class _ReportSourceLayer extends StatelessWidget {
                   children:
                       entry.value.map((item) {
                         final label =
-                            item['item_name'] ??
-                            item['drug_name'] ??
-                            item['examination_name'] ??
-                            item['source_type'] ??
-                            item['hospital_name'] ??
-                            entry.key;
+                            item['drug_name'] != null
+                                ? medicationDisplayName(
+                                  item['drug_name'],
+                                  standardDrugId: item['standard_drug_id'],
+                                )
+                                : item['item_name'] ??
+                                    item['examination_name'] ??
+                                    item['source_type'] ??
+                                    item['hospital_name'] ??
+                                    entry.key;
                         return ListTile(
                           leading: const Icon(
                             Icons.description_outlined,

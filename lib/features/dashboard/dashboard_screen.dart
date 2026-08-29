@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
+import '../medications/medication_catalog.dart';
 
 final dashboardProvider = FutureProvider.autoDispose<Map<String, dynamic>>((
   ref,
@@ -474,7 +475,12 @@ class MedicationManagementScreen extends ConsumerWidget {
               active
                   .map(
                     (item) => _MedicationReminder(
-                      name: _shortMedicationName(item['drug_name']?.toString()),
+                      name: _shortMedicationName(
+                        medicationDisplayName(
+                          item['drug_name'],
+                          standardDrugId: item['standard_drug_id'],
+                        ),
+                      ),
                       time:
                           item['scheduled_time']
                                       ?.toString()
@@ -512,7 +518,10 @@ class MedicationManagementScreen extends ConsumerWidget {
                       name:
                           active.isNotEmpty
                               ? _shortMedicationName(
-                                active[0]['drug_name']?.toString(),
+                                medicationDisplayName(
+                                  active[0]['drug_name'],
+                                  standardDrugId: active[0]['standard_drug_id'],
+                                ),
                               )
                               : '盐酸二甲双胍...',
                       taken: 22,
@@ -527,7 +536,10 @@ class MedicationManagementScreen extends ConsumerWidget {
                       name:
                           active.length > 1
                               ? _shortMedicationName(
-                                active[1]['drug_name']?.toString(),
+                                medicationDisplayName(
+                                  active[1]['drug_name'],
+                                  standardDrugId: active[1]['standard_drug_id'],
+                                ),
                               )
                               : '叶酸',
                       taken: 24,
@@ -542,7 +554,10 @@ class MedicationManagementScreen extends ConsumerWidget {
                       name:
                           active.length > 2
                               ? _shortMedicationName(
-                                active[2]['drug_name']?.toString(),
+                                medicationDisplayName(
+                                  active[2]['drug_name'],
+                                  standardDrugId: active[2]['standard_drug_id'],
+                                ),
                               )
                               : '维生素 D3',
                       taken: 25,
@@ -1268,7 +1283,10 @@ class _CurrentMedicationCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          items[index]['drug_name']?.toString() ?? '未命名用药',
+                          medicationDisplayName(
+                            items[index]['drug_name'],
+                            standardDrugId: items[index]['standard_drug_id'],
+                          ),
                           style: Theme.of(
                             context,
                           ).textTheme.titleMedium?.copyWith(fontSize: 15),
@@ -1473,7 +1491,10 @@ class _MedicationHistoryCard extends StatelessWidget {
                 : [
                   for (var index = 0; index < records.length; index++) ...[
                     _MedicationHistoryRow(
-                      name: records[index]['drug_name']?.toString() ?? '未命名用药',
+                      name: medicationDisplayName(
+                        records[index]['drug_name'],
+                        standardDrugId: records[index]['standard_drug_id'],
+                      ),
                       detail: _medicationHistoryDetail(records[index]),
                       onRejoin: onRejoin,
                     ),
@@ -1755,7 +1776,10 @@ class _MedicationProgressRow extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  medicine['drug_name'].toString(),
+                  medicationDisplayName(
+                    medicine['drug_name'],
+                    standardDrugId: medicine['standard_drug_id'],
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
