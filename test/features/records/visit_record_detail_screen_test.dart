@@ -1,8 +1,30 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pmos_enclaire/core/api_client.dart';
 import 'package:pmos_enclaire/core/theme.dart';
 import 'package:pmos_enclaire/features/records/records_screen.dart';
 import 'package:pmos_enclaire/features/records/visit_record_detail_screen.dart';
+
+// 1x1 透明 PNG。
+final _pngBytes = Uint8List.fromList(const [
+  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, //
+  0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, //
+  0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00, //
+  0x0D, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0xF8, 0xCF, 0xC0, 0x00, //
+  0x00, 0x03, 0x01, 0x01, 0x00, 0x18, 0xDD, 0x8D, 0xB1, 0x00, 0x00, 0x00, //
+  0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+]);
+
+class _OriginalFileApiClient extends ApiClient {
+  _OriginalFileApiClient() : super(const FlutterSecureStorage());
+
+  @override
+  Future<List<int>> download(String path) async => _pngBytes;
+}
 
 void main() {
   Widget app(Widget child) => MaterialApp(
@@ -141,6 +163,69 @@ void main() {
     expect(lowReference.data, '参考 ≥ 20 ng/mL');
     expect(lowReference.style?.color, const Color(0xFFC77A16));
     expect(find.text('低于参考范围'), findsNothing);
+  });
+
+  testWidgets(
+    'a record with a document shows the original + blockchain watermark',
+    (tester) async {
+      usePhoneViewport(tester);
+      const visit = VisitRecordDetailData(
+        id: 'doc-1',
+        documentId: 'doc-1',
+        revisionId: 'rev-1',
+        mimeType: 'image/png',
+        date: '2026-08-27',
+        hospital: '天津清和医院',
+        department: '门诊',
+        doctor: '孙医生',
+        verificationState: VisitVerificationState.unverified,
+        verificationLabel: '待核验',
+        verificationTitle: '门诊病历 · 已上传',
+        verificationDetail: 'MR00020.jpg',
+        summaryItems: [
+          VisitRecordSummaryItem(
+            title: '门诊病历',
+            category: VisitRecordCategory.outpatient,
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWithValue(_OriginalFileApiClient()),
+          ],
+          child: MaterialApp(
+            theme: buildPomiTheme(),
+            home: const VisitRecordDetailScreen(visit: visit),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('原件存证'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('blockchain-cert-watermark')),
+        findsWidgets,
+      );
+      expect(find.text('区块链存证'), findsWidgets);
+      expect(find.byType(Image), findsWidgets);
+    },
+  );
+
+  testWidgets('a Smoke record (no document) hides the original card', (
+    tester,
+  ) async {
+    usePhoneViewport(tester);
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: buildPomiTheme(),
+          home: VisitRecordDetailScreen(visit: smokeVisitRecordDetails.first),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('原件存证'), findsNothing);
   });
 
   testWidgets('every Smoke visit displays the green verification stamp', (

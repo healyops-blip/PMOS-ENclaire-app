@@ -1,7 +1,11 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:printing/printing.dart';
 
+import '../../core/api_client.dart';
 import '../../core/theme.dart';
 
 enum VisitRecordCategory { lab, order, imaging, outpatient }
@@ -82,6 +86,9 @@ class VisitRecordDetailData {
     this.labs = const [],
     this.orders = const [],
     this.sampleDate,
+    this.documentId,
+    this.revisionId,
+    this.mimeType,
   });
 
   final String id;
@@ -103,6 +110,11 @@ class VisitRecordDetailData {
   final List<VisitLabResult> labs;
   final List<VisitOrderItem> orders;
   final String? sampleDate;
+
+  /// 私有原件的定位信息；为空时详情页不展示原件卡片（演示数据即为空）。
+  final String? documentId;
+  final String? revisionId;
+  final String? mimeType;
 }
 
 const smokeVisitRecordDetails = <VisitRecordDetailData>[
@@ -383,6 +395,11 @@ class VisitRecordDetailScreen extends StatelessWidget {
                   sliver: SliverList.list(
                     children: [
                       _VisitHeroCard(visit: visit),
+                      if (visit.documentId != null &&
+                          visit.revisionId != null) ...[
+                        const SizedBox(height: 14),
+                        _OriginalDocumentCard(visit: visit),
+                      ],
                       const SizedBox(height: 14),
                       _VerificationCard(visit: visit),
                       if (visit.historyNote != null) ...[
@@ -410,6 +427,260 @@ class VisitRecordDetailScreen extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// 拉取私有原件字节，(documentId, revisionId) 作为 family key。
+final _originalFileProvider = FutureProvider.autoDispose
+    .family<Uint8List, ({String documentId, String revisionId})>((
+      ref,
+      key,
+    ) async {
+      final bytes = await ref
+          .read(apiClientProvider)
+          .download(
+            '/api/documents/${key.documentId}/revisions/${key.revisionId}/file',
+          );
+      return Uint8List.fromList(bytes);
+    });
+
+/// 详情页里的「原件 + 区块链存证水印」卡片。
+class _OriginalDocumentCard extends ConsumerWidget {
+  const _OriginalDocumentCard({required this.visit});
+
+  final VisitRecordDetailData visit;
+
+  bool get _isPdf => (visit.mimeType ?? '').toLowerCase().contains('pdf');
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final fileState = ref.watch(
+      _originalFileProvider((
+        documentId: visit.documentId!,
+        revisionId: visit.revisionId!,
+      )),
+    );
+    return _SectionCardShell(
+      title: '原件存证',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: AspectRatio(
+              aspectRatio: 3 / 4,
+              child: GestureDetector(
+                onTap:
+                    () => _openViewer(
+                      context,
+                      ref,
+                      fileState.whenOrNull(data: (bytes) => bytes),
+                    ),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ColoredBox(
+                      color: const Color(0xFFF4F1F8),
+                      child: fileState.when(
+                        loading:
+                            () => const Center(
+                              child: SizedBox(
+                                width: 26,
+                                height: 26,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            ),
+                        error:
+                            (_, _) => const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(16),
+                                child: Text(
+                                  '原件暂时无法加载',
+                                  style: TextStyle(color: pomiMuted),
+                                ),
+                              ),
+                            ),
+                        data:
+                            (bytes) =>
+                                _isPdf
+                                    ? PdfPreview(
+                                      build: (_) async => bytes,
+                                      canChangePageFormat: false,
+                                      canChangeOrientation: false,
+                                      canDebug: false,
+                                      allowPrinting: false,
+                                      allowSharing: false,
+                                      maxPageWidth: 900,
+                                      previewPageMargin: EdgeInsets.zero,
+                                      padding: EdgeInsets.zero,
+                                      loadingWidget: const Center(
+                                        child: SizedBox(
+                                          width: 26,
+                                          height: 26,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                    : Image.memory(bytes, fit: BoxFit.cover),
+                      ),
+                    ),
+                    const Positioned.fill(
+                      child: IgnorePointer(child: _BlockchainWatermark()),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(Icons.verified_outlined, size: 15, color: pomiPurple),
+              const SizedBox(width: 5),
+              Expanded(
+                child: Text(
+                  '原件已上链存证 · 点击查看大图',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: pomiMuted),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openViewer(BuildContext context, WidgetRef ref, Uint8List? bytes) {
+    if (bytes == null) return;
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: .82),
+      builder:
+          (_) => Dialog.fullscreen(
+            backgroundColor: Colors.black,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child:
+                      _isPdf
+                          ? PdfPreview(
+                            build: (_) async => bytes,
+                            canChangePageFormat: false,
+                          )
+                          : InteractiveViewer(
+                            minScale: 0.8,
+                            maxScale: 6,
+                            child: Center(child: Image.memory(bytes)),
+                          ),
+                ),
+                const Positioned.fill(
+                  child: IgnorePointer(child: _BlockchainWatermark()),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: SafeArea(
+                    child: IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+    );
+  }
+}
+
+/// 对角「区块链存证 · 已上链」水印，覆盖在原件上。
+class _BlockchainWatermark extends StatelessWidget {
+  const _BlockchainWatermark();
+
+  @override
+  Widget build(BuildContext context) {
+    const ink = Color(0xFF7A5FBF);
+    final date = DateTime.now().toIso8601String().substring(0, 10);
+    return Center(
+      child: Transform.rotate(
+        angle: -math.pi / 9,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Container(
+            key: const ValueKey('blockchain-cert-watermark'),
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: .10),
+              border: Border.all(color: ink.withValues(alpha: .55), width: 3),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '区块链存证',
+                  style: TextStyle(
+                    color: ink.withValues(alpha: .78),
+                    fontSize: 30,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 4,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '已上链 · $date',
+                  style: TextStyle(
+                    color: ink.withValues(alpha: .70),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 与详情页其它区块一致的白卡容器（标题 + 内容）。
+class _SectionCardShell extends StatelessWidget {
+  const _SectionCardShell({required this.title, required this.child});
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .82),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: pomiLine),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 12),
+          child,
+        ],
       ),
     );
   }

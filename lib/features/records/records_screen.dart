@@ -152,6 +152,8 @@ class VisitRecordsPage extends StatelessWidget {
     final name = document['original_file_name']?.toString() ?? type;
     final date = document['uploaded_at']?.toString().split('T').first ?? '最新上传';
     final documentId = _documentIdOf(document);
+    final revisionId = document['current_revision_id']?.toString();
+    final mimeType = document['mime_type']?.toString();
     final matchedObservations =
         observations
             .where((item) => item['document_id']?.toString() == documentId)
@@ -203,6 +205,9 @@ class VisitRecordsPage extends StatelessWidget {
       ];
       return VisitRecordDetailData(
         id: documentId ?? name,
+        documentId: documentId,
+        revisionId: revisionId,
+        mimeType: mimeType,
         date: date,
         hospital:
             document['hospital_name']?.toString() ??
@@ -251,6 +256,9 @@ class VisitRecordsPage extends StatelessWidget {
       ];
       return VisitRecordDetailData(
         id: documentId ?? name,
+        documentId: documentId,
+        revisionId: revisionId,
+        mimeType: mimeType,
         date: document['visit_date']?.toString().split('T').first ?? date,
         hospital:
             document['hospital_name']?.toString() ??
@@ -299,6 +307,9 @@ class VisitRecordsPage extends StatelessWidget {
       ];
       return VisitRecordDetailData(
         id: documentId ?? name,
+        documentId: documentId,
+        revisionId: revisionId,
+        mimeType: mimeType,
         date: date,
         hospital:
             document['hospital_name']?.toString() ??
@@ -363,6 +374,9 @@ class VisitRecordsPage extends StatelessWidget {
     ];
     return VisitRecordDetailData(
       id: documentId ?? name,
+      documentId: documentId,
+      revisionId: revisionId,
+      mimeType: mimeType,
       date: date,
       hospital:
           document['hospital_name']?.toString() ??
