@@ -3388,44 +3388,179 @@ class _CycleTrendDetail extends StatelessWidget {
   final List<Map<String, dynamic>> cycles;
   final VoidCallback onOpenSources;
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const _SectionHeading(title: '经期周期趋势', trailing: '点击记录查看来源'),
-      const SizedBox(height: 7),
-      PomiGlassCard(
-        padding: EdgeInsets.zero,
-        child: Column(
-          children:
-              cycles.reversed
-                  .take(8)
-                  .map(
-                    (item) => ListTile(
-                      dense: true,
-                      title: Text(
-                        '${item['start_date'] ?? '—'} 至 ${item['end_date'] ?? '进行中'}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      subtitle: Text(
-                        '周期 ${item['cycle_length_days'] ?? '—'} 天 · 月经 ${item['duration_days'] ?? '—'} 天',
-                        style: const TextStyle(fontSize: 10),
-                      ),
-                      trailing: const Icon(
-                        Icons.source_outlined,
-                        size: 17,
-                        color: pomiPurple,
-                      ),
-                      onTap: onOpenSources,
-                    ),
-                  )
-                  .toList(),
+  Widget build(BuildContext context) {
+    final latest = cycles.isEmpty ? null : cycles.last;
+    int? completedLength;
+    for (final cycle in cycles.reversed) {
+      final value = cycle['cycle_length_days'];
+      if (value is num) {
+        completedLength = value.toInt();
+        break;
+      }
+    }
+    final duration = latest?['duration_days'];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionHeading(title: '经期周期趋势', trailing: '点击记录查看来源'),
+        const SizedBox(height: 7),
+        PomiGlassCard(
+          padding: const EdgeInsets.all(12),
+          backgroundColor: const Color(0xFFF7F6F8),
+          child: SizedBox(
+            height: 72,
+            width: double.infinity,
+            child: CustomPaint(
+              painter: _CycleSundialPainter(
+                cycleLengthDays: completedLength ?? 56,
+                periodLengthDays: duration is num ? duration.toInt() : 0,
+                startLabel: _monthDay(latest?['start_date']?.toString()),
+              ),
+            ),
+          ),
         ),
+        const SizedBox(height: 9),
+        PomiGlassCard(
+          padding: EdgeInsets.zero,
+          child: Column(
+            children:
+                cycles.reversed.take(8).map((item) {
+                  final range =
+                      '${item['start_date'] ?? '—'} 至 ${item['end_date'] ?? '进行中'}';
+                  final details =
+                      '周期 ${item['cycle_length_days'] ?? '—'} 天 · 月经 ${item['duration_days'] ?? '—'} 天';
+                  return ListTile(
+                    dense: true,
+                    title: Text(
+                      range,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    subtitle: Text(
+                      details,
+                      style: const TextStyle(fontSize: 10),
+                    ),
+                    trailing: const Icon(
+                      Icons.source_outlined,
+                      size: 17,
+                      color: pomiPurple,
+                    ),
+                    onTap: onOpenSources,
+                  );
+                }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  static String _monthDay(String? raw) {
+    final date = DateTime.tryParse(raw ?? '');
+    return date == null
+        ? '未记录'
+        : '${date.month.toString().padLeft(2, '0')}–${date.day.toString().padLeft(2, '0')}';
+  }
+}
+
+class _CycleSundialPainter extends CustomPainter {
+  const _CycleSundialPainter({
+    required this.cycleLengthDays,
+    required this.periodLengthDays,
+    required this.startLabel,
+  });
+
+  final int cycleLengthDays;
+  final int periodLengthDays;
+  final String startLabel;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const left = 4.0;
+    final right = size.width - 4;
+    final y = size.height * .58;
+    final maxDays = cycleLengthDays.clamp(28, 56);
+    final grid = Paint()..color = const Color(0xFFE7E4EB);
+    for (var day = 0; day <= 56; day += 7) {
+      final x = left + (right - left) * day / 56;
+      canvas.drawLine(Offset(x, 13), Offset(x, size.height - 4), grid);
+      _paintText(canvas, '$day', Offset(x, 0), center: true);
+    }
+    final track =
+        Paint()
+          ..color = const Color(0xFFE8DFF2)
+          ..strokeWidth = 8
+          ..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(left, y), Offset(right, y), track);
+    final periodEnd =
+        left + (right - left) * periodLengthDays.clamp(0, 56) / 56;
+    final period =
+        Paint()
+          ..color = pomiPurple
+          ..strokeWidth = 8
+          ..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(left, y), Offset(periodEnd, y), period);
+    final cycleEnd = left + (right - left) * maxDays / 56;
+    final active =
+        Paint()
+          ..color = pomiPurple.withValues(alpha: .45)
+          ..strokeWidth = 1.5;
+    _drawDashedLine(
+      canvas,
+      Offset(periodEnd + 5, y),
+      Offset(cycleEnd, y),
+      active,
+    );
+    _paintText(canvas, '当前周期  $startLabel', Offset(left, y + 10));
+    _paintText(
+      canvas,
+      '进行中',
+      Offset(right, y + 10),
+      rightAligned: true,
+      accent: true,
+    );
+  }
+
+  void _drawDashedLine(Canvas canvas, Offset start, Offset end, Paint paint) {
+    for (var x = start.dx; x < end.dx; x += 7) {
+      canvas.drawLine(
+        Offset(x, start.dy),
+        Offset((x + 4).clamp(x, end.dx), end.dy),
+        paint,
+      );
+    }
+  }
+
+  void _paintText(
+    Canvas canvas,
+    String text,
+    Offset offset, {
+    bool center = false,
+    bool rightAligned = false,
+    bool accent = false,
+  }) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(color: accent ? pomiPurple : pomiMuted, fontSize: 8),
       ),
-    ],
-  );
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final dx =
+        center
+            ? offset.dx - painter.width / 2
+            : rightAligned
+            ? offset.dx - painter.width
+            : offset.dx;
+    painter.paint(canvas, Offset(dx, offset.dy));
+  }
+
+  @override
+  bool shouldRepaint(covariant _CycleSundialPainter oldDelegate) =>
+      oldDelegate.cycleLengthDays != cycleLengthDays ||
+      oldDelegate.periodLengthDays != periodLengthDays ||
+      oldDelegate.startLabel != startLabel;
 }
 
 class _WeightTrendDetail extends StatelessWidget {
@@ -3472,9 +3607,20 @@ class _WeightTrendDetail extends StatelessWidget {
                         'BMI ${item['bmi'] ?? '—'}',
                         style: const TextStyle(fontSize: 10),
                       ),
-                      trailing: Text(
-                        '${item['weight_kg'] ?? '—'} kg',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '${item['weight_kg'] ?? '—'} kg',
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(width: 6),
+                          const Icon(
+                            Icons.source_outlined,
+                            size: 17,
+                            color: pomiPurple,
+                          ),
+                        ],
                       ),
                       onTap: onOpenSources,
                     ),
@@ -3528,12 +3674,23 @@ class _LabTrendPoints extends StatelessWidget {
                   point['facility']?.toString() ?? '点击查看原始报告',
                   style: const TextStyle(fontSize: 10),
                 ),
-                trailing: Text(
-                  '$value $unit',
-                  style: TextStyle(
-                    color: abnormal ? pomiCoral : pomiInk,
-                    fontWeight: FontWeight.w800,
-                  ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '$value $unit',
+                      style: TextStyle(
+                        color: abnormal ? pomiCoral : pomiInk,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Icon(
+                      Icons.source_outlined,
+                      size: 17,
+                      color: pomiPurple,
+                    ),
+                  ],
                 ),
                 onTap: onOpenSources,
               );
