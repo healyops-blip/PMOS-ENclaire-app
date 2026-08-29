@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -20,7 +20,8 @@ class UploadScreen extends ConsumerStatefulWidget {
 
 class _UploadScreenState extends ConsumerState<UploadScreen> {
   String _documentType = 'lab';
-  File? _file;
+  Uint8List? _bytes;
+  String? _fileName;
   String? _idempotencyKey;
   String? _status;
   bool _working = false;
@@ -37,14 +38,15 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       type: FileType.custom,
       allowedExtensions: const ['jpg', 'jpeg', 'png', 'pdf'],
     );
-    final path = file?.path;
-    if (path != null) {
-      setState(() {
-        _file = File(path);
-        _idempotencyKey = null;
-      });
-      await _start();
-    }
+    if (file == null) return;
+    final bytes = await file.readAsBytes();
+    if (bytes.isEmpty) return;
+    setState(() {
+      _bytes = bytes;
+      _fileName = file.name;
+      _idempotencyKey = null;
+    });
+    await _start();
   }
 
   Future<void> _takePhoto() async {
@@ -54,18 +56,21 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       maxWidth: 4096,
       maxHeight: 4096,
     );
-    if (result != null) {
-      setState(() {
-        _file = File(result.path);
-        _idempotencyKey = null;
-      });
-      await _start();
-    }
+    if (result == null) return;
+    final bytes = await result.readAsBytes();
+    if (bytes.isEmpty) return;
+    setState(() {
+      _bytes = bytes;
+      _fileName = result.name;
+      _idempotencyKey = null;
+    });
+    await _start();
   }
 
   Future<void> _start() async {
-    final file = _file;
-    if (file == null) return;
+    final bytes = _bytes;
+    final fileName = _fileName;
+    if (bytes == null || fileName == null) return;
     setState(() {
       _working = true;
       _status = '正在安全上传原件';
@@ -73,7 +78,8 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     try {
       final api = ref.read(apiClientProvider);
       final result = await api.recognizeOcr(
-        file: file,
+        bytes: bytes,
+        filename: fileName,
         materialType: _wireMaterialType,
         promptVersion: 'pomi-ocr-v1',
         consentVersion: 'pomi-external-processing-v1',
@@ -103,7 +109,8 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
           context,
         ).showSnackBar(const SnackBar(content: Text('资料已确认，可在“记录”中查看和认证')));
         setState(() {
-          _file = null;
+          _bytes = null;
+          _fileName = null;
           _idempotencyKey = null;
           _status = null;
         });
@@ -180,17 +187,17 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
             ),
           ],
         ),
-        if (_file != null) ...[
+        if (_bytes != null) ...[
           const SizedBox(height: 14),
           PomiGlassCard(
             child: ListTile(
               leading: Icon(
-                _file!.path.toLowerCase().endsWith('.pdf')
+                _fileName!.toLowerCase().endsWith('.pdf')
                     ? Icons.picture_as_pdf
                     : Icons.image_outlined,
               ),
               title: Text(
-                _file!.uri.pathSegments.last,
+                _fileName!,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -200,7 +207,8 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                     _working
                         ? null
                         : () => setState(() {
-                          _file = null;
+                          _bytes = null;
+                          _fileName = null;
                           _idempotencyKey = null;
                         }),
                 icon: const Icon(Icons.close),
@@ -216,7 +224,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
         ],
         const SizedBox(height: 24),
         FilledButton.icon(
-          onPressed: _file == null || _working ? null : _start,
+          onPressed: _bytes == null || _working ? null : _start,
           icon: const Icon(Icons.document_scanner_outlined),
           label: const Text('开始识别'),
         ),

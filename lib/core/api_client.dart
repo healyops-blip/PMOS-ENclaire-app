@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -111,31 +111,27 @@ class ApiClient {
 
   Future<dynamic> upload(
     String path, {
-    required File file,
+    required Uint8List bytes,
+    required String filename,
     required String documentType,
   }) async {
     final data = FormData.fromMap({
       'document_type': documentType,
-      'file': await MultipartFile.fromFile(
-        file.path,
-        filename: file.uri.pathSegments.last,
-      ),
+      'file': MultipartFile.fromBytes(bytes, filename: filename),
     });
     return _request(() => dio.post(path, data: data));
   }
 
   Future<Map<String, dynamic>> recognizeOcr({
-    required File file,
+    required Uint8List bytes,
+    required String filename,
     required String materialType,
     required String promptVersion,
     required String consentVersion,
     required String idempotencyKey,
   }) async {
     final data = FormData.fromMap({
-      'file': await MultipartFile.fromFile(
-        file.path,
-        filename: file.uri.pathSegments.last,
-      ),
+      'file': MultipartFile.fromBytes(bytes, filename: filename),
       'material_type': materialType,
       'prompt_version': promptVersion,
     });
@@ -576,17 +572,19 @@ class SmokeApiClient extends ApiClient {
   @override
   Future<dynamic> upload(
     String path, {
-    required File file,
+    required Uint8List bytes,
+    required String filename,
     required String documentType,
   }) async => {
     'id': _id('document'),
     'document_type': documentType,
-    'original_file_name': file.uri.pathSegments.last,
+    'original_file_name': filename,
   };
 
   @override
   Future<Map<String, dynamic>> recognizeOcr({
-    required File file,
+    required Uint8List bytes,
+    required String filename,
     required String materialType,
     required String promptVersion,
     required String consentVersion,
@@ -606,7 +604,7 @@ class SmokeApiClient extends ApiClient {
     'medical_advice': '请携带原件与医生复核。',
     'examinations': <Map<String, dynamic>>[],
     'medication_suggestions': <Map<String, dynamic>>[],
-    'original_file_name': file.uri.pathSegments.last,
+    'original_file_name': filename,
   };
 
   @override
