@@ -164,6 +164,12 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
           );
       ref.invalidate(trackingProvider);
       if (mounted) setState(() => _cycleEditorExpanded = false);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
+      }
     } finally {
       if (mounted) setState(() => _savingCycle = false);
     }
@@ -262,23 +268,30 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                             );
                             return;
                           }
-                          await ref
-                              .read(apiClientProvider)
-                              .post(
-                                '/api/cycles',
-                                data: {
-                                  'start_date': start
-                                      .toIso8601String()
-                                      .substring(0, 10),
-                                  'end_date': end?.toIso8601String().substring(
-                                    0,
-                                    10,
-                                  ),
-                                  'flow_level': flow,
-                                },
+                          try {
+                            await ref
+                                .read(apiClientProvider)
+                                .post(
+                                  '/api/cycles',
+                                  data: {
+                                    'start_date': start
+                                        .toIso8601String()
+                                        .substring(0, 10),
+                                    'end_date': end
+                                        ?.toIso8601String()
+                                        .substring(0, 10),
+                                    'flow_level': flow,
+                                  },
+                                );
+                            if (sheetContext.mounted) {
+                              Navigator.pop(sheetContext, true);
+                            }
+                          } catch (error) {
+                            if (sheetContext.mounted) {
+                              ScaffoldMessenger.of(sheetContext).showSnackBar(
+                                SnackBar(content: Text(error.toString())),
                               );
-                          if (sheetContext.mounted) {
-                            Navigator.pop(sheetContext, true);
+                            }
                           }
                         },
                         child: const Text('保存'),
@@ -360,19 +373,27 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                             );
                             return;
                           }
-                          await ref
-                              .read(apiClientProvider)
-                              .post(
-                                '/api/weights',
-                                data: {
-                                  'record_date': date
-                                      .toIso8601String()
-                                      .substring(0, 10),
-                                  'weight_kg': value,
-                                },
+                          try {
+                            await ref
+                                .read(apiClientProvider)
+                                .post(
+                                  '/api/weights',
+                                  data: {
+                                    'record_date': date
+                                        .toIso8601String()
+                                        .substring(0, 10),
+                                    'weight_kg': value,
+                                  },
+                                );
+                            if (sheetContext.mounted) {
+                              Navigator.pop(sheetContext, true);
+                            }
+                          } catch (error) {
+                            if (sheetContext.mounted) {
+                              ScaffoldMessenger.of(sheetContext).showSnackBar(
+                                SnackBar(content: Text(error.toString())),
                               );
-                          if (sheetContext.mounted) {
-                            Navigator.pop(sheetContext, true);
+                            }
                           }
                         },
                         child: const Text('保存'),

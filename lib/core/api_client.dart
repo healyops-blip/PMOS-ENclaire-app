@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'smoke_report_fixture.dart';
+import '../features/auth/auth_controller.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 const apiBaseUrl = String.fromEnvironment(
@@ -20,7 +21,12 @@ final secureStorageProvider = Provider<FlutterSecureStorage>(
 
 final apiClientProvider = Provider<ApiClient>((ref) {
   final storage = ref.watch(secureStorageProvider);
-  return smokeMode ? SmokeApiClient(storage) : ApiClient(storage);
+  // Session 失效（AUTHENTICATION_REQUIRED）时刷新认证状态，
+  // 让路由守卫把用户带回登录页，避免各页面停留在 401 假崩溃状态。
+  void onAuthExpired() => ref.invalidate(authControllerProvider);
+  return smokeMode
+      ? SmokeApiClient(storage)
+      : ApiClient(storage, onAuthExpired: onAuthExpired);
 });
 
 class ApiFailure implements Exception {
@@ -43,7 +49,7 @@ class ApiFailure implements Exception {
 }
 
 class ApiClient {
-  ApiClient(this.storage, {String baseUrl = apiBaseUrl})
+  ApiClient(this.storage, {String baseUrl = apiBaseUrl, this.onAuthExpired})
     : dio = Dio(
         BaseOptions(
           baseUrl: baseUrl,
@@ -67,6 +73,7 @@ class ApiClient {
               storage.delete(key: sessionIdStorageKey),
               storage.delete(key: sessionExpiresAtStorageKey),
             ]);
+            onAuthExpired?.call();
           }
           handler.next(error);
         },
@@ -76,6 +83,7 @@ class ApiClient {
 
   final Dio dio;
   final FlutterSecureStorage storage;
+  final void Function()? onAuthExpired;
 
   Future<dynamic> get(
     String path, {
@@ -228,6 +236,10 @@ class ApiClient {
     'VALIDATION_ERROR' => '账号或密码格式不符合要求，请检查后重试',
     'AUTH_RATE_LIMITED' when retryAfter != null => '请求过于频繁，请在 $retryAfter 秒后重试',
     'AUTH_RATE_LIMITED' => '请求过于频繁，请稍后重试',
+    'CYCLE_DATE_OVERLAP' => '该时间段与已有经期记录重叠',
+    'CYCLE_DATE_ORDER_INVALID' => '开始日期不能晚于结束日期',
+    'CYCLE_VERSION_CONFLICT' => '经期记录已在其他设备更新，请刷新后重试',
+    'CYCLE_NOT_FOUND' => '未找到该经期记录',
     _ => '请求失败，请稍后重试',
   };
 }
