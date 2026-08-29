@@ -9,6 +9,8 @@ User=pomi
 Group=pomi
 WorkingDirectory=/opt/pomi/current/backend
 EnvironmentFile=/etc/pomi/pomi.env
+# OCR credentials are server-local and never committed to the release.
+EnvironmentFile=-/etc/pomi/pomi-ocr.env
 ExecStart=/opt/pomi/current/backend/.venv/bin/uvicorn pomi_backend.main:app --host 127.0.0.1 --port 8010 --workers 1 --proxy-headers --forwarded-allow-ips=127.0.0.1
 Restart=on-failure
 RestartSec=5s

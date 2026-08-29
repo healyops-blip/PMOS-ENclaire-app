@@ -354,11 +354,6 @@ class OCRTaskService:
             raise BusinessError(
                 "OCR_RESULT_NOT_CONFIRMABLE", "OCR result is not pending confirmation.", 409
             )
-        if not payload.examinations and not payload.medication_suggestions:
-            raise BusinessError(
-                "OCR_CONFIRMATION_EMPTY", "At least one health item must be confirmed.", 422
-            )
-
         report_dates = {
             "sample_date": None,
             "exam_date": None,
@@ -389,7 +384,8 @@ class OCRTaskService:
                 index,
                 report_dates,
             )
-            issues.extend(item_issues)
+            # 报告字段不做业务校验；缺失或无法解析的内容由规则层归一为
+            # NULL，完整原值仍保存在 confirmed_item_data 中。
             if normalized is not None:
                 normalized_labs.append((item, normalized))
 
@@ -416,13 +412,6 @@ class OCRTaskService:
                 dosage_value = None
                 dosage_unit = None
             medication_values.append((item, identifier, dosage_value, dosage_unit))
-        if issues:
-            raise BusinessError(
-                "OCR_CONFIRMATION_INVALID",
-                "Resolve the highlighted fields before importing.",
-                422,
-                details={"fields": [issue.as_dict() for issue in issues]},
-            )
         if not self.repository.claim_confirmation(task.id, now=utc_now()):
             self.session.rollback()
             raise BusinessError(

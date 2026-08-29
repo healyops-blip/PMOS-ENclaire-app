@@ -38,6 +38,46 @@ class _FieldErrorApiClient extends ApiClient {
 }
 
 void main() {
+  testWidgets('confirm screen only shows the report JSON allowlisted fields', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildPomiTheme(),
+        home: const OcrConfirmScreen(
+          resultId: 'result-1',
+          revisionId: 'rev-1',
+          materialType: 'outpatient_record',
+          resultSource: 'qwen3-vl',
+          draft: {
+            'doc_id': 'MR00020',
+            'hospital': '测试医院',
+            'evidence': 'internal evidence',
+            'model': 'internal model metadata',
+            'examinations': [
+              {
+                'item_name': '体温',
+                'value': '37.3',
+                'unit': '℃',
+                'reference_range': '36-37.5',
+                'abnormal': false,
+                'source_text': 'internal source text',
+              },
+            ],
+            'medication_suggestions': <Map<String, dynamic>>[],
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('MR00020'), findsOneWidget);
+    expect(find.text('测试医院'), findsOneWidget);
+    expect(find.text('internal evidence'), findsNothing);
+    expect(find.text('internal model metadata'), findsNothing);
+    expect(find.text('internal source text'), findsNothing);
+  });
+
   testWidgets('confirm screen surfaces backend field errors on each row', (
     tester,
   ) async {

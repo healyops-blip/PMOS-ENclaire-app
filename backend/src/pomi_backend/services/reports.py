@@ -727,6 +727,8 @@ class ReportSnapshotService:
                     point_reason = "missing_valid_date"
                 elif date.fromisoformat(item["trend_date"]) > self.business_date:
                     point_reason = "future_date"
+                elif normalized_value is None:
+                    point_reason = "missing_numeric_value"
                 elif target_unit and normalized_unit != target_unit:
                     converted = self._convert_lab_value(
                         metric_id,
@@ -1022,6 +1024,8 @@ class ReportSnapshotService:
 
     @staticmethod
     def _abnormal_status(item: LabObservation) -> str:
+        if item.numeric_value is None:
+            return "unknown"
         if item.reference_lower is None and item.reference_upper is None:
             return "unknown"
         if item.reference_lower is not None and item.numeric_value < item.reference_lower:
@@ -1062,7 +1066,7 @@ class ReportSnapshotService:
     @staticmethod
     def _convert_lab_value(
         metric_id: str,
-        value: float,
+        value: float | None,
         from_unit: str | None,
         to_unit: str,
     ) -> float | None:
@@ -1075,7 +1079,7 @@ class ReportSnapshotService:
             ("testosterone", "nmol/L", "ng/dL"): 1 / 0.0347,
         }
         factor = conversions.get((metric_id, from_unit, to_unit))
-        return round(value * factor, 6) if factor is not None else None
+        return round(value * factor, 6) if factor is not None and value is not None else None
 
     @staticmethod
     def _hormone_context_incomplete(metric_id: str, items: list[dict[str, Any]]) -> bool:

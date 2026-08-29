@@ -192,7 +192,7 @@ class ApiClient {
                 : 'REQUEST_FAILED';
         throw ApiFailure(
           code,
-          _userMessage(code, null),
+          _userMessage(code, null, path: response.requestOptions.path),
           statusCode: response.statusCode,
           requestId: requestId,
           details:
@@ -225,7 +225,7 @@ class ApiClient {
           error.response?.headers.value('x-request-id');
       return ApiFailure(
         code,
-        _userMessage(code, retryAfter),
+        _userMessage(code, retryAfter, path: error.requestOptions.path),
         statusCode: error.response?.statusCode,
         retryAfterSeconds: retryAfter,
         requestId: requestId,
@@ -247,29 +247,38 @@ class ApiClient {
     return (body['error'] as Map)['code']?.toString();
   }
 
-  static String _userMessage(String code, int? retryAfter) => switch (code) {
-    'INVALID_CREDENTIALS' => '账号或密码错误',
-    'AUTHENTICATION_REQUIRED' => '登录状态已失效，请重新登录',
-    'ACCOUNT_NAME_TAKEN' => '该账号已存在，请直接登录或更换账号名',
-    'PHONE_NUMBER_TAKEN' => '该手机号已注册，请直接登录',
-    'VALIDATION_ERROR' => '账号或密码格式不符合要求，请检查后重试',
-    'AUTH_RATE_LIMITED' when retryAfter != null => '请求过于频繁，请在 $retryAfter 秒后重试',
-    'AUTH_RATE_LIMITED' => '请求过于频繁，请稍后重试',
-    'CYCLE_DATE_OVERLAP' => '该时间段与已有经期记录重叠',
-    'CYCLE_DATE_ORDER_INVALID' => '开始日期不能晚于结束日期',
-    'CYCLE_VERSION_CONFLICT' => '经期记录已在其他设备更新，请刷新后重试',
-    'CYCLE_NOT_FOUND' => '未找到该经期记录',
-    'OCR_NOT_CONFIGURED' => '识别服务未配置，请联系开发者',
-    'OCR_TIMEOUT' => '识别超时，请稍后重试',
-    'OCR_NETWORK_ERROR' => '识别服务网络异常，请稍后重试',
-    'OCR_FILE_INVALID' => '图片无法读取，请重新拍摄或选择更清晰的照片',
-    'OCR_RESPONSE_INVALID' => '识别结果解析失败，请重试',
-    'OCR_RESPONSE_TRUNCATED' => '报告内容较多，识别结果被截断，请重试或分段拍摄',
-    'OCR_HTTP_400' => '图片内容无法识别，请拍清楚一点后重试',
-    'OCR_HTTP_429' => '识别请求过于频繁，请稍后重试',
-    'OCR_CONFIRMATION_INVALID' => '报告中有项目未通过校验（如单位无法识别），请修正后重试',
-    _ => '请求失败，请稍后重试',
-  };
+  static String _userMessage(String code, int? retryAfter, {String? path}) {
+    // VALIDATION_ERROR 是后端通用的 422 错误码，并不只表示登录/注册。
+    // 只有认证接口才显示账号密码提示；报告、体重等业务提交要显示通用
+    // 的内容校验提示，避免用户点击“入库”时误以为账号密码有问题。
+    if (code == 'VALIDATION_ERROR' && !(path ?? '').startsWith('/api/auth/')) {
+      return '提交内容格式不正确，请检查报告字段后重试';
+    }
+    return switch (code) {
+      'INVALID_CREDENTIALS' => '账号或密码错误',
+      'AUTHENTICATION_REQUIRED' => '登录状态已失效，请重新登录',
+      'ACCOUNT_NAME_TAKEN' => '该账号已存在，请直接登录或更换账号名',
+      'PHONE_NUMBER_TAKEN' => '该手机号已注册，请直接登录',
+      'VALIDATION_ERROR' => '账号或密码格式不符合要求，请检查后重试',
+      'AUTH_RATE_LIMITED' when retryAfter != null =>
+        '请求过于频繁，请在 $retryAfter 秒后重试',
+      'AUTH_RATE_LIMITED' => '请求过于频繁，请稍后重试',
+      'CYCLE_DATE_OVERLAP' => '该时间段与已有经期记录重叠',
+      'CYCLE_DATE_ORDER_INVALID' => '开始日期不能晚于结束日期',
+      'CYCLE_VERSION_CONFLICT' => '经期记录已在其他设备更新，请刷新后重试',
+      'CYCLE_NOT_FOUND' => '未找到该经期记录',
+      'OCR_NOT_CONFIGURED' => '识别服务未配置，请联系开发者',
+      'OCR_TIMEOUT' => '识别超时，请稍后重试',
+      'OCR_NETWORK_ERROR' => '识别服务网络异常，请稍后重试',
+      'OCR_FILE_INVALID' => '图片无法读取，请重新拍摄或选择更清晰的照片',
+      'OCR_RESPONSE_INVALID' => '识别结果解析失败，请重试',
+      'OCR_RESPONSE_TRUNCATED' => '报告内容较多，识别结果被截断，请重试或分段拍摄',
+      'OCR_HTTP_400' => '图片内容无法识别，请拍清楚一点后重试',
+      'OCR_HTTP_429' => '识别请求过于频繁，请稍后重试',
+      'OCR_CONFIRMATION_INVALID' => '报告中有项目未通过校验（如单位无法识别），请修正后重试',
+      _ => '请求失败，请稍后重试',
+    };
+  }
 }
 
 /// In-memory API used by the local Web Preview.

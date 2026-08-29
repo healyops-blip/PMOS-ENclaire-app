@@ -614,6 +614,48 @@ class _JsonFields extends StatelessWidget {
     'source_category': '药物分类',
   };
 
+  // OCR 返回中还会带有用于审计/回放的内部字段（例如 evidence、source
+  // 坐标和模型元数据）。确认页只展示面向用户的报告 JSON 字段；完整草稿
+  // 仍保留在内存中，提交时不会因为隐藏展示字段而丢失临床文本字段。
+  static const _visibleTopLevelKeys = {
+    'doc_id',
+    'hospital',
+    'department',
+    'visit_date',
+    'diagnosis_summary',
+    'medical_advice',
+    'examinations',
+    'medication_suggestions',
+    'original_file_name',
+  };
+  static const _visibleExaminationKeys = {
+    'item_name',
+    'value',
+    'unit',
+    'reference_range',
+    'abnormal',
+  };
+  static const _visibleMedicationKeys = {
+    'drug_name',
+    'dosage',
+    'frequency',
+    'duration',
+    'instruction',
+    'source_text',
+  };
+
+  bool _isVisibleKey(Object key) {
+    final keyName = key.toString();
+    if (path.isEmpty) return _visibleTopLevelKeys.contains(keyName);
+    if (path.startsWith('examinations.')) {
+      return _visibleExaminationKeys.contains(keyName);
+    }
+    if (path.startsWith('medication_suggestions.')) {
+      return _visibleMedicationKeys.contains(keyName);
+    }
+    return true;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (value is Map) {
@@ -622,7 +664,10 @@ class _JsonFields extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children:
             map.entries
-                .where((entry) => entry.key != 'confidence')
+                .where(
+                  (entry) =>
+                      entry.key != 'confidence' && _isVisibleKey(entry.key),
+                )
                 .map(
                   (entry) => Padding(
                     padding: const EdgeInsets.only(bottom: 12),
@@ -746,19 +791,19 @@ Map<String, dynamic> buildOcrConfirmationPayload(
         'treatment_plan',
         'medical_advice',
       ])
-        if (draft[key] != null) key: draft[key],
+        key: draft[key],
       // 识别响应顶层统一用 hospital/department，schema 用 *_name。
-      if (draft['hospital'] != null) 'hospital_name': draft['hospital'],
-      if (draft['department'] != null) 'department_name': draft['department'],
+      'hospital_name': draft['hospital'],
+      'department_name': draft['department'],
     };
-    return {
+        return {
       'result_id': resultId,
       'expected_revision_id': revisionId,
       'document_type': materialType,
       'confirmed_data': confirmedData,
       'field_confirmations': <Map<String, dynamic>>[],
-      'confirm_all': true,
-    };
+          'confirm_all': true,
+        };
   }
 
   // 化验 / 医嘱：扁平确认契约。
