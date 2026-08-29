@@ -187,6 +187,12 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
           );
       ref.invalidate(trackingProvider);
       if (mounted) setState(() => _cycleEditorExpanded = false);
+    } on ApiFailure catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
     } finally {
       if (mounted) setState(() => _savingCycle = false);
     }
@@ -285,21 +291,29 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                             );
                             return;
                           }
-                          await ref
-                              .read(apiClientProvider)
-                              .post(
-                                '/api/cycles',
-                                data: {
-                                  'start_date': start
-                                      .toIso8601String()
-                                      .substring(0, 10),
-                                  'end_date': end?.toIso8601String().substring(
-                                    0,
-                                    10,
-                                  ),
-                                  'flow_level': flow,
-                                },
+                          try {
+                            await ref
+                                .read(apiClientProvider)
+                                .post(
+                                  '/api/cycles',
+                                  data: {
+                                    'start_date': start
+                                        .toIso8601String()
+                                        .substring(0, 10),
+                                    'end_date': end
+                                        ?.toIso8601String()
+                                        .substring(0, 10),
+                                    'flow_level': flow,
+                                  },
+                                );
+                          } on ApiFailure catch (error) {
+                            if (sheetContext.mounted) {
+                              ScaffoldMessenger.of(sheetContext).showSnackBar(
+                                SnackBar(content: Text(error.message)),
                               );
+                            }
+                            return;
+                          }
                           if (sheetContext.mounted) {
                             Navigator.pop(sheetContext, true);
                           }
@@ -590,6 +604,7 @@ class _HorizontalCycleCalendarState extends State<_HorizontalCycleCalendar> {
   Widget build(BuildContext context) {
     final selected = DateUtils.dateOnly(widget.selectedDay);
     final today = DateUtils.dateOnly(DateTime.now());
+    final selectedIsPeriod = _isPeriodDay(selected);
     final start = today.subtract(const Duration(days: 14));
     final dates = List.generate(
       29,
@@ -606,20 +621,43 @@ class _HorizontalCycleCalendarState extends State<_HorizontalCycleCalendar> {
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
+              child: Column(
                 children: [
-                  Expanded(
-                    child: Text(
-                      '${selected.month}月${selected.day}日 星期${weekday[selected.weekday - 1]}',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: pomiInk,
-                        fontSize: 18,
-                        height: 28 / 20,
-                        fontWeight: FontWeight.w800,
-                      ),
+                  Text(
+                    '${selected.month}月${selected.day}日 星期${weekday[selected.weekday - 1]}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: pomiInk,
+                      fontSize: 18,
+                      height: 28 / 20,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
+                  if (selectedIsPeriod) ...[
+                    const SizedBox(height: 2),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: pomiCoral,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        const Text(
+                          '经期中',
+                          style: TextStyle(
+                            color: pomiCoral,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

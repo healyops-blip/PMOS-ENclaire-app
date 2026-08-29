@@ -33,7 +33,9 @@ void main() {
     tester,
   ) async {
     usePhoneViewport(tester);
-    await tester.pumpWidget(app(const VisitRecordsPage()));
+    await tester.pumpWidget(
+      app(const VisitRecordsPage(visitsOverride: smokeVisitRecordDetails)),
+    );
 
     for (final visit in smokeVisitRecordDetails) {
       expect(find.byKey(ValueKey('visit-record-${visit.id}')), findsOneWidget);

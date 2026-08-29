@@ -252,6 +252,38 @@ paths:
         '422':
           $ref: '#/components/responses/ErrorResponse'
 
+  /api/medication-catalog:
+    get:
+      tags: [Medications]
+      operationId: listMedicationCatalog
+      summary: List reviewed static medication candidates
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+            maxLength: 100
+          description: Search the standard name and aliases.
+        - name: category
+          in: query
+          schema:
+            type: string
+            maxLength: 80
+      responses:
+        '200':
+          description: Static candidates for recognition and manual entry
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MedicationCatalogPage'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+
   /api/medications/{medication_id}:
     put:
       tags: [Medications]
@@ -756,6 +788,75 @@ paths:
         '403':
           $ref: '#/components/responses/ErrorResponse'
         '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/documents/{document_id}/revisions/{revision_id}/display:
+    get:
+      tags: [Documents]
+      operationId: getDocumentDisplayAsset
+      summary: Get the private POMI-watermarked display derivative status
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - $ref: '#/components/parameters/RevisionId'
+      responses:
+        '200':
+          description: Display derivative status; data is null before OCR succeeds
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        oneOf:
+                          - $ref: '#/components/schemas/DocumentDisplayAsset'
+                          - type: 'null'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/documents/{document_id}/revisions/{revision_id}/display/retry:
+    post:
+      tags: [Documents]
+      operationId: retryDocumentDisplayAsset
+      summary: Idempotently regenerate a failed or missing display derivative after OCR
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - $ref: '#/components/parameters/RevisionId'
+      responses:
+        '200':
+          description: Current display derivative state
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DocumentDisplayAsset'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/documents/{document_id}/revisions/{revision_id}/display/file:
+    get:
+      tags: [Documents]
+      operationId: downloadDocumentDisplayAsset
+      summary: Stream the private POMI-watermarked display image
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - $ref: '#/components/parameters/RevisionId'
+      responses:
+        '200':
+          description: Watermarked JPEG or PNG with ownership checks
+          content:
+            image/jpeg:
+              schema: {type: string, format: binary}
+            image/png:
+              schema: {type: string, format: binary}
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
           $ref: '#/components/responses/ErrorResponse'
 
   /api/ocr/tasks:
@@ -1484,6 +1585,13 @@ components:
       schema:
         type: string
         format: uuid
+    RevisionId:
+      name: revision_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     TaskId:
       name: task_id
       in: path
@@ -1848,6 +1956,10 @@ components:
           type: string
           minLength: 1
           maxLength: 200
+        standard_drug_id:
+          type: [string, 'null']
+          maxLength: 80
+          description: ID of a selected static candidate; null means user-defined medication.
         specification:
           type: [string, 'null']
           maxLength: 200
@@ -2039,6 +2151,86 @@ components:
                   type: array
                   items:
                     $ref: '#/components/schemas/Medication'
+
+    MedicationCatalogEntry:
+      type: object
+      required:
+        - id
+        - version
+        - source
+        - disclaimer
+        - name
+        - category
+        - item_type
+        - pcos_context
+        - dosage_forms
+        - strength_candidates
+        - aliases
+        - route
+        - usage_reference
+        - schedule_source
+        - user_editable
+        - can_prefill_reminder
+        - review_status
+        - record_status
+      properties:
+        id:
+          type: string
+        version:
+          type: string
+        source:
+          type: string
+        disclaimer:
+          type: string
+        name:
+          type: string
+        category:
+          type: string
+        item_type:
+          type: string
+        pcos_context:
+          type: string
+        dosage_forms:
+          type: array
+          items:
+            type: string
+        strength_candidates:
+          type: array
+          items:
+            type: string
+        aliases:
+          type: array
+          items:
+            type: string
+        route:
+          type: string
+        usage_reference:
+          type: string
+        schedule_source:
+          type: string
+        user_editable:
+          type: boolean
+        can_prefill_reminder:
+          type: boolean
+        review_status:
+          type: string
+        record_status:
+          type: string
+
+    MedicationCatalogPage:
+      type: object
+      required: [version, source, disclaimer, items]
+      properties:
+        version:
+          type: [string, 'null']
+        source:
+          type: [string, 'null']
+        disclaimer:
+          type: [string, 'null']
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MedicationCatalogEntry'
 
     MedicationDailyUpsert:
       type: object
@@ -2394,6 +2586,10 @@ components:
         purge_after:
           type: [string, 'null']
           format: date-time
+        display_asset:
+          oneOf:
+            - $ref: '#/components/schemas/DocumentDisplayAsset'
+            - type: 'null'
 
     DocumentRevision:
       type: object
@@ -2432,6 +2628,50 @@ components:
         created_at:
           type: string
           format: date-time
+        display_asset:
+          oneOf:
+            - $ref: '#/components/schemas/DocumentDisplayAsset'
+            - type: 'null'
+
+    DocumentDisplayAsset:
+      type: object
+      additionalProperties: false
+      required: [id, document_id, document_revision_id, asset_type, watermark_version, status, attempt_count]
+      properties:
+        id: {type: string, format: uuid}
+        document_id: {type: string, format: uuid}
+        document_revision_id: {type: string, format: uuid}
+        asset_type:
+          type: string
+          const: pomi_watermarked_display
+        watermark_version:
+          type: string
+          const: pomi-watermark-v2
+        status:
+          type: string
+          enum: [processing, ready, failed, unsupported, purged]
+        mime_type:
+          type: [string, 'null']
+          enum: [image/jpeg, image/png, null]
+        file_size_bytes: {type: [integer, 'null']}
+        file_hash:
+          type: [string, 'null']
+          pattern: '^[a-f0-9]{64}$'
+        pixel_width: {type: [integer, 'null']}
+        pixel_height: {type: [integer, 'null']}
+        attempt_count: {type: integer, minimum: 0}
+        generated_at: {type: [string, 'null'], format: date-time}
+        error:
+          oneOf:
+            - type: object
+              required: [code, message]
+              properties:
+                code: {type: string}
+                message: {type: string}
+            - type: 'null'
+        file_endpoint:
+          type: [string, 'null']
+          pattern: '^/api/documents/.+/revisions/.+/display/file$'
 
     DocumentDetail:
       allOf:
@@ -2886,6 +3126,10 @@ components:
         file_endpoint:
           type: string
           pattern: '^/api/documents/.+/revisions/.+/file$'
+        display_asset:
+          oneOf:
+            - $ref: '#/components/schemas/DocumentDisplayAsset'
+            - type: 'null'
 
     ClinicalFieldConfirmation:
       type: object
@@ -3616,6 +3860,10 @@ components:
         file_url:
           type: [string, 'null']
           format: uri-reference
+        display_asset:
+          oneOf:
+            - $ref: '#/components/schemas/DocumentDisplayAsset'
+            - type: 'null'
 
     ReportSummary:
       type: object

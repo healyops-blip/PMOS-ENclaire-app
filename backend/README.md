@@ -108,7 +108,14 @@ account. Neither operation is exposed as an HTTP endpoint.
 
 ## Medication API
 
+- `GET /api/medication-catalog` returns the versioned, authenticated Pomi static
+  candidate library. `q` searches names and aliases and `category` filters it.
+  Candidates are for recognition/display only; they never create a regimen or
+  reminder by themselves.
 - `GET/POST /api/medications` reads grouped current medications or creates one.
+- A manually created medication may include `standard_drug_id` from the catalog;
+  a user-defined medication leaves it null. Both cases are persisted in the
+  patient-owned `medication` table, separate from `medication_catalog`.
 - `PUT /api/medications/{id}` adjusts, pauses, resumes, or stops a medication.
 - Dose/frequency adjustments create a new row linked by `replaces_medication_id`.
 - `GET /api/medications/{id}/events` returns the immutable cross-version timeline.

@@ -1,9 +1,10 @@
-import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'smoke_report_fixture.dart';
+import '../features/auth/auth_controller.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 const apiBaseUrl = String.fromEnvironment(
@@ -20,7 +21,12 @@ final secureStorageProvider = Provider<FlutterSecureStorage>(
 
 final apiClientProvider = Provider<ApiClient>((ref) {
   final storage = ref.watch(secureStorageProvider);
-  return smokeMode ? SmokeApiClient(storage) : ApiClient(storage);
+  // Session 失效（AUTHENTICATION_REQUIRED）时刷新认证状态，
+  // 让路由守卫把用户带回登录页，避免各页面停留在 401 假崩溃状态。
+  void onAuthExpired() => ref.invalidate(authControllerProvider);
+  return smokeMode
+      ? SmokeApiClient(storage)
+      : ApiClient(storage, onAuthExpired: onAuthExpired);
 });
 
 class ApiFailure implements Exception {
@@ -30,6 +36,7 @@ class ApiFailure implements Exception {
     this.statusCode,
     this.retryAfterSeconds,
     this.requestId,
+    this.details,
   });
 
   final String code;
@@ -38,12 +45,25 @@ class ApiFailure implements Exception {
   final int? retryAfterSeconds;
   final String? requestId;
 
+  /// 后端 `error.details` 原样透传，供表单按 `fields[]` 高亮出错项。
+  final Map<String, dynamic>? details;
+
+  /// `error.details.fields` 规范化为 `[{path, code, message}]`。
+  List<Map<String, dynamic>> get fieldIssues {
+    final raw = details?['fields'];
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList(growable: false);
+  }
+
   @override
   String toString() => message;
 }
 
 class ApiClient {
-  ApiClient(this.storage, {String baseUrl = apiBaseUrl})
+  ApiClient(this.storage, {String baseUrl = apiBaseUrl, this.onAuthExpired})
     : dio = Dio(
         BaseOptions(
           baseUrl: baseUrl,
@@ -67,6 +87,7 @@ class ApiClient {
               storage.delete(key: sessionIdStorageKey),
               storage.delete(key: sessionExpiresAtStorageKey),
             ]);
+            onAuthExpired?.call();
           }
           handler.next(error);
         },
@@ -76,6 +97,7 @@ class ApiClient {
 
   final Dio dio;
   final FlutterSecureStorage storage;
+  final void Function()? onAuthExpired;
 
   Future<dynamic> get(
     String path, {
@@ -103,31 +125,27 @@ class ApiClient {
 
   Future<dynamic> upload(
     String path, {
-    required File file,
+    required Uint8List bytes,
+    required String filename,
     required String documentType,
   }) async {
     final data = FormData.fromMap({
       'document_type': documentType,
-      'file': await MultipartFile.fromFile(
-        file.path,
-        filename: file.uri.pathSegments.last,
-      ),
+      'file': MultipartFile.fromBytes(bytes, filename: filename),
     });
     return _request(() => dio.post(path, data: data));
   }
 
   Future<Map<String, dynamic>> recognizeOcr({
-    required File file,
+    required Uint8List bytes,
+    required String filename,
     required String materialType,
     required String promptVersion,
     required String consentVersion,
     required String idempotencyKey,
   }) async {
     final data = FormData.fromMap({
-      'file': await MultipartFile.fromFile(
-        file.path,
-        filename: file.uri.pathSegments.last,
-      ),
+      'file': MultipartFile.fromBytes(bytes, filename: filename),
       'material_type': materialType,
       'prompt_version': promptVersion,
     });
@@ -177,6 +195,12 @@ class ApiClient {
           _userMessage(code, null),
           statusCode: response.statusCode,
           requestId: requestId,
+          details:
+              apiError is Map
+                  ? Map<String, dynamic>.from(
+                    apiError['details'] as Map? ?? const {},
+                  )
+                  : null,
         );
       }
       if (body is Map && body.length == 1 && body.containsKey('data')) {
@@ -205,6 +229,9 @@ class ApiClient {
         statusCode: error.response?.statusCode,
         retryAfterSeconds: retryAfter,
         requestId: requestId,
+        details: Map<String, dynamic>.from(
+          apiError['details'] as Map? ?? const {},
+        ),
       );
     }
     return ApiFailure(
@@ -228,6 +255,19 @@ class ApiClient {
     'VALIDATION_ERROR' => '账号或密码格式不符合要求，请检查后重试',
     'AUTH_RATE_LIMITED' when retryAfter != null => '请求过于频繁，请在 $retryAfter 秒后重试',
     'AUTH_RATE_LIMITED' => '请求过于频繁，请稍后重试',
+    'CYCLE_DATE_OVERLAP' => '该时间段与已有经期记录重叠',
+    'CYCLE_DATE_ORDER_INVALID' => '开始日期不能晚于结束日期',
+    'CYCLE_VERSION_CONFLICT' => '经期记录已在其他设备更新，请刷新后重试',
+    'CYCLE_NOT_FOUND' => '未找到该经期记录',
+    'OCR_NOT_CONFIGURED' => '识别服务未配置，请联系开发者',
+    'OCR_TIMEOUT' => '识别超时，请稍后重试',
+    'OCR_NETWORK_ERROR' => '识别服务网络异常，请稍后重试',
+    'OCR_FILE_INVALID' => '图片无法读取，请重新拍摄或选择更清晰的照片',
+    'OCR_RESPONSE_INVALID' => '识别结果解析失败，请重试',
+    'OCR_RESPONSE_TRUNCATED' => '报告内容较多，识别结果被截断，请重试或分段拍摄',
+    'OCR_HTTP_400' => '图片内容无法识别，请拍清楚一点后重试',
+    'OCR_HTTP_429' => '识别请求过于频繁，请稍后重试',
+    'OCR_CONFIRMATION_INVALID' => '报告中有项目未通过校验（如单位无法识别），请修正后重试',
     _ => '请求失败，请稍后重试',
   };
 }
@@ -255,8 +295,12 @@ class SmokeApiClient extends ApiClient {
     'health_goal': '整理复诊资料，并与医生高效沟通',
     'external_ocr_notice_accepted_at': '2026-08-27T00:00:00Z',
     'onboarding_completed': true,
+    'created_at': '2026-08-27T00:00:00Z',
     'updated_at': '2026-08-27T00:00:00Z',
   };
+  Map<String, dynamic>? _onboardingBasic;
+  Map<String, dynamic>? _onboardingCycle;
+  Map<String, dynamic>? _onboardingMedications;
   final List<Map<String, dynamic>> _weights = List.generate(7, (index) {
     const values = [71.3, 70.5, 71.0, 70.7, 69.9, 70.4, 70.0];
     final timestamp =
@@ -303,6 +347,18 @@ class SmokeApiClient extends ApiClient {
 
   String _id(String prefix) => '$prefix-${_nextId++}';
 
+  String _now() => DateTime.now().toUtc().toIso8601String();
+
+  Map<String, dynamic> _onboardingDraft(String currentStep) => {
+    'id': 'smoke-onboarding',
+    'current_step': currentStep,
+    'basic': _onboardingBasic == null ? null : Map.of(_onboardingBasic!),
+    'cycle': _onboardingCycle == null ? null : Map.of(_onboardingCycle!),
+    'medications':
+        _onboardingMedications == null ? null : Map.of(_onboardingMedications!),
+    'updated_at': _now(),
+  };
+
   @override
   Future<dynamic> get(
     String path, {
@@ -314,6 +370,17 @@ class SmokeApiClient extends ApiClient {
         'account_name': 'smoke',
         'onboarding_completed': true,
       };
+    }
+    if (path == '/api/onboarding') {
+      final currentStep =
+          _onboardingMedications != null
+              ? 'complete'
+              : _onboardingCycle != null
+              ? 'medications'
+              : _onboardingBasic != null
+              ? 'cycle'
+              : 'basic';
+      return _onboardingDraft(currentStep);
     }
     if (path == '/api/patient/profile') return Map.of(_profile);
     if (path == '/api/weights') return _copyList(_weights);
@@ -427,6 +494,19 @@ class SmokeApiClient extends ApiClient {
         },
       };
     }
+    if (path == '/api/onboarding/complete') {
+      final updatedAt = _now();
+      _profile['onboarding_completed'] = true;
+      _profile['updated_at'] = updatedAt;
+      return {
+        'account': {
+          'uid': 'smoke-user',
+          'account_name': 'smoke',
+          'onboarding_completed': true,
+        },
+        'profile': Map.of(_profile),
+      };
+    }
     if (path == '/api/weights') {
       final item = {'id': _id('weight'), ...values};
       _weights.add(item);
@@ -460,6 +540,34 @@ class SmokeApiClient extends ApiClient {
     Map<String, String>? headers,
   }) async {
     final values = _map(data);
+    if (path == '/api/onboarding/steps/basic') {
+      final updatedAt = _now();
+      _onboardingBasic = {...values, 'updated_at': updatedAt};
+      _profile.addAll({
+        'nickname': values['nickname'],
+        'birth_year': values['birth_year'],
+        'diagnosis_year': values['diagnosis_year'],
+        'height_cm': values['height_cm'],
+        'updated_at': updatedAt,
+      });
+      return _onboardingDraft('cycle');
+    }
+    if (path == '/api/onboarding/steps/cycle') {
+      final updatedAt = _now();
+      _onboardingCycle = {...values, 'updated_at': updatedAt};
+      _profile.addAll({
+        'usual_cycle_min_days': values['usual_cycle_min_days'],
+        'usual_cycle_max_days': values['usual_cycle_max_days'],
+        'next_visit_date': values['next_visit_date'],
+        'updated_at': updatedAt,
+      });
+      return _onboardingDraft('medications');
+    }
+    if (path == '/api/onboarding/steps/medications') {
+      final updatedAt = _now();
+      _onboardingMedications = {...values, 'updated_at': updatedAt};
+      return _onboardingDraft('complete');
+    }
     if (path == '/api/patient/profile') {
       _profile.addAll(values);
       return Map.of(_profile);
@@ -496,17 +604,19 @@ class SmokeApiClient extends ApiClient {
   @override
   Future<dynamic> upload(
     String path, {
-    required File file,
+    required Uint8List bytes,
+    required String filename,
     required String documentType,
   }) async => {
     'id': _id('document'),
     'document_type': documentType,
-    'original_file_name': file.uri.pathSegments.last,
+    'original_file_name': filename,
   };
 
   @override
   Future<Map<String, dynamic>> recognizeOcr({
-    required File file,
+    required Uint8List bytes,
+    required String filename,
     required String materialType,
     required String promptVersion,
     required String consentVersion,
@@ -526,7 +636,7 @@ class SmokeApiClient extends ApiClient {
     'medical_advice': '请携带原件与医生复核。',
     'examinations': <Map<String, dynamic>>[],
     'medication_suggestions': <Map<String, dynamic>>[],
-    'original_file_name': file.uri.pathSegments.last,
+    'original_file_name': filename,
   };
 
   @override

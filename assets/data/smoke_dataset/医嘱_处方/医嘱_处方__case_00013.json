@@ -1,0 +1,36 @@
+{
+  "doc_id": "PR00013",
+  "hospital": "武汉康礼医疗中心Kangli Medical Center Wuhan",
+  "department": "生殖科",
+  "visit_date": "2026-08-18",
+  "diagnosis_summary": "多囊卵巢综合征（代谢异常需评估）",
+  "medical_advice": "控制体重，配合药物治疗及随访",
+  "examinations": [],
+  "medication_suggestions": [
+    {
+      "drug_name": "枸橼酸氯米芬",
+      "dosage": "50mg",
+      "frequency": "每日1次",
+      "duration": "5天",
+      "instruction": "示例医嘱：口服，每日一次，连用5天，按周期评估排卵（PCOS）。",
+      "source_text": "药品 枸橼酸氯米芬（舒经芬） 50mg 用法 口服 片剂 用量 每次1片，每日1次 疗程 5天 总量 28片"
+    },
+    {
+      "drug_name": "司美格鲁肽",
+      "dosage": "—",
+      "frequency": "每周1次",
+      "duration": "长期",
+      "instruction": "示例医嘱：皮下注射，每周一次，配合生活方式干预（PCOS）。",
+      "source_text": "药品 司美格鲁肽（司美格鲁肽注射液） — 用法 皮下注射 注射剂 用量 每次1支，每周1次 疗程 长期 总量 2支"
+    },
+    {
+      "drug_name": "利拉鲁肽",
+      "dosage": "—",
+      "frequency": "每日1次",
+      "duration": "长期",
+      "instruction": "示例医嘱：皮下注射，每日一次，根据反应调整，按需随访（PCOS）。",
+      "source_text": "药品 利拉鲁肽（利拉鲁肽注射液） — 用法 皮下注射 注射剂 用量 按医嘱，每日1次 疗程 长期 总量 2支"
+    }
+  ],
+  "original_file_name": "医嘱_处方__case_00013.jpg"
+}

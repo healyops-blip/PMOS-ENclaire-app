@@ -114,3 +114,59 @@ class MedicationCatalogCache {
 
   static void clearForTesting() => _cached = null;
 }
+
+/// Returns the Chinese generic name used by the UI for a known catalog item.
+///
+/// Patient records may contain an OCR/source-language name, so the API keeps
+/// that value for auditability. Presentation code should use this helper when
+/// rendering a medication name. Unknown custom medicines are left unchanged.
+String medicationDisplayName(Object? value, {Object? standardDrugId}) {
+  final id = standardDrugId?.toString().trim().toLowerCase();
+  const byId = <String, String>{
+    'med_ethinylestradiol_cyproterone_acetate': '炔雌醇环丙孕酮片',
+    'med_ethinylestradiol_drospirenone': '炔雌醇屈螺酮片',
+    'med_metformin_hydrochloride': '盐酸二甲双胍',
+    'rxnorm:metformin': '盐酸二甲双胍',
+    'med_spironolactone': '螺内酯',
+    'med_dydrogesterone': '地屈孕酮',
+    'med_micronized_progesterone': '黄体酮',
+    'med_medroxyprogesterone_acetate': '醋酸甲羟孕酮',
+    'med_semaglutide': '司美格鲁肽',
+    'med_liraglutide': '利拉鲁肽',
+    'supp_inositol': '肌醇',
+    'supp_vitamin_d3': '维生素D3',
+    'rxnorm:cholecalciferol': '维生素D3',
+    'supp_vitamin_b12': '维生素B12',
+    'supp_calcium_vitamin_d3': '钙维生素D复方制剂',
+    'med_letrozole': '来曲唑',
+    'med_clomiphene_citrate': '枸橼酸氯米芬',
+    'supp_folic_acid': '叶酸',
+    'pomi:folic-acid': '叶酸',
+    'otc_paracetamol': '对乙酰氨基酚',
+    'otc_ibuprofen': '布洛芬',
+    'otc_compound_paracetamol_amantadine': '复方氨酚烷胺制剂',
+    'otc_dextromethorphan': '右美沙芬',
+  };
+  if (id != null && byId.containsKey(id)) return byId[id]!;
+
+  final name = value?.toString().trim() ?? '';
+  if (name.isEmpty) return '未命名药品';
+  final normalized = name.toLowerCase().replaceAll(RegExp(r'[\s_-]'), '');
+  const aliases = <String, String>{
+    'metformin': '盐酸二甲双胍',
+    'metforminxr': '盐酸二甲双胍',
+    'metforminhydrochloride': '盐酸二甲双胍',
+    'folicacid': '叶酸',
+    'vitamind3': '维生素D3',
+    'vitamind': '维生素D3',
+    'cholecalciferol': '维生素D3',
+    'inositol': '肌醇',
+    'myoinositol': '肌醇',
+    'dchiroinositol': '肌醇',
+    'ibuprofen': '布洛芬',
+    'paracetamol': '对乙酰氨基酚',
+    'acetaminophen': '对乙酰氨基酚',
+    'dextromethorphan': '右美沙芬',
+  };
+  return aliases[normalized] ?? name;
+}

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
+import '../medications/medication_catalog.dart';
 
 final dashboardProvider = FutureProvider.autoDispose<Map<String, dynamic>>((
   ref,
@@ -51,6 +52,19 @@ final medicationsProvider =
                   : '$dosageValue$dosageUnit';
           return value;
         }),
+      );
+    });
+
+final medicationCatalogProvider =
+    FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+      final data = await ref
+          .read(apiClientProvider)
+          .get('/api/medication-catalog');
+      final page = Map<String, dynamic>.from(data as Map);
+      return List<Map<String, dynamic>>.from(
+        (page['items'] as List? ?? const []).map(
+          (item) => Map<String, dynamic>.from(item as Map),
+        ),
       );
     });
 
@@ -150,7 +164,7 @@ class _DashboardBody extends ConsumerWidget {
                         'Hi, Pomie!',
                         style: TextStyle(
                           color: pomiMuted,
-                          fontSize: 20,
+                          fontSize: 22,
                           height: 28 / 22,
                           fontWeight: FontWeight.w800,
                         ),
@@ -166,7 +180,7 @@ class _DashboardBody extends ConsumerWidget {
                   TextSpan(
                     style: const TextStyle(
                       color: pomiInk,
-                      fontSize: 28,
+                      fontSize: 32,
                       height: 40 / 32,
                       fontWeight: FontWeight.w800,
                     ),
@@ -214,7 +228,7 @@ class _DashboardBody extends ConsumerWidget {
                         maxLines: 1,
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 13,
+                          fontSize: 14,
                           height: 20 / 14,
                           fontWeight: FontWeight.w700,
                         ),
@@ -288,7 +302,7 @@ class _HomeActionButton extends StatelessWidget {
             label,
             style: const TextStyle(
               color: pomiInk,
-              fontSize: 13,
+              fontSize: 14,
               height: 20 / 14,
               fontWeight: FontWeight.w700,
             ),
@@ -309,103 +323,114 @@ class _LatestVisitStatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => PomiGlassCard(
     onTap: onTap,
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-    child: Column(
+    borderRadius: 20,
+    backgroundOpacity: .36,
+    padding: EdgeInsets.zero,
+    child: Stack(
       children: [
-        Row(
+        Column(
           children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: pomiPurple.withValues(alpha: .08),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Icon(
-                Icons.description_outlined,
-                color: pomiPurple,
-                size: 21,
-              ),
-            ),
-            const SizedBox(width: 10),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+              child: Row(
                 children: [
-                  Text(
-                    '激素六项化验单',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: pomiInk,
-                      fontSize: 14,
-                      height: 21 / 15,
-                      fontWeight: FontWeight.w700,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '2026-08-25',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '仁和医院',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 3),
+                        const Align(
+                          alignment: Alignment.center,
+                          child: Text(
+                            '区块链技术支持',
+                            style: TextStyle(
+                              color: pomiPurple,
+                              fontSize: 10,
+                              height: 14 / 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  SizedBox(height: 3),
-                  Text(
-                    '仁和医院 · 2026-08-25',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: pomiSecondaryText,
-                      fontSize: 11,
-                      height: 16 / 11,
-                      fontWeight: FontWeight.w400,
+                  const SizedBox(width: 8),
+                  const Column(
+                    children: [
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: pomiSecondaryText,
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        '详情',
+                        style: TextStyle(
+                          color: pomiSecondaryText,
+                          fontSize: 10,
+                          height: 14 / 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1, color: pomiLine),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 88,
+                    child: Text(
+                      '化验单',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: pomiPurple.withValues(alpha: .09),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '化验/检测',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: pomiPurple,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 9,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0x143B86C8),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: const Color(0x333B86C8)),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.schedule_outlined,
-                        color: Color(0xFF337EBB),
-                        size: 14,
-                      ),
-                      SizedBox(width: 4),
-                      Text(
-                        '未核验',
-                        style: TextStyle(
-                          color: Color(0xFF337EBB),
-                          fontSize: 11,
-                          height: 16 / 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
           ],
         ),
-        const SizedBox(height: 6),
-        const Center(
-          child: Text(
-            '区块链技术支持',
-            style: TextStyle(
-              color: pomiPurple,
-              fontSize: 10,
-              height: 14 / 10,
-              fontWeight: FontWeight.w600,
+        Positioned(
+          right: 28,
+          top: 4,
+          child: Opacity(
+            opacity: .50,
+            child: Transform.rotate(
+              angle: -math.pi / 12,
+              child: Image.asset(
+                'assets/images/pomi_verified_stamp.png',
+                width: 88,
+                height: 88,
+                filterQuality: FilterQuality.high,
+              ),
             ),
           ),
         ),
@@ -421,7 +446,15 @@ class MedicationManagementScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(medicationsProvider);
     return Scaffold(
-      appBar: AppBar(),
+      appBar: AppBar(
+        actions: [
+          IconButton(
+            tooltip: '添加用药',
+            onPressed: () => _addMedication(context, ref),
+            icon: const Icon(Icons.add),
+          ),
+        ],
+      ),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error:
@@ -442,7 +475,12 @@ class MedicationManagementScreen extends ConsumerWidget {
               active
                   .map(
                     (item) => _MedicationReminder(
-                      name: _shortMedicationName(item['drug_name']?.toString()),
+                      name: _shortMedicationName(
+                        medicationDisplayName(
+                          item['drug_name'],
+                          standardDrugId: item['standard_drug_id'],
+                        ),
+                      ),
                       time:
                           item['scheduled_time']
                                       ?.toString()
@@ -473,10 +511,17 @@ class MedicationManagementScreen extends ConsumerWidget {
                 _MonthlyMedicationCard(
                   rows: [
                     _MonthlyMedicationStatus(
+                      medicationId:
+                          active.isNotEmpty
+                              ? active[0]['id']?.toString()
+                              : null,
                       name:
                           active.isNotEmpty
                               ? _shortMedicationName(
-                                active[0]['drug_name']?.toString(),
+                                medicationDisplayName(
+                                  active[0]['drug_name'],
+                                  standardDrugId: active[0]['standard_drug_id'],
+                                ),
                               )
                               : '盐酸二甲双胍...',
                       taken: 22,
@@ -484,10 +529,17 @@ class MedicationManagementScreen extends ConsumerWidget {
                       unrecorded: 2,
                     ),
                     _MonthlyMedicationStatus(
+                      medicationId:
+                          active.length > 1
+                              ? active[1]['id']?.toString()
+                              : null,
                       name:
                           active.length > 1
                               ? _shortMedicationName(
-                                active[1]['drug_name']?.toString(),
+                                medicationDisplayName(
+                                  active[1]['drug_name'],
+                                  standardDrugId: active[1]['standard_drug_id'],
+                                ),
                               )
                               : '叶酸',
                       taken: 24,
@@ -495,10 +547,17 @@ class MedicationManagementScreen extends ConsumerWidget {
                       unrecorded: 1,
                     ),
                     _MonthlyMedicationStatus(
+                      medicationId:
+                          active.length > 2
+                              ? active[2]['id']?.toString()
+                              : null,
                       name:
                           active.length > 2
                               ? _shortMedicationName(
-                                active[2]['drug_name']?.toString(),
+                                medicationDisplayName(
+                                  active[2]['drug_name'],
+                                  standardDrugId: active[2]['standard_drug_id'],
+                                ),
                               )
                               : '维生素 D3',
                       taken: 25,
@@ -506,6 +565,9 @@ class MedicationManagementScreen extends ConsumerWidget {
                       unrecorded: 0,
                     ),
                   ],
+                  onRowTap:
+                      (status) =>
+                          _showMonthlyMedicationDetails(context, ref, status),
                 ),
               ],
               const SizedBox(height: 28),
@@ -526,86 +588,199 @@ class MedicationManagementScreen extends ConsumerWidget {
     final name = TextEditingController();
     final dose = TextEditingController();
     final frequency = TextEditingController();
+    final route = TextEditingController();
+    Map<String, dynamic>? selectedCandidate;
+    final catalogFuture = ref.read(medicationCatalogProvider.future);
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       builder:
-          (sheetContext) => Padding(
-            padding: EdgeInsets.fromLTRB(
-              20,
-              20,
-              20,
-              MediaQuery.viewInsetsOf(sheetContext).bottom + 24,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  '手动添加用药',
-                  style: Theme.of(sheetContext).textTheme.titleLarge,
+          (sheetContext) => StatefulBuilder(
+            builder: (context, setSheetState) {
+              return Padding(
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  20,
+                  20,
+                  MediaQuery.viewInsetsOf(sheetContext).bottom + 24,
                 ),
-                const SizedBox(height: 5),
-                Text(
-                  '适用于自行购买的药品或补剂，不替代上传医嘱。',
-                  style: Theme.of(sheetContext).textTheme.bodySmall,
+                child: SingleChildScrollView(
+                  child: FutureBuilder<List<Map<String, dynamic>>>(
+                    future: catalogFuture,
+                    builder: (context, snapshot) {
+                      final candidates = snapshot.data ?? const [];
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            '添加用药',
+                            style: Theme.of(sheetContext).textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            '可从 Pomi 候选库选择，也可以完全自定义。候选库只用于识别和展示，不会自动生成提醒方案。',
+                            style: Theme.of(sheetContext).textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: 16),
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting)
+                            const LinearProgressIndicator(),
+                          if (candidates.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            DropdownButtonFormField<String>(
+                              initialValue:
+                                  selectedCandidate?['id']?.toString(),
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Pomi 候选药品（可选）',
+                              ),
+                              items: [
+                                const DropdownMenuItem<String>(
+                                  value: null,
+                                  child: Text('自定义药品'),
+                                ),
+                                ...candidates.map(
+                                  (item) => DropdownMenuItem<String>(
+                                    value: item['id']?.toString(),
+                                    child: Text(
+                                      '${item['name']} · ${item['category']}',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              onChanged: (id) {
+                                final candidate =
+                                    candidates
+                                        .where(
+                                          (item) =>
+                                              item['id']?.toString() == id,
+                                        )
+                                        .firstOrNull;
+                                setSheetState(() {
+                                  selectedCandidate = candidate;
+                                  if (candidate != null) {
+                                    name.text =
+                                        candidate['name']?.toString() ?? '';
+                                    route.text =
+                                        candidate['route']?.toString() ?? '';
+                                    final strengths =
+                                        candidate['strength_candidates']
+                                            as List?;
+                                    if (strengths != null &&
+                                        strengths.isNotEmpty) {
+                                      dose.text = strengths.first.toString();
+                                    }
+                                  }
+                                });
+                              },
+                            ),
+                          ],
+                          if (snapshot.hasError)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                '候选库暂时不可用，仍可继续自定义添加。',
+                                style:
+                                    Theme.of(sheetContext).textTheme.bodySmall,
+                              ),
+                            ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: name,
+                            decoration: const InputDecoration(
+                              labelText: '药品名称',
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: dose,
+                            decoration: const InputDecoration(
+                              labelText: '每次用量 / 规格',
+                              hintText: '例如：500 mg、1 片',
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: frequency,
+                            decoration: const InputDecoration(
+                              labelText: '每日用量 / 频次',
+                              hintText: '例如：每日 2 次，早晚各 1 次',
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: route,
+                            decoration: const InputDecoration(
+                              labelText: '给药途径（可选）',
+                              hintText: '例如：口服、皮下注射',
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          FilledButton(
+                            onPressed: () async {
+                              if (name.text.trim().isEmpty) return;
+                              await ref
+                                  .read(apiClientProvider)
+                                  .post(
+                                    '/api/medications',
+                                    headers: {
+                                      'Idempotency-Key':
+                                          'manual-${DateTime.now().microsecondsSinceEpoch}',
+                                    },
+                                    data: {
+                                      'drug_name': name.text.trim(),
+                                      'standard_drug_id':
+                                          selectedCandidate?['id'],
+                                      'source_category':
+                                          _sourceCategoryForCandidate(
+                                            selectedCandidate,
+                                          ),
+                                      'specification':
+                                          dose.text.trim().isEmpty
+                                              ? null
+                                              : dose.text.trim(),
+                                      'frequency':
+                                          frequency.text.trim().isEmpty
+                                              ? null
+                                              : frequency.text.trim(),
+                                      'route':
+                                          route.text.trim().isEmpty
+                                              ? null
+                                              : route.text.trim(),
+                                    },
+                                  );
+                              if (sheetContext.mounted) {
+                                Navigator.pop(sheetContext, true);
+                              }
+                            },
+                            child: const Text('保存到我的用药'),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
                 ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: name,
-                  decoration: const InputDecoration(labelText: '药品名称'),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: dose,
-                  decoration: const InputDecoration(labelText: '剂量 / 规格'),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: frequency,
-                  decoration: const InputDecoration(labelText: '频次'),
-                ),
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: () async {
-                    if (name.text.trim().isEmpty) return;
-                    await ref
-                        .read(apiClientProvider)
-                        .post(
-                          '/api/medications',
-                          headers: {
-                            'Idempotency-Key':
-                                'manual-${DateTime.now().microsecondsSinceEpoch}',
-                          },
-                          data: {
-                            'drug_name': name.text.trim(),
-                            'source_category': 'other_long_term',
-                            'specification':
-                                dose.text.trim().isEmpty
-                                    ? null
-                                    : dose.text.trim(),
-                            'frequency':
-                                frequency.text.trim().isEmpty
-                                    ? null
-                                    : frequency.text.trim(),
-                          },
-                        );
-                    if (sheetContext.mounted) Navigator.pop(sheetContext, true);
-                  },
-                  child: const Text('添加'),
-                ),
-              ],
-            ),
+              );
+            },
           ),
     );
     name.dispose();
     dose.dispose();
     frequency.dispose();
+    route.dispose();
     if (saved == true) {
       ref.invalidate(medicationsProvider);
       ref.invalidate(dashboardProvider);
     }
   }
+}
+
+String _sourceCategoryForCandidate(Map<String, dynamic>? candidate) {
+  if (candidate?['item_type']?.toString() == '补充剂') return 'supplement';
+  if (candidate?['item_type']?.toString() == '处方药') return 'prescribed';
+  return 'other_long_term';
 }
 
 String _shortMedicationName(String? value) {
@@ -733,7 +908,12 @@ class _ReminderRow extends StatelessWidget {
           ),
           const SizedBox(width: 4),
           IconButton(
-            onPressed: () {},
+            tooltip: '提醒设置',
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('提醒时间设置将在通知服务接通后可用')),
+              );
+            },
             style: IconButton.styleFrom(
               backgroundColor: pomiLavender.withValues(alpha: .85),
               foregroundColor: pomiPurple,
@@ -749,16 +929,330 @@ class _ReminderRow extends StatelessWidget {
 
 class _MonthlyMedicationStatus {
   const _MonthlyMedicationStatus({
+    this.medicationId,
     required this.name,
     required this.taken,
     required this.missed,
     required this.unrecorded,
   });
 
+  final String? medicationId;
   final String name;
   final int taken;
   final int missed;
   final int unrecorded;
+}
+
+Future<void> _showMonthlyMedicationDetails(
+  BuildContext context,
+  WidgetRef ref,
+  _MonthlyMedicationStatus summary,
+) async {
+  final medicationId = summary.medicationId;
+  if (medicationId == null || medicationId.isEmpty) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('当前用药缺少记录编号，暂时无法查看本月明细')));
+    return;
+  }
+  final today = DateUtils.dateOnly(DateTime.now());
+  final from = DateTime(today.year, today.month);
+  final future = ref
+      .read(apiClientProvider)
+      .get(
+        '/api/medication-daily',
+        queryParameters: {
+          'from':
+              '${from.year.toString().padLeft(4, '0')}-${from.month.toString().padLeft(2, '0')}-01',
+          'to': today.toIso8601String().substring(0, 10),
+          'medication_id': medicationId,
+        },
+      );
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder:
+        (_) => _MonthlyMedicationDetailsSheet(
+          medicationName: summary.name,
+          month: today,
+          recordsFuture: future,
+        ),
+  );
+}
+
+class _MonthlyMedicationDetailsSheet extends StatelessWidget {
+  const _MonthlyMedicationDetailsSheet({
+    required this.medicationName,
+    required this.month,
+    required this.recordsFuture,
+  });
+
+  final String medicationName;
+  final DateTime month;
+  final Future<dynamic> recordsFuture;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<dynamic>(
+      future: recordsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 280,
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (snapshot.hasError) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  '$medicationName · 本月用药',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 12),
+                const Text('暂时无法读取本月用药记录，请稍后重试。'),
+              ],
+            ),
+          );
+        }
+        final records = (snapshot.data as List? ?? const [])
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList(growable: false);
+        return _MonthlyMedicationCalendar(
+          medicationName: medicationName,
+          month: month,
+          records: records,
+        );
+      },
+    );
+  }
+}
+
+class _MonthlyMedicationCalendar extends StatelessWidget {
+  const _MonthlyMedicationCalendar({
+    required this.medicationName,
+    required this.month,
+    required this.records,
+  });
+
+  final String medicationName;
+  final DateTime month;
+  final List<Map<String, dynamic>> records;
+
+  @override
+  Widget build(BuildContext context) {
+    final statusByDate = <String, String>{};
+    for (final record in records) {
+      final rawDate = record['record_date']?.toString() ?? '';
+      if (rawDate.length < 10) continue;
+      statusByDate[rawDate.substring(0, 10)] =
+          record['intake_status']?.toString() ?? 'unrecorded';
+    }
+    final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
+    final firstWeekday = DateTime(month.year, month.month, 1).weekday % 7;
+    final cells = <int?>[
+      ...List<int?>.filled(firstWeekday, null),
+      for (var day = 1; day <= daysInMonth; day++) day,
+    ];
+    final missedDates = _datesWithStatus(statusByDate, 'missed');
+    final unrecordedDates = _datesWithStatus(statusByDate, 'unrecorded');
+    final takenCount = _datesWithStatus(statusByDate, 'taken').length;
+    DateTime? expectedFrom;
+    for (final date in statusByDate.keys) {
+      final parsed = DateTime.tryParse(date);
+      if (parsed != null &&
+          (expectedFrom == null || parsed.isBefore(expectedFrom))) {
+        expectedFrom = parsed;
+      }
+    }
+    final monthLabel = '${month.year}年${month.month}月';
+
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              '$medicationName · $monthLabel',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '已服用 $takenCount 天 · 主动漏服 ${missedDates.length} 天 · 未记录 ${unrecordedDates.length} 天',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 18),
+            const Row(
+              children: [
+                _MonthWeekdayLabel('日'),
+                _MonthWeekdayLabel('一'),
+                _MonthWeekdayLabel('二'),
+                _MonthWeekdayLabel('三'),
+                _MonthWeekdayLabel('四'),
+                _MonthWeekdayLabel('五'),
+                _MonthWeekdayLabel('六'),
+              ],
+            ),
+            const SizedBox(height: 6),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: cells.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 7,
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+              ),
+              itemBuilder: (context, index) {
+                final day = cells[index];
+                if (day == null) return const SizedBox.shrink();
+                final date = DateTime(month.year, month.month, day);
+                if (expectedFrom != null && date.isBefore(expectedFrom)) {
+                  return const SizedBox.shrink();
+                }
+                final key = date.toIso8601String().substring(0, 10);
+                final status = statusByDate[key] ?? 'unrecorded';
+                return _MonthStatusCell(day: day, status: status);
+              },
+            ),
+            const SizedBox(height: 18),
+            _DateListSection(
+              title: '主动漏服日期',
+              dates: missedDates,
+              color: pomiCoral,
+              emptyLabel: '本月没有主动漏服记录',
+            ),
+            const SizedBox(height: 10),
+            _DateListSection(
+              title: '未记录日期',
+              dates: unrecordedDates,
+              color: pomiSecondaryText,
+              emptyLabel: '本月每天都有状态记录',
+            ),
+            const SizedBox(height: 14),
+            Text(
+              '灰色日期表示尚未记录，不等同于漏服。',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<String> _datesWithStatus(Map<String, String> statuses, String status) =>
+      statuses.entries
+          .where((entry) => entry.value == status)
+          .map((entry) => entry.key)
+          .toList()
+        ..sort();
+}
+
+class _MonthWeekdayLabel extends StatelessWidget {
+  const _MonthWeekdayLabel(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Center(
+      child: Text(label, style: Theme.of(context).textTheme.labelSmall),
+    ),
+  );
+}
+
+class _MonthStatusCell extends StatelessWidget {
+  const _MonthStatusCell({required this.day, required this.status});
+
+  final int day;
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    final (background, foreground) = switch (status) {
+      'taken' => (pomiSuccess.withValues(alpha: .14), pomiSuccess),
+      'missed' => (pomiCoral.withValues(alpha: .30), const Color(0xFFB85E4D)),
+      _ => (pomiLine.withValues(alpha: .72), pomiSecondaryText),
+    };
+    return Tooltip(
+      message: switch (status) {
+        'taken' => '已服用',
+        'missed' => '主动漏服',
+        _ => '未记录',
+      },
+      child: Container(
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: foreground.withValues(alpha: .14)),
+        ),
+        child: Text(
+          '$day',
+          style: TextStyle(
+            color: foreground,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DateListSection extends StatelessWidget {
+  const _DateListSection({
+    required this.title,
+    required this.dates,
+    required this.color,
+    required this.emptyLabel,
+  });
+
+  final String title;
+  final List<String> dates;
+  final Color color;
+  final String emptyLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final labels = dates.map((date) => '${int.parse(date.substring(8, 10))}日');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        if (dates.isEmpty)
+          Text(emptyLabel, style: Theme.of(context).textTheme.bodySmall)
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children:
+                labels
+                    .map(
+                      (label) => Chip(
+                        label: Text(label),
+                        labelStyle: TextStyle(
+                          color: color,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        backgroundColor: color.withValues(alpha: .12),
+                        side: BorderSide.none,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    )
+                    .toList(),
+          ),
+      ],
+    );
+  }
 }
 
 class _CurrentMedicationCard extends StatelessWidget {
@@ -789,16 +1283,19 @@ class _CurrentMedicationCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          items[index]['drug_name']?.toString() ?? '未命名用药',
+                          medicationDisplayName(
+                            items[index]['drug_name'],
+                            standardDrugId: items[index]['standard_drug_id'],
+                          ),
                           style: Theme.of(
                             context,
-                          ).textTheme.titleMedium?.copyWith(fontSize: 14),
+                          ).textTheme.titleMedium?.copyWith(fontSize: 15),
                         ),
                         const SizedBox(height: 3),
                         if ((items[index]['dosage_text']?.toString() ?? '')
                             .isNotEmpty)
                           Text(
-                            items[index]['dosage_text'].toString(),
+                            '每次用量：${items[index]['dosage_text']}',
                             style: Theme.of(
                               context,
                             ).textTheme.bodySmall?.copyWith(fontSize: 12),
@@ -806,7 +1303,7 @@ class _CurrentMedicationCard extends StatelessWidget {
                         if ((items[index]['frequency']?.toString() ?? '')
                             .isNotEmpty)
                           Text(
-                            items[index]['frequency'].toString(),
+                            '每日用量：${items[index]['frequency']}',
                             style: Theme.of(
                               context,
                             ).textTheme.bodySmall?.copyWith(fontSize: 12),
@@ -827,9 +1324,10 @@ class _CurrentMedicationCard extends StatelessWidget {
 }
 
 class _MonthlyMedicationCard extends StatelessWidget {
-  const _MonthlyMedicationCard({required this.rows});
+  const _MonthlyMedicationCard({required this.rows, required this.onRowTap});
 
   final List<_MonthlyMedicationStatus> rows;
+  final ValueChanged<_MonthlyMedicationStatus> onRowTap;
 
   @override
   Widget build(BuildContext context) {
@@ -840,7 +1338,7 @@ class _MonthlyMedicationCard extends StatelessWidget {
       child: Column(
         children: [
           for (final row in rows) ...[
-            _MonthlyMedicationRow(status: row),
+            _MonthlyMedicationRow(status: row, onTap: () => onRowTap(row)),
             if (row != rows.last) const SizedBox(height: 14),
           ],
           const SizedBox(height: 18),
@@ -860,56 +1358,74 @@ class _MonthlyMedicationCard extends StatelessWidget {
 }
 
 class _MonthlyMedicationRow extends StatelessWidget {
-  const _MonthlyMedicationRow({required this.status});
+  const _MonthlyMedicationRow({required this.status, required this.onTap});
 
   final _MonthlyMedicationStatus status;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 105,
-          child: Text(
-            status.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-          ),
-        ),
-        SizedBox(
-          width: 78,
-          child: Row(
-            children: List.generate(
-              8,
-              (index) => Expanded(
-                child: Container(
-                  height: 9,
-                  margin: EdgeInsets.only(right: index == 7 ? 0 : 4),
-                  decoration: BoxDecoration(
-                    color: pomiSuccess,
-                    borderRadius: BorderRadius.circular(3),
+    return Semantics(
+      button: true,
+      label: '查看${status.name}本月用药记录',
+      onTap: onTap,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 5),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 105,
+                  child: Text(
+                    status.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-              ),
+                SizedBox(
+                  width: 78,
+                  child: Row(
+                    children: List.generate(
+                      8,
+                      (index) => Expanded(
+                        child: Container(
+                          height: 9,
+                          margin: EdgeInsets.only(right: index == 7 ? 0 : 4),
+                          decoration: BoxDecoration(
+                            color: pomiSuccess,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '已服用 ${status.taken} · 漏服 ${status.missed} · 未记录 ${status.unrecorded}',
+                      maxLines: 1,
+                      style: Theme.of(context).textTheme.labelSmall,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.chevron_right, size: 17, color: pomiMuted),
+              ],
             ),
           ),
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              '已服用 ${status.taken} · 漏服 ${status.missed} · 未记录 ${status.unrecorded}',
-              maxLines: 1,
-              style: Theme.of(context).textTheme.labelSmall,
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -975,7 +1491,10 @@ class _MedicationHistoryCard extends StatelessWidget {
                 : [
                   for (var index = 0; index < records.length; index++) ...[
                     _MedicationHistoryRow(
-                      name: records[index]['drug_name']?.toString() ?? '未命名用药',
+                      name: medicationDisplayName(
+                        records[index]['drug_name'],
+                        standardDrugId: records[index]['standard_drug_id'],
+                      ),
                       detail: _medicationHistoryDetail(records[index]),
                       onRejoin: onRejoin,
                     ),
@@ -1118,7 +1637,7 @@ class _MedicationProgressCard extends StatelessWidget {
                   maxLines: 1,
                   style: TextStyle(
                     color: pomiInk,
-                    fontSize: 16,
+                    fontSize: 18,
                     height: 26 / 18,
                     fontWeight: FontWeight.w800,
                   ),
@@ -1215,9 +1734,8 @@ class _MedicationProgressRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final status = medicine['today_status']?.toString() ?? 'unrecorded';
     final isPending = status == 'unrecorded';
-    final details = [medicine['dosage_text'], medicine['frequency']]
-        .where((value) => value != null && value.toString().trim().isNotEmpty)
-        .join(' · ');
+    final dosage = medicine['dosage_text']?.toString().trim() ?? '';
+    final dailyAmount = medicine['frequency']?.toString().trim() ?? '';
     final time =
         medicine['scheduled_time']?.toString().trim().isNotEmpty == true
             ? medicine['scheduled_time'].toString()
@@ -1246,7 +1764,7 @@ class _MedicationProgressRow extends ConsumerWidget {
               time,
               style: const TextStyle(
                 color: pomiSecondaryText,
-                fontSize: 12,
+                fontSize: 13,
                 height: 18 / 13,
                 fontWeight: FontWeight.w400,
               ),
@@ -1258,20 +1776,22 @@ class _MedicationProgressRow extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  medicine['drug_name'].toString(),
+                  medicationDisplayName(
+                    medicine['drug_name'],
+                    standardDrugId: medicine['standard_drug_id'],
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: isPending ? pomiInk : pomiSecondaryText,
-                    fontSize: 14,
+                    fontSize: 15,
                     height: 21 / 15,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                if (details.isNotEmpty) ...[
-                  const SizedBox(height: 2),
+                if (dosage.isNotEmpty)
                   Text(
-                    details,
+                    '每次用量：$dosage',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -1281,7 +1801,18 @@ class _MedicationProgressRow extends ConsumerWidget {
                       fontWeight: FontWeight.w400,
                     ),
                   ),
-                ],
+                if (dailyAmount.isNotEmpty)
+                  Text(
+                    '每日用量：$dailyAmount',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: pomiSecondaryText,
+                      fontSize: 12,
+                      height: 17 / 12,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -1332,7 +1863,7 @@ class _MedicationProgressRow extends ConsumerWidget {
                         '去记录',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 12,
+                          fontSize: 13,
                           height: 18 / 13,
                           fontWeight: FontWeight.w700,
                         ),

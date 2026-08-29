@@ -1,5 +1,8 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pmos_enclaire/core/api_client.dart';
 import 'package:pmos_enclaire/features/auth/onboarding_repository.dart';
+import 'package:pmos_enclaire/features/medications/medication_repository.dart';
 
 import 'support/fake_api_client.dart';
 
@@ -108,6 +111,83 @@ void main() {
       expect(result.profile.diagnosisYear, isNull);
     },
   );
+
+  test(
+    'tolerates numeric strings for height_cm in legacy draft responses',
+    () async {
+      final api = FakeApiClient(
+        handler:
+            (call) => {
+              'id': 'draft-1',
+              'current_step': 'basic',
+              // Legacy server draft serialized Decimal as a string.
+              'basic': {
+                'nickname': 'Pomi',
+                'birth_year': 1997,
+                'diagnosis_year': null,
+                'height_cm': '165.5',
+                'weight_kg': '58.3',
+                'updated_at': null,
+              },
+              'cycle': null,
+              'medications': null,
+              'updated_at': '2026-08-28T01:02:03Z',
+            },
+      );
+
+      final loaded = await OnboardingRepository(api).getDraft();
+
+      expect(loaded.basic?.heightCm, 165.5);
+      expect(loaded.basic?.weightKg, 58.3);
+    },
+  );
+
+  test('Smoke onboarding preserves the complete response contract', () async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final repository = OnboardingRepository(
+      SmokeApiClient(const FlutterSecureStorage()),
+    );
+
+    final basic = await repository.saveBasic(
+      const OnboardingBasicDraft(
+        nickname: 'Pomi',
+        birthYear: 1997,
+        diagnosisYear: 2023,
+        heightCm: 165,
+        weightKg: 60,
+      ),
+    );
+    expect(basic.currentStep, OnboardingStep.cycle);
+
+    final cycle = await repository.saveCycle(
+      const OnboardingCycleDraft(
+        lastMenstrualStartDate: '2026-08-01',
+        usualCycleMinDays: 35,
+        usualCycleMaxDays: 45,
+        nextVisitDate: '2026-09-01',
+      ),
+    );
+    expect(cycle.currentStep, OnboardingStep.medications);
+
+    final medications = await repository.saveMedications(
+      const OnboardingMedicationsDraft(
+        items: [
+          OnboardingMedicationDraft(
+            drugName: '二甲双胍',
+            sourceCategory: MedicationSourceCategory.prescribed,
+          ),
+        ],
+      ),
+    );
+    expect(medications.currentStep, OnboardingStep.complete);
+
+    final completed = await repository.complete(
+      idempotencyKey: 'smoke-onboarding-complete',
+    );
+    expect(completed.account.onboardingCompleted, isTrue);
+    expect(completed.profile.onboardingCompleted, isTrue);
+    expect(completed.profile.nickname, 'Pomi');
+  });
 }
 
 Map<String, dynamic> _draft({

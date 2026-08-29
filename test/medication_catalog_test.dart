@@ -28,4 +28,16 @@ void main() {
     expect(catalog.search('格华止').single.name, '盐酸二甲双胍');
     expect(catalog.search('VD3').single.id, 'supp_vitamin_d3');
   });
+
+  test('display names use Chinese generics for known English records', () {
+    expect(medicationDisplayName('Metformin'), '盐酸二甲双胍');
+    expect(
+      medicationDisplayName(
+        'anything',
+        standardDrugId: 'med_metformin_hydrochloride',
+      ),
+      '盐酸二甲双胍',
+    );
+    expect(medicationDisplayName('自定义复合营养粉'), '自定义复合营养粉');
+  });
 }

@@ -156,6 +156,20 @@ class Qwen3VLOCRProvider:
             if self.client is None and "active_client" in locals():
                 active_client.close()
         try:
+            finish_reason = raw["choices"][0].get("finish_reason")
+        except (KeyError, IndexError, TypeError):
+            finish_reason = None
+        if finish_reason == "length":
+            # The provider hit its output token cap mid-JSON; the payload can
+            # never parse, so fail fast with an explicit retryable code
+            # instead of a generic "invalid response".
+            raise OCRProviderError(
+                "response_format",
+                "OCR_RESPONSE_TRUNCATED",
+                "OCR response was truncated by the provider output token limit.",
+                retryable=True,
+            )
+        try:
             content = raw["choices"][0]["message"]["content"]
             if isinstance(content, str) and content.startswith("```"):
                 content = content.strip("`")
@@ -172,6 +186,72 @@ class Qwen3VLOCRProvider:
                 retryable=True,
             ) from exc
         return OCRProviderResponse(raw_response=raw, payload=payload, source="qwen3-vl")
+
+
+class LocalDatasetOCRProvider:
+    """Deterministic OCR substitute for local development and UI integration."""
+
+    _directories = {
+        "lab_report": "化验_检测报告",
+        "medical_order": "医嘱_处方",
+        "imaging_text_report": "影像文字报告",
+        "outpatient_record": "门诊病历_就诊记录",
+    }
+
+    def __init__(self, dataset_root: Path) -> None:
+        self.dataset_root = dataset_root
+
+    def recognize(self, request: OCRProviderRequest) -> OCRProviderResponse:
+        directory = self._directories.get(request.material_type)
+        if directory is None:
+            raise OCRProviderError(
+                "provider_rejected",
+                "OCR_MATERIAL_TYPE_INVALID",
+                "Unsupported OCR material type.",
+                retryable=False,
+            )
+        candidates = sorted((self.dataset_root / directory).glob("*.json"))
+        if not candidates:
+            raise OCRProviderError(
+                "provider_unavailable",
+                "OCR_DATASET_NOT_FOUND",
+                "Local OCR dataset is not available.",
+                retryable=False,
+            )
+        # Stable selection keeps repeated UI runs deterministic while still
+        # matching the material type selected by the user.
+        index = int(request.file_hash[:8], 16) % len(candidates)
+        payload = json.loads(candidates[index].read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise OCRProviderError(
+                "response_format",
+                "OCR_RESPONSE_INVALID",
+                "Local OCR dataset entry is invalid.",
+                retryable=False,
+            )
+        payload["original_file_name"] = request.file_name
+        if request.material_type == "imaging_text_report":
+            examinations = payload.get("examinations") or []
+            findings = [
+                str(item.get("source_text") or "").strip()
+                for item in examinations
+                if isinstance(item, dict) and str(item.get("source_text") or "").strip()
+            ]
+            payload["findings_text"] = "\n".join(findings) or "影像检查结果见原件。"
+            payload["conclusion_text"] = (
+                str(payload.get("diagnosis_summary") or "").strip() or "影像检查结论见原件。"
+            )
+            payload["examined_at"] = payload.get("visit_date")
+            payload["reported_at"] = payload.get("visit_date")
+        elif request.material_type == "outpatient_record":
+            payload["hospital_name"] = payload.get("hospital")
+            payload["department_name"] = payload.get("department")
+            payload["treatment_plan"] = payload.get("medical_advice")
+        return OCRProviderResponse(
+            raw_response={"source": "local-dataset", "dataset_file": str(candidates[index])},
+            payload=payload,
+            source="local-dataset",
+        )
 
 
 def _provider_media_url(request: OCRProviderRequest) -> str:
