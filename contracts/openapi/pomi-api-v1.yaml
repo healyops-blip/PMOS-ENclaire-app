@@ -252,6 +252,38 @@ paths:
         '422':
           $ref: '#/components/responses/ErrorResponse'
 
+  /api/medication-catalog:
+    get:
+      tags: [Medications]
+      operationId: listMedicationCatalog
+      summary: List reviewed static medication candidates
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+            maxLength: 100
+          description: Search the standard name and aliases.
+        - name: category
+          in: query
+          schema:
+            type: string
+            maxLength: 80
+      responses:
+        '200':
+          description: Static candidates for recognition and manual entry
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MedicationCatalogPage'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+
   /api/medications/{medication_id}:
     put:
       tags: [Medications]
@@ -1848,6 +1880,10 @@ components:
           type: string
           minLength: 1
           maxLength: 200
+        standard_drug_id:
+          type: [string, 'null']
+          maxLength: 80
+          description: ID of a selected static candidate; null means user-defined medication.
         specification:
           type: [string, 'null']
           maxLength: 200
@@ -2039,6 +2075,86 @@ components:
                   type: array
                   items:
                     $ref: '#/components/schemas/Medication'
+
+    MedicationCatalogEntry:
+      type: object
+      required:
+        - id
+        - version
+        - source
+        - disclaimer
+        - name
+        - category
+        - item_type
+        - pcos_context
+        - dosage_forms
+        - strength_candidates
+        - aliases
+        - route
+        - usage_reference
+        - schedule_source
+        - user_editable
+        - can_prefill_reminder
+        - review_status
+        - record_status
+      properties:
+        id:
+          type: string
+        version:
+          type: string
+        source:
+          type: string
+        disclaimer:
+          type: string
+        name:
+          type: string
+        category:
+          type: string
+        item_type:
+          type: string
+        pcos_context:
+          type: string
+        dosage_forms:
+          type: array
+          items:
+            type: string
+        strength_candidates:
+          type: array
+          items:
+            type: string
+        aliases:
+          type: array
+          items:
+            type: string
+        route:
+          type: string
+        usage_reference:
+          type: string
+        schedule_source:
+          type: string
+        user_editable:
+          type: boolean
+        can_prefill_reminder:
+          type: boolean
+        review_status:
+          type: string
+        record_status:
+          type: string
+
+    MedicationCatalogPage:
+      type: object
+      required: [version, source, disclaimer, items]
+      properties:
+        version:
+          type: [string, 'null']
+        source:
+          type: [string, 'null']
+        disclaimer:
+          type: [string, 'null']
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MedicationCatalogEntry'
 
     MedicationDailyUpsert:
       type: object

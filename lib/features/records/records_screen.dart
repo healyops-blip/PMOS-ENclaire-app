@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -66,8 +67,7 @@ class RecordsScreen extends ConsumerWidget {
             }
             return _ReportsList(reports: reports);
           }
-          if (smokeMode) return const VisitRecordsPage();
-          return _DocumentsList(documents: documents);
+          return _DocumentsList(documents: documents, visitLayout: smokeMode);
         },
       ),
     );
@@ -190,12 +190,21 @@ class VisitRecordsPage extends StatelessWidget {
   );
 }
 
-class _DocumentsList extends StatelessWidget {
-  const _DocumentsList({required this.documents});
+class _DocumentsList extends StatefulWidget {
+  const _DocumentsList({required this.documents, this.visitLayout = false});
 
   final List<Map<String, dynamic>> documents;
+  final bool visitLayout;
+
+  @override
+  State<_DocumentsList> createState() => _DocumentsListState();
+}
+
+class _DocumentsListState extends State<_DocumentsList> {
+  String? _selectedType;
 
   static const labels = {
+    null: '全部',
     'lab_report': '化验 / 检测',
     'medical_order': '医嘱 / 处方',
     'imaging_text_report': '影像文字报告',
@@ -204,18 +213,28 @@ class _DocumentsList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (documents.isEmpty) {
-      return const _EmptyState(
-        icon: Icons.folder_open_outlined,
-        text: '还没有上传医疗资料',
-      );
-    }
+    final filtered =
+        _selectedType == null
+            ? widget.documents
+            : widget.documents
+                .where((item) => item['document_type'] == _selectedType)
+                .toList(growable: false);
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 96),
-      itemCount: documents.length,
+      itemCount: filtered.isEmpty ? 2 : filtered.length + 1,
       separatorBuilder: (context, index) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
-        final document = documents[index];
+        if (index == 0) return _buildHeader(context, filtered.length);
+        if (filtered.isEmpty) {
+          return const _EmptyState(
+            icon: Icons.folder_open_outlined,
+            text: '没有符合条件的医疗资料',
+          );
+        }
+        final document = filtered[index - 1];
+        if (widget.visitLayout) {
+          return _DatasetDocumentCard(document: document);
+        }
         return PomiGlassCard(
           child: ListTile(
             contentPadding: const EdgeInsets.symmetric(
@@ -246,6 +265,74 @@ class _DocumentsList extends StatelessWidget {
     );
   }
 
+  Widget _buildHeader(BuildContext context, int count) => Row(
+    children: [
+      Expanded(
+        child: Text(
+          _selectedType == null ? '全部记录' : labels[_selectedType]!,
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+      ),
+      if (_selectedType != null)
+        Padding(
+          padding: const EdgeInsets.only(right: 4),
+          child: Text('$count 条', style: Theme.of(context).textTheme.bodySmall),
+        ),
+      TextButton.icon(
+        key: const ValueKey('records-filter-button'),
+        onPressed: _showFilters,
+        icon: const Icon(Icons.filter_alt_outlined, size: 19),
+        label: const Text('筛选'),
+      ),
+    ],
+  );
+
+  Future<void> _showFilters() async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder:
+          (context) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('筛选记录', style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 10),
+                  for (final entry in labels.entries)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                        entry.key == null
+                            ? Icons.all_inbox_outlined
+                            : _DocumentIcon.iconForType(entry.key!),
+                        color: pomiPurple,
+                      ),
+                      title: Text(entry.value),
+                      trailing:
+                          _selectedType == entry.key
+                              ? const Icon(
+                                Icons.check_circle,
+                                color: pomiPurple,
+                              )
+                              : null,
+                      onTap:
+                          () =>
+                              Navigator.of(context).pop(entry.key ?? '__all__'),
+                    ),
+                ],
+              ),
+            ),
+          ),
+    );
+    if (!mounted) return;
+    final nextType = selected == '__all__' ? null : selected;
+    if (nextType == _selectedType) return;
+    setState(() => _selectedType = nextType);
+  }
+
   static String _statusLabel(String? status) => switch (status) {
     'confirmed' => '已确认',
     'succeeded' || 'fallback' => '待确认',
@@ -256,19 +343,171 @@ class _DocumentsList extends StatelessWidget {
   };
 }
 
+class _DatasetDocumentCard extends StatelessWidget {
+  const _DatasetDocumentCard({required this.document});
+
+  final Map<String, dynamic> document;
+
+  @override
+  Widget build(BuildContext context) {
+    final type = document['document_type']?.toString() ?? '';
+    final date = document['visit_date']?.toString() ?? '日期未记录';
+    final status = document['latest_ocr_status']?.toString();
+    final verified = status == 'confirmed';
+    final item = VisitRecordSummaryItem(
+      title: switch (type) {
+        'lab_report' => '化验单',
+        'medical_order' => '医嘱',
+        'imaging_text_report' => '影像报告',
+        'outpatient_record' => '门诊病历',
+        _ => '医疗资料',
+      },
+      category: switch (type) {
+        'lab_report' => VisitRecordCategory.lab,
+        'medical_order' => VisitRecordCategory.order,
+        'imaging_text_report' => VisitRecordCategory.imaging,
+        'outpatient_record' => VisitRecordCategory.outpatient,
+        _ => VisitRecordCategory.outpatient,
+      },
+      trailing: type == 'lab_report' ? '采样 $date' : date,
+    );
+    return PomiGlassCard(
+      key: ValueKey('dataset-document-${document['id']}'),
+      onTap:
+          () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => DocumentDetailScreen(document: document),
+            ),
+          ),
+      borderRadius: 20,
+      backgroundOpacity: .36,
+      child: Stack(
+        children: [
+          Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                date,
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                              const SizedBox(width: 8),
+                              _VisitStatusBadge(
+                                text: verified ? '已核验' : '未核验',
+                                tone:
+                                    verified
+                                        ? VisitVerificationState.verified
+                                        : VisitVerificationState.unverified,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 2,
+                            children: [
+                              if (document['hospital'] != null)
+                                Text(
+                                  document['hospital'].toString(),
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              if (document['department'] != null)
+                                Text(
+                                  document['department'].toString(),
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          const Align(
+                            alignment: Alignment.center,
+                            child: Text(
+                              '区块链技术支持',
+                              style: TextStyle(
+                                color: pomiPurple,
+                                fontSize: 10,
+                                height: 14 / 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Column(
+                      children: [
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: pomiSecondaryText,
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          '详情',
+                          style: TextStyle(
+                            color: pomiSecondaryText,
+                            fontSize: 10,
+                            height: 14 / 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, color: pomiLine),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                child: _VisitRecordRow(row: item),
+              ),
+            ],
+          ),
+          if (verified)
+            Positioned(
+              right: 28,
+              top: 4,
+              child: Opacity(
+                opacity: .50,
+                child: Transform.rotate(
+                  angle: -math.pi / 12,
+                  child: Image.asset(
+                    'assets/images/pomi_verified_stamp.png',
+                    width: 88,
+                    height: 88,
+                    filterQuality: FilterQuality.high,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _DocumentIcon extends StatelessWidget {
   const _DocumentIcon({required this.type});
 
   final String type;
 
+  static IconData iconForType(String type) => switch (type) {
+    'lab_report' => Icons.science_outlined,
+    'medical_order' => Icons.medication_outlined,
+    'imaging_text_report' => Icons.image_search_outlined,
+    _ => Icons.description_outlined,
+  };
+
   @override
   Widget build(BuildContext context) {
-    final icon = switch (type) {
-      'lab_report' => Icons.science_outlined,
-      'medical_order' => Icons.medication_outlined,
-      'imaging_text_report' => Icons.image_search_outlined,
-      _ => Icons.description_outlined,
-    };
+    final icon = iconForType(type);
     return CircleAvatar(
       backgroundColor: pomiMint.withValues(alpha: .15),
       foregroundColor: pomiTeal,
@@ -294,96 +533,112 @@ class _VisitRecordCard extends StatelessWidget {
           ),
       borderRadius: 20,
       backgroundOpacity: .36,
-      child: Column(
+      child: Stack(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+          Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            visit.date,
-                            style: Theme.of(context).textTheme.titleLarge,
+                          Row(
+                            children: [
+                              Text(
+                                visit.sampleDate ?? visit.date,
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: _VisitStatusBadge(
+                                  text: visit.verificationLabel,
+                                  tone: visit.verificationState,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: _VisitStatusBadge(
-                              text: visit.verificationLabel,
-                              tone: visit.verificationState,
+                          const SizedBox(height: 3),
+                          _VisitMetadataFields(visit: visit),
+                          const SizedBox(height: 3),
+                          const Align(
+                            alignment: Alignment.center,
+                            child: Text(
+                              '区块链技术支持',
+                              style: TextStyle(
+                                color: pomiPurple,
+                                fontSize: 10,
+                                height: 14 / 10,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 3),
-                      _VisitMetadataFields(visit: visit),
-                      if (visit.historyNote != null) ...[
-                        const SizedBox(height: 5),
+                    ),
+                    const SizedBox(width: 8),
+                    const Column(
+                      children: [
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: pomiSecondaryText,
+                        ),
+                        SizedBox(height: 2),
                         Text(
-                          '超过 6 个月 · 仅供参考',
-                          style: Theme.of(
-                            context,
-                          ).textTheme.labelSmall?.copyWith(
-                            color: const Color(0xFF9B6818),
-                            fontWeight: FontWeight.w700,
+                          '详情',
+                          style: TextStyle(
+                            color: pomiSecondaryText,
+                            fontSize: 10,
+                            height: 14 / 10,
                           ),
                         ),
                       ],
-                      const SizedBox(height: 3),
-                      const Align(
-                        alignment: Alignment.center,
-                        child: Text(
-                          '区块链技术支持',
-                          style: TextStyle(
-                            color: pomiPurple,
-                            fontSize: 10,
-                            height: 14 / 10,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Column(
-                  children: [
-                    Icon(Icons.chevron_right_rounded, color: pomiSecondaryText),
-                    SizedBox(height: 2),
-                    Text(
-                      '详情',
-                      style: TextStyle(
-                        color: pomiSecondaryText,
-                        fontSize: 10,
-                        height: 14 / 10,
-                      ),
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+              const Divider(height: 1, color: pomiLine),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                child: Column(
+                  children: [
+                    for (
+                      var index = 0;
+                      index < visit.summaryItems.length;
+                      index++
+                    ) ...[
+                      _VisitRecordRow(row: visit.summaryItems[index]),
+                      if (index != visit.summaryItems.length - 1)
+                        const SizedBox(height: 10),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
-          const Divider(height: 1, color: pomiLine),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-            child: Column(
-              children: [
-                for (
-                  var index = 0;
-                  index < visit.summaryItems.length;
-                  index++
-                ) ...[
-                  _VisitRecordRow(row: visit.summaryItems[index]),
-                  if (index != visit.summaryItems.length - 1)
-                    const SizedBox(height: 10),
-                ],
-              ],
+          if (visit.verificationState == VisitVerificationState.verified)
+            Positioned(
+              right: 28,
+              top: 4,
+              child: Semantics(
+                image: true,
+                label: '该就诊记录已核验',
+                child: Opacity(
+                  opacity: .50,
+                  child: Transform.rotate(
+                    angle: -math.pi / 12,
+                    child: Image.asset(
+                      'assets/images/pomi_verified_stamp.png',
+                      width: 88,
+                      height: 88,
+                      filterQuality: FilterQuality.high,
+                    ),
+                  ),
+                ),
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -485,6 +740,11 @@ class _VisitRecordRow extends StatelessWidget {
         '医嘱/处方',
         pomiMint.withValues(alpha: .12),
         const Color(0xFF169F91),
+      ),
+      VisitRecordCategory.imaging => (
+        '影像报告',
+        const Color(0xFFEDE5FF),
+        pomiPurple,
       ),
       VisitRecordCategory.outpatient => (
         '门诊病历',
@@ -662,21 +922,63 @@ class _DocumentDetailScreenState extends ConsumerState<DocumentDetailScreen> {
           const SizedBox(height: 18),
           _DetailRow(
             label: '材料类型',
-            value: widget.document['document_type'].toString(),
+            value: _documentTypeLabel(
+              widget.document['document_type']?.toString(),
+            ),
           ),
           _DetailRow(
             label: '上传时间',
             value: widget.document['uploaded_at'].toString(),
           ),
-          _DetailRow(
-            label: '文件大小',
-            value: '${widget.document['file_size_bytes']} bytes',
-          ),
+          if (widget.document['file_size_bytes'] != null)
+            _DetailRow(
+              label: '文件大小',
+              value: '${widget.document['file_size_bytes']} bytes',
+            ),
           _DetailRow(
             label: '识别状态',
             value: widget.document['latest_ocr_status']?.toString() ?? '未识别',
           ),
           _DetailRow(label: '修订标识', value: revisionId),
+          if (widget.document['hospital'] != null ||
+              widget.document['department'] != null ||
+              widget.document['visit_date'] != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: PomiGlassCard(
+                child: Column(
+                  children: [
+                    if (widget.document['hospital'] != null)
+                      _DetailRow(
+                        label: '医院',
+                        value: widget.document['hospital'].toString(),
+                      ),
+                    if (widget.document['department'] != null)
+                      _DetailRow(
+                        label: '科室',
+                        value: widget.document['department'].toString(),
+                      ),
+                    if (widget.document['visit_date'] != null)
+                      _DetailRow(
+                        label: '就诊日期',
+                        value: widget.document['visit_date'].toString(),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          if ((widget.document['diagnosis_summary']?.toString() ?? '')
+              .isNotEmpty)
+            _DocumentSection(
+              title: '诊断摘要',
+              child: Text(widget.document['diagnosis_summary'].toString()),
+            ),
+          if ((widget.document['medical_advice']?.toString() ?? '').isNotEmpty)
+            _DocumentSection(
+              title: '医疗建议',
+              child: Text(widget.document['medical_advice'].toString()),
+            ),
+          ..._documentSections(),
           const SizedBox(height: 20),
           OutlinedButton.icon(
             onPressed: _openOriginal,
@@ -718,6 +1020,110 @@ class _DocumentDetailScreenState extends ConsumerState<DocumentDetailScreen> {
       ),
     );
   }
+
+  List<Widget> _documentSections() {
+    final sections = <Widget>[];
+    final examinations = _documentItems('examinations');
+    if (examinations.isNotEmpty) {
+      sections.add(
+        _DocumentSection(
+          title: '检查指标',
+          child: Column(
+            children: [
+              for (final item in examinations)
+                ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(item['item_name']?.toString() ?? '检查项目'),
+                  subtitle: Text(
+                    [item['reference_range'], item['source_text']]
+                        .where(
+                          (value) =>
+                              value != null && value.toString().isNotEmpty,
+                        )
+                        .join(' · '),
+                  ),
+                  trailing: Text(
+                    [item['value'], item['unit']]
+                        .where(
+                          (value) =>
+                              value != null && value.toString().isNotEmpty,
+                        )
+                        .join(' '),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+    final medications = _documentItems('medication_suggestions');
+    if (medications.isNotEmpty) {
+      sections.add(
+        _DocumentSection(
+          title: '用药建议',
+          child: Column(
+            children: [
+              for (final item in medications)
+                ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(item['drug_name']?.toString() ?? '药品'),
+                  subtitle: Text(
+                    [item['frequency'], item['duration'], item['instruction']]
+                        .where(
+                          (value) =>
+                              value != null && value.toString().isNotEmpty,
+                        )
+                        .join(' · '),
+                  ),
+                  trailing: Text(item['dosage']?.toString() ?? ''),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+    return sections;
+  }
+
+  String _documentTypeLabel(String? type) => switch (type) {
+    'lab_report' => '化验 / 检测',
+    'medical_order' => '医嘱 / 处方',
+    'imaging_text_report' => '影像文字报告',
+    'outpatient_record' => '门诊病历',
+    _ => type ?? '未分类',
+  };
+
+  List<Map<String, dynamic>> _documentItems(String key) {
+    final value = widget.document[key];
+    if (value is! List) return const [];
+    return value
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList(growable: false);
+  }
+}
+
+class _DocumentSection extends StatelessWidget {
+  const _DocumentSection({required this.title, required this.child});
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 18),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        PomiGlassCard(padding: const EdgeInsets.all(15), child: child),
+      ],
+    ),
+  );
 }
 
 class ReconciliationScreen extends ConsumerStatefulWidget {

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
 
-enum VisitRecordCategory { lab, order, outpatient }
+enum VisitRecordCategory { lab, order, imaging, outpatient }
 
 enum VisitVerificationState { verified, pending, unverified, archived }
 
@@ -109,7 +109,7 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
     department: '生殖内分泌科',
     doctor: '陈医生',
     verificationState: VisitVerificationState.verified,
-    verificationLabel: '来源签署已记录｜模拟',
+    verificationLabel: '已核验',
     verificationTitle: '就诊记录快照 · 上传后版本',
     verificationDetail: '检测单 6 · 模拟医院 B · 版本 V2 · 签署 2026-08-26 10:31',
     sampleDate: '2026-08-25',
@@ -188,7 +188,7 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
     department: '妇科',
     doctor: '李医生',
     verificationState: VisitVerificationState.pending,
-    verificationLabel: '来源核验申请中',
+    verificationLabel: '未核验',
     verificationTitle: '医院来源核验处理中',
     verificationDetail: '门诊病历与医嘱已提交，核验结果不会改变患者原始记录。',
     summaryItems: [
@@ -226,7 +226,7 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
     doctor: '李医生',
     contextLabel: '就诊前检测',
     verificationState: VisitVerificationState.unverified,
-    verificationLabel: '患者上传｜来源未核验',
+    verificationLabel: '未核验',
     verificationTitle: '患者上传材料',
     verificationDetail: 'OCR 内容已经患者确认，但尚未取得医院来源签署。',
     sampleDate: '2026-06-18',
@@ -268,7 +268,7 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
     department: '妇科',
     doctor: '李医生',
     verificationState: VisitVerificationState.archived,
-    verificationLabel: '历史归档｜模拟',
+    verificationLabel: '未核验',
     verificationTitle: '历史门诊记录',
     verificationDetail: '该记录来自较早版本的门诊病历归档。',
     historyNote: '此数据超过 6 个月，仅供参考，请以近期复诊结果为准。',
@@ -291,7 +291,7 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
     department: '内分泌科',
     doctor: '周医生',
     verificationState: VisitVerificationState.archived,
-    verificationLabel: '历史归档｜模拟',
+    verificationLabel: '未核验',
     verificationTitle: '历史检测材料',
     verificationDetail: '检测结果已归档，参考范围以原始报告为准。',
     historyNote: '此数据超过 6 个月，仅供参考，请勿据此自行调整用药。',
@@ -376,10 +376,6 @@ class VisitRecordDetailScreen extends StatelessWidget {
                       _VisitHeroCard(visit: visit),
                       const SizedBox(height: 14),
                       _VerificationCard(visit: visit),
-                      if (visit.historyNote != null) ...[
-                        const SizedBox(height: 14),
-                        _HistoryNotice(message: visit.historyNote!),
-                      ],
                       if (visit.clinicalFields.isNotEmpty) ...[
                         const SizedBox(height: 22),
                         _ClinicalSection(fields: visit.clinicalFields),
@@ -447,7 +443,7 @@ class _VisitHeroCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          visit.date,
+                          visit.sampleDate ?? visit.date,
                           style: Theme.of(context).textTheme.headlineMedium,
                         ),
                         const SizedBox(height: 2),
@@ -604,39 +600,6 @@ class _VerificationCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _HistoryNotice extends StatelessWidget {
-  const _HistoryNotice({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) => PomiGlassCard(
-    borderRadius: 20,
-    backgroundOpacity: .24,
-    padding: const EdgeInsets.all(15),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Icon(
-          Icons.history_toggle_off_rounded,
-          color: Color(0xFFB47314),
-          size: 22,
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            message,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: const Color(0xFF7A561B),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
 }
 
 class _SectionTitle extends StatelessWidget {

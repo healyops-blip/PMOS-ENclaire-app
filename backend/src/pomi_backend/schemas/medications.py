@@ -15,6 +15,7 @@ class StrictRequest(BaseModel):
 
 class MedicationInstruction(StrictRequest):
     drug_name: str | None = Field(default=None, min_length=1, max_length=200)
+    standard_drug_id: str | None = Field(default=None, min_length=1, max_length=80)
     specification: str | None = Field(default=None, max_length=200)
     dosage_value: Decimal | None = Field(default=None, ge=0)
     dosage_unit: str | None = Field(default=None, max_length=32)

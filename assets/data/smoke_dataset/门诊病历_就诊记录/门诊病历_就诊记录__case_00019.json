@@ -1,0 +1,33 @@
+{
+  "doc_id": "MR00019",
+  "hospital": "南京青岚医院Qinglan Hospital Nanjing",
+  "department": "生殖科",
+  "visit_date": "2026-08-20",
+  "diagnosis_summary": "多囊卵巢综合征",
+  "medical_advice": "建议记录周期与症状变化，按计划复诊",
+  "examinations": [
+    {
+      "item_name": "体温",
+      "value": "37.3",
+      "unit": "℃",
+      "reference_range": "36-37.5",
+      "abnormal": false
+    },
+    {
+      "item_name": "心率",
+      "value": "69",
+      "unit": "次/分",
+      "reference_range": "60-100",
+      "abnormal": false
+    },
+    {
+      "item_name": "血压",
+      "value": "110/51",
+      "unit": "mmHg",
+      "reference_range": "90-140/60-90",
+      "abnormal": false
+    }
+  ],
+  "medication_suggestions": [],
+  "original_file_name": "门诊病历_就诊记录__case_00019.jpg"
+}

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
-import '../../core/api_client.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../profile/profile_screen.dart';
 import '../records/records_screen.dart';
@@ -17,14 +16,20 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _index = 0;
-  // The navigation entry opens the complete reports list by default.
-  int _recordsTab = 1;
+  // The records navigation entry must always start at the complete visit list.
+  // The report view is entered only through the explicit "指标看板" action.
+  int _recordsTab = 0;
   void _openTab(int index) {
     if (index == 2) {
       _showUploadDialog();
       return;
     }
-    setState(() => _index = index);
+    setState(() {
+      // The bottom "记录" tab is the visit-record entry point.  Do not reuse
+      // the report-viewer tab left by the dashboard's "指标看板" action.
+      if (index == 3) _recordsTab = 0;
+      _index = index;
+    });
   }
 
   Future<void> _showUploadDialog() async {
@@ -74,10 +79,7 @@ class _AppShellState extends State<AppShell> {
     ];
     return Scaffold(
       body: IndexedStack(index: _index, children: pages),
-      bottomNavigationBar:
-          smokeMode && _index == 3 && _recordsTab == 1
-              ? null
-              : _PomiBottomNav(index: _index, onSelected: _openTab),
+      bottomNavigationBar: _PomiBottomNav(index: _index, onSelected: _openTab),
     );
   }
 }

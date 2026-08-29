@@ -1,0 +1,52 @@
+{
+  "doc_id": "P00003",
+  "hospital": "广州和煦医院Hexu Hospital Guangzhou",
+  "department": "生殖科",
+  "visit_date": "2026-08-01",
+  "diagnosis_summary": "超声提示：右侧卵巢多囊样改变。",
+  "medical_advice": "建议结合临床与性激素水平评估PCOS情况，必要时复查",
+  "examinations": [
+    {
+      "item_name": "右卵巢",
+      "value": "34*21*25",
+      "unit": "mm",
+      "reference_range": "25-40*15-25*20-35",
+      "abnormal": false,
+      "source_text": "右卵巢：呈多囊样改变，大小测量（mm）:34*21*25。基础卵泡数目:>15个。"
+    },
+    {
+      "item_name": "右侧基础卵泡",
+      "value": "9",
+      "unit": "个",
+      "reference_range": "",
+      "abnormal": false,
+      "source_text": "右卵巢：呈多囊样改变，大小测量（mm）:34*21*25。基础卵泡数目:>15个。"
+    },
+    {
+      "item_name": "左卵巢",
+      "value": "31*21*26",
+      "unit": "mm",
+      "reference_range": "25-40*15-25*20-35",
+      "abnormal": false,
+      "source_text": "左卵巢：呈多囊样改变，大小测量（mm）:29*21*34。基础卵泡数目:>13个。"
+    },
+    {
+      "item_name": "左侧基础卵泡",
+      "value": "22",
+      "unit": "个",
+      "reference_range": "",
+      "abnormal": false,
+      "source_text": "左卵巢：呈多囊样改变，大小测量（mm）:29*21*34。基础卵泡数目:>13个。"
+    },
+    {
+      "item_name": "盆腔积液",
+      "value": "无",
+      "unit": "",
+      "reference_range": "无",
+      "abnormal": false,
+      "source_text": "宫腔内未见异常回声，提示：无"
+    }
+  ],
+  "medication_suggestions": [],
+  "original_file_name": "影像文字报告__case_00003.jpg"
+}

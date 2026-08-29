@@ -58,7 +58,8 @@
         await Promise.all(registrations.map((registration) => registration.unregister()));
       }
       const script = document.createElement('script');
-      script.src = 'flutter_bootstrap.js';
+      // Keep local preview builds out of the browser's script cache.
+      script.src = 'flutter_bootstrap.js?v=20260829-0051';
       script.async = true;
       document.body.appendChild(script);
     })();

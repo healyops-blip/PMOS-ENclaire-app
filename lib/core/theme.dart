@@ -180,14 +180,24 @@ ThemeData buildPomiTheme() {
       displayLarge: TextStyle(color: pomiInk),
       displayMedium: TextStyle(color: pomiInk),
       displaySmall: TextStyle(color: pomiInk),
-      headlineLarge: TextStyle(color: pomiInk),
+      headlineLarge: TextStyle(
+        fontSize: 32,
+        height: 40 / 32,
+        fontWeight: FontWeight.w800,
+        color: pomiInk,
+      ),
       headlineMedium: TextStyle(
         fontSize: 24,
         height: 32 / 24,
         fontWeight: FontWeight.w800,
         color: pomiInk,
       ),
-      headlineSmall: TextStyle(color: pomiInk),
+      headlineSmall: TextStyle(
+        fontSize: 20,
+        height: 28 / 20,
+        fontWeight: FontWeight.w800,
+        color: pomiInk,
+      ),
       titleLarge: TextStyle(
         fontSize: 18,
         height: 26 / 18,
@@ -200,13 +210,33 @@ ThemeData buildPomiTheme() {
         fontWeight: FontWeight.w700,
         color: pomiInk,
       ),
-      titleSmall: TextStyle(color: pomiInk),
-      bodyLarge: TextStyle(color: pomiInk),
+      titleSmall: TextStyle(
+        fontSize: 14,
+        height: 20 / 14,
+        fontWeight: FontWeight.w700,
+        color: pomiInk,
+      ),
+      bodyLarge: TextStyle(fontSize: 16, height: 24 / 16, color: pomiInk),
       bodyMedium: TextStyle(fontSize: 15, height: 24 / 15, color: pomiInk),
       bodySmall: TextStyle(fontSize: 13, height: 20 / 13, color: pomiMuted),
-      labelLarge: TextStyle(color: pomiInk),
-      labelMedium: TextStyle(color: pomiSecondaryText),
-      labelSmall: TextStyle(color: pomiSecondaryText),
+      labelLarge: TextStyle(
+        fontSize: 14,
+        height: 20 / 14,
+        fontWeight: FontWeight.w700,
+        color: pomiInk,
+      ),
+      labelMedium: TextStyle(
+        fontSize: 13,
+        height: 20 / 13,
+        fontWeight: FontWeight.w500,
+        color: pomiSecondaryText,
+      ),
+      labelSmall: TextStyle(
+        fontSize: 11,
+        height: 16 / 11,
+        fontWeight: FontWeight.w500,
+        color: pomiSecondaryText,
+      ),
     ),
     cardTheme: const CardThemeData(
       margin: EdgeInsets.zero,
@@ -244,7 +274,11 @@ ThemeData buildPomiTheme() {
       style: FilledButton.styleFrom(
         minimumSize: const Size(48, 50),
         shape: const StadiumBorder(),
-        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        textStyle: const TextStyle(
+          fontSize: 15,
+          height: 20 / 15,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -253,15 +287,36 @@ ThemeData buildPomiTheme() {
         minimumSize: const Size(48, 48),
         shape: const StadiumBorder(),
         side: const BorderSide(color: Color(0xFFD8CCE4)),
+        textStyle: const TextStyle(
+          fontSize: 14,
+          height: 20 / 14,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
-      style: TextButton.styleFrom(foregroundColor: pomiInk),
+      style: TextButton.styleFrom(
+        foregroundColor: pomiInk,
+        textStyle: const TextStyle(
+          fontSize: 14,
+          height: 20 / 14,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     ),
     listTileTheme: const ListTileThemeData(
       textColor: pomiInk,
-      titleTextStyle: TextStyle(color: pomiInk),
-      subtitleTextStyle: TextStyle(color: pomiSecondaryText),
+      titleTextStyle: TextStyle(
+        fontSize: 15,
+        height: 24 / 15,
+        fontWeight: FontWeight.w500,
+        color: pomiInk,
+      ),
+      subtitleTextStyle: TextStyle(
+        fontSize: 13,
+        height: 20 / 13,
+        color: pomiSecondaryText,
+      ),
     ),
     popupMenuTheme: const PopupMenuThemeData(
       textStyle: TextStyle(color: pomiInk),
@@ -275,6 +330,7 @@ ThemeData buildPomiTheme() {
       titleTextStyle: TextStyle(
         color: pomiInk,
         fontSize: 20,
+        height: 28 / 20,
         fontWeight: FontWeight.w800,
       ),
     ),
@@ -287,6 +343,7 @@ ThemeData buildPomiTheme() {
       labelTextStyle: WidgetStateProperty.resolveWith(
         (states) => TextStyle(
           fontSize: 11,
+          height: 16 / 11,
           fontWeight:
               states.contains(WidgetState.selected)
                   ? FontWeight.w700

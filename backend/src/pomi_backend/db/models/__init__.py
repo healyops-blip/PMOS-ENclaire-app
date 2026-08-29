@@ -13,6 +13,7 @@ from pomi_backend.db.models.health import (
     WeightRecord,
 )
 from pomi_backend.db.models.labs import LabObservation
+from pomi_backend.db.models.medication_catalog import MedicationCatalogEntry
 from pomi_backend.db.models.ocr import OCRFieldResult, OCRResult, OCRTask
 from pomi_backend.db.models.orders import (
     MedicalOrder,
@@ -25,6 +26,7 @@ __all__ = [
     "Document",
     "DocumentRevision",
     "Medication",
+    "MedicationCatalogEntry",
     "ImagingReport",
     "LabObservation",
     "MedicationDaily",

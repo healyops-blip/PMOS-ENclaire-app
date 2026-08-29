@@ -1,0 +1,103 @@
+{
+  "doc_id": "LA00010",
+  "hospital": "苏州澜汐医院Lanxi Hospital Suzhou",
+  "department": "生殖科",
+  "visit_date": "2026-08-20",
+  "diagnosis_summary": "",
+  "medical_advice": "建议生活方式干预（饮食+运动），必要时与内分泌科联合随访",
+  "examinations": [
+    {
+      "item_name": "白细胞计数",
+      "value": "6",
+      "unit": "×10^9/L",
+      "reference_range": "4-12",
+      "abnormal": false
+    },
+    {
+      "item_name": "红细胞计数",
+      "value": "5",
+      "unit": "×10^12/L",
+      "reference_range": "4-6",
+      "abnormal": false
+    },
+    {
+      "item_name": "血红蛋白",
+      "value": "122",
+      "unit": "g/L",
+      "reference_range": "110-180",
+      "abnormal": false
+    },
+    {
+      "item_name": "血小板计数",
+      "value": "177",
+      "unit": "×10^9/L",
+      "reference_range": "100-350",
+      "abnormal": false
+    },
+    {
+      "item_name": "谷丙转氨酶",
+      "value": "22",
+      "unit": "U/L",
+      "reference_range": "5-45",
+      "abnormal": false
+    },
+    {
+      "item_name": "谷草转氨酶",
+      "value": "14",
+      "unit": "U/L",
+      "reference_range": "5-45",
+      "abnormal": false
+    },
+    {
+      "item_name": "总胆红素",
+      "value": "21",
+      "unit": "μmol/L",
+      "reference_range": "3-25",
+      "abnormal": false
+    },
+    {
+      "item_name": "肌酐",
+      "value": "79",
+      "unit": "μmol/L",
+      "reference_range": "40-120",
+      "abnormal": false
+    },
+    {
+      "item_name": "空腹血糖",
+      "value": "3",
+      "unit": "mmol/L",
+      "reference_range": "3-8",
+      "abnormal": false
+    },
+    {
+      "item_name": "总胆固醇",
+      "value": "4",
+      "unit": "mmol/L",
+      "reference_range": "3-6",
+      "abnormal": false
+    },
+    {
+      "item_name": "甘油三酯",
+      "value": "1.4",
+      "unit": "mmol/L",
+      "reference_range": "0.5-2.5",
+      "abnormal": false
+    },
+    {
+      "item_name": "高密度脂蛋白",
+      "value": "1.4",
+      "unit": "mmol/L",
+      "reference_range": "0.8-2.0",
+      "abnormal": false
+    },
+    {
+      "item_name": "低密度脂蛋白",
+      "value": "3.3",
+      "unit": "mmol/L",
+      "reference_range": "2-4",
+      "abnormal": false
+    }
+  ],
+  "medication_suggestions": [],
+  "original_file_name": "化验_检测报告__case_00010.jpg"
+}

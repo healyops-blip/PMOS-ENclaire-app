@@ -1,9 +1,12 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 
 import 'smoke_report_fixture.dart';
+import 'smoke_dataset.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 const apiBaseUrl = String.fromEnvironment(
@@ -299,6 +302,9 @@ class SmokeApiClient extends ApiClient {
       'today_status': 'unrecorded',
     },
   ];
+  final Map<String, Map<String, String>> _dailyOverrides = {};
+  Future<List<Map<String, dynamic>>>? _datasetFuture;
+  int _datasetCursor = 0;
   int _nextId = 1;
 
   String _id(String prefix) => '$prefix-${_nextId++}';
@@ -326,6 +332,66 @@ class SmokeApiClient extends ApiClient {
         'next_cursor': null,
         'has_more': false,
       };
+    }
+    if (path == '/api/medication-catalog') {
+      final catalog =
+          jsonDecode(
+                await rootBundle.loadString(
+                  'assets/data/pomi_medications_v2.json',
+                ),
+              )
+              as Map<String, dynamic>;
+      return {
+        'version': catalog['version'],
+        'source': catalog['source'],
+        'disclaimer': catalog['disclaimer'],
+        'items': catalog['entries'],
+      };
+    }
+    if (path == '/api/medication-daily') {
+      final today = DateTime.now();
+      final from =
+          _parseDate(queryParameters?['from']) ??
+          DateTime(today.year, today.month, 1);
+      final to =
+          _parseDate(queryParameters?['to']) ??
+          DateTime(today.year, today.month, today.day);
+      final medicationId = queryParameters?['medication_id']?.toString();
+      final medications = _medications.where(
+        (item) =>
+            item['current_status'] == 'active' &&
+            (medicationId == null || item['id'] == medicationId),
+      );
+      final items = <Map<String, dynamic>>[];
+      for (final medication in medications) {
+        var date = DateTime(from.year, from.month, from.day);
+        final effectiveTo =
+            to.isAfter(DateTime(today.year, today.month, today.day))
+                ? DateTime(today.year, today.month, today.day)
+                : to;
+        while (!date.isAfter(effectiveTo)) {
+          final firstExpected = DateTime(today.year, today.month, 3);
+          if (date.isBefore(firstExpected)) {
+            date = date.add(const Duration(days: 1));
+            continue;
+          }
+          final dateValue = date.toIso8601String().substring(0, 10);
+          final status =
+              _dailyOverrides[medication['id']?.toString()]?[dateValue] ??
+              _seededDailyStatus(medication['id']?.toString(), date);
+          items.add({
+            'id': 'smoke-daily-${medication['id']}-$dateValue',
+            'medication_id': medication['id'],
+            'record_date': dateValue,
+            'intake_status': status,
+            'recorded_at':
+                status == 'unrecorded' ? null : '${dateValue}T08:00:00Z',
+            'editable': true,
+          });
+          date = date.add(const Duration(days: 1));
+        }
+      }
+      return items;
     }
     if (path == '/api/dashboard') {
       final today =
@@ -380,7 +446,8 @@ class SmokeApiClient extends ApiClient {
       };
     }
     if (path == '/api/documents') {
-      return {'items': <Map<String, dynamic>>[], 'total': 0};
+      final documents = await _datasetDocuments();
+      return {'items': documents, 'total': documents.length};
     }
     if (path == '/api/reports') {
       return {
@@ -469,16 +536,21 @@ class SmokeApiClient extends ApiClient {
     ).firstMatch(path);
     if (dailyStatus != null) {
       final id = dailyStatus.group(1);
+      final recordDate = values['record_date']?.toString();
+      final status = values['intake_status']?.toString() ?? 'unrecorded';
       final medicine =
           _medications.where((item) => item['id'] == id).firstOrNull;
       if (medicine != null) {
-        medicine['today_status'] = values['intake_status'] ?? 'unrecorded';
+        medicine['today_status'] = status;
+        if (id != null && recordDate != null && recordDate.isNotEmpty) {
+          (_dailyOverrides[id] ??= {})[recordDate] = status;
+        }
       }
       return {
         'id': _id('daily'),
         'medication_id': id,
-        'record_date': values['record_date'],
-        'intake_status': values['intake_status'] ?? 'unrecorded',
+        'record_date': recordDate,
+        'intake_status': status,
       };
     }
     return {'id': _id('smoke'), ...values};
@@ -491,6 +563,38 @@ class SmokeApiClient extends ApiClient {
       _cycles.removeWhere((item) => item['id'] == cycleMatch.group(1));
     }
     return null;
+  }
+
+  DateTime? _parseDate(dynamic value) {
+    final raw = value?.toString();
+    if (raw == null || raw.isEmpty) return null;
+    final parsed = DateTime.tryParse(raw);
+    return parsed == null
+        ? null
+        : DateTime(parsed.year, parsed.month, parsed.day);
+  }
+
+  String _seededDailyStatus(String? medicationId, DateTime date) {
+    final today = DateTime.now();
+    final firstExpected = DateTime(today.year, today.month, 3);
+    if (date.isBefore(firstExpected)) return 'unrecorded';
+    final day = date.day;
+    return switch (medicationId) {
+      'smoke-medication-1' =>
+        day > 26
+            ? 'unrecorded'
+            : day == 8 || day == 19
+            ? 'missed'
+            : 'taken',
+      'smoke-medication-2' =>
+        day > 27
+            ? 'unrecorded'
+            : day == 11
+            ? 'missed'
+            : 'taken',
+      'smoke-medication-3' => day == 15 ? 'missed' : 'taken',
+      _ => 'unrecorded',
+    };
   }
 
   @override
@@ -511,26 +615,50 @@ class SmokeApiClient extends ApiClient {
     required String promptVersion,
     required String consentVersion,
     required String idempotencyKey,
-  }) async => {
-    'ocr_task_id': 'smoke-ocr',
-    'ocr_result_id': 'smoke-result',
-    'document_id': 'smoke-document',
-    'document_revision_id': 'smoke-revision',
-    'material_type': materialType,
-    'status': 'pending_confirmation',
-    'result_source': 'smoke',
-    'hospital': '演示医院',
-    'department': '妇科',
-    'visit_date': DateTime.now().toIso8601String().substring(0, 10),
-    'diagnosis_summary': '多囊卵巢综合征',
-    'medical_advice': '请携带原件与医生复核。',
-    'examinations': <Map<String, dynamic>>[],
-    'medication_suggestions': <Map<String, dynamic>>[],
-    'original_file_name': file.uri.pathSegments.last,
-  };
+  }) async {
+    final documents = await _datasetDocuments();
+    final matching = documents
+        .where((item) => item['document_type'] == materialType)
+        .toList(growable: false);
+    final source =
+        matching.isEmpty
+            ? documents[_datasetCursor++ % documents.length]
+            : matching[_datasetCursor++ % matching.length];
+    return {
+      'ocr_task_id': 'smoke-ocr',
+      'ocr_result_id': 'smoke-result-${source['id']}',
+      'document_id': source['id'],
+      'document_revision_id': source['current_revision_id'],
+      'material_type': materialType,
+      'status': 'pending_confirmation',
+      'result_source': 'smoke-dataset',
+      'hospital': source['hospital'],
+      'department': source['department'],
+      'visit_date': source['visit_date'],
+      'diagnosis_summary': source['diagnosis_summary'],
+      'medical_advice': source['medical_advice'],
+      'examinations': source['examinations'],
+      'medication_suggestions': source['medication_suggestions'],
+      'original_file_name': file.uri.pathSegments.last,
+      'dataset_source_file': source['dataset_json_asset'],
+    };
+  }
 
   @override
-  Future<List<int>> download(String path) async => <int>[];
+  Future<List<int>> download(String path) async {
+    final match = RegExp(
+      r'^/api/documents/([^/]+)/revisions/[^/]+/file$',
+    ).firstMatch(path);
+    if (match == null) return <int>[];
+    final documentId = match.group(1);
+    final documents = await _datasetDocuments();
+    final document =
+        documents.where((item) => item['id'] == documentId).firstOrNull;
+    final asset = document?['dataset_image_asset']?.toString();
+    if (asset == null || asset.isEmpty) return <int>[];
+    final data = await rootBundle.load(asset);
+    return data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+  }
 
   static Map<String, dynamic> _map(Object? value) {
     if (value is Map<String, dynamic>) return Map.of(value);
@@ -543,4 +671,23 @@ class SmokeApiClient extends ApiClient {
   static List<Map<String, dynamic>> _copyList(
     List<Map<String, dynamic>> values,
   ) => values.map(Map<String, dynamic>.of).toList();
+
+  Future<List<Map<String, dynamic>>> _datasetDocuments() async {
+    final loaded = await (_datasetFuture ??= loadSmokeDataset());
+    final documents =
+        loaded
+            .map(
+              (item) => smokeDatasetDocument(
+                item,
+                item['_dataset_json_asset']!.toString(),
+              ),
+            )
+            .toList();
+    documents.sort((a, b) {
+      final aDate = a['visit_date']?.toString() ?? '';
+      final bDate = b['visit_date']?.toString() ?? '';
+      return bDate.compareTo(aDate);
+    });
+    return documents;
+  }
 }

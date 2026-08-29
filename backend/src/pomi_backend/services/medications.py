@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from pomi_backend.api.business import BusinessError
 from pomi_backend.db.models import (
     Medication,
+    MedicationCatalogEntry,
     MedicationDaily,
     MedicationEvent,
     PatientProfile,
@@ -59,6 +60,29 @@ def medication_data(medication: Medication) -> dict[str, Any]:
         "replaces_medication_id": medication.replaces_medication_id,
         "created_at": _iso(medication.created_at),
         "updated_at": _iso(medication.updated_at),
+    }
+
+
+def medication_catalog_data(entry: MedicationCatalogEntry) -> dict[str, Any]:
+    return {
+        "id": entry.id,
+        "version": entry.version,
+        "source": entry.source,
+        "disclaimer": entry.disclaimer,
+        "name": entry.name,
+        "category": entry.category,
+        "item_type": entry.item_type,
+        "pcos_context": entry.pcos_context,
+        "dosage_forms": list(entry.dosage_forms or []),
+        "strength_candidates": list(entry.strength_candidates or []),
+        "aliases": list(entry.aliases or []),
+        "route": entry.route,
+        "usage_reference": entry.usage_reference,
+        "schedule_source": entry.schedule_source,
+        "user_editable": entry.user_editable,
+        "can_prefill_reminder": entry.can_prefill_reminder,
+        "review_status": entry.review_status,
+        "record_status": entry.record_status,
     }
 
 
@@ -118,6 +142,35 @@ class MedicationService:
             self.session.flush()
         return profile
 
+    def catalog(self, query: str | None = None, category: str | None = None) -> dict[str, Any]:
+        """Return static candidates for choosing or identifying a user medication."""
+        entries = list(
+            self.session.scalars(
+                select(MedicationCatalogEntry).order_by(
+                    MedicationCatalogEntry.category, MedicationCatalogEntry.name
+                )
+            )
+        )
+        normalized_query = "".join((query or "").casefold().split())
+        if category:
+            entries = [entry for entry in entries if entry.category == category]
+        if normalized_query:
+            entries = [
+                entry
+                for entry in entries
+                if normalized_query
+                in " ".join([entry.name, *(entry.aliases or [])]).casefold().replace(" ", "")
+            ]
+        version = entries[0].version if entries else None
+        source = entries[0].source if entries else None
+        disclaimer = entries[0].disclaimer if entries else None
+        return {
+            "version": version,
+            "source": source,
+            "disclaimer": disclaimer,
+            "items": [medication_catalog_data(entry) for entry in entries],
+        }
+
     def owned(self, medication_id: str) -> Medication:
         medication = self.session.scalar(
             select(Medication).where(
@@ -171,6 +224,15 @@ class MedicationService:
                 raise BusinessError("RESOURCE_NOT_FOUND", "Medication event was not found.", 404)
             return existing, event
 
+        if payload.standard_drug_id is not None:
+            catalog_entry = self.session.get(MedicationCatalogEntry, payload.standard_drug_id)
+            if catalog_entry is None:
+                raise BusinessError(
+                    "INVALID_STANDARD_DRUG_ID",
+                    "The selected medication candidate was not found.",
+                    422,
+                )
+
         medication = Medication(
             patient_id=profile.patient_id,
             drug_name=payload.drug_name.strip(),
@@ -178,6 +240,7 @@ class MedicationService:
             specification=payload.specification,
             dosage_value=payload.dosage_value,
             dosage_unit=payload.dosage_unit,
+            standard_drug_id=payload.standard_drug_id,
             frequency=payload.frequency,
             route=payload.route,
             status="active",
@@ -261,6 +324,7 @@ class MedicationService:
         old = instruction_data(medication)
         values = {
             "drug_name": medication.drug_name,
+            "standard_drug_id": medication.standard_drug_id,
             "specification": medication.specification,
             "dosage_value": medication.dosage_value,
             "dosage_unit": medication.dosage_unit,
@@ -270,6 +334,13 @@ class MedicationService:
         for field in values:
             if field in payload.model_fields_set:
                 values[field] = getattr(payload, field)
+        if "standard_drug_id" in payload.model_fields_set and payload.standard_drug_id is not None:
+            if self.session.get(MedicationCatalogEntry, payload.standard_drug_id) is None:
+                raise BusinessError(
+                    "INVALID_STANDARD_DRUG_ID",
+                    "The selected medication candidate was not found.",
+                    422,
+                )
         if values == {
             "drug_name": medication.drug_name,
             "specification": medication.specification,

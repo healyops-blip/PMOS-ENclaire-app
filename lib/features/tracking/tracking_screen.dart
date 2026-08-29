@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api_client.dart';
+import '../../core/pomi_date_picker.dart';
 import '../../core/theme.dart';
 
 final trackingProvider = FutureProvider.autoDispose<Map<String, dynamic>>((
@@ -124,8 +125,9 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
   }
 
   Future<void> _selectInlineCycleStart() async {
-    final value = await showDatePicker(
+    final value = await showPomiDatePicker(
       context: context,
+      title: '选择开始日期',
       firstDate: DateTime(2000),
       lastDate: DateTime.now(),
       initialDate: _cycleStart,
@@ -138,8 +140,9 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
   }
 
   Future<void> _selectInlineCycleEnd() async {
-    final value = await showDatePicker(
+    final value = await showPomiDatePicker(
       context: context,
+      title: '选择结束日期',
       firstDate: _cycleStart,
       lastDate: DateTime.now(),
       initialDate: _cycleEnd ?? _cycleStart,
@@ -215,8 +218,9 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                           style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
                         onTap: () async {
-                          final value = await showDatePicker(
+                          final value = await showPomiDatePicker(
                             context: context,
+                            title: '选择开始日期',
                             firstDate: DateTime(2000),
                             lastDate: DateTime.now(),
                             initialDate: start,
@@ -232,8 +236,9 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                           style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
                         onTap: () async {
-                          final value = await showDatePicker(
+                          final value = await showPomiDatePicker(
                             context: context,
+                            title: '选择结束日期',
                             firstDate: start,
                             lastDate: DateTime.now(),
                             initialDate: end ?? start,
@@ -327,8 +332,9 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                           style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
                         onTap: () async {
-                          final value = await showDatePicker(
+                          final value = await showPomiDatePicker(
                             context: context,
+                            title: '选择体重日期',
                             firstDate: DateTime(2000),
                             lastDate: DateTime.now(),
                             initialDate: date,

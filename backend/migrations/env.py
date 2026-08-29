@@ -15,6 +15,7 @@ from pomi_backend.db.models import (  # noqa: F401
     ImagingReport,
     LabObservation,
     Medication,
+    MedicationCatalogEntry,
     MedicationDaily,
     MedicationEvent,
     MenstrualCycle,

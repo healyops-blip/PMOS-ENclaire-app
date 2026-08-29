@@ -1,0 +1,36 @@
+{
+  "doc_id": "PR00014",
+  "hospital": "广州润心医疗中心Runxin Healthcare Guangzhou",
+  "department": "生殖科",
+  "visit_date": "2026-08-03",
+  "diagnosis_summary": "多囊卵巢综合征",
+  "medical_advice": "控制体重，配合药物治疗及随访",
+  "examinations": [],
+  "medication_suggestions": [
+    {
+      "drug_name": "炔雌醇环丙孕酮片",
+      "dosage": "炔雌醇0.035mg+醋酸环丙孕酮2mg",
+      "frequency": "每日1次",
+      "duration": "按周期",
+      "instruction": "示例医嘱：口服，按周期使用，遵医嘱复诊评估（PCOS）。",
+      "source_text": "药品 炔雌醇环丙孕酮片（达英-35） 炔雌醇0.035mg+醋酸环丙孕酮2mg 用法 口服 片剂 用量 按医嘱，每日1次 疗程 按周期 总量 14片"
+    },
+    {
+      "drug_name": "肌醇",
+      "dosage": "2g",
+      "frequency": "每日2次",
+      "duration": "长期",
+      "instruction": "示例医嘱：口服，每日两次，配合饮食与运动干预（PCOS）。",
+      "source_text": "药品 肌醇（MI） 2g 用法 口服 粉剂 用量 每次1袋，每日2次 疗程 长期 总量 30袋"
+    },
+    {
+      "drug_name": "叶酸",
+      "dosage": "0.4mg",
+      "frequency": "每日1次",
+      "duration": "长期",
+      "instruction": "示例医嘱：口服，每日一次，备孕/早孕期补充（PCOS）。",
+      "source_text": "药品 叶酸（维生素B9） 0.4mg 用法 口服 片剂 用量 每次1片，每日1次 疗程 长期 总量 20片"
+    }
+  ],
+  "original_file_name": "医嘱_处方__case_00014.jpg"
+}

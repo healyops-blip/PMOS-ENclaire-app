@@ -51,6 +51,52 @@ void main() {
     expect(find.textContaining('模拟医院'), findsNothing);
   });
 
+  testWidgets('records filter narrows documents by material type', (
+    tester,
+  ) async {
+    usePhoneViewport(tester);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          recordsProvider.overrideWith(
+            (ref) async => {
+              'documents': {
+                'items': [
+                  {
+                    'id': 'lab-1',
+                    'document_type': 'lab_report',
+                    'original_file_name': '化验单.jpg',
+                    'latest_ocr_status': 'confirmed',
+                  },
+                  {
+                    'id': 'order-1',
+                    'document_type': 'medical_order',
+                    'original_file_name': '医嘱单.jpg',
+                    'latest_ocr_status': 'confirmed',
+                  },
+                ],
+              },
+              'reports': {'items': <Map<String, dynamic>>[]},
+            },
+          ),
+        ],
+        child: app(const RecordsScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('化验单.jpg'), findsOneWidget);
+    expect(find.text('医嘱单.jpg'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('records-filter-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('医嘱 / 处方'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('医嘱单.jpg'), findsOneWidget);
+    expect(find.text('化验单.jpg'), findsNothing);
+    expect(find.text('1 条'), findsOneWidget);
+  });
+
   testWidgets('normal dashboard hides the fixed Smoke visit preview', (
     tester,
   ) async {
