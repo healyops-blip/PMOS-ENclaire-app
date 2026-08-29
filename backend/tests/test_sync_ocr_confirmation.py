@@ -88,7 +88,7 @@ def _recognize(
                 "Idempotency-Key": key,
                 "X-External-Processing-Consent-Version": "external-ocr-v1",
             },
-            data={"material_type": "outpatient_record", "prompt_version": "pomi-ocr-v1"},
+            data={"material_type": "imaging_text_report", "prompt_version": "pomi-ocr-v1"},
             files={"file": ("visit.png", _image(), "image/png")},
         )
     )

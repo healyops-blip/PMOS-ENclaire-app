@@ -40,6 +40,10 @@ class Settings:
     ocr_request_timeout_seconds: int = 90
     ocr_lease_seconds: int = 180
     business_timezone: str = DEFAULT_BUSINESS_TIMEZONE
+    # LLM settings for patient note rewriting (defaults reuse OCR base/key)
+    llm_api_base_url: str | None = None
+    llm_api_key: str | None = None
+    llm_model: str = "qwen3.8-max"
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -82,4 +86,7 @@ class Settings:
             ocr_request_timeout_seconds=int(os.getenv("POMI_OCR_TIMEOUT_SECONDS", "90")),
             ocr_lease_seconds=int(os.getenv("POMI_OCR_LEASE_SECONDS", "180")),
             business_timezone=os.getenv("POMI_BUSINESS_TIMEZONE", DEFAULT_BUSINESS_TIMEZONE),
+            llm_api_base_url=os.getenv("POMI_LLM_API_BASE_URL", None),
+            llm_api_key=os.getenv("POMI_LLM_API_KEY", None),
+            llm_model=os.getenv("POMI_LLM_MODEL", "qwen3.8-max"),
         )
