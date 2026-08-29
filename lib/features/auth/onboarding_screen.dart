@@ -50,10 +50,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       _height.text = '165';
       _weight.text = '60';
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted)
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Smoke 演示信息已预填，可直接进入下一步')),
           );
+        }
       });
     }
   }
