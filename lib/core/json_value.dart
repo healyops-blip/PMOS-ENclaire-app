@@ -55,6 +55,13 @@ double? jsonDoubleOrNull(Map<String, dynamic> json, String key) {
   final value = json[key];
   if (value == null) return null;
   if (value is num) return value.toDouble();
+  // Pydantic serializes Decimal fields as JSON strings in some response
+  // envelopes (notably onboarding drafts). Accept only a fully numeric
+  // string so the client remains strict about malformed values.
+  if (value is String) {
+    final parsed = double.tryParse(value.trim());
+    if (parsed != null) return parsed;
+  }
   throw ApiFailure('INVALID_RESPONSE', '服务字段 $key 格式异常');
 }
 

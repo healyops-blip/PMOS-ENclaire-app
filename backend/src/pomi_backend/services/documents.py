@@ -13,7 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from pomi_backend.api.business import BusinessError
-from pomi_backend.db.models import Document, DocumentRevision, OCRTask, UserAccount
+from pomi_backend.db.models import Document, DocumentRevision, OCRResult, OCRTask, UserAccount
 from pomi_backend.db.models.auth import utc_now
 from pomi_backend.db.models.health import new_uuid
 from pomi_backend.repositories import DocumentRepository, PatientRepository
@@ -96,8 +96,31 @@ class DocumentService:
             .order_by(OCRTask.created_at.desc(), OCRTask.id.desc())
             .limit(1)
         )
+        latest_result = (
+            self.session.scalar(select(OCRResult).where(OCRResult.task_id == latest_task.id))
+            if latest_task is not None
+            else None
+        )
+        draft = latest_result.validated_draft if latest_result is not None else {}
+        if not isinstance(draft, dict):
+            draft = {}
+        clinical_metadata = {
+            key: draft[key]
+            for key in (
+                "hospital",
+                "department",
+                "hospital_name",
+                "department_name",
+                "visit_date",
+                "sample_date",
+                "exam_date",
+                "report_date",
+            )
+            if draft.get(key) is not None
+        }
         return {
             **document_data(document, current_revision),
+            **clinical_metadata,
             "latest_ocr_task_id": latest_task.id if latest_task is not None else None,
             "latest_ocr_status": latest_task.status if latest_task is not None else None,
             "latest_ocr_result_source": (

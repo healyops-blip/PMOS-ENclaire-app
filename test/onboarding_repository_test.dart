@@ -46,6 +46,18 @@ void main() {
   );
 
   test(
+    'parses Decimal height and weight values serialized as strings',
+    () async {
+      final api = FakeApiClient(handler: (_) => _draftWithDecimalStrings());
+
+      final loaded = await OnboardingRepository(api).getDraft();
+
+      expect(loaded.basic?.heightCm, 165.5);
+      expect(loaded.basic?.weightKg, 62.3);
+    },
+  );
+
+  test(
     'saves and parses the usual period duration in the cycle step',
     () async {
       late ApiCall savedCall;
@@ -109,6 +121,22 @@ void main() {
     },
   );
 }
+
+Map<String, dynamic> _draftWithDecimalStrings() => {
+  'id': 'draft-decimal-1',
+  'current_step': 'basic',
+  'basic': {
+    'nickname': 'Pomi',
+    'birth_year': 1997,
+    'diagnosis_year': null,
+    'height_cm': '165.5',
+    'weight_kg': '62.3',
+    'updated_at': null,
+  },
+  'cycle': null,
+  'medications': null,
+  'updated_at': '2026-08-28T01:02:03Z',
+};
 
 Map<String, dynamic> _draft({
   String currentStep = 'basic',

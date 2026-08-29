@@ -346,19 +346,6 @@ class _LatestVisitStatusCard extends StatelessWidget {
                           '仁和医院',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
-                        const SizedBox(height: 3),
-                        const Align(
-                          alignment: Alignment.center,
-                          child: Text(
-                            '区块链技术支持',
-                            style: TextStyle(
-                              color: pomiPurple,
-                              fontSize: 10,
-                              height: 14 / 10,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
                       ],
                     ),
                   ),
@@ -395,27 +382,23 @@ class _LatestVisitStatusCard extends StatelessWidget {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 9,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: pomiPurple.withValues(alpha: .09),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      '化验/检测',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: pomiPurple,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
           ],
+        ),
+        Positioned(
+          right: 16,
+          bottom: 9,
+          child: const Text(
+            '区块链技术支持',
+            style: TextStyle(
+              color: Colors.black,
+              fontSize: 10,
+              height: 14 / 10,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ),
         Positioned(
           right: 28,

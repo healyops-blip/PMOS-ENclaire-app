@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy import Engine
+from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from pomi_backend.api.auth import router as auth_router
@@ -68,6 +69,20 @@ def create_app(*, settings: Settings | None = None, engine: Engine | None = None
 
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RequestContextMiddleware)
+    # The Flutter web dev server runs on port 3010. Keep this allow-list
+    # development-only so production remains governed by the deployment
+    # ingress policy.
+    if active_settings.environment != "production":
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=[
+                "http://127.0.0.1:3010",
+                "http://localhost:3010",
+            ],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
     if active_settings.environment == "production":
         app.add_middleware(
             TrustedHostMiddleware,

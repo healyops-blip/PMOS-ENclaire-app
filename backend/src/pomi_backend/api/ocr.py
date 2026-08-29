@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, File, Form, Header, Request, UploadFile, status
@@ -31,6 +32,7 @@ from pomi_backend.services.ocr import (
     task_data,
 )
 from pomi_backend.services.ocr_provider import (
+    LocalDatasetOCRProvider,
     OCRProviderError,
     OCRProviderRequest,
     Qwen3VLOCRProvider,
@@ -100,12 +102,16 @@ def recognize(
         if existing_result is None:
             raise BusinessError("OCR_RESULT_NOT_READY", "OCR result is not ready.", 409)
         return success(request, sync_result_data(existing, existing_result))
-    provider = Qwen3VLOCRProvider(
-        api_base_url=settings.ocr_api_base_url,
-        api_key=settings.ocr_api_key,
-        model=settings.ocr_model or DEFAULT_OCR_MODEL,
-        timeout_seconds=settings.ocr_request_timeout_seconds,
-    )
+    if settings.environment != "production" and settings.local_ocr_dataset_enabled:
+        dataset_root = Path(__file__).resolve().parents[4] / "assets" / "data" / "smoke_dataset"
+        provider = LocalDatasetOCRProvider(dataset_root)
+    else:
+        provider = Qwen3VLOCRProvider(
+            api_base_url=settings.ocr_api_base_url,
+            api_key=settings.ocr_api_key,
+            model=settings.ocr_model or DEFAULT_OCR_MODEL,
+            timeout_seconds=settings.ocr_request_timeout_seconds,
+        )
     try:
         response = provider.recognize(
             OCRProviderRequest(

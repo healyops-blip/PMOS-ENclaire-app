@@ -67,7 +67,17 @@ class RecordsScreen extends ConsumerWidget {
             }
             return _ReportsList(reports: reports);
           }
-          return _DocumentsList(documents: documents, visitLayout: smokeMode);
+          final hasClinicalMetadata = documents.any(
+            (item) =>
+                item['visit_date'] != null ||
+                item['sample_date'] != null ||
+                item['exam_date'] != null ||
+                item['report_date'] != null,
+          );
+          return _DocumentsList(
+            documents: documents,
+            visitLayout: smokeMode || hasClinicalMetadata,
+          );
         },
       ),
     );
@@ -351,7 +361,12 @@ class _DatasetDocumentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final type = document['document_type']?.toString() ?? '';
-    final date = document['visit_date']?.toString() ?? '日期未记录';
+    final date =
+        (type == 'lab_report'
+                ? (document['sample_date'] ?? document['visit_date'])
+                : (document['visit_date'] ?? document['exam_date']))
+            ?.toString() ??
+        '日期未记录';
     final status = document['latest_ocr_status']?.toString();
     final verified = status == 'confirmed';
     final item = VisitRecordSummaryItem(
@@ -420,19 +435,6 @@ class _DatasetDocumentCard extends StatelessWidget {
                                 ),
                             ],
                           ),
-                          const SizedBox(height: 3),
-                          const Align(
-                            alignment: Alignment.center,
-                            child: Text(
-                              '区块链技术支持',
-                              style: TextStyle(
-                                color: pomiPurple,
-                                fontSize: 10,
-                                height: 14 / 10,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
                         ],
                       ),
                     ),
@@ -460,7 +462,17 @@ class _DatasetDocumentCard extends StatelessWidget {
               const Divider(height: 1, color: pomiLine),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-                child: _VisitRecordRow(row: item),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _VisitRecordRow(row: item),
+                    const SizedBox(height: 7),
+                    const Align(
+                      alignment: Alignment.bottomRight,
+                      child: _BlockchainSupportLabel(),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -556,19 +568,6 @@ class _VisitRecordCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 3),
                           _VisitMetadataFields(visit: visit),
-                          const SizedBox(height: 3),
-                          const Align(
-                            alignment: Alignment.center,
-                            child: Text(
-                              '区块链技术支持',
-                              style: TextStyle(
-                                color: pomiPurple,
-                                fontSize: 10,
-                                height: 14 / 10,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
                         ],
                       ),
                     ),
@@ -597,6 +596,7 @@ class _VisitRecordCard extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     for (
                       var index = 0;
@@ -607,6 +607,11 @@ class _VisitRecordCard extends StatelessWidget {
                       if (index != visit.summaryItems.length - 1)
                         const SizedBox(height: 10),
                     ],
+                    const SizedBox(height: 7),
+                    const Align(
+                      alignment: Alignment.bottomRight,
+                      child: _BlockchainSupportLabel(),
+                    ),
                   ],
                 ),
               ),
@@ -672,6 +677,35 @@ class _VisitMetadataFields extends StatelessWidget {
             style: Theme.of(context).textTheme.bodySmall,
           ),
       ],
+    );
+  }
+}
+
+class _BlockchainSupportLabel extends StatelessWidget {
+  const _BlockchainSupportLabel();
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      '区块链技术支持',
+      style: TextStyle(
+        color: pomiPurple,
+        fontSize: 10,
+        height: 14 / 10,
+        fontWeight: FontWeight.w700,
+        shadows: [
+          Shadow(
+            offset: const Offset(-0.7, -0.7),
+            blurRadius: 0.5,
+            color: Colors.white.withValues(alpha: .72),
+          ),
+          Shadow(
+            offset: const Offset(0.8, 0.8),
+            blurRadius: 1.2,
+            color: pomiPurple.withValues(alpha: .42),
+          ),
+        ],
+      ),
     );
   }
 }

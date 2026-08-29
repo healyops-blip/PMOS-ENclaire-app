@@ -37,6 +37,7 @@ class Settings:
     ocr_api_base_url: str = DEFAULT_OCR_API_BASE_URL
     ocr_api_key: str | None = None
     ocr_model: str = DEFAULT_OCR_MODEL
+    local_ocr_dataset_enabled: bool = False
     ocr_request_timeout_seconds: int = 90
     ocr_lease_seconds: int = 180
     business_timezone: str = DEFAULT_BUSINESS_TIMEZONE
@@ -79,6 +80,7 @@ class Settings:
             ocr_api_base_url=os.getenv("POMI_OCR_API_BASE_URL", DEFAULT_OCR_API_BASE_URL),
             ocr_api_key=os.getenv("POMI_OCR_API_KEY"),
             ocr_model=os.getenv("POMI_OCR_MODEL", DEFAULT_OCR_MODEL),
+            local_ocr_dataset_enabled=os.getenv("POMI_LOCAL_OCR_DATASET", "0") == "1",
             ocr_request_timeout_seconds=int(os.getenv("POMI_OCR_TIMEOUT_SECONDS", "90")),
             ocr_lease_seconds=int(os.getenv("POMI_OCR_LEASE_SECONDS", "180")),
             business_timezone=os.getenv("POMI_BUSINESS_TIMEZONE", DEFAULT_BUSINESS_TIMEZONE),
