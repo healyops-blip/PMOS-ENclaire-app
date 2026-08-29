@@ -604,6 +604,7 @@ class _HorizontalCycleCalendarState extends State<_HorizontalCycleCalendar> {
   Widget build(BuildContext context) {
     final selected = DateUtils.dateOnly(widget.selectedDay);
     final today = DateUtils.dateOnly(DateTime.now());
+    final selectedIsPeriod = _isPeriodDay(selected);
     final start = today.subtract(const Duration(days: 14));
     final dates = List.generate(
       29,
@@ -620,20 +621,43 @@ class _HorizontalCycleCalendarState extends State<_HorizontalCycleCalendar> {
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
+              child: Column(
                 children: [
-                  Expanded(
-                    child: Text(
-                      '${selected.month}月${selected.day}日 星期${weekday[selected.weekday - 1]}',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: pomiInk,
-                        fontSize: 18,
-                        height: 28 / 20,
-                        fontWeight: FontWeight.w800,
-                      ),
+                  Text(
+                    '${selected.month}月${selected.day}日 星期${weekday[selected.weekday - 1]}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: pomiInk,
+                      fontSize: 18,
+                      height: 28 / 20,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
+                  if (selectedIsPeriod) ...[
+                    const SizedBox(height: 2),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: pomiCoral,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        const Text(
+                          '经期中',
+                          style: TextStyle(
+                            color: pomiCoral,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
