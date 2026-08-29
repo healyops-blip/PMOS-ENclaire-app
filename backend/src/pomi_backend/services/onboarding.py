@@ -54,9 +54,14 @@ class OnboardingService:
         return draft
 
     def save_basic(self, payload: OnboardingBasicInput) -> OnboardingDraft:
-        return self._save(
-            "basic_data", payload.model_dump(mode="json", exclude_none=False), "cycle"
-        )
+        data = payload.model_dump(mode="json", exclude_none=False)
+        # Pydantic serializes Decimal as string in JSON mode; normalize the
+        # numeric fields back to numbers so the draft contract keeps
+        # height_cm/weight_kg as numbers (matching the patient profile API).
+        for key in ("height_cm", "weight_kg"):
+            if data.get(key) is not None:
+                data[key] = float(data[key])
+        return self._save("basic_data", data, "cycle")
 
     def save_cycle(self, payload: OnboardingCycleInput) -> OnboardingDraft:
         return self._save(

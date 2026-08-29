@@ -165,7 +165,7 @@ def _payload(kind: str) -> dict[str, Any]:
             "doctor_name": None,
             "visit_date": None,
             "chief_complaint": None,
-            "diagnosis_summary": None,
+            "diagnosis_summary": " visible text ",
             "treatment_plan": None,
             "medical_advice": None,
         },
@@ -253,9 +253,7 @@ def _make_due(factory: sessionmaker[Session], task_id: str) -> None:
 def test_four_materials_are_idempotent_traceable_and_uid_scoped(api_client: TestClient) -> None:
     owner = _headers(api_client, "ocr-owner")
     outsider = _headers(api_client, "ocr-outsider")
-    for index, kind in enumerate(
-        ("lab_report", "medical_order", "imaging_text_report", "outpatient_record")
-    ):
+    for index, kind in enumerate(("lab_report", "medical_order", "imaging_text_report")):
         document = _upload(api_client, owner, kind, index)
         task = _create(api_client, owner, document)
         repeated = _create(api_client, owner, document)
@@ -272,7 +270,12 @@ def test_four_materials_are_idempotent_traceable_and_uid_scoped(api_client: Test
         assert result["fields"][0]["confidence"] == 0.91
         assert result["fields"][0]["source_region"]["page"] == 1
         assert result["source_document"]["document_revision_id"] == document["current_revision_id"]
+        display = result["source_document"]["display_asset"]
+        assert display["status"] == "ready"
+        assert display["file_endpoint"].endswith("/display/file")
+        assert api_client.get(display["file_endpoint"], headers=owner).status_code == 200
         assert api_client.get(f"/api/ocr/tasks/{task['id']}", headers=outsider).status_code == 404
+        assert api_client.get(display["file_endpoint"], headers=outsider).status_code == 404
         assert (
             api_client.get(f"/api/ocr/tasks/{task['id']}/result", headers=outsider).status_code
             == 404
@@ -346,8 +349,8 @@ def test_lease_recovery_and_ambiguous_provider_call_are_not_replayed(
     api_client: TestClient,
 ) -> None:
     headers = _headers(api_client, "ocr-lease")
-    first = _create(api_client, headers, _upload(api_client, headers, "outpatient_record", 1))
-    second = _create(api_client, headers, _upload(api_client, headers, "outpatient_record", 2))
+    first = _create(api_client, headers, _upload(api_client, headers, "imaging_text_report", 1))
+    second = _create(api_client, headers, _upload(api_client, headers, "imaging_text_report", 2))
     with api_client.app.state.session_factory() as session:
         recoverable = session.get(OCRTask, first["id"])
         ambiguous = session.get(OCRTask, second["id"])
@@ -460,7 +463,7 @@ def test_ocr_requires_consent_and_explicit_owned_revision(api_client: TestClient
     }
 
 
-def test_imaging_and_outpatient_confirmation_is_idempotent_and_traceable(
+def test_imaging_confirmation_is_idempotent_and_traceable(
     api_client: TestClient,
 ) -> None:
     owner = _headers(api_client, "clinical-owner")

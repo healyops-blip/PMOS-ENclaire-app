@@ -94,3 +94,57 @@ class DocumentRevision(Base):
         String(36), ForeignKey("user_account.uid", ondelete="RESTRICT"), nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, default=utc_now)
+
+
+class DocumentDisplayAsset(Base):
+    """A private, reproducible display derivative of an immutable source revision."""
+
+    __tablename__ = "document_display_asset"
+    __table_args__ = (
+        CheckConstraint(
+            "asset_type IN ('pomi_watermarked_display')",
+            name="document_display_asset_type",
+        ),
+        CheckConstraint(
+            "status IN ('processing', 'ready', 'failed', 'unsupported', 'purged')",
+            name="document_display_asset_status",
+        ),
+        UniqueConstraint(
+            "document_revision_id",
+            "asset_type",
+            "watermark_version",
+            name="uq_document_display_asset_revision_variant",
+        ),
+        Index(
+            "ix_document_display_asset_document_revision",
+            "document_id",
+            "document_revision_id",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    document_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("document.id", ondelete="CASCADE"), nullable=False
+    )
+    document_revision_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("document_revision.id", ondelete="CASCADE"), nullable=False
+    )
+    asset_type: Mapped[str] = mapped_column(
+        String(40), nullable=False, default="pomi_watermarked_display"
+    )
+    watermark_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="processing")
+    storage_path: Mapped[str | None] = mapped_column(String(500))
+    file_hash: Mapped[str | None] = mapped_column(String(64))
+    file_size_bytes: Mapped[int | None] = mapped_column(Integer)
+    mime_type: Mapped[str | None] = mapped_column(String(64))
+    pixel_width: Mapped[int | None] = mapped_column(Integer)
+    pixel_height: Mapped[int | None] = mapped_column(Integer)
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    failure_code: Mapped[str | None] = mapped_column(String(80))
+    failure_message: Mapped[str | None] = mapped_column(String(500))
+    generated_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime, nullable=False, default=utc_now, onupdate=utc_now
+    )

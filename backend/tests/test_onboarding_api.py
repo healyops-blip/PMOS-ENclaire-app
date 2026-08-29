@@ -77,3 +77,28 @@ def test_period_duration_rejects_implausible_values(api_client: TestClient) -> N
     )
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_basic_draft_keeps_height_and_weight_as_numbers(api_client: TestClient) -> None:
+    """Decimal fields must round-trip as JSON numbers, not strings.
+
+    Pydantic serializes Decimal to string in JSON mode by default, which broke
+    the draft contract and made the client throw "height_cm 格式异常".
+    """
+    headers = _register_and_login(api_client)
+    basic = _data(
+        api_client.put(
+            "/api/onboarding/steps/basic",
+            headers=headers,
+            json={
+                "nickname": "Pomi User",
+                "birth_year": 1997,
+                "height_cm": 165.5,
+                "weight_kg": 58.3,
+            },
+        )
+    )
+    assert basic["basic"]["height_cm"] == 165.5
+    assert isinstance(basic["basic"]["height_cm"], (int, float))
+    assert basic["basic"]["weight_kg"] == 58.3
+    assert isinstance(basic["basic"]["weight_kg"], (int, float))

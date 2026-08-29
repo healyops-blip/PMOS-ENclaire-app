@@ -77,6 +77,7 @@ class VisitRecordDetailData {
     required this.summaryItems,
     this.contextLabel,
     this.historyNote,
+    this.isDemo = false,
     this.clinicalFields = const [],
     this.labs = const [],
     this.orders = const [],
@@ -95,6 +96,9 @@ class VisitRecordDetailData {
   final String verificationDetail;
   final String? historyNote;
   final List<VisitRecordSummaryItem> summaryItems;
+
+  /// 是否为演示（Smoke）数据。真实后端导入的记录为 false。
+  final bool isDemo;
   final List<VisitClinicalField> clinicalFields;
   final List<VisitLabResult> labs;
   final List<VisitOrderItem> orders;
@@ -109,7 +113,7 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
     department: '生殖内分泌科',
     doctor: '陈医生',
     verificationState: VisitVerificationState.verified,
-    verificationLabel: '已核验',
+    verificationLabel: '来源签署已记录｜模拟',
     verificationTitle: '就诊记录快照 · 上传后版本',
     verificationDetail: '检测单 6 · 模拟医院 B · 版本 V2 · 签署 2026-08-26 10:31',
     sampleDate: '2026-08-25',
@@ -125,6 +129,7 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
         trailing: '2026-08-26',
       ),
     ],
+    isDemo: true,
     clinicalFields: [
       VisitClinicalField(label: '就诊原因', value: '复诊评估代谢指标与当前用药'),
       VisitClinicalField(label: '医生记录', value: '结合近期检测结果调整方案，按期复查。'),
@@ -188,7 +193,7 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
     department: '妇科',
     doctor: '李医生',
     verificationState: VisitVerificationState.pending,
-    verificationLabel: '未核验',
+    verificationLabel: '来源核验申请中',
     verificationTitle: '医院来源核验处理中',
     verificationDetail: '门诊病历与医嘱已提交，核验结果不会改变患者原始记录。',
     summaryItems: [
@@ -198,6 +203,7 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
       ),
       VisitRecordSummaryItem(title: '医嘱', category: VisitRecordCategory.order),
     ],
+    isDemo: true,
     clinicalFields: [
       VisitClinicalField(label: '主诉', value: '月经周期延长，近两月痤疮增多'),
       VisitClinicalField(label: '记录摘要', value: '建议完成激素与代谢相关检测后复诊。'),
@@ -226,7 +232,7 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
     doctor: '李医生',
     contextLabel: '就诊前检测',
     verificationState: VisitVerificationState.unverified,
-    verificationLabel: '未核验',
+    verificationLabel: '患者上传｜来源未核验',
     verificationTitle: '患者上传材料',
     verificationDetail: 'OCR 内容已经患者确认，但尚未取得医院来源签署。',
     sampleDate: '2026-06-18',
@@ -237,6 +243,7 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
         trailing: '采样 2026-06-18',
       ),
     ],
+    isDemo: true,
     labs: [
       VisitLabResult(
         name: '促黄体生成素',
@@ -268,7 +275,7 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
     department: '妇科',
     doctor: '李医生',
     verificationState: VisitVerificationState.archived,
-    verificationLabel: '未核验',
+    verificationLabel: '历史归档｜模拟',
     verificationTitle: '历史门诊记录',
     verificationDetail: '该记录来自较早版本的门诊病历归档。',
     historyNote: '此数据超过 6 个月，仅供参考，请以近期复诊结果为准。',
@@ -278,6 +285,7 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
         category: VisitRecordCategory.outpatient,
       ),
     ],
+    isDemo: true,
     clinicalFields: [
       VisitClinicalField(label: '主诉', value: '月经周期不规律'),
       VisitClinicalField(label: '记录摘要', value: '建议记录周期变化并按计划复诊。'),
@@ -291,7 +299,7 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
     department: '内分泌科',
     doctor: '周医生',
     verificationState: VisitVerificationState.archived,
-    verificationLabel: '未核验',
+    verificationLabel: '历史归档｜模拟',
     verificationTitle: '历史检测材料',
     verificationDetail: '检测结果已归档，参考范围以原始报告为准。',
     historyNote: '此数据超过 6 个月，仅供参考，请勿据此自行调整用药。',
@@ -303,6 +311,7 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
         trailing: '采样 2025-12-14',
       ),
     ],
+    isDemo: true,
     labs: [
       VisitLabResult(
         name: '空腹胰岛素',
@@ -376,6 +385,10 @@ class VisitRecordDetailScreen extends StatelessWidget {
                       _VisitHeroCard(visit: visit),
                       const SizedBox(height: 14),
                       _VerificationCard(visit: visit),
+                      if (visit.historyNote != null) ...[
+                        const SizedBox(height: 14),
+                        _HistoryNotice(message: visit.historyNote!),
+                      ],
                       if (visit.clinicalFields.isNotEmpty) ...[
                         const SizedBox(height: 22),
                         _ClinicalSection(fields: visit.clinicalFields),
@@ -443,12 +456,12 @@ class _VisitHeroCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          visit.sampleDate ?? visit.date,
+                          visit.date,
                           style: Theme.of(context).textTheme.headlineMedium,
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '就诊记录 · 演示数据',
+                          visit.isDemo ? '就诊记录 · 演示数据' : '就诊记录',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],
@@ -483,29 +496,31 @@ class _VisitHeroCard extends StatelessWidget {
               ),
             ],
           ),
-          Positioned(
-            key: const ValueKey('pomi-verified-stamp-position'),
-            right: -4,
-            top: 0,
-            child: Semantics(
-              image: true,
-              label: '该报告已核验',
-              child: Opacity(
-                opacity: .88,
-                child: Transform.rotate(
-                  key: const ValueKey('pomi-verified-stamp-rotation'),
-                  angle: -math.pi / 4,
-                  child: Image.asset(
-                    'assets/images/pomi_verified_stamp.png',
-                    key: const ValueKey('pomi-verified-stamp'),
-                    width: 132,
-                    height: 132,
-                    filterQuality: FilterQuality.high,
+          if (visit.isDemo ||
+              visit.verificationState == VisitVerificationState.verified)
+            Positioned(
+              key: const ValueKey('pomi-verified-stamp-position'),
+              right: -4,
+              top: 0,
+              child: Semantics(
+                image: true,
+                label: '该报告已核验',
+                child: Opacity(
+                  opacity: .88,
+                  child: Transform.rotate(
+                    key: const ValueKey('pomi-verified-stamp-rotation'),
+                    angle: -math.pi / 4,
+                    child: Image.asset(
+                      'assets/images/pomi_verified_stamp.png',
+                      key: const ValueKey('pomi-verified-stamp'),
+                      width: 132,
+                      height: 132,
+                      filterQuality: FilterQuality.high,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -600,6 +615,39 @@ class _VerificationCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _HistoryNotice extends StatelessWidget {
+  const _HistoryNotice({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => PomiGlassCard(
+    borderRadius: 20,
+    backgroundOpacity: .24,
+    padding: const EdgeInsets.all(15),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Icon(
+          Icons.history_toggle_off_rounded,
+          color: Color(0xFFB47314),
+          size: 22,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            message,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: const Color(0xFF7A561B),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _SectionTitle extends StatelessWidget {
@@ -744,8 +792,8 @@ class _LabResultRow extends StatelessWidget {
                       text: result.value,
                       style: TextStyle(
                         color: status.valueColor,
-                        fontSize: 18,
-                        height: 24 / 18,
+                        fontSize: 16,
+                        height: 22 / 16,
                         fontWeight: FontWeight.w800,
                       ),
                     ),

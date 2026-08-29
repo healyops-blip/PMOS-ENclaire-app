@@ -14,11 +14,13 @@ from pomi_backend.services import AuthService
 from pomi_backend.services.auth import AuthError
 from pomi_backend.services.clinical_text import ClinicalTextConfirmationService
 from pomi_backend.services.documents import DocumentService
+from pomi_backend.services.llm_chat_provider import QwenChatProvider
 from pomi_backend.services.medications import MedicationService
 from pomi_backend.services.ocr import OCRTaskService
 from pomi_backend.services.onboarding import OnboardingService
 from pomi_backend.services.orders import MedicalOrderService, ReconciliationService
 from pomi_backend.services.patient import PatientProfileService
+from pomi_backend.services.patient_note_rewrite import PatientNoteRewriteService
 from pomi_backend.services.patient_notes import PatientNoteService
 from pomi_backend.services.reports import ReportSnapshotService
 
@@ -115,6 +117,7 @@ def get_ocr_task_service(
         account,
         model_name=request.app.state.settings.ocr_model,
         business_date=request.app.state.business_date_provider(),
+        storage_root=request.app.state.settings.storage_root,
     )
 
 
@@ -181,4 +184,20 @@ def get_report_snapshot_service(
 
 ReportSnapshotServiceDependency = Annotated[
     ReportSnapshotService, Depends(get_report_snapshot_service)
+]
+
+
+def get_patient_note_rewrite_service(request: Request) -> PatientNoteRewriteService:
+    settings = request.app.state.settings
+    provider = QwenChatProvider(
+        api_base_url=(settings.llm_api_base_url or settings.ocr_api_base_url),
+        api_key=(settings.llm_api_key or settings.ocr_api_key),
+        model=settings.llm_model,
+        timeout_seconds=settings.ocr_request_timeout_seconds,
+    )
+    return PatientNoteRewriteService(provider)
+
+
+PatientNoteRewriteServiceDependency = Annotated[
+    PatientNoteRewriteService, Depends(get_patient_note_rewrite_service)
 ]

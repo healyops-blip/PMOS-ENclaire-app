@@ -11,6 +11,7 @@ from sqlalchemy import engine_from_config, pool
 from pomi_backend.db.base import Base
 from pomi_backend.db.models import (  # noqa: F401
     Document,
+    DocumentDisplayAsset,
     DocumentRevision,
     ImagingReport,
     LabObservation,
@@ -22,7 +23,7 @@ from pomi_backend.db.models import (  # noqa: F401
     OCRFieldResult,
     OCRResult,
     OCRTask,
-    OutpatientRecord,
+    # OutpatientRecord,  # 门诊病历已不再支持
     PatientNote,
     PatientProfile,
     ReportSnapshot,
