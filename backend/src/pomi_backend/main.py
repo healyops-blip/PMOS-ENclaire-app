@@ -72,10 +72,14 @@ def create_app(*, settings: Settings | None = None, engine: Engine | None = None
     # CORS is only enabled outside production so the local Flutter Web preview
     # (served from a different port/origin) can reach the API during
     # development and smoke testing. Production uses same-origin/known hosts.
+    # Never wildcard: a non-production deployment on the public internet would
+    # otherwise let any website script authenticated cross-origin calls. Allow
+    # localhost/127.0.0.1 on any port, plus anything in POMI_CORS_ALLOW_ORIGINS.
     if active_settings.environment != "production":
         app.add_middleware(
             CORSMiddleware,
-            allow_origins=["*"],
+            allow_origins=list(active_settings.cors_allow_origins),
+            allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
             allow_credentials=False,
             allow_methods=["*"],
             allow_headers=["*"],

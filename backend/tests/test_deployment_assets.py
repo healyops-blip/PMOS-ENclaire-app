@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import subprocess
 from importlib.resources import files
 from io import BytesIO
 from pathlib import Path
@@ -8,6 +9,17 @@ from pathlib import Path
 from PIL import Image
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _tracked_files() -> list[Path]:
+    """Git-tracked files only; scratch copies under .tmp/ etc. must not count."""
+    output = subprocess.run(
+        ["git", "-C", str(REPOSITORY_ROOT), "ls-files", "-z"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    return [REPOSITORY_ROOT / name for name in output.split("\0") if name]
 
 
 def read(relative_path: str) -> str:
@@ -65,11 +77,9 @@ def test_environment_example_and_repository_contain_no_seed_passwords() -> None:
 
     tracked_text = "\n".join(
         path.read_text(encoding="utf-8", errors="ignore")
-        for path in REPOSITORY_ROOT.rglob("*")
+        for path in _tracked_files()
         if path.is_file()
         and path.resolve() != Path(__file__).resolve()
-        and ".git" not in path.parts
-        and ".venv" not in path.parts
         and path.suffix in {".py", ".md", ".yml", ".yaml", ".example", ".service"}
     )
     assert not re.search(r"POMI_(FIRST_TIME|RETURNING)_ACCOUNT_PASSWORD=\S+", tracked_text)
