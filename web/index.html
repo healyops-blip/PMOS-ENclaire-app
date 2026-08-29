@@ -224,9 +224,9 @@
   </style>
 </head>
 <body>
-  <div class="backend-switch" title="Preview 使用前端内存 smoke 数据">
-    <span class="backend-status online" aria-hidden="true"></span>
-    <span>数据：Smoke</span>
+  <div class="backend-switch" title="检测本地后端连接状态">
+    <span class="backend-status" id="backend-status" aria-hidden="true"></span>
+    <span id="backend-label">数据：检测中…</span>
   </div>
   <main class="device-frame">
     <div class="system-status-bar" aria-label="模拟手机系统状态栏">
@@ -247,7 +247,7 @@
         </svg>
       </span>
     </div>
-    <iframe src="app.html?v=2608271235" title="Pomi Flutter mobile preview"></iframe>
+    <iframe src="app.html" id="pomi-app" title="Pomi Flutter mobile preview"></iframe>
   </main>
   <script>
     const updateSystemTime = () => {
@@ -262,8 +262,47 @@
       document.querySelector('.device-frame')
         .classList.toggle('auth-mode', isAuthScreen);
     };
+
+    // 应用加载后刷新 iframe 的缓存破坏参数，避免 service worker / 浏览器缓存
+    // 命中旧版本 app.html；同时探活本地后端，动态显示数据来源徽标。
+    const appFrame = document.getElementById('pomi-app');
+    const refreshAppVersion = () => {
+      if (!appFrame) return;
+      const base = 'app.html';
+      const stamped = `${base}?v=${Date.now()}`;
+      if (appFrame.getAttribute('src') !== stamped) {
+        appFrame.setAttribute('src', stamped);
+      }
+    };
+
+    const backendStatus = document.getElementById('backend-status');
+    const backendLabel = document.getElementById('backend-label');
+    const setBackend = (label, state) => {
+      if (backendLabel) backendLabel.textContent = label;
+      if (backendStatus) {
+        backendStatus.classList.remove('online', 'offline');
+        if (state) backendStatus.classList.add(state);
+      }
+    };
+    const probeBackend = async () => {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 3000);
+        const response = await fetch('http://127.0.0.1:8000/health/live', {
+          signal: controller.signal,
+          cache: 'no-store',
+        });
+        clearTimeout(timer);
+        setBackend(response.ok ? '数据：真实后端' : '数据：演示数据', response.ok ? 'online' : 'offline');
+      } catch (_) {
+        setBackend('数据：演示数据', 'offline');
+      }
+    };
+
     updateSystemTime();
     updateStatusBarTheme();
+    refreshAppVersion();
+    probeBackend();
     setInterval(updateSystemTime, 30000);
     window.addEventListener('hashchange', updateStatusBarTheme);
   </script>

@@ -38,14 +38,21 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       allowedExtensions: const ['jpg', 'jpeg', 'png', 'pdf'],
     );
     if (file == null) return;
-    final bytes = await file.readAsBytes();
-    if (bytes.isEmpty) return;
-    setState(() {
-      _bytes = bytes;
-      _fileName = file.name;
-      _idempotencyKey = null;
-    });
-    await _start();
+    try {
+      final bytes = await file.readAsBytes();
+      if (bytes.isEmpty) {
+        _showMessage('所选文件内容为空，请重新选择');
+        return;
+      }
+      setState(() {
+        _bytes = bytes;
+        _fileName = file.name;
+        _idempotencyKey = null;
+      });
+      await _start();
+    } catch (error) {
+      _showMessage('读取文件失败：$error');
+    }
   }
 
   Future<void> _takePhoto() async {
@@ -56,14 +63,28 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       maxHeight: 4096,
     );
     if (result == null) return;
-    final bytes = await result.readAsBytes();
-    if (bytes.isEmpty) return;
-    setState(() {
-      _bytes = bytes;
-      _fileName = result.name;
-      _idempotencyKey = null;
-    });
-    await _start();
+    try {
+      final bytes = await result.readAsBytes();
+      if (bytes.isEmpty) {
+        _showMessage('照片内容为空，请重试');
+        return;
+      }
+      setState(() {
+        _bytes = bytes;
+        _fileName = result.name;
+        _idempotencyKey = null;
+      });
+      await _start();
+    } catch (error) {
+      _showMessage('读取照片失败：$error');
+    }
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _start() async {
