@@ -1862,15 +1862,14 @@ class _MedicationProgressCard extends StatelessWidget {
                   item['today_status'] == 'missed',
             )
             .length;
-    final visibleMedicines = medicines.take(3).toList(growable: false);
 
     return SizedBox(
       width: double.infinity,
-      height: 320,
       child: PomiGlassCard(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               children: [
@@ -1927,33 +1926,26 @@ class _MedicationProgressCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            Expanded(
-              child:
-                  visibleMedicines.isEmpty
-                      ? Align(
-                        alignment: Alignment.topLeft,
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: OutlinedButton.icon(
-                            onPressed: onManage,
-                            icon: const Icon(Icons.add, size: 18),
-                            label: const Text('添加当前用药'),
-                          ),
-                        ),
-                      )
-                      : ListView(
-                        padding: EdgeInsets.zero,
-                        children: visibleMedicines.indexed
-                            .map(
-                              (entry) => _MedicationProgressRow(
-                                medicine: entry.$2,
-                                index: entry.$1,
-                                onUpdated: onUpdated,
-                              ),
-                            )
-                            .toList(growable: false),
-                      ),
-            ),
+            if (medicines.isEmpty)
+              Align(
+                alignment: Alignment.topLeft,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: OutlinedButton.icon(
+                    onPressed: onManage,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('添加当前用药'),
+                  ),
+                ),
+              )
+            else
+              ...medicines.indexed.map(
+                (entry) => _MedicationProgressRow(
+                  medicine: entry.$2,
+                  index: entry.$1,
+                  onUpdated: onUpdated,
+                ),
+              ),
           ],
         ),
       ),
