@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from pomi_backend.api.business import BusinessError
 from pomi_backend.db.models import (
+    DocumentDisplayAsset,
     ImagingReport,
     LabObservation,
     MedicalOrder,
@@ -39,6 +40,11 @@ from pomi_backend.repositories import (
     ReportSourceRepository,
 )
 from pomi_backend.schemas.reports import ReportCreate
+from pomi_backend.services.watermarks import (
+    ASSET_TYPE,
+    WATERMARK_VERSION,
+    display_asset_data,
+)
 
 RULE_VERSION = "report-rules-v2"
 TEMPLATE_VERSION = "report-snapshot-v2"
@@ -494,6 +500,10 @@ class ReportSnapshotService:
                     "origin_kind": item.origin_kind,
                     "document_id": item.document_id,
                     "document_revision_id": item.document_revision_id,
+                    "display_asset": self._display_asset_identity(
+                        item.document_id,
+                        item.document_revision_id,
+                    ),
                 }
                 for item in source_drafts
             ],
@@ -507,6 +517,10 @@ class ReportSnapshotService:
     ) -> list[dict[str, Any]]:
         nodes: list[dict[str, Any]] = []
         for number, draft in enumerate(drafts, start=1):
+            display_asset = self._display_asset(
+                draft.document_id,
+                draft.document_revision_id,
+            )
             source = ReportSource(
                 id=new_uuid(),
                 report_id=report.id,
@@ -527,10 +541,42 @@ class ReportSnapshotService:
                     "origin_kind": source.origin_kind,
                     "document_id": source.document_id,
                     "document_revision_id": source.document_revision_id,
+                    "display_asset": display_asset_data(display_asset),
                     "rule_execution_id": source.rule_execution_id,
                 }
             )
         return nodes
+
+    def _display_asset(
+        self,
+        document_id: str | None,
+        revision_id: str | None,
+    ) -> DocumentDisplayAsset | None:
+        if document_id is None or revision_id is None:
+            return None
+        return self.session.scalar(
+            select(DocumentDisplayAsset).where(
+                DocumentDisplayAsset.document_id == document_id,
+                DocumentDisplayAsset.document_revision_id == revision_id,
+                DocumentDisplayAsset.asset_type == ASSET_TYPE,
+                DocumentDisplayAsset.watermark_version == WATERMARK_VERSION,
+            )
+        )
+
+    def _display_asset_identity(
+        self,
+        document_id: str | None,
+        revision_id: str | None,
+    ) -> dict[str, Any] | None:
+        asset = self._display_asset(document_id, revision_id)
+        if asset is None:
+            return None
+        return {
+            "asset_type": asset.asset_type,
+            "watermark_version": asset.watermark_version,
+            "status": asset.status,
+            "file_hash": asset.file_hash,
+        }
 
     def _build_snapshot(
         self,

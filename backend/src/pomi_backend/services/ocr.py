@@ -7,6 +7,7 @@ import json
 import re
 from datetime import date
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy.exc import IntegrityError
@@ -40,6 +41,11 @@ from pomi_backend.services.lab_rules import (
 from pomi_backend.services.medications import instruction_data, medication_data
 from pomi_backend.services.ocr_prompts import PROMPT_VERSION, SCHEMA_VERSION
 from pomi_backend.services.orders import standard_drug_id
+from pomi_backend.services.watermarks import (
+    ASSET_TYPE,
+    WATERMARK_VERSION,
+    display_asset_data,
+)
 
 
 def task_data(task: OCRTask) -> dict[str, Any]:
@@ -228,11 +234,13 @@ class OCRTaskService:
         *,
         model_name: str,
         business_date: date,
+        storage_root: Path,
     ) -> None:
         self.session = session
         self.account = account
         self.model_name = model_name
         self.business_date = business_date
+        self.storage_root = storage_root
         self.patient = PatientRepository(session).get_or_create(account.uid)
         self.repository = OCRRepository(session, self.patient.patient_id)
         self.documents = DocumentRepository(session, self.patient.patient_id)
@@ -300,6 +308,12 @@ class OCRTaskService:
         revision = self.documents.revision(task.document_id, task.document_revision_id)
         source = None
         if document is not None and revision is not None:
+            display_asset = self.documents.display_asset(
+                document.id,
+                revision.id,
+                asset_type=ASSET_TYPE,
+                watermark_version=WATERMARK_VERSION,
+            )
             source = {
                 "document_id": document.id,
                 "document_revision_id": revision.id,
@@ -307,6 +321,7 @@ class OCRTaskService:
                 "mime_type": revision.mime_type,
                 "revision_number": revision.revision_number,
                 "file_endpoint": (f"/api/documents/{document.id}/revisions/{revision.id}/file"),
+                "display_asset": display_asset_data(display_asset),
             }
         return result_data(
             result,

@@ -8,7 +8,14 @@ from PIL import Image
 from pytest import MonkeyPatch
 from sqlalchemy import func, select
 
-from pomi_backend.db.models import LabObservation, Medication, MedicationEvent, OCRResult, OCRTask
+from pomi_backend.db.models import (
+    DocumentDisplayAsset,
+    LabObservation,
+    Medication,
+    MedicationEvent,
+    OCRResult,
+    OCRTask,
+)
 from pomi_backend.services.ocr_provider import OCRProviderResponse
 
 
@@ -25,7 +32,7 @@ def _headers(client: TestClient, name: str) -> dict[str, str]:
 
 def _image() -> bytes:
     output = BytesIO()
-    Image.new("RGB", (32, 24), "white").save(output, format="PNG")
+    Image.new("RGB", (320, 240), (52, 64, 82)).save(output, format="PNG")
     return output.getvalue()
 
 
@@ -131,6 +138,17 @@ def test_sync_recognize_persists_result_and_reuses_idempotency_key(
 
     assert repeated == first
     assert FakeProvider.calls == 1
+    display = first["display_asset"]
+    assert display["status"] == "ready"
+    assert display["watermark_version"] == "pomi-watermark-v2"
+    assert display["pixel_width"] == 320
+    assert display["pixel_height"] == 240
+    watermarked = api_client.get(display["file_endpoint"], headers=owner)
+    assert watermarked.status_code == 200
+    assert watermarked.headers["cache-control"] == "private, no-store"
+    with Image.open(BytesIO(watermarked.content)) as image:
+        assert image.size == (320, 240)
+        assert image.convert("RGB").getpixel((160, 120)) != (52, 64, 82)
     with api_client.app.state.session_factory() as session:
         assert session.scalar(select(func.count()).select_from(OCRTask)) == 1
         assert session.scalar(select(func.count()).select_from(OCRResult)) == 1
@@ -138,11 +156,44 @@ def test_sync_recognize_persists_result_and_reuses_idempotency_key(
         assert task is not None
         assert task.status == "pending_confirmation"
         assert task.result_source == "fake-qwen"
+        assert session.scalar(select(func.count()).select_from(DocumentDisplayAsset)) == 1
 
     second_owner = _headers(api_client, "sync-ocr-other-owner")
     other = _recognize(api_client, second_owner)
     assert other["ocr_task_id"] != first["ocr_task_id"]
     assert FakeProvider.calls == 2
+    assert api_client.get(display["file_endpoint"], headers=second_owner).status_code == 404
+
+
+def test_watermark_retry_isolated_from_successful_ocr(
+    api_client: TestClient, monkeypatch: MonkeyPatch
+) -> None:
+    monkeypatch.setattr("pomi_backend.api.ocr.Qwen3VLOCRProvider", FakeProvider)
+    owner = _headers(api_client, "sync-watermark-retry")
+    from pomi_backend.services import watermarks
+
+    renderer = watermarks._render_watermarked_image
+
+    def fail_renderer(*_args, **_kwargs):
+        raise OSError("synthetic renderer failure")
+
+    monkeypatch.setattr(watermarks, "_render_watermarked_image", fail_renderer)
+    recognized = _recognize(api_client, owner, key="sync-watermark-retry-001")
+    failed = recognized["display_asset"]
+    assert failed["status"] == "failed"
+    assert failed["error"]["code"] == "WATERMARK_RENDER_FAILED"
+    task = _data(api_client.get(f"/api/ocr/tasks/{recognized['ocr_task_id']}", headers=owner))
+    assert task["status"] == "pending_confirmation"
+
+    retry_endpoint = (
+        f"/api/documents/{recognized['document_id']}/revisions/"
+        f"{recognized['document_revision_id']}/display/retry"
+    )
+    monkeypatch.setattr(watermarks, "_render_watermarked_image", renderer)
+    recovered = _data(api_client.post(retry_endpoint, headers=owner))
+    assert recovered["status"] == "ready"
+    assert recovered["id"] == failed["id"]
+    assert recovered["attempt_count"] == failed["attempt_count"] + 1
 
 
 def test_sync_confirmation_is_atomic_idempotent_and_owned(

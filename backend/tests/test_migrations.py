@@ -7,7 +7,7 @@ from alembic.config import Config
 from pytest import MonkeyPatch
 from sqlalchemy import create_engine, inspect, text
 
-MIGRATION_HEAD = "20260829_0034"
+MIGRATION_HEAD = "20260829_0035"
 
 
 def test_initial_migration_is_repeatable_and_safe(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
@@ -26,6 +26,7 @@ def test_initial_migration_is_repeatable_and_safe(tmp_path: Path, monkeypatch: M
     assert set(inspector.get_table_names()) >= {
         "alembic_version",
         "document",
+        "document_display_asset",
         "document_revision",
         "imaging_report",
         "lab_observation",
@@ -54,6 +55,7 @@ def test_initial_migration_is_repeatable_and_safe(tmp_path: Path, monkeypatch: M
     medication_columns = {column["name"] for column in inspector.get_columns("medication")}
     event_columns = {column["name"] for column in inspector.get_columns("medication_event")}
     profile_columns = {column["name"] for column in inspector.get_columns("patient_profile")}
+    display_columns = {column["name"] for column in inspector.get_columns("document_display_asset")}
     assert "password_hash" in account_columns
     assert "password" not in account_columns
     assert "session_hash" in session_columns
@@ -61,6 +63,17 @@ def test_initial_migration_is_repeatable_and_safe(tmp_path: Path, monkeypatch: M
     assert "idempotency_key" in medication_columns
     assert "stop_source" in event_columns
     assert "period_duration_days" in profile_columns
+    assert {
+        "document_id",
+        "document_revision_id",
+        "asset_type",
+        "watermark_version",
+        "status",
+        "storage_path",
+        "file_hash",
+        "attempt_count",
+        "generated_at",
+    } <= display_columns
     assert "lab_observation" in inspector.get_table_names()
     lab_columns = {column["name"] for column in inspector.get_columns("lab_observation")}
     assert {
@@ -112,6 +125,7 @@ def test_laboratory_migration_upgrades_the_current_main_schema(
     command.upgrade(config, "head")
     assert {
         "document",
+        "document_display_asset",
         "document_revision",
         "patient_note",
         "report_snapshot",

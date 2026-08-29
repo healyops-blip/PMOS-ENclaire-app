@@ -270,7 +270,12 @@ def test_four_materials_are_idempotent_traceable_and_uid_scoped(api_client: Test
         assert result["fields"][0]["confidence"] == 0.91
         assert result["fields"][0]["source_region"]["page"] == 1
         assert result["source_document"]["document_revision_id"] == document["current_revision_id"]
+        display = result["source_document"]["display_asset"]
+        assert display["status"] == "ready"
+        assert display["file_endpoint"].endswith("/display/file")
+        assert api_client.get(display["file_endpoint"], headers=owner).status_code == 200
         assert api_client.get(f"/api/ocr/tasks/{task['id']}", headers=outsider).status_code == 404
+        assert api_client.get(display["file_endpoint"], headers=outsider).status_code == 404
         assert (
             api_client.get(f"/api/ocr/tasks/{task['id']}/result", headers=outsider).status_code
             == 404
