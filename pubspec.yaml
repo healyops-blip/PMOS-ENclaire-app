@@ -1,5 +1,5 @@
 name: pmos_enclaire
-description: PCOS follow-up preparation mobile client.
+description: POMI — PCOS follow-up preparation mobile client.
 publish_to: none
 version: 0.1.0+1
 
@@ -34,6 +34,12 @@ flutter:
     - assets/brand/POMI-logo.svg
     - assets/brand/POMI-logo-mark.svg
     - assets/data/pomi_medications_v2.json
+    - assets/data/smoke_dataset/
+    - assets/data/smoke_dataset/_clean_bases/
+    - assets/data/smoke_dataset/影像文字报告/
+    - assets/data/smoke_dataset/化验_检测报告/
+    - assets/data/smoke_dataset/医嘱_处方/
+    - assets/data/smoke_dataset/门诊病历_就诊记录/
     - assets/images/pomie_thinking.gif
     - assets/images/pomie_questioning.gif
     - assets/images/pomi_verified_stamp.png
@@ -47,4 +53,14 @@ flutter:
         - asset: assets/fonts/NotoSansSC-Bold.ttf
           weight: 700
         - asset: assets/fonts/NotoSansSC-ExtraBold.ttf
+          weight: 800
+    - family: POMI Noto Sans SC Subset
+      fonts:
+        - asset: assets/fonts/pomi_web_subset/NotoSansSC-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/pomi_web_subset/NotoSansSC-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/pomi_web_subset/NotoSansSC-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/pomi_web_subset/NotoSansSC-ExtraBold.ttf
           weight: 800

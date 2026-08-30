@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from decimal import Decimal
 from io import BytesIO
 
 import pytest
@@ -267,13 +268,76 @@ def test_invalid_p0_unit_reference_and_date_are_stable_field_errors(
         "LAB_REFERENCE_RANGE_INVALID",
         "LAB_DATE_INVALID",
         "LAB_NAME_REQUIRED",
-        "LAB_VALUE_REQUIRED",
-        "LAB_UNIT_REQUIRED",
     }
+    # 数值/单位缺空不再产生 LAB_VALUE_REQUIRED / LAB_UNIT_REQUIRED：
+    # 缺空的项目被跳过或保留空串，不再让整份确认失败。
+    assert "LAB_VALUE_REQUIRED" not in codes
+    assert "LAB_UNIT_REQUIRED" not in codes
     assert error["details"]["p0_evaluation"]["invalid_fields"] == 5
     with api_client.app.state.session_factory() as session:
         assert session.query(LabObservation).count() == 0
         assert session.get(OCRTask, task["id"]).status == "pending_confirmation"
+
+
+def test_mapped_metric_without_unit_is_rejected_not_stored_unconverted() -> None:
+    """已映射为标准指标的项目缺单位时必须报错，否则数值会未换算地混入标准趋势线。"""
+    mapped, issues = normalize_lab_item(
+        {"name": "血糖", "value": "99", "unit": "", "reference_range": "70-100"},
+        0,
+        {},
+    )
+    assert mapped is None
+    assert [issue.code for issue in issues] == ["LAB_UNIT_REQUIRED"]
+
+    # 未映射指标缺单位仍然放行（保留空单位，前端展示为「—」）。
+    unmapped, unmapped_issues = normalize_lab_item(
+        {"name": "某自定义指标", "value": "8", "unit": "", "reference_range": None},
+        0,
+        {},
+    )
+    assert unmapped_issues == []
+    assert unmapped is not None
+    assert unmapped.mapping_status == "needs_manual_review"
+    assert unmapped.standard_unit == ""
+
+
+def test_value_with_glued_unit_is_split_not_rejected() -> None:
+    """模型常把「数值 单位」写在一起（如 "6 ×10^9/L"），确认时应拆分而不是整份失败。"""
+    parsed, issues = normalize_lab_item(
+        {
+            "name": "白细胞计数(WBC)",
+            "value": "6 ×10^9/L",
+            "unit": "×10^9/L",
+            "reference_range": "4-12",
+        },
+        0,
+        {},
+    )
+    assert issues == []
+    assert parsed is not None
+    assert parsed.numeric_value == Decimal("6")
+    assert parsed.raw_value == "6"
+    assert parsed.standard_unit == "10^9/L"
+
+    # 单位字段为空、只有 value 粘着单位时，尾部作为单位候选。
+    inferred, inferred_issues = normalize_lab_item(
+        {"name": "血红蛋白", "value": "146 g/L", "unit": "", "reference_range": "110-180"},
+        0,
+        {},
+    )
+    assert inferred_issues == []
+    assert inferred is not None
+    assert inferred.numeric_value == Decimal("146")
+    assert inferred.standard_unit == "g/L"
+
+    # 非数值的定性结果仍然拒绝。
+    qualitative, qualitative_issues = normalize_lab_item(
+        {"name": "隐血", "value": "阴性", "unit": "", "reference_range": None},
+        0,
+        {},
+    )
+    assert qualitative is None
+    assert [issue.code for issue in qualitative_issues] == ["LAB_VALUE_INVALID"]
 
 
 @pytest.mark.parametrize(

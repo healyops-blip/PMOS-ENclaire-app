@@ -504,6 +504,19 @@ class ReconciliationService:
     def execute(
         self, reconciliation_id: str, payload: ReconciliationExecute
     ) -> MedicationReconciliation:
+        decision_aliases = {
+            "accept_new": "accept",
+            "keep_existing": "keep_current",
+            "stop_existing": "accept",
+            "manual_review": "reject",
+        }
+        normalized_decisions = [
+            decision.model_copy(
+                update={"decision": decision_aliases.get(decision.decision, decision.decision)}
+            )
+            for decision in payload.decisions
+        ]
+        payload = payload.model_copy(update={"decisions": normalized_decisions})
         reconciliation = self.owned(reconciliation_id)
         canonical_payload = json.loads(
             json.dumps(payload.model_dump(mode="json"), ensure_ascii=False, sort_keys=True)

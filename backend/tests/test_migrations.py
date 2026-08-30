@@ -7,7 +7,7 @@ from alembic.config import Config
 from pytest import MonkeyPatch
 from sqlalchemy import create_engine, inspect, text
 
-MIGRATION_HEAD = "20260829_0034"
+MIGRATION_HEAD = "20260830_0036"
 
 
 def test_initial_migration_is_repeatable_and_safe(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
@@ -30,6 +30,7 @@ def test_initial_migration_is_repeatable_and_safe(tmp_path: Path, monkeypatch: M
         "imaging_report",
         "lab_observation",
         "medication",
+        "medication_catalog",
         "medication_daily",
         "medication_event",
         "medical_order",

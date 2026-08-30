@@ -108,6 +108,54 @@ METRICS = (
 )
 
 METRIC_BY_ALIAS = {alias: spec for spec in METRICS for alias in spec.aliases}
+
+# 化验/检验项目名里高度专属的词，用于识别「被 OCR 误当成药品」的化验指标。
+# 只收会明确出现在检验单、几乎不会出现在药名里的词，避免误伤真实药物。
+_LAB_METRIC_HINTS = (
+    "计数",
+    "转氨酶",
+    "转肽酶",
+    "脱氢酶",
+    "磷酸酶",
+    "淀粉酶",
+    "肌酸激酶",
+    "血红蛋白",
+    "血小板",
+    "白细胞",
+    "红细胞",
+    "中性粒",
+    "淋巴细胞",
+    "单核细胞",
+    "嗜酸性",
+    "嗜碱性",
+    "网织红",
+    "红细胞压积",
+    "血细胞比容",
+    "脂蛋白",
+    "胆固醇",
+    "甘油三酯",
+    "尿酸",
+    "肌酐",
+    "尿素氮",
+    "胆红素",
+    "c反应蛋白",
+    "空腹血糖",
+    "餐后血糖",
+    "随机血糖",
+    "糖化血红蛋白",
+    "同型半胱氨酸",
+    "d-二聚体",
+)
+
+
+def looks_like_lab_metric(name: str | None) -> bool:
+    """名称是否明显是化验/检验项目而非药品。"""
+    if not name:
+        return False
+    text = unicodedata.normalize("NFKC", name).casefold()
+    return any(hint in text for hint in _LAB_METRIC_HINTS)
+
+
 UNIT_ALIASES = {
     "mmol/l": "mmol/L",
     "mg/dl": "mg/dL",
@@ -131,6 +179,8 @@ UNIT_ALIASES = {
     "10^12/l": "10^12/L",
     "10*12/l": "10^12/L",
     "10¹²/l": "10^12/L",
+    "μmol/l": "μmol/L",
+    "µmol/l": "μmol/L",
 }
 
 
@@ -147,11 +197,29 @@ def parse_number(value: Any) -> Decimal | None:
     return parsed if parsed.is_finite() else None
 
 
+_LEADING_NUMBER_PATTERN = re.compile(r"^\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*(.*)$", re.DOTALL)
+
+
+def _split_number_and_unit(raw: Any) -> tuple[Decimal | None, str | None]:
+    """Split a glued "<number> <unit>" value, e.g. "6 ×10^9/L" -> (6, "×10^9/L")."""
+    match = _LEADING_NUMBER_PATTERN.match(str(raw).replace(",", ""))
+    if match is None:
+        return None, None
+    return parse_number(match.group(1)), (match.group(2).strip() or None)
+
+
 def normalize_unit(value: Any) -> str | None:
     if value is None:
         return None
-    text = unicodedata.normalize("NFKC", str(value)).strip().replace(" ", "")
+    text = str(value).strip().replace(" ", "")
+    # 把上标数量级 10⁹ / 10¹² 先规范成 10^9 / 10^12（必须在 NFKC 之前执行，
+    # 否则 NFKC 会把上标并进数字，10⁹/L 变成 109/L 而丢失幂号）。
+    sup = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹", "0123456789")
+    text = re.sub(r"[⁰¹²³⁴⁵⁶⁷⁸⁹]+", lambda m: "^" + m.group(0).translate(sup), text)
+    text = unicodedata.normalize("NFKC", text).strip()
     text = text.replace("μ", "μ").replace("µ", "µ")
+    # 容忍常见的 "×10^9/L" 前导乘号（模型常以 ×/x/✕ 开头书写数量级）。
+    text = re.sub(r"^[×xX✕✖*]", "", text)
     return UNIT_ALIASES.get(text.casefold())
 
 
@@ -219,9 +287,19 @@ def normalize_lab_item(
         )
     raw_value = str(item.get("value") or "").strip()
     numeric = parse_number(item.get("value"))
+    inline_unit: str | None = None
+    if numeric is None and raw_value:
+        # 模型有时把「数值 单位」写在同一个字段里（如 "6 ×10^9/L"、"146 g/L"）。
+        # 取前导数字作为数值，尾部留作单位候选（仅在单位字段为空时采用），
+        # 并把 raw_value 归一为纯数字，避免展示时单位重复。
+        numeric, inline_unit = _split_number_and_unit(raw_value)
+        if numeric is not None:
+            raw_value = str(numeric)
     if not raw_value:
-        issues.append(FieldIssue(f"{prefix}.value", "LAB_VALUE_REQUIRED", "数值不能为空。"))
-    elif numeric is None:
+        # 数值缺失：项目无记录价值，跳过该条但不让整体确认失败；
+        # 若项目名也缺失（issues 非空）则仍然报错。
+        return None, issues
+    if numeric is None:
         issues.append(FieldIssue(f"{prefix}.value", "LAB_VALUE_INVALID", "数值格式无法解析。"))
     elif abs(numeric) > MAX_NUMERIC_ABS:
         issues.append(
@@ -231,16 +309,27 @@ def normalize_lab_item(
         issues.append(
             FieldIssue(f"{prefix}.value", "LAB_VALUE_TOO_LONG", "原始数值不能超过 100 个字符。")
         )
-    raw_unit = str(item.get("unit") or "").strip()
-    unit = normalize_unit(item.get("unit"))
+    spec = METRIC_BY_ALIAS.get(_key(name)) if name else None
+    raw_unit = str(item.get("unit") or "").strip() or (inline_unit or "")
+    unit = normalize_unit(raw_unit or None)
     if not raw_unit:
-        issues.append(FieldIssue(f"{prefix}.unit", "LAB_UNIT_REQUIRED", "单位不能为空。"))
+        # 单位缺失：未映射指标允许入库，保留空串由前端展示为「—」；
+        # 已映射为标准指标的项目必须有单位，否则数值无法安全换算到
+        # 标准趋势线，会与其他单位的点混在一起。
+        unit = None
+        if spec is not None:
+            issues.append(
+                FieldIssue(
+                    f"{prefix}.unit",
+                    "LAB_UNIT_REQUIRED",
+                    "该项目已识别为标准指标，请补充单位。",
+                )
+            )
     elif unit is None:
         issues.append(FieldIssue(f"{prefix}.unit", "LAB_UNIT_UNSUPPORTED", "单位不在允许范围内。"))
     elif len(raw_unit) > 40:
         issues.append(FieldIssue(f"{prefix}.unit", "LAB_UNIT_TOO_LONG", "单位不能超过 40 个字符。"))
 
-    spec = METRIC_BY_ALIAS.get(_key(name)) if name else None
     factor = Decimal("1")
     standard_unit = unit or raw_unit
     if spec is not None and unit is not None:
@@ -300,8 +389,7 @@ def normalize_lab_item(
 
     if issues:
         return None, issues
-    assert numeric is not None and unit is not None
-    converted = numeric * factor
+    converted = numeric * factor if numeric is not None else None
     priority = ("sample_date", "exam_date", "report_date", "visit_date")
     trend_source = next((field for field in priority if parsed_dates[field] is not None), None)
     return (
@@ -340,9 +428,14 @@ def p0_evaluation(
     total = len(items) * 3
     valid = 0
     for item in items:
+        value = item.get("value")
+        number = parse_number(value)
+        inline_unit: str | None = None
+        if number is None:
+            number, inline_unit = _split_number_and_unit(value)
         valid += int(bool(str(item.get("name") or "").strip()))
-        valid += int(parse_number(item.get("value")) is not None)
-        valid += int(normalize_unit(item.get("unit")) is not None)
+        valid += int(number is not None)
+        valid += int(normalize_unit(str(item.get("unit") or "").strip() or inline_unit) is not None)
     output: dict[str, int | float] = {
         "total_fields": total,
         "valid_fields": valid,

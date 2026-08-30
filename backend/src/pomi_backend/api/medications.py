@@ -43,6 +43,16 @@ def list_medications(
     )
 
 
+@router.get("/medication-catalog")
+def list_medication_catalog(
+    request: Request,
+    service: MedicationServiceDependency,
+    query: Annotated[str | None, Query(alias="q", max_length=100)] = None,
+    category: Annotated[str | None, Query(max_length=80)] = None,
+) -> dict:
+    return success(request, service.catalog(query, category))
+
+
 @router.post("/medications", status_code=status.HTTP_201_CREATED)
 def create_medication(
     payload: MedicationCreate,

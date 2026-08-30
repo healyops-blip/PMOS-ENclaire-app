@@ -1,11 +1,11 @@
 {
-    "name": "pomi_mobile",
-    "short_name": "pomi_mobile",
+    "name": "POMI",
+    "short_name": "POMI",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#F3ECF3",
+    "theme_color": "#6A4C93",
+    "description": "POMI · PCOS 复诊准备助手",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

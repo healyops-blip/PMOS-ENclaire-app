@@ -33,10 +33,15 @@ class Settings:
     auth_rate_limit_attempts: int = DEFAULT_AUTH_RATE_LIMIT_ATTEMPTS
     auth_rate_limit_window_seconds: int = DEFAULT_AUTH_RATE_LIMIT_WINDOW_SECONDS
     allowed_hosts: tuple[str, ...] = DEFAULT_ALLOWED_HOSTS
+    # Extra browser origins allowed to call the API cross-origin outside
+    # production. Local Flutter Web preview (localhost/127.0.0.1, any port) is
+    # always allowed; set POMI_CORS_ALLOW_ORIGINS for any additional host.
+    cors_allow_origins: tuple[str, ...] = ()
     storage_root: Path = DEFAULT_STORAGE_ROOT
     ocr_api_base_url: str = DEFAULT_OCR_API_BASE_URL
     ocr_api_key: str | None = None
     ocr_model: str = DEFAULT_OCR_MODEL
+    local_ocr_dataset_enabled: bool = False
     ocr_request_timeout_seconds: int = 90
     ocr_lease_seconds: int = 180
     business_timezone: str = DEFAULT_BUSINESS_TIMEZONE
@@ -79,10 +84,16 @@ class Settings:
                 )
                 if host.strip()
             ),
+            cors_allow_origins=tuple(
+                origin.strip()
+                for origin in os.getenv("POMI_CORS_ALLOW_ORIGINS", "").split(",")
+                if origin.strip()
+            ),
             storage_root=Path(os.getenv("POMI_STORAGE_ROOT", str(DEFAULT_STORAGE_ROOT))),
             ocr_api_base_url=os.getenv("POMI_OCR_API_BASE_URL", DEFAULT_OCR_API_BASE_URL),
             ocr_api_key=os.getenv("POMI_OCR_API_KEY"),
             ocr_model=os.getenv("POMI_OCR_MODEL", DEFAULT_OCR_MODEL),
+            local_ocr_dataset_enabled=os.getenv("POMI_LOCAL_OCR_DATASET", "0") == "1",
             ocr_request_timeout_seconds=int(os.getenv("POMI_OCR_TIMEOUT_SECONDS", "90")),
             ocr_lease_seconds=int(os.getenv("POMI_OCR_LEASE_SECONDS", "180")),
             business_timezone=os.getenv("POMI_BUSINESS_TIMEZONE", DEFAULT_BUSINESS_TIMEZONE),

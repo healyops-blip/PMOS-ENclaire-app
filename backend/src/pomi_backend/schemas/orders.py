@@ -50,7 +50,17 @@ class ReconciliationDecision(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     item_id: str = Field(min_length=1, max_length=36)
-    decision: Literal["accept", "keep_current", "reject"]
+    # Accept the UI-facing values during the integration period. The service
+    # normalizes them to the persisted domain values before execution.
+    decision: Literal[
+        "accept",
+        "keep_current",
+        "reject",
+        "accept_new",
+        "keep_existing",
+        "stop_existing",
+        "manual_review",
+    ]
     note: str | None = Field(default=None, max_length=500)
     stop_date: date | None = None
     stop_source: str | None = Field(default=None, max_length=80)

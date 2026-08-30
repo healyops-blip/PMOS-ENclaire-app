@@ -1,0 +1,36 @@
+{
+  "doc_id": "PR00012",
+  "hospital": "广州润心医疗中心Runxin Healthcare Guangzhou",
+  "department": "生殖科",
+  "visit_date": "2026-07-29",
+  "diagnosis_summary": "多囊卵巢综合征（代谢异常需评估）",
+  "medical_advice": "调整月经周期，监测排卵及代谢指标",
+  "examinations": [],
+  "medication_suggestions": [
+    {
+      "drug_name": "叶酸",
+      "dosage": "0.4mg",
+      "frequency": "每日1次",
+      "duration": "长期",
+      "instruction": "示例医嘱：口服，每日一次，备孕/早孕期补充（PCOS）。",
+      "source_text": "药品 叶酸（VB9） 0.4mg 用法 口服 片剂 用量 每次1片，每日1次 疗程 长期 总量 20片"
+    },
+    {
+      "drug_name": "司美格鲁肽",
+      "dosage": "—",
+      "frequency": "每周1次",
+      "duration": "长期",
+      "instruction": "示例医嘱：皮下注射，每周一次，配合生活方式干预（PCOS）。",
+      "source_text": "药品 司美格鲁肽（司美格鲁肽注射液） — 用法 皮下注射 注射剂 用量 按医嘱，每周1次 疗程 长期 总量 4支"
+    },
+    {
+      "drug_name": "盐酸二甲双胍",
+      "dosage": "0.5g",
+      "frequency": "每日3次",
+      "duration": "长期",
+      "instruction": "示例医嘱：口服，每日2-3次，长期管理，注意餐后服用（PCOS）。",
+      "source_text": "药品 盐酸二甲双胍（格华止） 0.5g 用法 口服 普通片 用量 每次1片，每日3次 疗程 长期 总量 1盒"
+    }
+  ],
+  "original_file_name": "医嘱_处方__case_00012.jpg"
+}

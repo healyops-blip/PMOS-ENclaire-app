@@ -63,6 +63,7 @@ app.*.map.json
 /backend/uploads/
 /backend/logs/
 /backend/backups/
+/backend/runtime/
 
 # Local export archives
 /export/

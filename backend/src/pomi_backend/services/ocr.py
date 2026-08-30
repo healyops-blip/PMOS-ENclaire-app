@@ -7,6 +7,7 @@ import json
 import re
 from datetime import date
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy.exc import IntegrityError
@@ -33,6 +34,7 @@ from pomi_backend.repositories import (
 from pomi_backend.schemas.ocr_recognize import OCRResultConfirmRequest
 from pomi_backend.services.lab_rules import (
     FieldIssue,
+    looks_like_lab_metric,
     normalize_lab_item,
     p0_evaluation,
     parse_number,
@@ -40,6 +42,11 @@ from pomi_backend.services.lab_rules import (
 from pomi_backend.services.medications import instruction_data, medication_data
 from pomi_backend.services.ocr_prompts import PROMPT_VERSION, SCHEMA_VERSION
 from pomi_backend.services.orders import standard_drug_id
+from pomi_backend.services.watermarks import (
+    ASSET_TYPE,
+    WATERMARK_VERSION,
+    display_asset_data,
+)
 
 
 def task_data(task: OCRTask) -> dict[str, Any]:
@@ -132,6 +139,13 @@ def normalize_algorithm_payload(payload: dict[str, Any], original_file_name: str
             "medication_suggestions": draft.get("medication_suggestions")
             or draft.get("orders", []),
         }
+        # Imaging text reports and outpatient records carry material-specific
+        # fields that must survive normalization; the generic envelope above
+        # drops them, so forward the whole draft's extra keys verbatim.
+        _list_keys = {"examinations", "items", "orders", "medication_suggestions"}
+        for key, value in draft.items():
+            if key not in payload and key not in _list_keys:
+                payload[key] = value
     payload["original_file_name"] = original_file_name
     if evidence is not None:
         payload["evidence"] = evidence
@@ -228,11 +242,13 @@ class OCRTaskService:
         *,
         model_name: str,
         business_date: date,
+        storage_root: Path,
     ) -> None:
         self.session = session
         self.account = account
         self.model_name = model_name
         self.business_date = business_date
+        self.storage_root = storage_root
         self.patient = PatientRepository(session).get_or_create(account.uid)
         self.repository = OCRRepository(session, self.patient.patient_id)
         self.documents = DocumentRepository(session, self.patient.patient_id)
@@ -300,6 +316,12 @@ class OCRTaskService:
         revision = self.documents.revision(task.document_id, task.document_revision_id)
         source = None
         if document is not None and revision is not None:
+            display_asset = self.documents.display_asset(
+                document.id,
+                revision.id,
+                asset_type=ASSET_TYPE,
+                watermark_version=WATERMARK_VERSION,
+            )
             source = {
                 "document_id": document.id,
                 "document_revision_id": revision.id,
@@ -307,6 +329,7 @@ class OCRTaskService:
                 "mime_type": revision.mime_type,
                 "revision_number": revision.revision_number,
                 "file_endpoint": (f"/api/documents/{document.id}/revisions/{revision.id}/file"),
+                "display_asset": display_asset_data(display_asset),
             }
         return result_data(
             result,
@@ -385,23 +408,24 @@ class OCRTaskService:
                     )
                 )
             identifier = standard_drug_id(item.drug_name.strip())
-            if identifier is None:
+            # OCR 常把化验单里的检验项目误放进用药建议。名字明显是化验指标的，
+            # 不写进正式用药，让用户从确认列表里移除。
+            if identifier is None and looks_like_lab_metric(item.drug_name):
                 issues.append(
                     FieldIssue(
                         f"medication_suggestions.{index}.drug_name",
-                        "DRUG_MAPPING_REQUIRED",
-                        "药品不在确定性词库中，请手动添加或取消本次导入。",
+                        "MEDICATION_LOOKS_LIKE_LAB_METRIC",
+                        f"「{item.drug_name.strip()}」看起来是化验项目而不是药品，请从用药清单中移除。",
                     )
                 )
+            # 未映射药名不再硬阻塞入库：标准词库未收录的药品（如地屈孕酮、肌醇等）
+            # 仍可确认，仅保留 standard_drug_id=None 供后续人工复核。
             dosage_value, dosage_unit = _dosage_parts(item.dosage)
+            # 剂量缺空或无法解析为「数值+单位」时不再硬阻塞：保留原始文本，
+            # 由用户后续在用药详情中修正，避免「确认并入库」因剂量格式失败。
             if item.dosage and (dosage_value is None or dosage_unit is None):
-                issues.append(
-                    FieldIssue(
-                        f"medication_suggestions.{index}.dosage",
-                        "DOSAGE_INVALID",
-                        "剂量必须包含可识别的数值和单位，例如 500mg。",
-                    )
-                )
+                dosage_value = None
+                dosage_unit = None
             medication_values.append((item, identifier, dosage_value, dosage_unit))
         if issues:
             raise BusinessError(

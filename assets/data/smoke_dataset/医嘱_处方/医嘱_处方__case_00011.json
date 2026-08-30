@@ -1,0 +1,36 @@
+{
+  "doc_id": "PR00011",
+  "hospital": "武汉康礼医疗中心Kangli Medical Center Wuhan",
+  "department": "生殖科",
+  "visit_date": "2026-08-26",
+  "diagnosis_summary": "多囊卵巢综合征（代谢异常需评估）",
+  "medical_advice": "控制体重，配合药物治疗及随访",
+  "examinations": [],
+  "medication_suggestions": [
+    {
+      "drug_name": "地屈孕酮",
+      "dosage": "10mg",
+      "frequency": "每日2次",
+      "duration": "按周期",
+      "instruction": "示例医嘱：口服，每日两次，按周期应用以调经，遵医嘱复诊（PCOS）。",
+      "source_text": "药品 地屈孕酮（达芙通） 10mg 用法 口服 片剂 用量 按医嘱，每日2次 疗程 按周期 总量 20片"
+    },
+    {
+      "drug_name": "枸橼酸氯米芬",
+      "dosage": "50mg",
+      "frequency": "每日1次",
+      "duration": "5天",
+      "instruction": "示例医嘱：口服，每日一次，连用5天，按周期评估排卵（PCOS）。",
+      "source_text": "药品 枸橼酸氯米芬（舒经芬） 50mg 用法 口服 片剂 用量 每次1片，每日1次 疗程 5天 总量 14片"
+    },
+    {
+      "drug_name": "肌醇",
+      "dosage": "2g",
+      "frequency": "每日2次",
+      "duration": "长期",
+      "instruction": "示例医嘱：口服，每日两次，配合饮食与运动干预（PCOS）。",
+      "source_text": "药品 肌醇（Myo-inositol） 2g 用法 口服 胶囊剂 用量 按医嘱，每日2次 疗程 长期 总量 28粒"
+    }
+  ],
+  "original_file_name": "医嘱_处方__case_00011.jpg"
+}

@@ -18,18 +18,18 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="Pomi Flutter mobile preview.">
+  <meta name="description" content="POMI · PCOS 复诊准备助手">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="pomi_mobile">
+  <meta name="apple-mobile-web-app-title" content="POMI">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>Pomi Mobile Preview</title>
+  <title>POMI</title>
   <link rel="manifest" href="manifest.json">
   <style>
     @font-face {
@@ -75,7 +75,7 @@
       box-sizing: border-box;
       padding: 20px;
       overflow: hidden;
-      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Noto Sans SC', sans-serif;
+      font-family: 'Noto Sans SC', sans-serif;
     }
 
     .device-frame {
@@ -105,7 +105,7 @@
       box-sizing: border-box;
       color: #111111;
       background: transparent;
-      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Noto Sans SC', sans-serif;
+      font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
       font-size: 10px;
       font-weight: 700;
       line-height: 1;
@@ -189,7 +189,7 @@
       color: #4a2e6b;
       background: rgba(255, 255, 255, 0.94);
       box-shadow: 0 6px 20px rgba(74, 46, 107, 0.12);
-      font: 600 13px/1 -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Noto Sans SC', sans-serif;
+      font: 600 13px/1 'Noto Sans SC', sans-serif;
       cursor: default;
       z-index: 10;
     }
@@ -224,9 +224,9 @@
   </style>
 </head>
 <body>
-  <div class="backend-switch" title="Preview 使用前端内存 smoke 数据">
+  <div class="backend-switch" title="数据来源由构建参数和 Preview 启动模式决定">
     <span class="backend-status online" aria-hidden="true"></span>
-    <span>数据：Smoke</span>
+    <span>数据：启动模式</span>
   </div>
   <main class="device-frame">
     <div class="system-status-bar" aria-label="模拟手机系统状态栏">
@@ -247,7 +247,7 @@
         </svg>
       </span>
     </div>
-    <iframe src="app.html?v=2608271235" title="Pomi Flutter mobile preview"></iframe>
+    <iframe src="app.html?v=20260829-0063" title="Pomi Flutter mobile preview"></iframe>
   </main>
   <script>
     const updateSystemTime = () => {

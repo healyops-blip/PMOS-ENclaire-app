@@ -57,7 +57,8 @@ def seed_health_data(
         medication = Medication(
             id=medication_id,
             patient_id=returning_patient.patient_id,
-            drug_name="Metformin",
+            drug_name="盐酸二甲双胍",
+            standard_drug_id="med_metformin_hydrochloride",
             source_category="prescribed",
             specification="500 mg",
             dosage_value=Decimal("500"),

@@ -32,6 +32,39 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
   DateTime? _cycleEnd;
   String _cycleFlow = 'medium';
 
+  /// 正在编辑的已有经期记录；为空表示新建。
+  Map<String, dynamic>? _editingCycle;
+
+  /// 最近一次 build 拿到的经期列表，供保存时做本地校验。
+  List<Map<String, dynamic>> _cycles = const [];
+
+  /// 把后端的 flow_level（可能是 unknown / null / 其它）收敛到分段按钮支持的值。
+  static String _normalizeFlow(Object? value) {
+    final flow = value?.toString();
+    return (flow == 'light' || flow == 'medium' || flow == 'heavy')
+        ? flow!
+        : 'medium';
+  }
+
+  /// 找出包含 [day] 的已有经期记录（用于点日历时编辑而不是重复新建）。
+  Map<String, dynamic>? _cycleContaining(
+    DateTime day,
+    List<Map<String, dynamic>> cycles,
+  ) {
+    final target = DateUtils.dateOnly(day);
+    for (final cycle in cycles) {
+      final start = DateTime.tryParse(cycle['start_date']?.toString() ?? '');
+      if (start == null) continue;
+      // 无结束日期 = 进行中，后端按「无限延伸」处理，这里也一样：start 及之后都算。
+      final end = DateTime.tryParse(cycle['end_date']?.toString() ?? '');
+      final inRange =
+          !target.isBefore(DateUtils.dateOnly(start)) &&
+          (end == null || !target.isAfter(DateUtils.dateOnly(end)));
+      if (inRange) return cycle;
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(trackingProvider);
@@ -46,6 +79,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
               (item) => Map<String, dynamic>.from(item as Map),
             ),
           );
+          _cycles = cycles;
           final weights = List<Map<String, dynamic>>.from(
             (data['weights'] as List).map(
               (item) => Map<String, dynamic>.from(item as Map),
@@ -57,7 +91,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
               await ref.read(trackingProvider.future);
             },
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 28),
               children: [
                 _HorizontalCycleCalendar(
                   selectedDay: _focusedDay,
@@ -66,19 +100,34 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                   onSelected: (day) {
                     final selected = DateUtils.dateOnly(day);
                     final today = DateUtils.dateOnly(DateTime.now());
-                    setState(() {
-                      _focusedDay = selected;
-                      if (!selected.isAfter(today)) {
-                        _cycleStart = selected;
-                        _cycleEnd = null;
-                        _cycleEditorExpanded = true;
-                      }
-                    });
                     if (selected.isAfter(today)) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('只能记录今天及之前的经期')),
                       );
+                      return;
                     }
+                    final existing = _cycleContaining(selected, cycles);
+                    setState(() {
+                      _focusedDay = selected;
+                      _cycleEditorExpanded = true;
+                      if (existing != null) {
+                        // 点到已有经期内的某天 → 打开这条记录编辑。
+                        _editingCycle = existing;
+                        _cycleStart =
+                            DateTime.tryParse(
+                              existing['start_date']?.toString() ?? '',
+                            ) ??
+                            selected;
+                        _cycleEnd = DateTime.tryParse(
+                          existing['end_date']?.toString() ?? '',
+                        );
+                        _cycleFlow = _normalizeFlow(existing['flow_level']);
+                      } else {
+                        _editingCycle = null;
+                        _cycleStart = selected;
+                        _cycleEnd = null;
+                      }
+                    });
                   },
                   onAdd:
                       () => _addCycle(context, ref, initialStart: _focusedDay),
@@ -93,6 +142,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                         () => setState(() {
                           _cycleEditorExpanded = !_cycleEditorExpanded;
                           if (_cycleEditorExpanded) {
+                            _editingCycle = null;
                             _cycleStart = _focusedDay;
                             _cycleEnd = null;
                           }
@@ -121,12 +171,17 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                                   end: _cycleEnd,
                                   flow: _cycleFlow,
                                   saving: _savingCycle,
+                                  isEditing: _editingCycle != null,
                                   onStartTap: _selectInlineCycleStart,
                                   onEndTap: _selectInlineCycleEnd,
                                   onFlowChanged:
                                       (value) =>
                                           setState(() => _cycleFlow = value),
                                   onSave: _saveInlineCycle,
+                                  onDelete:
+                                      _editingCycle == null
+                                          ? null
+                                          : _deleteInlineCycle,
                                 )
                                 : const SizedBox.shrink(),
                       ),
@@ -173,20 +228,98 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
 
   Future<void> _saveInlineCycle() async {
     if (_savingCycle) return;
+    // 新建一条早于「进行中」经期的历史记录时，必须有结束日期，否则两条都会
+    // 被后端当成开放区间而判定重叠。
+    if (_editingCycle == null && _cycleEnd == null) {
+      final hasLater = _cycles.any((c) {
+        final s = DateTime.tryParse(c['start_date']?.toString() ?? '');
+        return s != null &&
+            DateUtils.dateOnly(s).isAfter(DateUtils.dateOnly(_cycleStart));
+      });
+      if (hasLater) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('这段经期在更近的记录之前，请先选择结束日期')));
+        return;
+      }
+    }
     setState(() => _savingCycle = true);
     try {
-      await ref
-          .read(apiClientProvider)
-          .post(
-            '/api/cycles',
-            data: {
-              'start_date': _cycleStart.toIso8601String().substring(0, 10),
-              'end_date': _cycleEnd?.toIso8601String().substring(0, 10),
-              'flow_level': _cycleFlow,
-            },
-          );
+      final api = ref.read(apiClientProvider);
+      final body = {
+        'start_date': _cycleStart.toIso8601String().substring(0, 10),
+        'end_date': _cycleEnd?.toIso8601String().substring(0, 10),
+        'flow_level': _cycleFlow,
+      };
+      final editing = _editingCycle;
+      if (editing != null) {
+        await api.put(
+          '/api/cycles/${editing['id']}',
+          data: {
+            ...body,
+            if (editing['updated_at'] != null)
+              'updated_at': editing['updated_at'],
+          },
+        );
+      } else {
+        await api.post('/api/cycles', data: body);
+      }
       ref.invalidate(trackingProvider);
-      if (mounted) setState(() => _cycleEditorExpanded = false);
+      if (mounted) {
+        setState(() {
+          _cycleEditorExpanded = false;
+          _editingCycle = null;
+        });
+      }
+    } on ApiFailure catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _savingCycle = false);
+    }
+  }
+
+  Future<void> _deleteInlineCycle() async {
+    final editing = _editingCycle;
+    if (editing == null || _savingCycle) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('删除这条经期记录？'),
+            content: const Text('删除后不可恢复。'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('删除'),
+              ),
+            ],
+          ),
+    );
+    if (confirmed != true) return;
+    setState(() => _savingCycle = true);
+    try {
+      await ref.read(apiClientProvider).delete('/api/cycles/${editing['id']}');
+      ref.invalidate(trackingProvider);
+      if (mounted) {
+        setState(() {
+          _cycleEditorExpanded = false;
+          _editingCycle = null;
+        });
+      }
+    } on ApiFailure catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
     } finally {
       if (mounted) setState(() => _savingCycle = false);
     }
@@ -285,21 +418,29 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                             );
                             return;
                           }
-                          await ref
-                              .read(apiClientProvider)
-                              .post(
-                                '/api/cycles',
-                                data: {
-                                  'start_date': start
-                                      .toIso8601String()
-                                      .substring(0, 10),
-                                  'end_date': end?.toIso8601String().substring(
-                                    0,
-                                    10,
-                                  ),
-                                  'flow_level': flow,
-                                },
+                          try {
+                            await ref
+                                .read(apiClientProvider)
+                                .post(
+                                  '/api/cycles',
+                                  data: {
+                                    'start_date': start
+                                        .toIso8601String()
+                                        .substring(0, 10),
+                                    'end_date': end
+                                        ?.toIso8601String()
+                                        .substring(0, 10),
+                                    'flow_level': flow,
+                                  },
+                                );
+                          } on ApiFailure catch (error) {
+                            if (sheetContext.mounted) {
+                              ScaffoldMessenger.of(sheetContext).showSnackBar(
+                                SnackBar(content: Text(error.message)),
                               );
+                            }
+                            return;
+                          }
                           if (sheetContext.mounted) {
                             Navigator.pop(sheetContext, true);
                           }
@@ -572,13 +713,11 @@ class _HorizontalCycleCalendar extends StatefulWidget {
 }
 
 class _HorizontalCycleCalendarState extends State<_HorizontalCycleCalendar> {
-  late final ScrollController _controller;
+  final ScrollController _controller = ScrollController();
 
-  @override
-  void initState() {
-    super.initState();
-    _controller = ScrollController(initialScrollOffset: 620);
-  }
+  // 每个日期格宽 48 + 间隔 7。
+  static const double _itemExtent = 55;
+  DateTime? _centeredOn;
 
   @override
   void dispose() {
@@ -586,16 +725,34 @@ class _HorizontalCycleCalendarState extends State<_HorizontalCycleCalendar> {
     super.dispose();
   }
 
+  /// 把选中日滚到可视区中间（首帧 + 选中日变化时各做一次，不干扰手动滑动）。
+  void _centerSelected(DateTime start, DateTime selected) {
+    if (_centeredOn == selected || !_controller.hasClients) return;
+    final index = selected.difference(start).inDays;
+    if (index < 0) return;
+    final viewport = _controller.position.viewportDimension;
+    final target = (index * _itemExtent + _itemExtent / 2 - viewport / 2).clamp(
+      0.0,
+      _controller.position.maxScrollExtent,
+    );
+    _centeredOn = selected;
+    _controller.jumpTo(target);
+  }
+
   @override
   Widget build(BuildContext context) {
     final selected = DateUtils.dateOnly(widget.selectedDay);
     final today = DateUtils.dateOnly(DateTime.now());
+    final selectedIsPeriod = _isPeriodDay(selected);
     final start = today.subtract(const Duration(days: 14));
     final dates = List.generate(
       29,
       (index) => start.add(Duration(days: index)),
     );
     final weekday = const ['一', '二', '三', '四', '五', '六', '日'];
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _centerSelected(start, selected),
+    );
 
     return PomiGlassCard(
       borderRadius: 24,
@@ -606,20 +763,43 @@ class _HorizontalCycleCalendarState extends State<_HorizontalCycleCalendar> {
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
+              child: Column(
                 children: [
-                  Expanded(
-                    child: Text(
-                      '${selected.month}月${selected.day}日 星期${weekday[selected.weekday - 1]}',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: pomiInk,
-                        fontSize: 18,
-                        height: 28 / 20,
-                        fontWeight: FontWeight.w800,
-                      ),
+                  Text(
+                    '${selected.month}月${selected.day}日 星期${weekday[selected.weekday - 1]}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: pomiInk,
+                      fontSize: 18,
+                      height: 26 / 18,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
+                  if (selectedIsPeriod) ...[
+                    const SizedBox(height: 2),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: pomiCoral,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        const Text(
+                          '经期中',
+                          style: TextStyle(
+                            color: pomiCoral,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -656,11 +836,13 @@ class _HorizontalCycleCalendarState extends State<_HorizontalCycleCalendar> {
 
   bool _isPeriodDay(DateTime day) {
     final target = DateUtils.dateOnly(day);
+    final today = DateUtils.dateOnly(DateTime.now());
     return widget.cycles.any((cycle) {
       final start = DateTime.tryParse(cycle['start_date'].toString());
       if (start == null) return false;
+      // 无结束日期（进行中）：标记到今天为止。
       final end =
-          DateTime.tryParse(cycle['end_date']?.toString() ?? '') ?? start;
+          DateTime.tryParse(cycle['end_date']?.toString() ?? '') ?? today;
       return !target.isBefore(DateUtils.dateOnly(start)) &&
           !target.isAfter(DateUtils.dateOnly(end));
     });
@@ -710,17 +892,20 @@ class _HorizontalCalendarDay extends StatelessWidget {
             AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               width: 48,
-              height: selected ? 76 : 68,
+              height: 72,
               decoration: BoxDecoration(
                 color:
                     selected
                         ? pomiPurple.withValues(alpha: .13)
                         : const Color(0xFFF1EFF5),
                 borderRadius: BorderRadius.circular(26),
-                border:
-                    selected
-                        ? Border.all(color: pomiPurple.withValues(alpha: .22))
-                        : null,
+                border: Border.all(
+                  color:
+                      selected
+                          ? pomiPurple.withValues(alpha: .35)
+                          : Colors.transparent,
+                  width: 1.5,
+                ),
               ),
               child: Stack(
                 alignment: Alignment.center,
@@ -852,16 +1037,20 @@ class _InlineCycleEditor extends StatelessWidget {
     required this.onEndTap,
     required this.onFlowChanged,
     required this.onSave,
+    this.isEditing = false,
+    this.onDelete,
   });
 
   final DateTime start;
   final DateTime? end;
   final String flow;
   final bool saving;
+  final bool isEditing;
   final VoidCallback onStartTap;
   final VoidCallback onEndTap;
   final ValueChanged<String> onFlowChanged;
   final VoidCallback onSave;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -915,8 +1104,16 @@ class _InlineCycleEditor extends StatelessWidget {
                       dimension: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                    : const Text('保存经期记录'),
+                    : Text(isEditing ? '更新经期记录' : '保存经期记录'),
           ),
+          if (isEditing && onDelete != null) ...[
+            const SizedBox(height: 4),
+            TextButton(
+              onPressed: saving ? null : onDelete,
+              style: TextButton.styleFrom(foregroundColor: pomiCoral),
+              child: const Text('删除这条记录'),
+            ),
+          ],
         ],
       ),
     );

@@ -2,9 +2,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
+import '../medications/medication_catalog.dart';
+import '../records/records_screen.dart' show recordsProvider;
 
 final dashboardProvider = FutureProvider.autoDispose<Map<String, dynamic>>((
   ref,
@@ -54,6 +57,61 @@ final medicationsProvider =
       );
     });
 
+/// 本月每种用药的 taken / missed / unrecorded 计数，键为 medication_id。
+/// 由 /api/medication-daily 当月区间聚合，正式版和 Smoke 用同一套 UI。
+final monthlyMedicationStatusProvider = FutureProvider.autoDispose<
+  Map<String, ({int taken, int missed, int unrecorded})>
+>((ref) async {
+  final now = DateTime.now();
+  String two(int v) => v.toString().padLeft(2, '0');
+  final value = await ref
+      .read(apiClientProvider)
+      .get(
+        '/api/medication-daily',
+        queryParameters: {
+          'from': '${now.year}-${two(now.month)}-01',
+          'to': '${now.year}-${two(now.month)}-${two(now.day)}',
+        },
+      );
+  final items = (value as List?) ?? const [];
+  final agg = <String, List<int>>{};
+  for (final raw in items) {
+    if (raw is! Map) continue;
+    final id = raw['medication_id']?.toString();
+    if (id == null || id.isEmpty) continue;
+    final bucket = agg.putIfAbsent(id, () => <int>[0, 0, 0]);
+    switch (raw['intake_status']?.toString()) {
+      case 'taken':
+        bucket[0]++;
+      case 'missed':
+        bucket[1]++;
+      default:
+        bucket[2]++;
+    }
+  }
+  return {
+    for (final entry in agg.entries)
+      entry.key: (
+        taken: entry.value[0],
+        missed: entry.value[1],
+        unrecorded: entry.value[2],
+      ),
+  };
+});
+
+final medicationCatalogProvider =
+    FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+      final data = await ref
+          .read(apiClientProvider)
+          .get('/api/medication-catalog');
+      final page = Map<String, dynamic>.from(data as Map);
+      return List<Map<String, dynamic>>.from(
+        (page['items'] as List? ?? const []).map(
+          (item) => Map<String, dynamic>.from(item as Map),
+        ),
+      );
+    });
+
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({
     required this.onOpenTab,
@@ -92,6 +150,52 @@ class DashboardScreen extends ConsumerWidget {
   }
 }
 
+typedef _LatestVisit =
+    ({String date, String hospital, String label, String tag});
+
+const _materialTags = <String, String>{
+  'lab_report': '化验/检测',
+  'medical_order': '医嘱/处方',
+  'imaging_text_report': '影像报告',
+  'outpatient_record': '门诊病历',
+};
+
+/// recordsProvider 的 documents 里按 uploaded_at 取最新一份，映射成卡片文案。
+_LatestVisit? _latestVisitOf(Map<String, dynamic> records) {
+  final docs =
+      ((records['documents'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList()
+        ..sort(
+          (a, b) => (b['uploaded_at']?.toString() ?? '').compareTo(
+            a['uploaded_at']?.toString() ?? '',
+          ),
+        );
+  if (docs.isEmpty) return null;
+  final doc = docs.first;
+  String? pick(List<String> keys) {
+    for (final k in keys) {
+      final v = doc[k]?.toString().trim();
+      if (v != null && v.isNotEmpty) return v.split('T').first;
+    }
+    return null;
+  }
+
+  final type = doc['document_type']?.toString() ?? '';
+  return (
+    date:
+        pick(['visit_date', 'report_date', 'sample_date', 'uploaded_at']) ??
+        '最新上传',
+    hospital:
+        (doc['hospital_name'] ?? doc['hospital'])?.toString() ??
+        doc['original_file_name']?.toString() ??
+        '医疗记录',
+    label: doc['original_file_name']?.toString() ?? '医疗资料',
+    tag: _materialTags[type] ?? '医疗资料',
+  );
+}
+
 class _DashboardBody extends ConsumerWidget {
   const _DashboardBody({
     required this.data,
@@ -113,6 +217,9 @@ class _DashboardBody extends ConsumerWidget {
     );
     final nextVisit = profile['next_visit_date']?.toString();
     final days = _daysUntil(nextVisit);
+    final latestVisit = ref
+        .watch(recordsProvider)
+        .maybeWhen(data: _latestVisitOf, orElse: () => null);
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -150,7 +257,7 @@ class _DashboardBody extends ConsumerWidget {
                         'Hi, Pomie!',
                         style: TextStyle(
                           color: pomiMuted,
-                          fontSize: 20,
+                          fontSize: 22,
                           height: 28 / 22,
                           fontWeight: FontWeight.w800,
                         ),
@@ -166,7 +273,7 @@ class _DashboardBody extends ConsumerWidget {
                   TextSpan(
                     style: const TextStyle(
                       color: pomiInk,
-                      fontSize: 28,
+                      fontSize: 32,
                       height: 40 / 32,
                       fontWeight: FontWeight.w800,
                     ),
@@ -214,7 +321,7 @@ class _DashboardBody extends ConsumerWidget {
                         maxLines: 1,
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 13,
+                          fontSize: 14,
                           height: 20 / 14,
                           fontWeight: FontWeight.w700,
                         ),
@@ -223,9 +330,15 @@ class _DashboardBody extends ConsumerWidget {
                   ),
                 ],
               ),
-              if (smokeMode) ...[
+              if (latestVisit != null) ...[
                 const SizedBox(height: 14),
-                _LatestVisitStatusCard(onTap: () => onOpenRecords()),
+                _LatestVisitStatusCard(
+                  date: latestVisit.date,
+                  hospital: latestVisit.hospital,
+                  materialLabel: latestVisit.label,
+                  materialTag: latestVisit.tag,
+                  onTap: () => onOpenRecords(),
+                ),
               ],
             ],
           ),
@@ -241,7 +354,10 @@ class _DashboardBody extends ConsumerWidget {
                     builder: (context) => const MedicationManagementScreen(),
                   ),
                 ),
-            onUpdated: () => ref.invalidate(dashboardProvider),
+            onUpdated: () {
+              ref.invalidate(dashboardProvider);
+              ref.invalidate(monthlyMedicationStatusProvider);
+            },
           ),
         ),
         const SizedBox(height: 12),
@@ -288,7 +404,7 @@ class _HomeActionButton extends StatelessWidget {
             label,
             style: const TextStyle(
               color: pomiInk,
-              fontSize: 13,
+              fontSize: 14,
               height: 20 / 14,
               fontWeight: FontWeight.w700,
             ),
@@ -299,113 +415,135 @@ class _HomeActionButton extends StatelessWidget {
   );
 }
 
-/// TODO(product): Bind this preview copy to the latest visit document and
-/// signature workflow after the API fields are confirmed.
+/// 首页「最近就诊」卡：取自 recordsProvider 里最新上传的一份材料。
 class _LatestVisitStatusCard extends StatelessWidget {
-  const _LatestVisitStatusCard({required this.onTap});
+  const _LatestVisitStatusCard({
+    required this.date,
+    required this.hospital,
+    required this.materialLabel,
+    required this.materialTag,
+    required this.onTap,
+  });
 
+  final String date;
+  final String hospital;
+  final String materialLabel;
+  final String materialTag;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) => PomiGlassCard(
     onTap: onTap,
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-    child: Column(
+    borderRadius: 20,
+    backgroundOpacity: .36,
+    padding: EdgeInsets.zero,
+    child: Stack(
       children: [
-        Row(
+        Column(
           children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: pomiPurple.withValues(alpha: .08),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Icon(
-                Icons.description_outlined,
-                color: pomiPurple,
-                size: 21,
-              ),
-            ),
-            const SizedBox(width: 10),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+              child: Row(
                 children: [
-                  Text(
-                    '激素六项化验单',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: pomiInk,
-                      fontSize: 14,
-                      height: 21 / 15,
-                      fontWeight: FontWeight.w700,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          date,
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          hospital,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 3),
+                        const Align(
+                          alignment: Alignment.center,
+                          child: Text(
+                            '区块链技术支持',
+                            style: TextStyle(
+                              color: pomiPurple,
+                              fontSize: 10,
+                              height: 14 / 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  SizedBox(height: 3),
-                  Text(
-                    '仁和医院 · 2026-08-25',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: pomiSecondaryText,
-                      fontSize: 11,
-                      height: 16 / 11,
-                      fontWeight: FontWeight.w400,
+                  const SizedBox(width: 8),
+                  const Column(
+                    children: [
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: pomiSecondaryText,
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        '详情',
+                        style: TextStyle(
+                          color: pomiSecondaryText,
+                          fontSize: 10,
+                          height: 14 / 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1, color: pomiLine),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 88,
+                    child: Text(
+                      materialLabel,
+                      style: Theme.of(context).textTheme.titleMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: pomiPurple.withValues(alpha: .09),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      materialTag,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: pomiPurple,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 9,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0x143B86C8),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: const Color(0x333B86C8)),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.schedule_outlined,
-                        color: Color(0xFF337EBB),
-                        size: 14,
-                      ),
-                      SizedBox(width: 4),
-                      Text(
-                        '未核验',
-                        style: TextStyle(
-                          color: Color(0xFF337EBB),
-                          fontSize: 11,
-                          height: 16 / 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
           ],
         ),
-        const SizedBox(height: 6),
-        const Center(
-          child: Text(
-            '区块链技术支持',
-            style: TextStyle(
-              color: pomiPurple,
-              fontSize: 10,
-              height: 14 / 10,
-              fontWeight: FontWeight.w600,
+        Positioned(
+          right: 28,
+          top: 4,
+          child: Opacity(
+            opacity: .50,
+            child: Transform.rotate(
+              angle: -math.pi / 12,
+              child: Image.asset(
+                'assets/images/pomi_verified_stamp.png',
+                width: 88,
+                height: 88,
+                filterQuality: FilterQuality.high,
+              ),
             ),
           ),
         ),
@@ -421,7 +559,15 @@ class MedicationManagementScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(medicationsProvider);
     return Scaffold(
-      appBar: AppBar(),
+      appBar: AppBar(
+        actions: [
+          IconButton(
+            tooltip: '添加用药',
+            onPressed: () => _addMedication(context, ref),
+            icon: const Icon(Icons.add),
+          ),
+        ],
+      ),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error:
@@ -438,81 +584,77 @@ class MedicationManagementScreen extends ConsumerWidget {
               items
                   .where((item) => item['current_status'] != 'active')
                   .toList();
-          final reminders =
-              active
-                  .map(
-                    (item) => _MedicationReminder(
-                      name: _shortMedicationName(item['drug_name']?.toString()),
-                      time:
-                          item['scheduled_time']
-                                      ?.toString()
-                                      .trim()
-                                      .isNotEmpty ==
-                                  true
-                              ? item['scheduled_time'].toString()
-                              : '未设置',
+          final reminders = [
+            for (final item in active)
+              _MedicationReminder(
+                medicationId: item['id']?.toString() ?? '',
+                name: _shortMedicationName(
+                  medicationDisplayName(
+                    item['drug_name'],
+                    standardDrugId: item['standard_drug_id'],
+                  ),
+                ),
+                doseCount: _dosesPerDay(item['frequency']?.toString()),
+                frequencyLabel: item['frequency']?.toString(),
+              ),
+          ];
+          final monthlyStatus = ref
+              .watch(monthlyMedicationStatusProvider)
+              .maybeWhen(
+                data: (value) => value,
+                orElse:
+                    () =>
+                        const <
+                          String,
+                          ({int taken, int missed, int unrecorded})
+                        >{},
+              );
+          final monthlyRows = [
+            for (final item in active)
+              () {
+                final id = item['id']?.toString();
+                final counts =
+                    (id == null ? null : monthlyStatus[id]) ??
+                    (taken: 0, missed: 0, unrecorded: 0);
+                return _MonthlyMedicationStatus(
+                  medicationId: id,
+                  name: _shortMedicationName(
+                    medicationDisplayName(
+                      item['drug_name'],
+                      standardDrugId: item['standard_drug_id'],
                     ),
-                  )
-                  .toList();
+                  ),
+                  taken: counts.taken,
+                  missed: counts.missed,
+                  unrecorded: counts.unrecorded,
+                );
+              }(),
+          ];
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 36),
             children: [
-              _MedicationPageHeading(smokeMode ? '用药提醒' : '当前用药'),
+              const _MedicationPageHeading('用药提醒'),
               const SizedBox(height: 16),
-              if (smokeMode)
-                if (reminders.isEmpty)
-                  const _MedicationEmptyCard(message: '还没有当前用药')
-                else
-                  _ReminderCard(reminders: reminders)
+              if (reminders.isEmpty)
+                const _MedicationEmptyCard(message: '还没有当前用药')
               else
-                _CurrentMedicationCard(items: active),
-              if (smokeMode) ...[
+                _ReminderCard(reminders: reminders),
+              if (monthlyRows.isNotEmpty) ...[
                 const SizedBox(height: 28),
                 const _MedicationPageHeading('本月状态'),
                 const SizedBox(height: 16),
                 _MonthlyMedicationCard(
-                  rows: [
-                    _MonthlyMedicationStatus(
-                      name:
-                          active.isNotEmpty
-                              ? _shortMedicationName(
-                                active[0]['drug_name']?.toString(),
-                              )
-                              : '盐酸二甲双胍...',
-                      taken: 22,
-                      missed: 2,
-                      unrecorded: 2,
-                    ),
-                    _MonthlyMedicationStatus(
-                      name:
-                          active.length > 1
-                              ? _shortMedicationName(
-                                active[1]['drug_name']?.toString(),
-                              )
-                              : '叶酸',
-                      taken: 24,
-                      missed: 1,
-                      unrecorded: 1,
-                    ),
-                    _MonthlyMedicationStatus(
-                      name:
-                          active.length > 2
-                              ? _shortMedicationName(
-                                active[2]['drug_name']?.toString(),
-                              )
-                              : '维生素 D3',
-                      taken: 25,
-                      missed: 1,
-                      unrecorded: 0,
-                    ),
-                  ],
+                  rows: monthlyRows,
+                  onRowTap:
+                      (status) =>
+                          _showMonthlyMedicationDetails(context, ref, status),
                 ),
               ],
               const SizedBox(height: 28),
               const _MedicationPageHeading('停换药历史'),
               const SizedBox(height: 16),
               _MedicationHistoryCard(
-                items: smokeMode ? null : inactive,
+                items: inactive,
                 onRejoin: () => _addMedication(context, ref),
               ),
             ],
@@ -526,86 +668,199 @@ class MedicationManagementScreen extends ConsumerWidget {
     final name = TextEditingController();
     final dose = TextEditingController();
     final frequency = TextEditingController();
+    final route = TextEditingController();
+    Map<String, dynamic>? selectedCandidate;
+    final catalogFuture = ref.read(medicationCatalogProvider.future);
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       builder:
-          (sheetContext) => Padding(
-            padding: EdgeInsets.fromLTRB(
-              20,
-              20,
-              20,
-              MediaQuery.viewInsetsOf(sheetContext).bottom + 24,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  '手动添加用药',
-                  style: Theme.of(sheetContext).textTheme.titleLarge,
+          (sheetContext) => StatefulBuilder(
+            builder: (context, setSheetState) {
+              return Padding(
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  20,
+                  20,
+                  MediaQuery.viewInsetsOf(sheetContext).bottom + 24,
                 ),
-                const SizedBox(height: 5),
-                Text(
-                  '适用于自行购买的药品或补剂，不替代上传医嘱。',
-                  style: Theme.of(sheetContext).textTheme.bodySmall,
+                child: SingleChildScrollView(
+                  child: FutureBuilder<List<Map<String, dynamic>>>(
+                    future: catalogFuture,
+                    builder: (context, snapshot) {
+                      final candidates = snapshot.data ?? const [];
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            '添加用药',
+                            style: Theme.of(sheetContext).textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            '可从 Pomi 候选库选择，也可以完全自定义。候选库只用于识别和展示，不会自动生成提醒方案。',
+                            style: Theme.of(sheetContext).textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: 16),
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting)
+                            const LinearProgressIndicator(),
+                          if (candidates.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            DropdownButtonFormField<String>(
+                              initialValue:
+                                  selectedCandidate?['id']?.toString(),
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Pomi 候选药品（可选）',
+                              ),
+                              items: [
+                                const DropdownMenuItem<String>(
+                                  value: null,
+                                  child: Text('自定义药品'),
+                                ),
+                                ...candidates.map(
+                                  (item) => DropdownMenuItem<String>(
+                                    value: item['id']?.toString(),
+                                    child: Text(
+                                      '${item['name']} · ${item['category']}',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              onChanged: (id) {
+                                final candidate =
+                                    candidates
+                                        .where(
+                                          (item) =>
+                                              item['id']?.toString() == id,
+                                        )
+                                        .firstOrNull;
+                                setSheetState(() {
+                                  selectedCandidate = candidate;
+                                  if (candidate != null) {
+                                    name.text =
+                                        candidate['name']?.toString() ?? '';
+                                    route.text =
+                                        candidate['route']?.toString() ?? '';
+                                    final strengths =
+                                        candidate['strength_candidates']
+                                            as List?;
+                                    if (strengths != null &&
+                                        strengths.isNotEmpty) {
+                                      dose.text = strengths.first.toString();
+                                    }
+                                  }
+                                });
+                              },
+                            ),
+                          ],
+                          if (snapshot.hasError)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                '候选库暂时不可用，仍可继续自定义添加。',
+                                style:
+                                    Theme.of(sheetContext).textTheme.bodySmall,
+                              ),
+                            ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: name,
+                            decoration: const InputDecoration(
+                              labelText: '药品名称',
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: dose,
+                            decoration: const InputDecoration(
+                              labelText: '每次用量 / 规格',
+                              hintText: '例如：500 mg、1 片',
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: frequency,
+                            decoration: const InputDecoration(
+                              labelText: '每日用量 / 频次',
+                              hintText: '例如：每日 2 次，早晚各 1 次',
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: route,
+                            decoration: const InputDecoration(
+                              labelText: '给药途径（可选）',
+                              hintText: '例如：口服、皮下注射',
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          FilledButton(
+                            onPressed: () async {
+                              if (name.text.trim().isEmpty) return;
+                              await ref
+                                  .read(apiClientProvider)
+                                  .post(
+                                    '/api/medications',
+                                    headers: {
+                                      'Idempotency-Key':
+                                          'manual-${DateTime.now().microsecondsSinceEpoch}',
+                                    },
+                                    data: {
+                                      'drug_name': name.text.trim(),
+                                      'standard_drug_id':
+                                          selectedCandidate?['id'],
+                                      'source_category':
+                                          _sourceCategoryForCandidate(
+                                            selectedCandidate,
+                                          ),
+                                      'specification':
+                                          dose.text.trim().isEmpty
+                                              ? null
+                                              : dose.text.trim(),
+                                      'frequency':
+                                          frequency.text.trim().isEmpty
+                                              ? null
+                                              : frequency.text.trim(),
+                                      'route':
+                                          route.text.trim().isEmpty
+                                              ? null
+                                              : route.text.trim(),
+                                    },
+                                  );
+                              if (sheetContext.mounted) {
+                                Navigator.pop(sheetContext, true);
+                              }
+                            },
+                            child: const Text('保存到我的用药'),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
                 ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: name,
-                  decoration: const InputDecoration(labelText: '药品名称'),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: dose,
-                  decoration: const InputDecoration(labelText: '剂量 / 规格'),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: frequency,
-                  decoration: const InputDecoration(labelText: '频次'),
-                ),
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: () async {
-                    if (name.text.trim().isEmpty) return;
-                    await ref
-                        .read(apiClientProvider)
-                        .post(
-                          '/api/medications',
-                          headers: {
-                            'Idempotency-Key':
-                                'manual-${DateTime.now().microsecondsSinceEpoch}',
-                          },
-                          data: {
-                            'drug_name': name.text.trim(),
-                            'source_category': 'other_long_term',
-                            'specification':
-                                dose.text.trim().isEmpty
-                                    ? null
-                                    : dose.text.trim(),
-                            'frequency':
-                                frequency.text.trim().isEmpty
-                                    ? null
-                                    : frequency.text.trim(),
-                          },
-                        );
-                    if (sheetContext.mounted) Navigator.pop(sheetContext, true);
-                  },
-                  child: const Text('添加'),
-                ),
-              ],
-            ),
+              );
+            },
           ),
     );
     name.dispose();
     dose.dispose();
     frequency.dispose();
+    route.dispose();
     if (saved == true) {
       ref.invalidate(medicationsProvider);
       ref.invalidate(dashboardProvider);
     }
   }
+}
+
+String _sourceCategoryForCandidate(Map<String, dynamic>? candidate) {
+  if (candidate?['item_type']?.toString() == '补充剂') return 'supplement';
+  if (candidate?['item_type']?.toString() == '处方药') return 'prescribed';
+  return 'other_long_term';
 }
 
 String _shortMedicationName(String? value) {
@@ -626,10 +881,139 @@ class _MedicationPageHeading extends StatelessWidget {
 }
 
 class _MedicationReminder {
-  const _MedicationReminder({required this.name, required this.time});
+  const _MedicationReminder({
+    required this.medicationId,
+    required this.name,
+    required this.doseCount,
+    this.frequencyLabel,
+  });
 
+  final String medicationId;
   final String name;
-  final String time;
+
+  /// 每天服用次数（由 frequency 解析，1–4）。
+  final int doseCount;
+  final String? frequencyLabel;
+}
+
+/// 由「每日两次」「每天3次」「BID/TID」等 frequency 文案推断每天服用次数。
+int _dosesPerDay(String? frequency) {
+  final raw = (frequency ?? '').toLowerCase().trim();
+  if (raw.isEmpty) return 1;
+  if (raw.contains('qid') || raw.contains('每日四') || raw.contains('每天四')) {
+    return 4;
+  }
+  if (raw.contains('tid') ||
+      raw.contains('三次') ||
+      raw.contains('3次') ||
+      raw.contains('每日三') ||
+      raw.contains('每天三') ||
+      raw.contains('每8小时') ||
+      raw.contains('每八小时')) {
+    return 3;
+  }
+  if (raw.contains('bid') ||
+      raw.contains('两次') ||
+      raw.contains('二次') ||
+      raw.contains('2次') ||
+      raw.contains('每日两') ||
+      raw.contains('每天两') ||
+      raw.contains('每12小时') ||
+      raw.contains('早晚')) {
+    return 2;
+  }
+  final match = RegExp(r'(\d+)\s*次').firstMatch(raw);
+  if (match != null) {
+    final n = int.tryParse(match.group(1)!) ?? 1;
+    return n.clamp(1, 4);
+  }
+  return 1;
+}
+
+/// 每天 N 次的默认提醒时间。
+List<TimeOfDay> _defaultReminderTimes(int count) => switch (count) {
+  >= 4 => const [
+    TimeOfDay(hour: 8, minute: 0),
+    TimeOfDay(hour: 12, minute: 0),
+    TimeOfDay(hour: 16, minute: 0),
+    TimeOfDay(hour: 20, minute: 0),
+  ],
+  3 => const [
+    TimeOfDay(hour: 8, minute: 0),
+    TimeOfDay(hour: 13, minute: 0),
+    TimeOfDay(hour: 19, minute: 0),
+  ],
+  2 => const [TimeOfDay(hour: 8, minute: 0), TimeOfDay(hour: 20, minute: 0)],
+  _ => const [TimeOfDay(hour: 8, minute: 0)],
+};
+
+String _formatTimeOfDay(TimeOfDay t) =>
+    '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+/// 用药提醒的本地设置（后端无对应字段），按 medication_id + slot 序号存
+/// SharedPreferences：`pomi_med_reminder_<id>_<i>` = "HH:mm" 或 "off"。
+class _MedicationReminderStore {
+  static String _key(String id, int slot) => 'pomi_med_reminder_${id}_$slot';
+
+  static Future<List<_ReminderSlot>> load(
+    String medicationId,
+    int doseCount,
+  ) async {
+    final defaults = _defaultReminderTimes(doseCount);
+    final fallback = [
+      for (final t in defaults) _ReminderSlot(time: t, enabled: true),
+    ];
+    if (medicationId.isEmpty) return fallback;
+    final SharedPreferences prefs;
+    try {
+      prefs = await SharedPreferences.getInstance();
+    } catch (_) {
+      return fallback;
+    }
+    return [
+      for (var i = 0; i < defaults.length; i++)
+        () {
+          final stored = prefs.getString(_key(medicationId, i));
+          if (stored == 'off') {
+            return _ReminderSlot(time: defaults[i], enabled: false);
+          }
+          final parts = stored?.split(':');
+          if (parts != null && parts.length == 2) {
+            final h = int.tryParse(parts[0]);
+            final m = int.tryParse(parts[1]);
+            if (h != null && m != null) {
+              return _ReminderSlot(
+                time: TimeOfDay(hour: h, minute: m),
+                enabled: true,
+              );
+            }
+          }
+          return _ReminderSlot(time: defaults[i], enabled: true);
+        }(),
+    ];
+  }
+
+  static Future<void> save(
+    String medicationId,
+    int slot,
+    _ReminderSlot value,
+  ) async {
+    if (medicationId.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _key(medicationId, slot),
+      value.enabled ? _formatTimeOfDay(value.time) : 'off',
+    );
+  }
+}
+
+class _ReminderSlot {
+  const _ReminderSlot({required this.time, required this.enabled});
+  final TimeOfDay time;
+  final bool enabled;
+
+  _ReminderSlot copyWith({TimeOfDay? time, bool? enabled}) =>
+      _ReminderSlot(time: time ?? this.time, enabled: enabled ?? this.enabled);
 }
 
 class _ReminderCard extends StatefulWidget {
@@ -642,10 +1026,43 @@ class _ReminderCard extends StatefulWidget {
 }
 
 class _ReminderCardState extends State<_ReminderCard> {
-  late final List<bool> _enabled = List<bool>.filled(
-    widget.reminders.length,
-    true,
-  );
+  /// medicationId -> 各次的提醒设置。
+  final Map<String, List<_ReminderSlot>> _slots = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAll();
+  }
+
+  Future<void> _loadAll() async {
+    for (final reminder in widget.reminders) {
+      final slots = await _MedicationReminderStore.load(
+        reminder.medicationId,
+        reminder.doseCount,
+      );
+      if (!mounted) return;
+      setState(() => _slots[reminder.medicationId] = slots);
+    }
+  }
+
+  Future<void> _updateSlot(
+    _MedicationReminder reminder,
+    int index,
+    _ReminderSlot value,
+  ) async {
+    setState(() {
+      final list = List<_ReminderSlot>.from(
+        _slots[reminder.medicationId] ??
+            _defaultReminderTimes(
+              reminder.doseCount,
+            ).map((t) => _ReminderSlot(time: t, enabled: true)),
+      );
+      list[index] = value;
+      _slots[reminder.medicationId] = list;
+    });
+    await _MedicationReminderStore.save(reminder.medicationId, index, value);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -655,10 +1072,16 @@ class _ReminderCardState extends State<_ReminderCard> {
       child: Column(
         children: [
           for (var index = 0; index < widget.reminders.length; index++) ...[
-            _ReminderRow(
+            _MedicationReminderTile(
               reminder: widget.reminders[index],
-              enabled: _enabled[index],
-              onChanged: (value) => setState(() => _enabled[index] = value),
+              slots:
+                  _slots[widget.reminders[index].medicationId] ??
+                  _defaultReminderTimes(
+                    widget.reminders[index].doseCount,
+                  ).map((t) => _ReminderSlot(time: t, enabled: true)).toList(),
+              onSlotChanged:
+                  (slotIndex, value) =>
+                      _updateSlot(widget.reminders[index], slotIndex, value),
             ),
             if (index != widget.reminders.length - 1)
               const Divider(height: 1, color: pomiLine),
@@ -669,167 +1092,484 @@ class _ReminderCardState extends State<_ReminderCard> {
   }
 }
 
-class _ReminderRow extends StatelessWidget {
-  const _ReminderRow({
+class _MedicationReminderTile extends StatelessWidget {
+  const _MedicationReminderTile({
     required this.reminder,
-    required this.enabled,
-    required this.onChanged,
+    required this.slots,
+    required this.onSlotChanged,
   });
 
   final _MedicationReminder reminder;
-  final bool enabled;
-  final ValueChanged<bool> onChanged;
+  final List<_ReminderSlot> slots;
+  final void Function(int index, _ReminderSlot value) onSlotChanged;
 
   @override
   Widget build(BuildContext context) {
+    final freqText =
+        reminder.doseCount > 1
+            ? '每日 ${reminder.doseCount} 次'
+            : (reminder.frequencyLabel?.trim().isNotEmpty == true
+                ? reminder.frequencyLabel!.trim()
+                : '每日提醒');
     return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  reminder.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 2),
-                Text('每日提醒', style: Theme.of(context).textTheme.bodySmall),
-              ],
-            ),
+          Text(
+            reminder.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleMedium,
           ),
-          Container(
-            height: 44,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: .34),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: pomiPurple.withValues(alpha: .20)),
+          const SizedBox(height: 2),
+          Text(freqText, style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(height: 10),
+          for (var i = 0; i < slots.length; i++)
+            Padding(
+              padding: EdgeInsets.only(bottom: i == slots.length - 1 ? 0 : 8),
+              child: _ReminderRow(
+                slot: slots[i],
+                label: slots.length > 1 ? '第 ${i + 1} 次' : null,
+                onTimeTap: () async {
+                  final picked = await showTimePicker(
+                    context: context,
+                    initialTime: slots[i].time,
+                  );
+                  if (picked != null) {
+                    onSlotChanged(i, slots[i].copyWith(time: picked));
+                  }
+                },
+                onEnabledChanged:
+                    (v) => onSlotChanged(i, slots[i].copyWith(enabled: v)),
+              ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  reminder.time,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: pomiPurple,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                const Icon(Icons.schedule, color: pomiInk, size: 19),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Switch(
-            value: enabled,
-            onChanged: onChanged,
-            activeTrackColor: pomiMint,
-            activeThumbColor: Colors.white,
-          ),
-          const SizedBox(width: 4),
-          IconButton(
-            onPressed: () {},
-            style: IconButton.styleFrom(
-              backgroundColor: pomiLavender.withValues(alpha: .85),
-              foregroundColor: pomiPurple,
-              minimumSize: const Size(42, 42),
-            ),
-            icon: const Icon(Icons.settings_outlined, size: 21),
-          ),
         ],
       ),
+    );
+  }
+}
+
+class _ReminderRow extends StatelessWidget {
+  const _ReminderRow({
+    required this.slot,
+    required this.onTimeTap,
+    required this.onEnabledChanged,
+    this.label,
+  });
+
+  final _ReminderSlot slot;
+  final String? label;
+  final VoidCallback onTimeTap;
+  final ValueChanged<bool> onEnabledChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        if (label != null)
+          Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: Text(label!, style: Theme.of(context).textTheme.bodySmall),
+          ),
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: InkWell(
+              onTap: onTimeTap,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                height: 40,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: .34),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: pomiPurple.withValues(alpha: .20)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _formatTimeOfDay(slot.time),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: slot.enabled ? pomiPurple : pomiSecondaryText,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.schedule,
+                      color: slot.enabled ? pomiInk : pomiSecondaryText,
+                      size: 18,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Switch(
+          value: slot.enabled,
+          onChanged: onEnabledChanged,
+          activeTrackColor: pomiMint,
+          activeThumbColor: Colors.white,
+        ),
+      ],
     );
   }
 }
 
 class _MonthlyMedicationStatus {
   const _MonthlyMedicationStatus({
+    this.medicationId,
     required this.name,
     required this.taken,
     required this.missed,
     required this.unrecorded,
   });
 
+  final String? medicationId;
   final String name;
   final int taken;
   final int missed;
   final int unrecorded;
 }
 
-class _CurrentMedicationCard extends StatelessWidget {
-  const _CurrentMedicationCard({required this.items});
+Future<void> _showMonthlyMedicationDetails(
+  BuildContext context,
+  WidgetRef ref,
+  _MonthlyMedicationStatus summary,
+) async {
+  final medicationId = summary.medicationId;
+  if (medicationId == null || medicationId.isEmpty) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('当前用药缺少记录编号，暂时无法查看本月明细')));
+    return;
+  }
+  final today = DateUtils.dateOnly(DateTime.now());
+  final from = DateTime(today.year, today.month);
+  final future = ref
+      .read(apiClientProvider)
+      .get(
+        '/api/medication-daily',
+        queryParameters: {
+          'from':
+              '${from.year.toString().padLeft(4, '0')}-${from.month.toString().padLeft(2, '0')}-01',
+          'to': today.toIso8601String().substring(0, 10),
+          'medication_id': medicationId,
+        },
+      );
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    constraints: BoxConstraints(
+      maxHeight: MediaQuery.sizeOf(context).height * 0.88,
+    ),
+    builder:
+        (_) => _MonthlyMedicationDetailsSheet(
+          medicationName: summary.name,
+          month: today,
+          recordsFuture: future,
+        ),
+  );
+}
 
-  final List<Map<String, dynamic>> items;
+class _MonthlyMedicationDetailsSheet extends StatelessWidget {
+  const _MonthlyMedicationDetailsSheet({
+    required this.medicationName,
+    required this.month,
+    required this.recordsFuture,
+  });
+
+  final String medicationName;
+  final DateTime month;
+  final Future<dynamic> recordsFuture;
 
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) {
-      return const _MedicationEmptyCard(message: '还没有当前用药');
-    }
-    return PomiGlassCard(
-      padding: const EdgeInsets.symmetric(horizontal: 18),
-      borderRadius: 22,
-      backgroundOpacity: .34,
-      child: Column(
-        children: [
-          for (var index = 0; index < items.length; index++) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Row(
-                children: [
-                  const Icon(Icons.medication_outlined, color: pomiPurple),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          items[index]['drug_name']?.toString() ?? '未命名用药',
-                          style: Theme.of(
-                            context,
-                          ).textTheme.titleMedium?.copyWith(fontSize: 14),
-                        ),
-                        const SizedBox(height: 3),
-                        if ((items[index]['dosage_text']?.toString() ?? '')
-                            .isNotEmpty)
-                          Text(
-                            items[index]['dosage_text'].toString(),
-                            style: Theme.of(
-                              context,
-                            ).textTheme.bodySmall?.copyWith(fontSize: 12),
-                          ),
-                        if ((items[index]['frequency']?.toString() ?? '')
-                            .isNotEmpty)
-                          Text(
-                            items[index]['frequency'].toString(),
-                            style: Theme.of(
-                              context,
-                            ).textTheme.bodySmall?.copyWith(fontSize: 12),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+    return FutureBuilder<dynamic>(
+      future: recordsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 280,
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (snapshot.hasError) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  '$medicationName · 本月用药',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 12),
+                const Text('暂时无法读取本月用药记录，请稍后重试。'),
+              ],
             ),
-            if (index != items.length - 1)
-              const Divider(height: 1, color: pomiLine),
+          );
+        }
+        final records = (snapshot.data as List? ?? const [])
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList(growable: false);
+        return _MonthlyMedicationCalendar(
+          medicationName: medicationName,
+          month: month,
+          records: records,
+        );
+      },
+    );
+  }
+}
+
+class _MonthlyMedicationCalendar extends StatelessWidget {
+  const _MonthlyMedicationCalendar({
+    required this.medicationName,
+    required this.month,
+    required this.records,
+  });
+
+  final String medicationName;
+  final DateTime month;
+  final List<Map<String, dynamic>> records;
+
+  @override
+  Widget build(BuildContext context) {
+    final statusByDate = <String, String>{};
+    for (final record in records) {
+      final rawDate = record['record_date']?.toString() ?? '';
+      if (rawDate.length < 10) continue;
+      statusByDate[rawDate.substring(0, 10)] =
+          record['intake_status']?.toString() ?? 'unrecorded';
+    }
+    final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
+    final firstWeekday = DateTime(month.year, month.month, 1).weekday % 7;
+    final cells = <int?>[
+      ...List<int?>.filled(firstWeekday, null),
+      for (var day = 1; day <= daysInMonth; day++) day,
+    ];
+    final missedDates = _datesWithStatus(statusByDate, 'missed');
+    final unrecordedDates = _datesWithStatus(statusByDate, 'unrecorded');
+    final takenCount = _datesWithStatus(statusByDate, 'taken').length;
+    final today = DateUtils.dateOnly(DateTime.now());
+    final monthLabel = '${month.year}年${month.month}月';
+
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              '$medicationName · $monthLabel',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '已服用 $takenCount 天 · 主动漏服 ${missedDates.length} 天 · 未记录 ${unrecordedDates.length} 天',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 18),
+            const Row(
+              children: [
+                _MonthWeekdayLabel('日'),
+                _MonthWeekdayLabel('一'),
+                _MonthWeekdayLabel('二'),
+                _MonthWeekdayLabel('三'),
+                _MonthWeekdayLabel('四'),
+                _MonthWeekdayLabel('五'),
+                _MonthWeekdayLabel('六'),
+              ],
+            ),
+            const SizedBox(height: 6),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: cells.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 7,
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                childAspectRatio: 1,
+              ),
+              itemBuilder: (context, index) {
+                final day = cells[index];
+                if (day == null) return const SizedBox.shrink();
+                final date = DateTime(month.year, month.month, day);
+                final key = date.toIso8601String().substring(0, 10);
+                final recorded = statusByDate[key];
+                final String status;
+                if (recorded != null) {
+                  status = recorded;
+                } else if (date.isAfter(today)) {
+                  status = 'future';
+                } else {
+                  status = 'none';
+                }
+                return _MonthStatusCell(day: day, status: status);
+              },
+            ),
+            const SizedBox(height: 18),
+            _DateListSection(
+              title: '主动漏服日期',
+              dates: missedDates,
+              color: pomiCoral,
+              emptyLabel: '本月没有主动漏服记录',
+            ),
+            const SizedBox(height: 10),
+            _DateListSection(
+              title: '未记录日期',
+              dates: unrecordedDates,
+              color: pomiSecondaryText,
+              emptyLabel: '本月每天都有状态记录',
+            ),
+            const SizedBox(height: 14),
+            Text(
+              '灰色日期表示尚未记录，不等同于漏服。',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
           ],
-        ],
+        ),
+      ),
+    );
+  }
+
+  List<String> _datesWithStatus(Map<String, String> statuses, String status) =>
+      statuses.entries
+          .where((entry) => entry.value == status)
+          .map((entry) => entry.key)
+          .toList()
+        ..sort();
+}
+
+class _MonthWeekdayLabel extends StatelessWidget {
+  const _MonthWeekdayLabel(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Center(
+      child: Text(label, style: Theme.of(context).textTheme.labelSmall),
+    ),
+  );
+}
+
+class _MonthStatusCell extends StatelessWidget {
+  const _MonthStatusCell({required this.day, required this.status});
+
+  final int day;
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    final (background, foreground) = switch (status) {
+      'taken' => (pomiSuccess.withValues(alpha: .14), pomiSuccess),
+      'missed' => (pomiCoral.withValues(alpha: .30), const Color(0xFFB85E4D)),
+      'unrecorded' => (pomiLine.withValues(alpha: .72), pomiSecondaryText),
+      'future' => (
+        Colors.transparent,
+        pomiSecondaryText.withValues(alpha: .35),
+      ),
+      // 'none'：本月内、非应服药日或无记录 —— 只显示浅底日期。
+      _ => (const Color(0xFFF3F1F6), pomiSecondaryText.withValues(alpha: .8)),
+    };
+    return Tooltip(
+      message: switch (status) {
+        'taken' => '已服用',
+        'missed' => '主动漏服',
+        'unrecorded' => '未记录',
+        _ => '$day 日',
+      },
+      child: Container(
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color:
+                status == 'future'
+                    ? Colors.transparent
+                    : foreground.withValues(alpha: .14),
+          ),
+        ),
+        child: Text(
+          '$day',
+          style: TextStyle(
+            color: foreground,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
     );
   }
 }
 
+class _DateListSection extends StatelessWidget {
+  const _DateListSection({
+    required this.title,
+    required this.dates,
+    required this.color,
+    required this.emptyLabel,
+  });
+
+  final String title;
+  final List<String> dates;
+  final Color color;
+  final String emptyLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final labels = dates.map(
+      (date) =>
+          '${int.parse(date.substring(5, 7))}月${int.parse(date.substring(8, 10))}日',
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        if (dates.isEmpty)
+          Text(emptyLabel, style: Theme.of(context).textTheme.bodySmall)
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children:
+                labels
+                    .map(
+                      (label) => Chip(
+                        label: Text(label),
+                        labelStyle: TextStyle(
+                          color: color,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        backgroundColor: color.withValues(alpha: .12),
+                        side: BorderSide.none,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    )
+                    .toList(),
+          ),
+      ],
+    );
+  }
+}
+
 class _MonthlyMedicationCard extends StatelessWidget {
-  const _MonthlyMedicationCard({required this.rows});
+  const _MonthlyMedicationCard({required this.rows, required this.onRowTap});
 
   final List<_MonthlyMedicationStatus> rows;
+  final ValueChanged<_MonthlyMedicationStatus> onRowTap;
 
   @override
   Widget build(BuildContext context) {
@@ -840,7 +1580,7 @@ class _MonthlyMedicationCard extends StatelessWidget {
       child: Column(
         children: [
           for (final row in rows) ...[
-            _MonthlyMedicationRow(status: row),
+            _MonthlyMedicationRow(status: row, onTap: () => onRowTap(row)),
             if (row != rows.last) const SizedBox(height: 14),
           ],
           const SizedBox(height: 18),
@@ -860,56 +1600,74 @@ class _MonthlyMedicationCard extends StatelessWidget {
 }
 
 class _MonthlyMedicationRow extends StatelessWidget {
-  const _MonthlyMedicationRow({required this.status});
+  const _MonthlyMedicationRow({required this.status, required this.onTap});
 
   final _MonthlyMedicationStatus status;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 105,
-          child: Text(
-            status.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-          ),
-        ),
-        SizedBox(
-          width: 78,
-          child: Row(
-            children: List.generate(
-              8,
-              (index) => Expanded(
-                child: Container(
-                  height: 9,
-                  margin: EdgeInsets.only(right: index == 7 ? 0 : 4),
-                  decoration: BoxDecoration(
-                    color: pomiSuccess,
-                    borderRadius: BorderRadius.circular(3),
+    return Semantics(
+      button: true,
+      label: '查看${status.name}本月用药记录',
+      onTap: onTap,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 5),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 105,
+                  child: Text(
+                    status.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-              ),
+                SizedBox(
+                  width: 78,
+                  child: Row(
+                    children: List.generate(
+                      8,
+                      (index) => Expanded(
+                        child: Container(
+                          height: 9,
+                          margin: EdgeInsets.only(right: index == 7 ? 0 : 4),
+                          decoration: BoxDecoration(
+                            color: pomiSuccess,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '已服用 ${status.taken} · 漏服 ${status.missed} · 未记录 ${status.unrecorded}',
+                      maxLines: 1,
+                      style: Theme.of(context).textTheme.labelSmall,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.chevron_right, size: 17, color: pomiMuted),
+              ],
             ),
           ),
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              '已服用 ${status.taken} · 漏服 ${status.missed} · 未记录 ${status.unrecorded}',
-              maxLines: 1,
-              style: Theme.of(context).textTheme.labelSmall,
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -975,7 +1733,10 @@ class _MedicationHistoryCard extends StatelessWidget {
                 : [
                   for (var index = 0; index < records.length; index++) ...[
                     _MedicationHistoryRow(
-                      name: records[index]['drug_name']?.toString() ?? '未命名用药',
+                      name: medicationDisplayName(
+                        records[index]['drug_name'],
+                        standardDrugId: records[index]['standard_drug_id'],
+                      ),
                       detail: _medicationHistoryDetail(records[index]),
                       onRejoin: onRejoin,
                     ),
@@ -1101,15 +1862,14 @@ class _MedicationProgressCard extends StatelessWidget {
                   item['today_status'] == 'missed',
             )
             .length;
-    final visibleMedicines = medicines.take(3).toList(growable: false);
 
     return SizedBox(
       width: double.infinity,
-      height: 320,
       child: PomiGlassCard(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               children: [
@@ -1118,7 +1878,7 @@ class _MedicationProgressCard extends StatelessWidget {
                   maxLines: 1,
                   style: TextStyle(
                     color: pomiInk,
-                    fontSize: 16,
+                    fontSize: 18,
                     height: 26 / 18,
                     fontWeight: FontWeight.w800,
                   ),
@@ -1166,33 +1926,26 @@ class _MedicationProgressCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            Expanded(
-              child:
-                  visibleMedicines.isEmpty
-                      ? Align(
-                        alignment: Alignment.topLeft,
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: OutlinedButton.icon(
-                            onPressed: onManage,
-                            icon: const Icon(Icons.add, size: 18),
-                            label: const Text('添加当前用药'),
-                          ),
-                        ),
-                      )
-                      : ListView(
-                        padding: EdgeInsets.zero,
-                        children: visibleMedicines.indexed
-                            .map(
-                              (entry) => _MedicationProgressRow(
-                                medicine: entry.$2,
-                                index: entry.$1,
-                                onUpdated: onUpdated,
-                              ),
-                            )
-                            .toList(growable: false),
-                      ),
-            ),
+            if (medicines.isEmpty)
+              Align(
+                alignment: Alignment.topLeft,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: OutlinedButton.icon(
+                    onPressed: onManage,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('添加当前用药'),
+                  ),
+                ),
+              )
+            else
+              ...medicines.indexed.map(
+                (entry) => _MedicationProgressRow(
+                  medicine: entry.$2,
+                  index: entry.$1,
+                  onUpdated: onUpdated,
+                ),
+              ),
           ],
         ),
       ),
@@ -1215,9 +1968,8 @@ class _MedicationProgressRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final status = medicine['today_status']?.toString() ?? 'unrecorded';
     final isPending = status == 'unrecorded';
-    final details = [medicine['dosage_text'], medicine['frequency']]
-        .where((value) => value != null && value.toString().trim().isNotEmpty)
-        .join(' · ');
+    final dosage = medicine['dosage_text']?.toString().trim() ?? '';
+    final dailyAmount = medicine['frequency']?.toString().trim() ?? '';
     final time =
         medicine['scheduled_time']?.toString().trim().isNotEmpty == true
             ? medicine['scheduled_time'].toString()
@@ -1246,7 +1998,7 @@ class _MedicationProgressRow extends ConsumerWidget {
               time,
               style: const TextStyle(
                 color: pomiSecondaryText,
-                fontSize: 12,
+                fontSize: 13,
                 height: 18 / 13,
                 fontWeight: FontWeight.w400,
               ),
@@ -1258,20 +2010,22 @@ class _MedicationProgressRow extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  medicine['drug_name'].toString(),
+                  medicationDisplayName(
+                    medicine['drug_name'],
+                    standardDrugId: medicine['standard_drug_id'],
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: isPending ? pomiInk : pomiSecondaryText,
-                    fontSize: 14,
+                    fontSize: 15,
                     height: 21 / 15,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                if (details.isNotEmpty) ...[
-                  const SizedBox(height: 2),
+                if (dosage.isNotEmpty)
                   Text(
-                    details,
+                    '每次用量：$dosage',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -1281,7 +2035,18 @@ class _MedicationProgressRow extends ConsumerWidget {
                       fontWeight: FontWeight.w400,
                     ),
                   ),
-                ],
+                if (dailyAmount.isNotEmpty)
+                  Text(
+                    '每日用量：$dailyAmount',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: pomiSecondaryText,
+                      fontSize: 12,
+                      height: 17 / 12,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -1332,7 +2097,7 @@ class _MedicationProgressRow extends ConsumerWidget {
                         '去记录',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 12,
+                          fontSize: 13,
                           height: 18 / 13,
                           fontWeight: FontWeight.w700,
                         ),

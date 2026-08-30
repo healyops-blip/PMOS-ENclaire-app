@@ -2,7 +2,7 @@
 
 from pomi_backend.db.models.auth import UserAccount, UserSession
 from pomi_backend.db.models.clinical_text import ImagingReport, OutpatientRecord
-from pomi_backend.db.models.documents import Document, DocumentRevision
+from pomi_backend.db.models.documents import Document, DocumentDisplayAsset, DocumentRevision
 from pomi_backend.db.models.health import (
     Medication,
     MedicationDaily,
@@ -13,6 +13,7 @@ from pomi_backend.db.models.health import (
     WeightRecord,
 )
 from pomi_backend.db.models.labs import LabObservation
+from pomi_backend.db.models.medication_catalog import MedicationCatalogEntry
 from pomi_backend.db.models.ocr import OCRFieldResult, OCRResult, OCRTask
 from pomi_backend.db.models.orders import (
     MedicalOrder,
@@ -23,8 +24,10 @@ from pomi_backend.db.models.reports import PatientNote, ReportSnapshot, ReportSo
 
 __all__ = [
     "Document",
+    "DocumentDisplayAsset",
     "DocumentRevision",
     "Medication",
+    "MedicationCatalogEntry",
     "ImagingReport",
     "LabObservation",
     "MedicationDaily",

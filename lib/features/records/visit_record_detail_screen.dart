@@ -1,10 +1,14 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:printing/printing.dart';
 
+import '../../core/api_client.dart';
 import '../../core/theme.dart';
 
-enum VisitRecordCategory { lab, order, outpatient }
+enum VisitRecordCategory { lab, order, imaging, outpatient }
 
 enum VisitVerificationState { verified, pending, unverified, archived }
 
@@ -77,10 +81,14 @@ class VisitRecordDetailData {
     required this.summaryItems,
     this.contextLabel,
     this.historyNote,
+    this.isDemo = false,
     this.clinicalFields = const [],
     this.labs = const [],
     this.orders = const [],
     this.sampleDate,
+    this.documentId,
+    this.revisionId,
+    this.mimeType,
   });
 
   final String id;
@@ -95,10 +103,18 @@ class VisitRecordDetailData {
   final String verificationDetail;
   final String? historyNote;
   final List<VisitRecordSummaryItem> summaryItems;
+
+  /// 是否为演示（Smoke）数据。真实后端导入的记录为 false。
+  final bool isDemo;
   final List<VisitClinicalField> clinicalFields;
   final List<VisitLabResult> labs;
   final List<VisitOrderItem> orders;
   final String? sampleDate;
+
+  /// 私有原件的定位信息；为空时详情页不展示原件卡片（演示数据即为空）。
+  final String? documentId;
+  final String? revisionId;
+  final String? mimeType;
 }
 
 const smokeVisitRecordDetails = <VisitRecordDetailData>[
@@ -125,6 +141,7 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
         trailing: '2026-08-26',
       ),
     ],
+    isDemo: true,
     clinicalFields: [
       VisitClinicalField(label: '就诊原因', value: '复诊评估代谢指标与当前用药'),
       VisitClinicalField(label: '医生记录', value: '结合近期检测结果调整方案，按期复查。'),
@@ -198,6 +215,7 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
       ),
       VisitRecordSummaryItem(title: '医嘱', category: VisitRecordCategory.order),
     ],
+    isDemo: true,
     clinicalFields: [
       VisitClinicalField(label: '主诉', value: '月经周期延长，近两月痤疮增多'),
       VisitClinicalField(label: '记录摘要', value: '建议完成激素与代谢相关检测后复诊。'),
@@ -237,6 +255,7 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
         trailing: '采样 2026-06-18',
       ),
     ],
+    isDemo: true,
     labs: [
       VisitLabResult(
         name: '促黄体生成素',
@@ -278,6 +297,7 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
         category: VisitRecordCategory.outpatient,
       ),
     ],
+    isDemo: true,
     clinicalFields: [
       VisitClinicalField(label: '主诉', value: '月经周期不规律'),
       VisitClinicalField(label: '记录摘要', value: '建议记录周期变化并按计划复诊。'),
@@ -303,6 +323,7 @@ const smokeVisitRecordDetails = <VisitRecordDetailData>[
         trailing: '采样 2025-12-14',
       ),
     ],
+    isDemo: true,
     labs: [
       VisitLabResult(
         name: '空腹胰岛素',
@@ -374,6 +395,11 @@ class VisitRecordDetailScreen extends StatelessWidget {
                   sliver: SliverList.list(
                     children: [
                       _VisitHeroCard(visit: visit),
+                      if (visit.documentId != null &&
+                          visit.revisionId != null) ...[
+                        const SizedBox(height: 14),
+                        _OriginalDocumentCard(visit: visit),
+                      ],
                       const SizedBox(height: 14),
                       _VerificationCard(visit: visit),
                       if (visit.historyNote != null) ...[
@@ -401,6 +427,260 @@ class VisitRecordDetailScreen extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// 拉取私有原件字节，(documentId, revisionId) 作为 family key。
+final _originalFileProvider = FutureProvider.autoDispose
+    .family<Uint8List, ({String documentId, String revisionId})>((
+      ref,
+      key,
+    ) async {
+      final bytes = await ref
+          .read(apiClientProvider)
+          .download(
+            '/api/documents/${key.documentId}/revisions/${key.revisionId}/file',
+          );
+      return Uint8List.fromList(bytes);
+    });
+
+/// 详情页里的「原件 + 区块链存证水印」卡片。
+class _OriginalDocumentCard extends ConsumerWidget {
+  const _OriginalDocumentCard({required this.visit});
+
+  final VisitRecordDetailData visit;
+
+  bool get _isPdf => (visit.mimeType ?? '').toLowerCase().contains('pdf');
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final fileState = ref.watch(
+      _originalFileProvider((
+        documentId: visit.documentId!,
+        revisionId: visit.revisionId!,
+      )),
+    );
+    return _SectionCardShell(
+      title: '原件存证',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: AspectRatio(
+              aspectRatio: 3 / 4,
+              child: GestureDetector(
+                onTap:
+                    () => _openViewer(
+                      context,
+                      ref,
+                      fileState.whenOrNull(data: (bytes) => bytes),
+                    ),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ColoredBox(
+                      color: const Color(0xFFF4F1F8),
+                      child: fileState.when(
+                        loading:
+                            () => const Center(
+                              child: SizedBox(
+                                width: 26,
+                                height: 26,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            ),
+                        error:
+                            (_, _) => const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(16),
+                                child: Text(
+                                  '原件暂时无法加载',
+                                  style: TextStyle(color: pomiMuted),
+                                ),
+                              ),
+                            ),
+                        data:
+                            (bytes) =>
+                                _isPdf
+                                    ? PdfPreview(
+                                      build: (_) async => bytes,
+                                      canChangePageFormat: false,
+                                      canChangeOrientation: false,
+                                      canDebug: false,
+                                      allowPrinting: false,
+                                      allowSharing: false,
+                                      maxPageWidth: 900,
+                                      previewPageMargin: EdgeInsets.zero,
+                                      padding: EdgeInsets.zero,
+                                      loadingWidget: const Center(
+                                        child: SizedBox(
+                                          width: 26,
+                                          height: 26,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                    : Image.memory(bytes, fit: BoxFit.cover),
+                      ),
+                    ),
+                    const Positioned.fill(
+                      child: IgnorePointer(child: _BlockchainWatermark()),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(Icons.verified_outlined, size: 15, color: pomiPurple),
+              const SizedBox(width: 5),
+              Expanded(
+                child: Text(
+                  '原件已上链存证 · 点击查看大图',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: pomiMuted),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openViewer(BuildContext context, WidgetRef ref, Uint8List? bytes) {
+    if (bytes == null) return;
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: .82),
+      builder:
+          (_) => Dialog.fullscreen(
+            backgroundColor: Colors.black,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child:
+                      _isPdf
+                          ? PdfPreview(
+                            build: (_) async => bytes,
+                            canChangePageFormat: false,
+                          )
+                          : InteractiveViewer(
+                            minScale: 0.8,
+                            maxScale: 6,
+                            child: Center(child: Image.memory(bytes)),
+                          ),
+                ),
+                const Positioned.fill(
+                  child: IgnorePointer(child: _BlockchainWatermark()),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: SafeArea(
+                    child: IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+    );
+  }
+}
+
+/// 对角「区块链存证 · 已上链」水印，覆盖在原件上。
+class _BlockchainWatermark extends StatelessWidget {
+  const _BlockchainWatermark();
+
+  @override
+  Widget build(BuildContext context) {
+    const ink = Color(0xFF7A5FBF);
+    final date = DateTime.now().toIso8601String().substring(0, 10);
+    return Center(
+      child: Transform.rotate(
+        angle: -math.pi / 9,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Container(
+            key: const ValueKey('blockchain-cert-watermark'),
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: .10),
+              border: Border.all(color: ink.withValues(alpha: .55), width: 3),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '区块链存证',
+                  style: TextStyle(
+                    color: ink.withValues(alpha: .78),
+                    fontSize: 30,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 4,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '已上链 · $date',
+                  style: TextStyle(
+                    color: ink.withValues(alpha: .70),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 与详情页其它区块一致的白卡容器（标题 + 内容）。
+class _SectionCardShell extends StatelessWidget {
+  const _SectionCardShell({required this.title, required this.child});
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .82),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: pomiLine),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 12),
+          child,
+        ],
       ),
     );
   }
@@ -452,7 +732,7 @@ class _VisitHeroCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '就诊记录 · 演示数据',
+                          visit.isDemo ? '就诊记录 · 演示数据' : '就诊记录',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],
@@ -487,29 +767,31 @@ class _VisitHeroCard extends StatelessWidget {
               ),
             ],
           ),
-          Positioned(
-            key: const ValueKey('pomi-verified-stamp-position'),
-            right: -4,
-            top: 0,
-            child: Semantics(
-              image: true,
-              label: '该报告已核验',
-              child: Opacity(
-                opacity: .88,
-                child: Transform.rotate(
-                  key: const ValueKey('pomi-verified-stamp-rotation'),
-                  angle: -math.pi / 4,
-                  child: Image.asset(
-                    'assets/images/pomi_verified_stamp.png',
-                    key: const ValueKey('pomi-verified-stamp'),
-                    width: 132,
-                    height: 132,
-                    filterQuality: FilterQuality.high,
+          if (visit.isDemo ||
+              visit.verificationState == VisitVerificationState.verified)
+            Positioned(
+              key: const ValueKey('pomi-verified-stamp-position'),
+              right: -4,
+              top: 0,
+              child: Semantics(
+                image: true,
+                label: '该报告已核验',
+                child: Opacity(
+                  opacity: .88,
+                  child: Transform.rotate(
+                    key: const ValueKey('pomi-verified-stamp-rotation'),
+                    angle: -math.pi / 4,
+                    child: Image.asset(
+                      'assets/images/pomi_verified_stamp.png',
+                      key: const ValueKey('pomi-verified-stamp'),
+                      width: 132,
+                      height: 132,
+                      filterQuality: FilterQuality.high,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );

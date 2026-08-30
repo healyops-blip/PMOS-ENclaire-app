@@ -1,0 +1,1242 @@
+{
+  "影像文字报告\\影像文字报告__case_00001.jpg": {
+    "report_type": "影像文字报告",
+    "hospital": "上海瑞宁医院",
+    "department": "生殖科",
+    "truth_file": "影像文字报告\\影像文字报告__case_00001.json",
+    "truth": {
+      "doc_id": "P00001",
+      "hospital": "上海瑞宁医院Ruining Hospital Shanghai",
+      "department": "生殖科",
+      "visit_date": "2026-08-22",
+      "diagnosis_summary": "超声提示：左侧卵巢多囊样改变。",
+      "medical_advice": "建议计划妊娠者提前评估PCOS相关风险并制定方案",
+      "examinations": [
+        {
+          "item_name": "右卵巢",
+          "value": "34*21*25",
+          "unit": "mm",
+          "reference_range": "25-40*15-25*20-35",
+          "abnormal": false,
+          "source_text": "右卵巢：呈多囊样改变，大小测量（mm）:34*21*25。基础卵泡数目:>8个。"
+        },
+        {
+          "item_name": "右侧基础卵泡",
+          "value": "8",
+          "unit": "个",
+          "reference_range": "",
+          "abnormal": false,
+          "source_text": "右卵巢：呈多囊样改变，大小测量（mm）:34*21*25。基础卵泡数目:>8个。"
+        },
+        {
+          "item_name": "左卵巢",
+          "value": "34*23*24",
+          "unit": "mm",
+          "reference_range": "25-40*15-25*20-35",
+          "abnormal": false,
+          "source_text": "左卵巢：呈多囊样改变，大小测量（mm）:34*23*24。基础卵泡数目:>24个。"
+        },
+        {
+          "item_name": "左侧基础卵泡",
+          "value": "24",
+          "unit": "个",
+          "reference_range": "",
+          "abnormal": false,
+          "source_text": "左卵巢：呈多囊样改变，大小测量（mm）:34*23*24。基础卵泡数目:>24个。"
+        },
+        {
+          "item_name": "盆腔积液",
+          "value": "无",
+          "unit": "",
+          "reference_range": "无",
+          "abnormal": false,
+          "source_text": "宫腔内未见异常回声，提示：无"
+        }
+      ],
+      "medication_suggestions": [],
+      "original_file_name": "影像文字报告__case_00001.jpg"
+    }
+  },
+  "影像文字报告\\影像文字报告__case_00002.jpg": {
+    "report_type": "影像文字报告",
+    "hospital": "成都柏安医院",
+    "department": "生殖科",
+    "truth_file": "影像文字报告\\影像文字报告__case_00002.json",
+    "truth": {
+      "doc_id": "P00002",
+      "hospital": "成都柏安医院Boan Hospital Chengdu",
+      "department": "生殖科",
+      "visit_date": "2026-08-24",
+      "diagnosis_summary": "超声提示：左侧卵巢多囊样改变。",
+      "medical_advice": "建议内分泌与妇科联合随诊，进行PCOS相关管理",
+      "examinations": [
+        {
+          "item_name": "右卵巢",
+          "value": "31*19*28",
+          "unit": "mm",
+          "reference_range": "25-40*15-25*20-35",
+          "abnormal": false,
+          "source_text": "右卵巢：呈多囊样改变，大小测量（mm）:31*19*29。基础卵泡数目:>25个。"
+        },
+        {
+          "item_name": "右侧基础卵泡",
+          "value": "9",
+          "unit": "个",
+          "reference_range": "",
+          "abnormal": false,
+          "source_text": "右卵巢：呈多囊样改变，大小测量（mm）:31*19*29。基础卵泡数目:>25个。"
+        },
+        {
+          "item_name": "左卵巢",
+          "value": "32*21*26",
+          "unit": "mm",
+          "reference_range": "25-40*15-25*20-35",
+          "abnormal": false,
+          "source_text": "左卵巢：呈多囊样改变，大小测量（mm）:32*19*28。基础卵泡数目:>27个。"
+        },
+        {
+          "item_name": "左侧基础卵泡",
+          "value": "26",
+          "unit": "个",
+          "reference_range": "",
+          "abnormal": false,
+          "source_text": "左卵巢：呈多囊样改变，大小测量（mm）:32*19*28。基础卵泡数目:>27个。"
+        },
+        {
+          "item_name": "盆腔积液",
+          "value": "无",
+          "unit": "",
+          "reference_range": "无",
+          "abnormal": false,
+          "source_text": "宫腔内未见异常回声，提示：无"
+        }
+      ],
+      "medication_suggestions": [],
+      "original_file_name": "影像文字报告__case_00002.jpg"
+    }
+  },
+  "影像文字报告\\影像文字报告__case_00003.jpg": {
+    "report_type": "影像文字报告",
+    "hospital": "广州和煦医院",
+    "department": "生殖科",
+    "truth_file": "影像文字报告\\影像文字报告__case_00003.json",
+    "truth": {
+      "doc_id": "P00003",
+      "hospital": "广州和煦医院Hexu Hospital Guangzhou",
+      "department": "生殖科",
+      "visit_date": "2026-08-01",
+      "diagnosis_summary": "超声提示：右侧卵巢多囊样改变。",
+      "medical_advice": "建议结合临床与性激素水平评估PCOS情况，必要时复查",
+      "examinations": [
+        {
+          "item_name": "右卵巢",
+          "value": "34*21*25",
+          "unit": "mm",
+          "reference_range": "25-40*15-25*20-35",
+          "abnormal": false,
+          "source_text": "右卵巢：呈多囊样改变，大小测量（mm）:34*21*25。基础卵泡数目:>15个。"
+        },
+        {
+          "item_name": "右侧基础卵泡",
+          "value": "9",
+          "unit": "个",
+          "reference_range": "",
+          "abnormal": false,
+          "source_text": "右卵巢：呈多囊样改变，大小测量（mm）:34*21*25。基础卵泡数目:>15个。"
+        },
+        {
+          "item_name": "左卵巢",
+          "value": "31*21*26",
+          "unit": "mm",
+          "reference_range": "25-40*15-25*20-35",
+          "abnormal": false,
+          "source_text": "左卵巢：呈多囊样改变，大小测量（mm）:29*21*34。基础卵泡数目:>13个。"
+        },
+        {
+          "item_name": "左侧基础卵泡",
+          "value": "22",
+          "unit": "个",
+          "reference_range": "",
+          "abnormal": false,
+          "source_text": "左卵巢：呈多囊样改变，大小测量（mm）:29*21*34。基础卵泡数目:>13个。"
+        },
+        {
+          "item_name": "盆腔积液",
+          "value": "无",
+          "unit": "",
+          "reference_range": "无",
+          "abnormal": false,
+          "source_text": "宫腔内未见异常回声，提示：无"
+        }
+      ],
+      "medication_suggestions": [],
+      "original_file_name": "影像文字报告__case_00003.jpg"
+    }
+  },
+  "影像文字报告\\影像文字报告__case_00004.jpg": {
+    "report_type": "影像文字报告",
+    "hospital": "苏州云舒健康中心",
+    "department": "生殖科",
+    "truth_file": "影像文字报告\\影像文字报告__case_00004.json",
+    "truth": {
+      "doc_id": "P00004",
+      "hospital": "苏州云舒健康中心Yunshu Health Center Suzhou",
+      "department": "生殖科",
+      "visit_date": "2026-08-16",
+      "diagnosis_summary": "超声提示：双侧卵巢多囊样改变。",
+      "medical_advice": "建议内分泌与妇科联合随诊，进行PCOS相关管理",
+      "examinations": [
+        {
+          "item_name": "右卵巢",
+          "value": "35*19*22",
+          "unit": "mm",
+          "reference_range": "25-40*15-25*20-35",
+          "abnormal": false,
+          "source_text": "右卵巢：呈多囊样改变，大小测量（mm）:35*17*20。基础卵泡数目:>28个。"
+        },
+        {
+          "item_name": "右侧基础卵泡",
+          "value": "9",
+          "unit": "个",
+          "reference_range": "",
+          "abnormal": false,
+          "source_text": "右卵巢：呈多囊样改变，大小测量（mm）:35*17*20。基础卵泡数目:>28个。"
+        },
+        {
+          "item_name": "左卵巢",
+          "value": "37*21*26",
+          "unit": "mm",
+          "reference_range": "25-40*15-25*20-35",
+          "abnormal": false,
+          "source_text": "左卵巢：呈多囊样改变，大小测量（mm）:38*16*30。基础卵泡数目:>10个。"
+        },
+        {
+          "item_name": "左侧基础卵泡",
+          "value": "22",
+          "unit": "个",
+          "reference_range": "",
+          "abnormal": false,
+          "source_text": "左卵巢：呈多囊样改变，大小测量（mm）:38*16*30。基础卵泡数目:>10个。"
+        },
+        {
+          "item_name": "盆腔积液",
+          "value": "无",
+          "unit": "",
+          "reference_range": "无",
+          "abnormal": false,
+          "source_text": "宫腔内未见异常回声，提示：无"
+        }
+      ],
+      "medication_suggestions": [],
+      "original_file_name": "影像文字报告__case_00004.jpg"
+    }
+  },
+  "影像文字报告\\影像文字报告__case_00005.jpg": {
+    "report_type": "影像文字报告",
+    "hospital": "深圳予安健康中心",
+    "department": "生殖科",
+    "truth_file": "影像文字报告\\影像文字报告__case_00005.json",
+    "truth": {
+      "doc_id": "P00005",
+      "hospital": "深圳予安健康中心Yuan Health Center Shenzhen",
+      "department": "生殖科",
+      "visit_date": "2026-08-19",
+      "diagnosis_summary": "超声提示：右侧卵巢多囊样改变。",
+      "medical_advice": "建议3-6个月后复查超声及相关激素，动态评估PCOS",
+      "examinations": [
+        {
+          "item_name": "右卵巢",
+          "value": "37*19*28",
+          "unit": "mm",
+          "reference_range": "25-40*15-25*20-35",
+          "abnormal": false,
+          "source_text": "右卵巢：呈多囊样改变，大小测量（mm）:37*16*28。基础卵泡数目:>21个。"
+        },
+        {
+          "item_name": "右侧基础卵泡",
+          "value": "9",
+          "unit": "个",
+          "reference_range": "",
+          "abnormal": false,
+          "source_text": "右卵巢：呈多囊样改变，大小测量（mm）:37*16*28。基础卵泡数目:>21个。"
+        },
+        {
+          "item_name": "左卵巢",
+          "value": "34*21*26",
+          "unit": "mm",
+          "reference_range": "25-40*15-25*20-35",
+          "abnormal": false,
+          "source_text": "左卵巢：呈多囊样改变，大小测量（mm）:34*16*28。基础卵泡数目:>29个。"
+        },
+        {
+          "item_name": "左侧基础卵泡",
+          "value": "26",
+          "unit": "个",
+          "reference_range": "",
+          "abnormal": false,
+          "source_text": "左卵巢：呈多囊样改变，大小测量（mm）:34*16*28。基础卵泡数目:>29个。"
+        },
+        {
+          "item_name": "盆腔积液",
+          "value": "无",
+          "unit": "",
+          "reference_range": "无",
+          "abnormal": false,
+          "source_text": "宫腔内未见异常回声，提示：无"
+        }
+      ],
+      "medication_suggestions": [],
+      "original_file_name": "影像文字报告__case_00005.jpg"
+    }
+  },
+  "化验_检测报告\\化验_检测报告__case_00006.jpg": {
+    "report_type": "化验_检测报告",
+    "hospital": "上海越明医疗中心",
+    "department": "生殖科",
+    "truth_file": "化验_检测报告\\化验_检测报告__case_00006.json",
+    "truth": {
+      "doc_id": "LA00006",
+      "hospital": "上海越明医疗中心Yueming Medical Center Shanghai",
+      "department": "生殖科",
+      "visit_date": "2026-08-03",
+      "diagnosis_summary": "",
+      "medical_advice": "建议结合PCOS（多囊卵巢综合征）相关评估，按需随访",
+      "examinations": [
+        {
+          "item_name": "白细胞计数",
+          "value": "5",
+          "unit": "×10^9/L",
+          "reference_range": "4-12",
+          "abnormal": false
+        },
+        {
+          "item_name": "红细胞计数",
+          "value": "6",
+          "unit": "×10^12/L",
+          "reference_range": "4-6",
+          "abnormal": false
+        },
+        {
+          "item_name": "血红蛋白",
+          "value": "121",
+          "unit": "g/L",
+          "reference_range": "110-180",
+          "abnormal": false
+        },
+        {
+          "item_name": "血小板计数",
+          "value": "161",
+          "unit": "×10^9/L",
+          "reference_range": "100-350",
+          "abnormal": false
+        },
+        {
+          "item_name": "谷丙转氨酶",
+          "value": "24",
+          "unit": "U/L",
+          "reference_range": "5-45",
+          "abnormal": false
+        },
+        {
+          "item_name": "谷草转氨酶",
+          "value": "16",
+          "unit": "U/L",
+          "reference_range": "5-45",
+          "abnormal": false
+        },
+        {
+          "item_name": "总胆红素",
+          "value": "23",
+          "unit": "μmol/L",
+          "reference_range": "3-25",
+          "abnormal": false
+        },
+        {
+          "item_name": "肌酐",
+          "value": "87",
+          "unit": "μmol/L",
+          "reference_range": "40-120",
+          "abnormal": false
+        },
+        {
+          "item_name": "空腹血糖",
+          "value": "3",
+          "unit": "mmol/L",
+          "reference_range": "3-8",
+          "abnormal": false
+        },
+        {
+          "item_name": "总胆固醇",
+          "value": "5",
+          "unit": "mmol/L",
+          "reference_range": "3-6",
+          "abnormal": false
+        },
+        {
+          "item_name": "甘油三酯",
+          "value": "1.5",
+          "unit": "mmol/L",
+          "reference_range": "0.5-2.5",
+          "abnormal": false
+        },
+        {
+          "item_name": "高密度脂蛋白",
+          "value": "1.4",
+          "unit": "mmol/L",
+          "reference_range": "0.8-2.0",
+          "abnormal": false
+        },
+        {
+          "item_name": "低密度脂蛋白",
+          "value": "3.7",
+          "unit": "mmol/L",
+          "reference_range": "2-4",
+          "abnormal": false
+        }
+      ],
+      "medication_suggestions": [],
+      "original_file_name": "化验_检测报告__case_00006.jpg"
+    }
+  },
+  "化验_检测报告\\化验_检测报告__case_00007.jpg": {
+    "report_type": "化验_检测报告",
+    "hospital": "南京青岚医院",
+    "department": "生殖科",
+    "truth_file": "化验_检测报告\\化验_检测报告__case_00007.json",
+    "truth": {
+      "doc_id": "LA00007",
+      "hospital": "南京青岚医院Qinglan Hospital Nanjing",
+      "department": "生殖科",
+      "visit_date": "2026-08-03",
+      "diagnosis_summary": "",
+      "medical_advice": "如为PCOS管理阶段，建议记录月经周期并按医嘱复诊",
+      "examinations": [
+        {
+          "item_name": "白细胞计数",
+          "value": "6",
+          "unit": "×10^9/L",
+          "reference_range": "4-12",
+          "abnormal": false
+        },
+        {
+          "item_name": "红细胞计数",
+          "value": "6",
+          "unit": "×10^12/L",
+          "reference_range": "4-6",
+          "abnormal": false
+        },
+        {
+          "item_name": "血红蛋白",
+          "value": "131",
+          "unit": "g/L",
+          "reference_range": "110-180",
+          "abnormal": false
+        },
+        {
+          "item_name": "血小板计数",
+          "value": "177",
+          "unit": "×10^9/L",
+          "reference_range": "100-350",
+          "abnormal": false
+        },
+        {
+          "item_name": "谷丙转氨酶",
+          "value": "26",
+          "unit": "U/L",
+          "reference_range": "5-45",
+          "abnormal": false
+        },
+        {
+          "item_name": "谷草转氨酶",
+          "value": "18",
+          "unit": "U/L",
+          "reference_range": "5-45",
+          "abnormal": false
+        },
+        {
+          "item_name": "总胆红素",
+          "value": "21",
+          "unit": "μmol/L",
+          "reference_range": "3-25",
+          "abnormal": false
+        },
+        {
+          "item_name": "肌酐",
+          "value": "94",
+          "unit": "μmol/L",
+          "reference_range": "40-120",
+          "abnormal": false
+        },
+        {
+          "item_name": "空腹血糖",
+          "value": "3",
+          "unit": "mmol/L",
+          "reference_range": "3-8",
+          "abnormal": false
+        },
+        {
+          "item_name": "总胆固醇",
+          "value": "5",
+          "unit": "mmol/L",
+          "reference_range": "3-6",
+          "abnormal": false
+        },
+        {
+          "item_name": "甘油三酯",
+          "value": "1.7",
+          "unit": "mmol/L",
+          "reference_range": "0.5-2.5",
+          "abnormal": false
+        },
+        {
+          "item_name": "高密度脂蛋白",
+          "value": "1.5",
+          "unit": "mmol/L",
+          "reference_range": "0.8-2.0",
+          "abnormal": false
+        },
+        {
+          "item_name": "低密度脂蛋白",
+          "value": "3.3",
+          "unit": "mmol/L",
+          "reference_range": "2-4",
+          "abnormal": false
+        }
+      ],
+      "medication_suggestions": [],
+      "original_file_name": "化验_检测报告__case_00007.jpg"
+    }
+  },
+  "化验_检测报告\\化验_检测报告__case_00008.jpg": {
+    "report_type": "化验_检测报告",
+    "hospital": "苏州云舒健康中心",
+    "department": "生殖科",
+    "truth_file": "化验_检测报告\\化验_检测报告__case_00008.json",
+    "truth": {
+      "doc_id": "LA00008",
+      "hospital": "苏州云舒健康中心Yunshu Health Center Suzhou",
+      "department": "生殖科",
+      "visit_date": "2026-08-20",
+      "diagnosis_summary": "",
+      "medical_advice": "如为PCOS管理阶段，建议记录月经周期并按医嘱复诊",
+      "examinations": [
+        {
+          "item_name": "白细胞计数",
+          "value": "6",
+          "unit": "×10^9/L",
+          "reference_range": "4-12",
+          "abnormal": false
+        },
+        {
+          "item_name": "红细胞计数",
+          "value": "6",
+          "unit": "×10^12/L",
+          "reference_range": "4-6",
+          "abnormal": false
+        },
+        {
+          "item_name": "血红蛋白",
+          "value": "133",
+          "unit": "g/L",
+          "reference_range": "110-180",
+          "abnormal": false
+        },
+        {
+          "item_name": "血小板计数",
+          "value": "164",
+          "unit": "×10^9/L",
+          "reference_range": "100-350",
+          "abnormal": false
+        },
+        {
+          "item_name": "谷丙转氨酶",
+          "value": "22",
+          "unit": "U/L",
+          "reference_range": "5-45",
+          "abnormal": false
+        },
+        {
+          "item_name": "谷草转氨酶",
+          "value": "14",
+          "unit": "U/L",
+          "reference_range": "5-45",
+          "abnormal": false
+        },
+        {
+          "item_name": "总胆红素",
+          "value": "25",
+          "unit": "μmol/L",
+          "reference_range": "3-25",
+          "abnormal": false
+        },
+        {
+          "item_name": "肌酐",
+          "value": "79",
+          "unit": "μmol/L",
+          "reference_range": "40-120",
+          "abnormal": false
+        },
+        {
+          "item_name": "空腹血糖",
+          "value": "3",
+          "unit": "mmol/L",
+          "reference_range": "3-8",
+          "abnormal": false
+        },
+        {
+          "item_name": "总胆固醇",
+          "value": "6",
+          "unit": "mmol/L",
+          "reference_range": "3-6",
+          "abnormal": false
+        },
+        {
+          "item_name": "甘油三酯",
+          "value": "1.7",
+          "unit": "mmol/L",
+          "reference_range": "0.5-2.5",
+          "abnormal": false
+        },
+        {
+          "item_name": "高密度脂蛋白",
+          "value": "1.5",
+          "unit": "mmol/L",
+          "reference_range": "0.8-2.0",
+          "abnormal": false
+        },
+        {
+          "item_name": "低密度脂蛋白",
+          "value": "3.9",
+          "unit": "mmol/L",
+          "reference_range": "2-4",
+          "abnormal": false
+        }
+      ],
+      "medication_suggestions": [],
+      "original_file_name": "化验_检测报告__case_00008.jpg"
+    }
+  },
+  "化验_检测报告\\化验_检测报告__case_00009.jpg": {
+    "report_type": "化验_检测报告",
+    "hospital": "成都柏安医院",
+    "department": "生殖科",
+    "truth_file": "化验_检测报告\\化验_检测报告__case_00009.json",
+    "truth": {
+      "doc_id": "LA00009",
+      "hospital": "成都柏安医院Boan Hospital Chengdu",
+      "department": "生殖科",
+      "visit_date": "2026-08-07",
+      "diagnosis_summary": "",
+      "medical_advice": "建议结合PCOS（多囊卵巢综合征）相关评估，按需随访",
+      "examinations": [
+        {
+          "item_name": "白细胞计数",
+          "value": "4",
+          "unit": "×10^9/L",
+          "reference_range": "4-12",
+          "abnormal": false
+        },
+        {
+          "item_name": "红细胞计数",
+          "value": "5",
+          "unit": "×10^12/L",
+          "reference_range": "4-6",
+          "abnormal": false
+        },
+        {
+          "item_name": "血红蛋白",
+          "value": "133",
+          "unit": "g/L",
+          "reference_range": "110-180",
+          "abnormal": false
+        },
+        {
+          "item_name": "血小板计数",
+          "value": "145",
+          "unit": "×10^9/L",
+          "reference_range": "100-350",
+          "abnormal": false
+        },
+        {
+          "item_name": "谷丙转氨酶",
+          "value": "25",
+          "unit": "U/L",
+          "reference_range": "5-45",
+          "abnormal": false
+        },
+        {
+          "item_name": "谷草转氨酶",
+          "value": "18",
+          "unit": "U/L",
+          "reference_range": "5-45",
+          "abnormal": false
+        },
+        {
+          "item_name": "总胆红素",
+          "value": "21",
+          "unit": "μmol/L",
+          "reference_range": "3-25",
+          "abnormal": false
+        },
+        {
+          "item_name": "肌酐",
+          "value": "78",
+          "unit": "μmol/L",
+          "reference_range": "40-120",
+          "abnormal": false
+        },
+        {
+          "item_name": "空腹血糖",
+          "value": "3",
+          "unit": "mmol/L",
+          "reference_range": "3-8",
+          "abnormal": false
+        },
+        {
+          "item_name": "总胆固醇",
+          "value": "4",
+          "unit": "mmol/L",
+          "reference_range": "3-6",
+          "abnormal": false
+        },
+        {
+          "item_name": "甘油三酯",
+          "value": "1.6",
+          "unit": "mmol/L",
+          "reference_range": "0.5-2.5",
+          "abnormal": false
+        },
+        {
+          "item_name": "高密度脂蛋白",
+          "value": "1.5",
+          "unit": "mmol/L",
+          "reference_range": "0.8-2.0",
+          "abnormal": false
+        },
+        {
+          "item_name": "低密度脂蛋白",
+          "value": "3.5",
+          "unit": "mmol/L",
+          "reference_range": "2-4",
+          "abnormal": false
+        }
+      ],
+      "medication_suggestions": [],
+      "original_file_name": "化验_检测报告__case_00009.jpg"
+    }
+  },
+  "化验_检测报告\\化验_检测报告__case_00010.jpg": {
+    "report_type": "化验_检测报告",
+    "hospital": "苏州澜汐医院",
+    "department": "生殖科",
+    "truth_file": "化验_检测报告\\化验_检测报告__case_00010.json",
+    "truth": {
+      "doc_id": "LA00010",
+      "hospital": "苏州澜汐医院Lanxi Hospital Suzhou",
+      "department": "生殖科",
+      "visit_date": "2026-08-20",
+      "diagnosis_summary": "",
+      "medical_advice": "建议生活方式干预（饮食+运动），必要时与内分泌科联合随访",
+      "examinations": [
+        {
+          "item_name": "白细胞计数",
+          "value": "6",
+          "unit": "×10^9/L",
+          "reference_range": "4-12",
+          "abnormal": false
+        },
+        {
+          "item_name": "红细胞计数",
+          "value": "5",
+          "unit": "×10^12/L",
+          "reference_range": "4-6",
+          "abnormal": false
+        },
+        {
+          "item_name": "血红蛋白",
+          "value": "122",
+          "unit": "g/L",
+          "reference_range": "110-180",
+          "abnormal": false
+        },
+        {
+          "item_name": "血小板计数",
+          "value": "177",
+          "unit": "×10^9/L",
+          "reference_range": "100-350",
+          "abnormal": false
+        },
+        {
+          "item_name": "谷丙转氨酶",
+          "value": "22",
+          "unit": "U/L",
+          "reference_range": "5-45",
+          "abnormal": false
+        },
+        {
+          "item_name": "谷草转氨酶",
+          "value": "14",
+          "unit": "U/L",
+          "reference_range": "5-45",
+          "abnormal": false
+        },
+        {
+          "item_name": "总胆红素",
+          "value": "21",
+          "unit": "μmol/L",
+          "reference_range": "3-25",
+          "abnormal": false
+        },
+        {
+          "item_name": "肌酐",
+          "value": "79",
+          "unit": "μmol/L",
+          "reference_range": "40-120",
+          "abnormal": false
+        },
+        {
+          "item_name": "空腹血糖",
+          "value": "3",
+          "unit": "mmol/L",
+          "reference_range": "3-8",
+          "abnormal": false
+        },
+        {
+          "item_name": "总胆固醇",
+          "value": "4",
+          "unit": "mmol/L",
+          "reference_range": "3-6",
+          "abnormal": false
+        },
+        {
+          "item_name": "甘油三酯",
+          "value": "1.4",
+          "unit": "mmol/L",
+          "reference_range": "0.5-2.5",
+          "abnormal": false
+        },
+        {
+          "item_name": "高密度脂蛋白",
+          "value": "1.4",
+          "unit": "mmol/L",
+          "reference_range": "0.8-2.0",
+          "abnormal": false
+        },
+        {
+          "item_name": "低密度脂蛋白",
+          "value": "3.3",
+          "unit": "mmol/L",
+          "reference_range": "2-4",
+          "abnormal": false
+        }
+      ],
+      "medication_suggestions": [],
+      "original_file_name": "化验_检测报告__case_00010.jpg"
+    }
+  },
+  "医嘱_处方\\医嘱_处方__case_00011.jpg": {
+    "report_type": "医嘱_处方",
+    "hospital": "武汉康礼医疗中心",
+    "department": "生殖科",
+    "truth_file": "医嘱_处方\\医嘱_处方__case_00011.json",
+    "truth": {
+      "doc_id": "PR00011",
+      "hospital": "武汉康礼医疗中心Kangli Medical Center Wuhan",
+      "department": "生殖科",
+      "visit_date": "2026-08-26",
+      "diagnosis_summary": "多囊卵巢综合征（代谢异常需评估）",
+      "medical_advice": "控制体重，配合药物治疗及随访",
+      "examinations": [],
+      "medication_suggestions": [
+        {
+          "drug_name": "地屈孕酮",
+          "dosage": "10mg",
+          "frequency": "每日2次",
+          "duration": "按周期",
+          "instruction": "示例医嘱：口服，每日两次，按周期应用以调经，遵医嘱复诊（PCOS）。",
+          "source_text": "药品 地屈孕酮（达芙通） 10mg 用法 口服 片剂 用量 按医嘱，每日2次 疗程 按周期 总量 20片"
+        },
+        {
+          "drug_name": "枸橼酸氯米芬",
+          "dosage": "50mg",
+          "frequency": "每日1次",
+          "duration": "5天",
+          "instruction": "示例医嘱：口服，每日一次，连用5天，按周期评估排卵（PCOS）。",
+          "source_text": "药品 枸橼酸氯米芬（舒经芬） 50mg 用法 口服 片剂 用量 每次1片，每日1次 疗程 5天 总量 14片"
+        },
+        {
+          "drug_name": "肌醇",
+          "dosage": "2g",
+          "frequency": "每日2次",
+          "duration": "长期",
+          "instruction": "示例医嘱：口服，每日两次，配合饮食与运动干预（PCOS）。",
+          "source_text": "药品 肌醇（Myo-inositol） 2g 用法 口服 胶囊剂 用量 按医嘱，每日2次 疗程 长期 总量 28粒"
+        }
+      ],
+      "original_file_name": "医嘱_处方__case_00011.jpg"
+    }
+  },
+  "医嘱_处方\\医嘱_处方__case_00012.jpg": {
+    "report_type": "医嘱_处方",
+    "hospital": "广州润心医疗中心",
+    "department": "生殖科",
+    "truth_file": "医嘱_处方\\医嘱_处方__case_00012.json",
+    "truth": {
+      "doc_id": "PR00012",
+      "hospital": "广州润心医疗中心Runxin Healthcare Guangzhou",
+      "department": "生殖科",
+      "visit_date": "2026-07-29",
+      "diagnosis_summary": "多囊卵巢综合征（代谢异常需评估）",
+      "medical_advice": "调整月经周期，监测排卵及代谢指标",
+      "examinations": [],
+      "medication_suggestions": [
+        {
+          "drug_name": "叶酸",
+          "dosage": "0.4mg",
+          "frequency": "每日1次",
+          "duration": "长期",
+          "instruction": "示例医嘱：口服，每日一次，备孕/早孕期补充（PCOS）。",
+          "source_text": "药品 叶酸（VB9） 0.4mg 用法 口服 片剂 用量 每次1片，每日1次 疗程 长期 总量 20片"
+        },
+        {
+          "drug_name": "司美格鲁肽",
+          "dosage": "—",
+          "frequency": "每周1次",
+          "duration": "长期",
+          "instruction": "示例医嘱：皮下注射，每周一次，配合生活方式干预（PCOS）。",
+          "source_text": "药品 司美格鲁肽（司美格鲁肽注射液） — 用法 皮下注射 注射剂 用量 按医嘱，每周1次 疗程 长期 总量 4支"
+        },
+        {
+          "drug_name": "盐酸二甲双胍",
+          "dosage": "0.5g",
+          "frequency": "每日3次",
+          "duration": "长期",
+          "instruction": "示例医嘱：口服，每日2-3次，长期管理，注意餐后服用（PCOS）。",
+          "source_text": "药品 盐酸二甲双胍（格华止） 0.5g 用法 口服 普通片 用量 每次1片，每日3次 疗程 长期 总量 1盒"
+        }
+      ],
+      "original_file_name": "医嘱_处方__case_00012.jpg"
+    }
+  },
+  "医嘱_处方\\医嘱_处方__case_00013.jpg": {
+    "report_type": "医嘱_处方",
+    "hospital": "武汉康礼医疗中心",
+    "department": "生殖科",
+    "truth_file": "医嘱_处方\\医嘱_处方__case_00013.json",
+    "truth": {
+      "doc_id": "PR00013",
+      "hospital": "武汉康礼医疗中心Kangli Medical Center Wuhan",
+      "department": "生殖科",
+      "visit_date": "2026-08-18",
+      "diagnosis_summary": "多囊卵巢综合征（代谢异常需评估）",
+      "medical_advice": "控制体重，配合药物治疗及随访",
+      "examinations": [],
+      "medication_suggestions": [
+        {
+          "drug_name": "枸橼酸氯米芬",
+          "dosage": "50mg",
+          "frequency": "每日1次",
+          "duration": "5天",
+          "instruction": "示例医嘱：口服，每日一次，连用5天，按周期评估排卵（PCOS）。",
+          "source_text": "药品 枸橼酸氯米芬（舒经芬） 50mg 用法 口服 片剂 用量 每次1片，每日1次 疗程 5天 总量 28片"
+        },
+        {
+          "drug_name": "司美格鲁肽",
+          "dosage": "—",
+          "frequency": "每周1次",
+          "duration": "长期",
+          "instruction": "示例医嘱：皮下注射，每周一次，配合生活方式干预（PCOS）。",
+          "source_text": "药品 司美格鲁肽（司美格鲁肽注射液） — 用法 皮下注射 注射剂 用量 每次1支，每周1次 疗程 长期 总量 2支"
+        },
+        {
+          "drug_name": "利拉鲁肽",
+          "dosage": "—",
+          "frequency": "每日1次",
+          "duration": "长期",
+          "instruction": "示例医嘱：皮下注射，每日一次，根据反应调整，按需随访（PCOS）。",
+          "source_text": "药品 利拉鲁肽（利拉鲁肽注射液） — 用法 皮下注射 注射剂 用量 按医嘱，每日1次 疗程 长期 总量 2支"
+        }
+      ],
+      "original_file_name": "医嘱_处方__case_00013.jpg"
+    }
+  },
+  "医嘱_处方\\医嘱_处方__case_00014.jpg": {
+    "report_type": "医嘱_处方",
+    "hospital": "广州润心医疗中心",
+    "department": "生殖科",
+    "truth_file": "医嘱_处方\\医嘱_处方__case_00014.json",
+    "truth": {
+      "doc_id": "PR00014",
+      "hospital": "广州润心医疗中心Runxin Healthcare Guangzhou",
+      "department": "生殖科",
+      "visit_date": "2026-08-03",
+      "diagnosis_summary": "多囊卵巢综合征",
+      "medical_advice": "控制体重，配合药物治疗及随访",
+      "examinations": [],
+      "medication_suggestions": [
+        {
+          "drug_name": "炔雌醇环丙孕酮片",
+          "dosage": "炔雌醇0.035mg+醋酸环丙孕酮2mg",
+          "frequency": "每日1次",
+          "duration": "按周期",
+          "instruction": "示例医嘱：口服，按周期使用，遵医嘱复诊评估（PCOS）。",
+          "source_text": "药品 炔雌醇环丙孕酮片（达英-35） 炔雌醇0.035mg+醋酸环丙孕酮2mg 用法 口服 片剂 用量 按医嘱，每日1次 疗程 按周期 总量 14片"
+        },
+        {
+          "drug_name": "肌醇",
+          "dosage": "2g",
+          "frequency": "每日2次",
+          "duration": "长期",
+          "instruction": "示例医嘱：口服，每日两次，配合饮食与运动干预（PCOS）。",
+          "source_text": "药品 肌醇（MI） 2g 用法 口服 粉剂 用量 每次1袋，每日2次 疗程 长期 总量 30袋"
+        },
+        {
+          "drug_name": "叶酸",
+          "dosage": "0.4mg",
+          "frequency": "每日1次",
+          "duration": "长期",
+          "instruction": "示例医嘱：口服，每日一次，备孕/早孕期补充（PCOS）。",
+          "source_text": "药品 叶酸（维生素B9） 0.4mg 用法 口服 片剂 用量 每次1片，每日1次 疗程 长期 总量 20片"
+        }
+      ],
+      "original_file_name": "医嘱_处方__case_00014.jpg"
+    }
+  },
+  "医嘱_处方\\医嘱_处方__case_00015.jpg": {
+    "report_type": "医嘱_处方",
+    "hospital": "广州和煦医院",
+    "department": "生殖科",
+    "truth_file": "医嘱_处方\\医嘱_处方__case_00015.json",
+    "truth": {
+      "doc_id": "PR00015",
+      "hospital": "广州和煦医院Hexu Hospital Guangzhou",
+      "department": "生殖科",
+      "visit_date": "2026-08-02",
+      "diagnosis_summary": "多囊卵巢综合征",
+      "medical_advice": "控制体重，配合药物治疗及随访",
+      "examinations": [],
+      "medication_suggestions": [
+        {
+          "drug_name": "司美格鲁肽",
+          "dosage": "—",
+          "frequency": "每周1次",
+          "duration": "长期",
+          "instruction": "示例医嘱：皮下注射，每周一次，配合生活方式干预（PCOS）。",
+          "source_text": "药品 司美格鲁肽（司美格鲁肽注射液） — 用法 皮下注射 注射剂 用量 每次1支，每周1次 疗程 长期 总量 2支"
+        },
+        {
+          "drug_name": "利拉鲁肽",
+          "dosage": "—",
+          "frequency": "每日1次",
+          "duration": "长期",
+          "instruction": "示例医嘱：皮下注射，每日一次，根据反应调整，按需随访（PCOS）。",
+          "source_text": "药品 利拉鲁肽（利拉鲁肽注射液） — 用法 皮下注射 注射剂 用量 每次1支，每日1次 疗程 长期 总量 2支"
+        },
+        {
+          "drug_name": "来曲唑",
+          "dosage": "2.5mg",
+          "frequency": "每日1次",
+          "duration": "5天",
+          "instruction": "示例医嘱：口服，每日一次，连用5天，按周期诱导排卵（PCOS）。",
+          "source_text": "药品 来曲唑（来曲唑片） 2.5mg 用法 口服 片剂 用量 按医嘱，每日1次 疗程 5天 总量 14片"
+        }
+      ],
+      "original_file_name": "医嘱_处方__case_00015.jpg"
+    }
+  },
+  "门诊病历_就诊记录\\门诊病历_就诊记录__case_00016.jpg": {
+    "report_type": "门诊病历_就诊记录",
+    "hospital": "西安达济医院",
+    "department": "生殖科",
+    "truth_file": "门诊病历_就诊记录\\门诊病历_就诊记录__case_00016.json",
+    "truth": {
+      "doc_id": "MR00016",
+      "hospital": "西安达济医院Daji Hospital Xi'an",
+      "department": "生殖科",
+      "visit_date": "2026-07-31",
+      "diagnosis_summary": "多囊卵巢综合征",
+      "medical_advice": "建议记录周期与症状变化，按计划复诊",
+      "examinations": [
+        {
+          "item_name": "体温",
+          "value": "37.5",
+          "unit": "℃",
+          "reference_range": "36-37.5",
+          "abnormal": false
+        },
+        {
+          "item_name": "心率",
+          "value": "74",
+          "unit": "次/分",
+          "reference_range": "60-100",
+          "abnormal": false
+        },
+        {
+          "item_name": "血压",
+          "value": "112/81",
+          "unit": "mmHg",
+          "reference_range": "90-140/60-90",
+          "abnormal": false
+        }
+      ],
+      "medication_suggestions": [],
+      "original_file_name": "门诊病历_就诊记录__case_00016.jpg"
+    }
+  },
+  "门诊病历_就诊记录\\门诊病历_就诊记录__case_00017.jpg": {
+    "report_type": "门诊病历_就诊记录",
+    "hospital": "广州和煦医院",
+    "department": "生殖科",
+    "truth_file": "门诊病历_就诊记录\\门诊病历_就诊记录__case_00017.json",
+    "truth": {
+      "doc_id": "MR00017",
+      "hospital": "广州和煦医院Hexu Hospital Guangzhou",
+      "department": "生殖科",
+      "visit_date": "2026-08-24",
+      "diagnosis_summary": "多囊卵巢综合征",
+      "medical_advice": "建议记录周期与症状变化，按计划复诊",
+      "examinations": [
+        {
+          "item_name": "体温",
+          "value": "37.6",
+          "unit": "℃",
+          "reference_range": "36-37.5",
+          "abnormal": true
+        },
+        {
+          "item_name": "心率",
+          "value": "91",
+          "unit": "次/分",
+          "reference_range": "60-100",
+          "abnormal": false
+        },
+        {
+          "item_name": "血压",
+          "value": "147/64",
+          "unit": "mmHg",
+          "reference_range": "90-140/60-90",
+          "abnormal": false
+        }
+      ],
+      "medication_suggestions": [],
+      "original_file_name": "门诊病历_就诊记录__case_00017.jpg"
+    }
+  },
+  "门诊病历_就诊记录\\门诊病历_就诊记录__case_00018.jpg": {
+    "report_type": "门诊病历_就诊记录",
+    "hospital": "南京启康医院",
+    "department": "生殖科",
+    "truth_file": "门诊病历_就诊记录\\门诊病历_就诊记录__case_00018.json",
+    "truth": {
+      "doc_id": "MR00018",
+      "hospital": "南京启康医院Qikang Hospital Nanjing",
+      "department": "生殖科",
+      "visit_date": "2026-08-23",
+      "diagnosis_summary": "多囊卵巢综合征",
+      "medical_advice": "建议记录周期与症状变化，按计划复诊",
+      "examinations": [
+        {
+          "item_name": "体温",
+          "value": "37.4",
+          "unit": "℃",
+          "reference_range": "36-37.5",
+          "abnormal": false
+        },
+        {
+          "item_name": "心率",
+          "value": "67",
+          "unit": "次/分",
+          "reference_range": "60-100",
+          "abnormal": false
+        },
+        {
+          "item_name": "血压",
+          "value": "108/66",
+          "unit": "mmHg",
+          "reference_range": "90-140/60-90",
+          "abnormal": false
+        }
+      ],
+      "medication_suggestions": [],
+      "original_file_name": "门诊病历_就诊记录__case_00018.jpg"
+    }
+  },
+  "门诊病历_就诊记录\\门诊病历_就诊记录__case_00019.jpg": {
+    "report_type": "门诊病历_就诊记录",
+    "hospital": "南京青岚医院",
+    "department": "生殖科",
+    "truth_file": "门诊病历_就诊记录\\门诊病历_就诊记录__case_00019.json",
+    "truth": {
+      "doc_id": "MR00019",
+      "hospital": "南京青岚医院Qinglan Hospital Nanjing",
+      "department": "生殖科",
+      "visit_date": "2026-08-20",
+      "diagnosis_summary": "多囊卵巢综合征",
+      "medical_advice": "建议记录周期与症状变化，按计划复诊",
+      "examinations": [
+        {
+          "item_name": "体温",
+          "value": "37.3",
+          "unit": "℃",
+          "reference_range": "36-37.5",
+          "abnormal": false
+        },
+        {
+          "item_name": "心率",
+          "value": "69",
+          "unit": "次/分",
+          "reference_range": "60-100",
+          "abnormal": false
+        },
+        {
+          "item_name": "血压",
+          "value": "110/51",
+          "unit": "mmHg",
+          "reference_range": "90-140/60-90",
+          "abnormal": false
+        }
+      ],
+      "medication_suggestions": [],
+      "original_file_name": "门诊病历_就诊记录__case_00019.jpg"
+    }
+  },
+  "门诊病历_就诊记录\\门诊病历_就诊记录__case_00020.jpg": {
+    "report_type": "门诊病历_就诊记录",
+    "hospital": "天津清和医院",
+    "department": "生殖科",
+    "truth_file": "门诊病历_就诊记录\\门诊病历_就诊记录__case_00020.json",
+    "truth": {
+      "doc_id": "MR00020",
+      "hospital": "天津清和医院Qinghe Hospital Tianjin",
+      "department": "生殖科",
+      "visit_date": "2026-08-27",
+      "diagnosis_summary": "多囊卵巢综合征",
+      "medical_advice": "建议记录周期与症状变化，按计划复诊",
+      "examinations": [
+        {
+          "item_name": "体温",
+          "value": "37.3",
+          "unit": "℃",
+          "reference_range": "36-37.5",
+          "abnormal": false
+        },
+        {
+          "item_name": "心率",
+          "value": "86",
+          "unit": "次/分",
+          "reference_range": "60-100",
+          "abnormal": false
+        },
+        {
+          "item_name": "血压",
+          "value": "128/58",
+          "unit": "mmHg",
+          "reference_range": "90-140/60-90",
+          "abnormal": false
+        }
+      ],
+      "medication_suggestions": [],
+      "original_file_name": "门诊病历_就诊记录__case_00020.jpg"
+    }
+  }
+}

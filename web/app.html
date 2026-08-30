@@ -5,8 +5,8 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="description" content="Pomi Flutter mobile app.">
-  <title>Pomi</title>
+  <meta name="description" content="POMI · PCOS 复诊准备助手">
+  <title>POMI</title>
   <style>
     @font-face {
       font-family: 'Noto Sans SC';
@@ -43,7 +43,7 @@
       margin: 0;
       overflow: hidden;
       background: #f8f5fa;
-      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Noto Sans SC', sans-serif;
+      font-family: 'Noto Sans SC', sans-serif;
     }
   </style>
 </head>
@@ -58,7 +58,8 @@
         await Promise.all(registrations.map((registration) => registration.unregister()));
       }
       const script = document.createElement('script');
-      script.src = 'flutter_bootstrap.js';
+      // Keep local preview builds out of the browser's script cache.
+      script.src = 'flutter_bootstrap.js?v=20260829-0063';
       script.async = true;
       document.body.appendChild(script);
     })();

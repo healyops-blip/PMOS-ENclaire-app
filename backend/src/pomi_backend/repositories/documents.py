@@ -7,7 +7,11 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from pomi_backend.db.models.documents import Document, DocumentRevision
+from pomi_backend.db.models.documents import (
+    Document,
+    DocumentDisplayAsset,
+    DocumentRevision,
+)
 
 
 class DocumentRepository:
@@ -95,3 +99,22 @@ class DocumentRepository:
             )
         )
         return (current or 0) + 1
+
+    def display_asset(
+        self,
+        document_id: str,
+        revision_id: str,
+        *,
+        asset_type: str,
+        watermark_version: str,
+    ) -> DocumentDisplayAsset | None:
+        if self.revision(document_id, revision_id) is None:
+            return None
+        return self.session.scalar(
+            select(DocumentDisplayAsset).where(
+                DocumentDisplayAsset.document_id == document_id,
+                DocumentDisplayAsset.document_revision_id == revision_id,
+                DocumentDisplayAsset.asset_type == asset_type,
+                DocumentDisplayAsset.watermark_version == watermark_version,
+            )
+        )

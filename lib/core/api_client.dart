@@ -1,9 +1,12 @@
-import 'dart:io';
+import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 
 import 'smoke_report_fixture.dart';
+import 'smoke_dataset.dart';
+import '../features/auth/auth_controller.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 const apiBaseUrl = String.fromEnvironment(
@@ -20,7 +23,12 @@ final secureStorageProvider = Provider<FlutterSecureStorage>(
 
 final apiClientProvider = Provider<ApiClient>((ref) {
   final storage = ref.watch(secureStorageProvider);
-  return smokeMode ? SmokeApiClient(storage) : ApiClient(storage);
+  // Session 失效（AUTHENTICATION_REQUIRED）时刷新认证状态，
+  // 让路由守卫把用户带回登录页，避免各页面停留在 401 假崩溃状态。
+  void onAuthExpired() => ref.invalidate(authControllerProvider);
+  return smokeMode
+      ? SmokeApiClient(storage)
+      : ApiClient(storage, onAuthExpired: onAuthExpired);
 });
 
 class ApiFailure implements Exception {
@@ -30,6 +38,7 @@ class ApiFailure implements Exception {
     this.statusCode,
     this.retryAfterSeconds,
     this.requestId,
+    this.details,
   });
 
   final String code;
@@ -38,12 +47,25 @@ class ApiFailure implements Exception {
   final int? retryAfterSeconds;
   final String? requestId;
 
+  /// 后端 `error.details` 原样透传，供表单按 `fields[]` 高亮出错项。
+  final Map<String, dynamic>? details;
+
+  /// `error.details.fields` 规范化为 `[{path, code, message}]`。
+  List<Map<String, dynamic>> get fieldIssues {
+    final raw = details?['fields'];
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList(growable: false);
+  }
+
   @override
   String toString() => message;
 }
 
 class ApiClient {
-  ApiClient(this.storage, {String baseUrl = apiBaseUrl})
+  ApiClient(this.storage, {String baseUrl = apiBaseUrl, this.onAuthExpired})
     : dio = Dio(
         BaseOptions(
           baseUrl: baseUrl,
@@ -67,6 +89,7 @@ class ApiClient {
               storage.delete(key: sessionIdStorageKey),
               storage.delete(key: sessionExpiresAtStorageKey),
             ]);
+            onAuthExpired?.call();
           }
           handler.next(error);
         },
@@ -76,6 +99,7 @@ class ApiClient {
 
   final Dio dio;
   final FlutterSecureStorage storage;
+  final void Function()? onAuthExpired;
 
   Future<dynamic> get(
     String path, {
@@ -103,31 +127,27 @@ class ApiClient {
 
   Future<dynamic> upload(
     String path, {
-    required File file,
+    required Uint8List bytes,
+    required String filename,
     required String documentType,
   }) async {
     final data = FormData.fromMap({
       'document_type': documentType,
-      'file': await MultipartFile.fromFile(
-        file.path,
-        filename: file.uri.pathSegments.last,
-      ),
+      'file': MultipartFile.fromBytes(bytes, filename: filename),
     });
     return _request(() => dio.post(path, data: data));
   }
 
   Future<Map<String, dynamic>> recognizeOcr({
-    required File file,
+    required Uint8List bytes,
+    required String filename,
     required String materialType,
     required String promptVersion,
     required String consentVersion,
     required String idempotencyKey,
   }) async {
     final data = FormData.fromMap({
-      'file': await MultipartFile.fromFile(
-        file.path,
-        filename: file.uri.pathSegments.last,
-      ),
+      'file': MultipartFile.fromBytes(bytes, filename: filename),
       'material_type': materialType,
       'prompt_version': promptVersion,
     });
@@ -177,6 +197,12 @@ class ApiClient {
           _userMessage(code, null),
           statusCode: response.statusCode,
           requestId: requestId,
+          details:
+              apiError is Map
+                  ? Map<String, dynamic>.from(
+                    apiError['details'] as Map? ?? const {},
+                  )
+                  : null,
         );
       }
       if (body is Map && body.length == 1 && body.containsKey('data')) {
@@ -205,6 +231,9 @@ class ApiClient {
         statusCode: error.response?.statusCode,
         retryAfterSeconds: retryAfter,
         requestId: requestId,
+        details: Map<String, dynamic>.from(
+          apiError['details'] as Map? ?? const {},
+        ),
       );
     }
     return ApiFailure(
@@ -228,6 +257,19 @@ class ApiClient {
     'VALIDATION_ERROR' => '账号或密码格式不符合要求，请检查后重试',
     'AUTH_RATE_LIMITED' when retryAfter != null => '请求过于频繁，请在 $retryAfter 秒后重试',
     'AUTH_RATE_LIMITED' => '请求过于频繁，请稍后重试',
+    'CYCLE_DATE_ORDER_INVALID' => '经期开始日期不能晚于结束日期',
+    'CYCLE_DATE_OVERLAP' => '该日期与已有经期记录重叠，请先结束或修改已有记录',
+    'CYCLE_VERSION_CONFLICT' => '经期记录已在其他设备更新，请刷新后重试',
+    'CYCLE_NOT_FOUND' => '经期记录不存在，可能已被删除',
+    'OCR_NOT_CONFIGURED' => '识别服务未配置，请联系开发者',
+    'OCR_TIMEOUT' => '识别超时，请稍后重试',
+    'OCR_NETWORK_ERROR' => '识别服务网络异常，请稍后重试',
+    'OCR_FILE_INVALID' => '图片无法读取，请重新拍摄或选择更清晰的照片',
+    'OCR_RESPONSE_INVALID' => '识别结果解析失败，请重试',
+    'OCR_RESPONSE_TRUNCATED' => '报告内容较多，识别结果被截断，请重试或分段拍摄',
+    'OCR_HTTP_400' => '图片内容无法识别，请拍清楚一点后重试',
+    'OCR_HTTP_429' => '识别请求过于频繁，请稍后重试',
+    'OCR_CONFIRMATION_INVALID' => '报告中有项目未通过校验（如单位无法识别），请修正后重试',
     _ => '请求失败，请稍后重试',
   };
 }
@@ -255,8 +297,12 @@ class SmokeApiClient extends ApiClient {
     'health_goal': '整理复诊资料，并与医生高效沟通',
     'external_ocr_notice_accepted_at': '2026-08-27T00:00:00Z',
     'onboarding_completed': true,
+    'created_at': '2026-08-27T00:00:00Z',
     'updated_at': '2026-08-27T00:00:00Z',
   };
+  Map<String, dynamic>? _onboardingBasic;
+  Map<String, dynamic>? _onboardingCycle;
+  Map<String, dynamic>? _onboardingMedications;
   final List<Map<String, dynamic>> _weights = List.generate(7, (index) {
     const values = [71.3, 70.5, 71.0, 70.7, 69.9, 70.4, 70.0];
     final timestamp =
@@ -299,9 +345,24 @@ class SmokeApiClient extends ApiClient {
       'today_status': 'unrecorded',
     },
   ];
+  final Map<String, Map<String, String>> _dailyOverrides = {};
+  Future<List<Map<String, dynamic>>>? _datasetFuture;
+  int _datasetCursor = 0;
   int _nextId = 1;
 
   String _id(String prefix) => '$prefix-${_nextId++}';
+
+  String _now() => DateTime.now().toUtc().toIso8601String();
+
+  Map<String, dynamic> _onboardingDraft(String currentStep) => {
+    'id': 'smoke-onboarding',
+    'current_step': currentStep,
+    'basic': _onboardingBasic == null ? null : Map.of(_onboardingBasic!),
+    'cycle': _onboardingCycle == null ? null : Map.of(_onboardingCycle!),
+    'medications':
+        _onboardingMedications == null ? null : Map.of(_onboardingMedications!),
+    'updated_at': _now(),
+  };
 
   @override
   Future<dynamic> get(
@@ -315,6 +376,17 @@ class SmokeApiClient extends ApiClient {
         'onboarding_completed': true,
       };
     }
+    if (path == '/api/onboarding') {
+      final currentStep =
+          _onboardingMedications != null
+              ? 'complete'
+              : _onboardingCycle != null
+              ? 'medications'
+              : _onboardingBasic != null
+              ? 'cycle'
+              : 'basic';
+      return _onboardingDraft(currentStep);
+    }
     if (path == '/api/patient/profile') return Map.of(_profile);
     if (path == '/api/weights') return _copyList(_weights);
     if (path == '/api/cycles') return _copyList(_cycles);
@@ -326,6 +398,66 @@ class SmokeApiClient extends ApiClient {
         'next_cursor': null,
         'has_more': false,
       };
+    }
+    if (path == '/api/medication-catalog') {
+      final catalog =
+          jsonDecode(
+                await rootBundle.loadString(
+                  'assets/data/pomi_medications_v2.json',
+                ),
+              )
+              as Map<String, dynamic>;
+      return {
+        'version': catalog['version'],
+        'source': catalog['source'],
+        'disclaimer': catalog['disclaimer'],
+        'items': catalog['entries'],
+      };
+    }
+    if (path == '/api/medication-daily') {
+      final today = DateTime.now();
+      final from =
+          _parseDate(queryParameters?['from']) ??
+          DateTime(today.year, today.month, 1);
+      final to =
+          _parseDate(queryParameters?['to']) ??
+          DateTime(today.year, today.month, today.day);
+      final medicationId = queryParameters?['medication_id']?.toString();
+      final medications = _medications.where(
+        (item) =>
+            item['current_status'] == 'active' &&
+            (medicationId == null || item['id'] == medicationId),
+      );
+      final items = <Map<String, dynamic>>[];
+      for (final medication in medications) {
+        var date = DateTime(from.year, from.month, from.day);
+        final effectiveTo =
+            to.isAfter(DateTime(today.year, today.month, today.day))
+                ? DateTime(today.year, today.month, today.day)
+                : to;
+        while (!date.isAfter(effectiveTo)) {
+          final firstExpected = DateTime(today.year, today.month, 3);
+          if (date.isBefore(firstExpected)) {
+            date = date.add(const Duration(days: 1));
+            continue;
+          }
+          final dateValue = date.toIso8601String().substring(0, 10);
+          final status =
+              _dailyOverrides[medication['id']?.toString()]?[dateValue] ??
+              _seededDailyStatus(medication['id']?.toString(), date);
+          items.add({
+            'id': 'smoke-daily-${medication['id']}-$dateValue',
+            'medication_id': medication['id'],
+            'record_date': dateValue,
+            'intake_status': status,
+            'recorded_at':
+                status == 'unrecorded' ? null : '${dateValue}T08:00:00Z',
+            'editable': true,
+          });
+          date = date.add(const Duration(days: 1));
+        }
+      }
+      return items;
     }
     if (path == '/api/dashboard') {
       final today =
@@ -380,7 +512,8 @@ class SmokeApiClient extends ApiClient {
       };
     }
     if (path == '/api/documents') {
-      return {'items': <Map<String, dynamic>>[], 'total': 0};
+      final documents = await _datasetDocuments();
+      return {'items': documents, 'total': documents.length};
     }
     if (path == '/api/reports') {
       return {
@@ -427,6 +560,19 @@ class SmokeApiClient extends ApiClient {
         },
       };
     }
+    if (path == '/api/onboarding/complete') {
+      final updatedAt = _now();
+      _profile['onboarding_completed'] = true;
+      _profile['updated_at'] = updatedAt;
+      return {
+        'account': {
+          'uid': 'smoke-user',
+          'account_name': 'smoke',
+          'onboarding_completed': true,
+        },
+        'profile': Map.of(_profile),
+      };
+    }
     if (path == '/api/weights') {
       final item = {'id': _id('weight'), ...values};
       _weights.add(item);
@@ -460,6 +606,34 @@ class SmokeApiClient extends ApiClient {
     Map<String, String>? headers,
   }) async {
     final values = _map(data);
+    if (path == '/api/onboarding/steps/basic') {
+      final updatedAt = _now();
+      _onboardingBasic = {...values, 'updated_at': updatedAt};
+      _profile.addAll({
+        'nickname': values['nickname'],
+        'birth_year': values['birth_year'],
+        'diagnosis_year': values['diagnosis_year'],
+        'height_cm': values['height_cm'],
+        'updated_at': updatedAt,
+      });
+      return _onboardingDraft('cycle');
+    }
+    if (path == '/api/onboarding/steps/cycle') {
+      final updatedAt = _now();
+      _onboardingCycle = {...values, 'updated_at': updatedAt};
+      _profile.addAll({
+        'usual_cycle_min_days': values['usual_cycle_min_days'],
+        'usual_cycle_max_days': values['usual_cycle_max_days'],
+        'next_visit_date': values['next_visit_date'],
+        'updated_at': updatedAt,
+      });
+      return _onboardingDraft('medications');
+    }
+    if (path == '/api/onboarding/steps/medications') {
+      final updatedAt = _now();
+      _onboardingMedications = {...values, 'updated_at': updatedAt};
+      return _onboardingDraft('complete');
+    }
     if (path == '/api/patient/profile') {
       _profile.addAll(values);
       return Map.of(_profile);
@@ -469,16 +643,21 @@ class SmokeApiClient extends ApiClient {
     ).firstMatch(path);
     if (dailyStatus != null) {
       final id = dailyStatus.group(1);
+      final recordDate = values['record_date']?.toString();
+      final status = values['intake_status']?.toString() ?? 'unrecorded';
       final medicine =
           _medications.where((item) => item['id'] == id).firstOrNull;
       if (medicine != null) {
-        medicine['today_status'] = values['intake_status'] ?? 'unrecorded';
+        medicine['today_status'] = status;
+        if (id != null && recordDate != null && recordDate.isNotEmpty) {
+          (_dailyOverrides[id] ??= {})[recordDate] = status;
+        }
       }
       return {
         'id': _id('daily'),
         'medication_id': id,
-        'record_date': values['record_date'],
-        'intake_status': values['intake_status'] ?? 'unrecorded',
+        'record_date': recordDate,
+        'intake_status': status,
       };
     }
     return {'id': _id('smoke'), ...values};
@@ -493,44 +672,102 @@ class SmokeApiClient extends ApiClient {
     return null;
   }
 
+  DateTime? _parseDate(dynamic value) {
+    final raw = value?.toString();
+    if (raw == null || raw.isEmpty) return null;
+    final parsed = DateTime.tryParse(raw);
+    return parsed == null
+        ? null
+        : DateTime(parsed.year, parsed.month, parsed.day);
+  }
+
+  String _seededDailyStatus(String? medicationId, DateTime date) {
+    final today = DateTime.now();
+    final firstExpected = DateTime(today.year, today.month, 3);
+    if (date.isBefore(firstExpected)) return 'unrecorded';
+    final day = date.day;
+    return switch (medicationId) {
+      'smoke-medication-1' =>
+        day > 26
+            ? 'unrecorded'
+            : day == 8 || day == 19
+            ? 'missed'
+            : 'taken',
+      'smoke-medication-2' =>
+        day > 27
+            ? 'unrecorded'
+            : day == 11
+            ? 'missed'
+            : 'taken',
+      'smoke-medication-3' => day == 15 ? 'missed' : 'taken',
+      _ => 'unrecorded',
+    };
+  }
+
   @override
   Future<dynamic> upload(
     String path, {
-    required File file,
+    required Uint8List bytes,
+    required String filename,
     required String documentType,
   }) async => {
     'id': _id('document'),
     'document_type': documentType,
-    'original_file_name': file.uri.pathSegments.last,
+    'original_file_name': filename,
   };
 
   @override
   Future<Map<String, dynamic>> recognizeOcr({
-    required File file,
+    required Uint8List bytes,
+    required String filename,
     required String materialType,
     required String promptVersion,
     required String consentVersion,
     required String idempotencyKey,
-  }) async => {
-    'ocr_task_id': 'smoke-ocr',
-    'ocr_result_id': 'smoke-result',
-    'document_id': 'smoke-document',
-    'document_revision_id': 'smoke-revision',
-    'material_type': materialType,
-    'status': 'pending_confirmation',
-    'result_source': 'smoke',
-    'hospital': '演示医院',
-    'department': '妇科',
-    'visit_date': DateTime.now().toIso8601String().substring(0, 10),
-    'diagnosis_summary': '多囊卵巢综合征',
-    'medical_advice': '请携带原件与医生复核。',
-    'examinations': <Map<String, dynamic>>[],
-    'medication_suggestions': <Map<String, dynamic>>[],
-    'original_file_name': file.uri.pathSegments.last,
-  };
+  }) async {
+    final documents = await _datasetDocuments();
+    final matching = documents
+        .where((item) => item['document_type'] == materialType)
+        .toList(growable: false);
+    final source =
+        matching.isEmpty
+            ? documents[_datasetCursor++ % documents.length]
+            : matching[_datasetCursor++ % matching.length];
+    return {
+      'ocr_task_id': 'smoke-ocr',
+      'ocr_result_id': 'smoke-result-${source['id']}',
+      'document_id': source['id'],
+      'document_revision_id': source['current_revision_id'],
+      'material_type': materialType,
+      'status': 'pending_confirmation',
+      'result_source': 'smoke-dataset',
+      'hospital': source['hospital'],
+      'department': source['department'],
+      'visit_date': source['visit_date'],
+      'diagnosis_summary': source['diagnosis_summary'],
+      'medical_advice': source['medical_advice'],
+      'examinations': source['examinations'],
+      'medication_suggestions': source['medication_suggestions'],
+      'original_file_name': filename,
+      'dataset_source_file': source['dataset_json_asset'],
+    };
+  }
 
   @override
-  Future<List<int>> download(String path) async => <int>[];
+  Future<List<int>> download(String path) async {
+    final match = RegExp(
+      r'^/api/documents/([^/]+)/revisions/[^/]+/file$',
+    ).firstMatch(path);
+    if (match == null) return <int>[];
+    final documentId = match.group(1);
+    final documents = await _datasetDocuments();
+    final document =
+        documents.where((item) => item['id'] == documentId).firstOrNull;
+    final asset = document?['dataset_image_asset']?.toString();
+    if (asset == null || asset.isEmpty) return <int>[];
+    final data = await rootBundle.load(asset);
+    return data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+  }
 
   static Map<String, dynamic> _map(Object? value) {
     if (value is Map<String, dynamic>) return Map.of(value);
@@ -543,4 +780,23 @@ class SmokeApiClient extends ApiClient {
   static List<Map<String, dynamic>> _copyList(
     List<Map<String, dynamic>> values,
   ) => values.map(Map<String, dynamic>.of).toList();
+
+  Future<List<Map<String, dynamic>>> _datasetDocuments() async {
+    final loaded = await (_datasetFuture ??= loadSmokeDataset());
+    final documents =
+        loaded
+            .map(
+              (item) => smokeDatasetDocument(
+                item,
+                item['_dataset_json_asset']!.toString(),
+              ),
+            )
+            .toList();
+    documents.sort((a, b) {
+      final aDate = a['visit_date']?.toString() ?? '';
+      final bDate = b['visit_date']?.toString() ?? '';
+      return bDate.compareTo(aDate);
+    });
+    return documents;
+  }
 }
