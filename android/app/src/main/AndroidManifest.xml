@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Release/production builds talk to the deployed HTTPS API. Debug and
+         profile manifests declare this too (for the Flutter tooling); the
+         release manifest needs it in its own right or every request fails. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="POMI"
         android:name="${applicationName}"
