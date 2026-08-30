@@ -6,6 +6,23 @@ FastAPI and SQLite backend in the same repository. See
 security rules, and [`docs/ui-guidelines.md`](docs/ui-guidelines.md) for Flutter
 visual and layout rules.
 
+## POMI
+
+**把散落的检查单，变成医生敢直接看的一页报告**
+
+首款 AI + 区块链的女性多囊患者健康管理工具：把散落各家医院的检查单、医嘱、病历，自动整理成一份符合循证医学规范、医生愿意直接采信的复诊存证报告。不诊断、不荐药、不替代医生。
+
+<p align="center">
+  <img src="docs/images/pomi-landing-page.png" alt="POMI 产品首页" width="100%" />
+</p>
+
+<p align="center">
+  <img src="docs/images/pomi-app-dashboard.png" alt="POMI 移动端首页与用药看板" width="46%" />
+  <img src="docs/images/pomi-fpg-trend.png" alt="POMI 空腹血糖趋势界面" width="46%" />
+</p>
+
+核心体验包括：拍照或上传医疗资料、OCR 后确认入库、指标趋势追踪、用药记录，以及可分享的医生版就诊报告。
+
 ## Repository layout
 
 - `lib/`: Flutter application code
